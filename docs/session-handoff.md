@@ -67,11 +67,11 @@ still on JSON store.
 - Node 24 type-strips TS scripts; `@/…` aliases don't resolve in `scripts/*`.
 
 ### Next likely steps
-1. **Review Phase 0**, then start **Phase 1 — Auth.js + workspaces**
-   (`docs/commercialization.md`). RLS is not used (D1/SQLite); workspace
-   isolation is enforced in the service layer.
+1. **Run the full commercial build in one pass** (Phases 1–4 combined) using
+   the prompt in `docs/commercialization.md`. Do it in a new chat with Opus 4.8.
+   Read `session-handoff.md` + `constitution.md` first (AGENTS.md rule).
 2. Search quality Tier 1: structured extraction + email verification
-   (`docs/search-and-enrichment.md`).
+   (`docs/search-and-enrichment.md`) — after commercialization lands.
 
 ---
 
