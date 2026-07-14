@@ -1,0 +1,45 @@
+# Decisions & Learnings
+
+This folder is the project's **memory**. Two kinds of entries:
+
+- **ADRs (Architecture Decision Records)** — numbered files (`NNNN-title.md`) for
+  significant decisions with alternatives and consequences. Add one whenever you
+  make a choice a future contributor might otherwise re-litigate.
+- **[`LEARNINGS.md`](LEARNINGS.md)** — a running, dated log of smaller discoveries
+  ("this API returns X", "this tool has quirk Y"). Append; don't rewrite history.
+
+## When to add what
+
+| Situation | Where |
+| --- | --- |
+| Chose a library/pattern/provider over alternatives | New ADR |
+| Reversed or amended a past decision | New ADR that supersedes the old one |
+| Discovered a gotcha, quirk, or non-obvious fact | `LEARNINGS.md` entry |
+| Changed a product invariant | Amend `../constitution.md` + ADR |
+
+## ADR template
+
+```md
+# NNNN. <Title>
+- Status: proposed | accepted | superseded by NNNN
+- Date: YYYY-MM-DD
+
+## Context
+What forces are at play?
+
+## Decision
+What we chose.
+
+## Alternatives considered
+Options + why not.
+
+## Consequences
+Trade-offs, follow-ups, what this makes easy/hard.
+```
+
+## Index
+
+- [0001 — Local JSON file DB behind a repository interface](0001-json-file-db.md)
+- [0002 — Provider-agnostic search & email with demo fallback](0002-provider-agnostic-integrations.md)
+- [0003 — Supabase for auth + database](0003-supabase-auth-and-db.md)
+- [0004 — Cloudflare Workers via @opennextjs/cloudflare as the deploy target](0004-cloudflare-opennext-deploy.md)

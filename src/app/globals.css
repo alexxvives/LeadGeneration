@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+/*
+  Lodestar design system.
+  Brand story: a lodestar is the star you navigate by — here, your best-fit
+  customers. Palette is deep "ink" night sky + aurora teal/green + warm amber,
+  deliberately avoiding purple-on-white and cream+terracotta clichés.
+*/
+
+@theme {
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+
+  /* Ink (background scale) */
+  --color-ink-950: #060a12;
+  --color-ink-900: #0a1120;
+  --color-ink-850: #0e1729;
+  --color-ink-800: #131f34;
+  --color-ink-700: #1c2b45;
+  --color-ink-600: #293c5c;
+
+  /* Aurora (primary accent) */
+  --color-aurora-300: #7ff2c8;
+  --color-aurora-400: #43e0a8;
+  --color-aurora-500: #16c390;
+  --color-aurora-600: #0e9d74;
+
+  /* Amber (secondary accent / warmth) */
+  --color-amber-300: #ffd48a;
+  --color-amber-400: #f7b955;
+  --color-amber-500: #eb9d2f;
+
+  /* Neutral text on ink */
+  --color-mist-100: #eaf1fb;
+  --color-mist-300: #b6c4dc;
+  --color-mist-500: #7f92b3;
+
+  --radius-xl2: 1.25rem;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--color-ink-950);
+    color: var(--color-mist-100);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--color-aurora-400);
+    color: var(--color-ink-950);
+  }
+  /* Custom scrollbar for the dark theme */
+  * {
+    scrollbar-color: var(--color-ink-600) transparent;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  /* Soft aurora glow used behind hero + brand marks */
+  .aurora-glow {
+    background:
+      radial-gradient(60% 60% at 20% 20%, rgba(67, 224, 168, 0.22), transparent 70%),
+      radial-gradient(50% 50% at 85% 15%, rgba(247, 185, 85, 0.16), transparent 70%),
+      radial-gradient(70% 70% at 60% 100%, rgba(22, 195, 144, 0.15), transparent 70%);
+  }
+  .glass {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06),
+      rgba(255, 255, 255, 0.02)
+    );
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .card-hover {
+    transition:
+      transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 50px -20px rgba(22, 195, 144, 0.35);
+  }
+  @keyframes float-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-float-up {
+    animation: float-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 25%,
+      rgba(255, 255, 255, 0.1) 37%,
+      rgba(255, 255, 255, 0.04) 63%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+  @keyframes pulse-ring {
+    0% {
+      box-shadow: 0 0 0 0 rgba(67, 224, 168, 0.4);
+    }
+    70% {
+      box-shadow: 0 0 0 10px rgba(67, 224, 168, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(67, 224, 168, 0);
+    }
+  }
+  .pulse-ring {
+    animation: pulse-ring 2s infinite;
+  }
+}
