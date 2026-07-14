@@ -99,3 +99,20 @@ Out of scope: Stripe live deploy, LLM drafting, contact-form automation.
 - Don’t chase Fable / 21st.dev for polish before Phase B quality.
 - Don’t store SMTP passwords in the UI.
 - Don’t break demo mode.
+
+---
+
+## Standing UX audit prompt
+
+Paste this when you want another Pipeline / table / map polish pass:
+
+```
+Audit /app?view=pipeline (and the leads table + map below it) against
+.cursor/skills/lodestar-ui/SKILL.md and docs/constitution.md Art. IV.
+
+List 8–12 concrete UX fixes ranked by user friction. Prefer layout/hierarchy
+over new features. Cite component file paths. Do not redesign the brand.
+
+Use Playwright and/or chrome-devtools MCP on http://127.0.0.1:3000 to observe
+overflow, cramped cards, and status wrapping — don’t guess.
+```

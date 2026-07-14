@@ -14,7 +14,7 @@ export function StatusPill({ status }: { status: LeadStatus | OutreachStatus }) 
   const s = STATUS_STYLES[status] ?? STATUS_STYLES.new;
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${s.cls}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${s.cls}`}
     >
       {s.label}
     </span>

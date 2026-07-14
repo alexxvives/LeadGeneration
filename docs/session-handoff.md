@@ -9,10 +9,10 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-14 (auth fix, Studio split, docs sync, lockfile)
+## ⏱️ Status — updated 2026-07-14 (Pipeline UX polish + DevTools MCP + lockfile regen)
 
-**Stage:** CRM Pipeline working. Studio UI modularized. Docs synced to Search /
-Pipeline product shape. Commercial code complete; deploy remains.
+**Stage:** CRM Pipeline polished (column actions, collapsible lost, table/map).
+`chrome-devtools-mcp` wired in Cursor. Lockfile regenerated for CF `npm ci`.
 
 **Works today (local, zero keys):** Search → Enrich → Draft → Approve → Send.
 Sidebar: **Search, Pipeline, Runs, Settings.**
@@ -21,34 +21,28 @@ Auth/metering OFF until `AUTH_SECRET` is set.
 **Live keys** (`.env.local`): Firecrawl, Resend. SMTP/Stripe/Turnstile/D1 not yet.
 
 ### Recently done (this session)
-- **Auth MissingAdapter fix.** Email/magic-link providers (Resend, Nodemailer)
-  live only in `src/auth.ts` when a D1 adapter exists. Edge `auth.config.ts`
-  keeps Credentials (dev) only — middleware no longer logs MissingAdapter when
-  `RESEND_API_KEY` is set locally.
-- **`package-lock.json` synced** for `@dnd-kit/*` + `leaflet` (unblocks Cloudflare
-  `npm ci`).
-- **Studio split:** `PipelineView.tsx`, `RunsView.tsx`, `StudioHelpers.tsx`;
-  `Studio.tsx` ~420 lines orchestrator. Deleted dead `AccountMenu.tsx`.
-- **Docs synced:** `how-it-works` screens/flow, AGENTS/README maps (migrations
-  0001–0006), commercialization, ADR 0007, roadmap Phase A, handoff.
-- Docs review: kept all ADRs (incl. superseded 0003); kept business-plan vs
-  commercialization as separate strategy vs build docs — no merges needed.
+- **chrome-devtools-mcp** added to `~/.cursor/mcp.json` — reload MCP in Cursor.
+- **Pipeline UX:** Draft/Approve all in New header; Send all in Contacted;
+  Not Interested collapsed by default (4-column main grid); droppable when closed.
+- **Lead table:** phone under email; StatusPill nowrap (“In review”); Subject
+  column removed.
+- **Map pins** colored by `crmStage` + legend.
+- **`package-lock.json` regenerated** (dnd-kit + leaflet present) — retrigger CF
+  build on this commit if prior log was from before `0bbcef9`.
 
 ### In flight / next
-- **Deploy path** (D1/SMTP/Stripe): `npm run cf:migrate` (through 0006) then
-  `npm run cf:deploy`.
-- **Phase C** — bulk polish already partly in Pipeline; saved ICPs, reply stubs.
+- **Deploy:** clear CF dependency cache if `npm ci` still fails after this push;
+  then `cf:migrate` + `cf:deploy`.
+- Phase C / more UX via standing audit prompt in `docs/roadmap-next.md`.
 
 ### Known issues / gotchas
-- **`npm run smoke` crashes on Windows** (native libuv abort on 2nd `fetch`).
-  Prefer Playwright/browser; Chrome DevTools MCP / agent skills are useful for
-  UI debugging (see LEARNINGS).
-- Dev server recompiles can briefly return HTML to API calls mid-edit; retry.
+- **`npm run smoke` crashes on Windows** — prefer Playwright / chrome-devtools.
 - PowerShell: use `;` not `&&`.
+- After MCP config change: Cursor → Settings → MCP → refresh/reload servers.
 
 ### Next likely steps
-1. Deploy + live-verify commercial path.
-2. Or continue Phase C from `docs/roadmap-next.md`.
+1. Confirm Cloudflare build on this commit succeeds.
+2. Deploy + live-verify, or paste the UX audit prompt for another polish round.
 
 ---
 

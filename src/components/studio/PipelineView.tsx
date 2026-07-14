@@ -18,12 +18,12 @@ import { ArrowIcon, CheckIcon, SparkIcon, MailIcon, PhoneIcon, FormIcon } from "
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
 
-const CRM_COLUMNS: {
+const MAIN_COLUMNS: {
   stage: CrmStage;
   title: string;
   hint: string;
   empty: string;
-  color: string; // dot colour class
+  color: string;
 }[] = [
   {
     stage: "new",
@@ -53,16 +53,18 @@ const CRM_COLUMNS: {
     empty: "Move here when you close the deal.",
     color: "bg-aurora-300",
   },
-  {
-    stage: "not_interested",
-    title: "Not Interested",
-    hint: "Lost",
-    empty: "Move here when they decline.",
-    color: "bg-rose-400",
-  },
 ];
 
-// Email-workflow status badge inside a pipeline card.
+const NOT_INTERESTED_COL = {
+  stage: "not_interested" as const,
+  title: "Not Interested",
+  hint: "Lost",
+  empty: "Move here when they decline.",
+  color: "bg-rose-400",
+};
+
+const ALL_COLUMNS = [...MAIN_COLUMNS, NOT_INTERESTED_COL];
+
 const EMAIL_STATUS_BADGE: Record<string, { label: string; cls: string } | undefined> = {
   queued:   { label: "Draft ready", cls: "bg-amber-400/15 text-amber-300" },
   approved: { label: "Approved",    cls: "bg-aurora-400/15 text-aurora-300" },
@@ -70,7 +72,6 @@ const EMAIL_STATUS_BADGE: Record<string, { label: string; cls: string } | undefi
   failed:   { label: "Failed",      cls: "bg-rose-500/15 text-rose-300" },
 };
 
-// Next CRM stage for the quick-advance button on each card.
 const NEXT_CRM_STAGE: Partial<Record<CrmStage, CrmStage>> = {
   new: "contacted",
   contacted: "in_conversation",
@@ -102,10 +103,11 @@ export function PipelineView({
   const [draftingAll, setDraftingAll] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [lostOpen, setLostOpen] = useState(false);
 
-  // Leads with a draft ready for review (lead status "queued" = draft written, awaiting approval).
   const queuedLeads = leads.filter((l) => l.status === "queued" && l.outreach);
   const undraftedLeads = leads.filter((l) => l.status === "new" && !l.outreach && l.emails.length > 0);
+  const lostLeads = leads.filter((l) => l.crmStage === "not_interested");
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -125,6 +127,7 @@ export function PipelineView({
     const newStage = over.id as CrmStage;
     if (!lead || lead.crmStage === newStage) return;
     onMoveStage(String(active.id), newStage);
+    if (newStage === "not_interested" && !lostOpen) setLostOpen(true);
   }
 
   const sendAllApproved = async () => {
@@ -149,66 +152,59 @@ export function PipelineView({
     setApprovingAll(false);
   };
 
-  // Collect all active bulk actions to show in one bar.
-  const bulkActions: React.ReactNode[] = [];
-  if (undraftedLeads.length > 0) {
-    bulkActions.push(
+  const newHeaderActions = (
+    <>
+      {undraftedLeads.length > 0 && (
+        <button
+          type="button"
+          onClick={draftAll}
+          disabled={draftingAll}
+          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100 disabled:opacity-50"
+        >
+          {draftingAll ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3 w-3 text-aurora-300" />}
+          Draft all ({undraftedLeads.length})
+        </button>
+      )}
+      {queuedLeads.length > 0 && (
+        <button
+          type="button"
+          onClick={approveAll}
+          disabled={approvingAll}
+          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100 disabled:opacity-50"
+        >
+          {approvingAll ? <Spinner className="h-3 w-3" /> : <CheckIcon className="h-3 w-3 text-aurora-300" />}
+          Approve all ({queuedLeads.length})
+        </button>
+      )}
+    </>
+  );
+
+  const contactedHeaderActions =
+    approvedLeads.length > 0 ? (
       <button
-        key="draft-all"
-        onClick={draftAll}
-        disabled={draftingAll}
-        className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-mist-100 transition-colors hover:bg-white/5 disabled:opacity-50"
-      >
-        {draftingAll ? <Spinner className="h-3.5 w-3.5" /> : <SparkIcon className="h-3.5 w-3.5 text-aurora-300" />}
-        Draft all ({undraftedLeads.length})
-      </button>,
-    );
-  }
-  if (queuedLeads.length > 0) {
-    bulkActions.push(
-      <button
-        key="approve-all"
-        onClick={approveAll}
-        disabled={approvingAll}
-        className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-mist-100 transition-colors hover:bg-white/5 disabled:opacity-50"
-      >
-        {approvingAll ? <Spinner className="h-3.5 w-3.5" /> : <CheckIcon className="h-3.5 w-3.5 text-aurora-300" />}
-        Approve all drafts ({queuedLeads.length})
-      </button>,
-    );
-  }
-  if (approvedLeads.length > 0) {
-    bulkActions.push(
-      <button
-        key="send-all"
+        type="button"
         onClick={sendAllApproved}
         disabled={sendingAll}
-        className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
+        className="inline-flex items-center gap-1 rounded-md bg-aurora-400/15 px-1.5 py-0.5 text-[11px] font-medium text-aurora-300 transition-colors hover:bg-aurora-400/25 disabled:opacity-50"
       >
-        {sendingAll ? <Spinner className="h-3.5 w-3.5" /> : <ArrowIcon className="h-3.5 w-3.5" />}
+        {sendingAll ? <Spinner className="h-3 w-3" /> : <ArrowIcon className="h-3 w-3" />}
         {canSend ? `Send all (${approvedLeads.length})` : `Send demo (${approvedLeads.length})`}
-      </button>,
-    );
-  }
+      </button>
+    ) : null;
 
   return (
     <div className="space-y-4">
-      {/* Bulk-action bar — only shown when there's something to do */}
-      {bulkActions.length > 0 && (
-        <div className="glass flex flex-wrap items-center justify-end gap-2 rounded-xl2 p-3">
-          <p className="mr-auto text-xs text-mist-500">Bulk actions</p>
-          {bulkActions}
-        </div>
-      )}
-
       <p className="text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
         {leads.length === 1 ? "" : "s"} · drag to move between stages
       </p>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${CRM_COLUMNS.length}, minmax(0, 1fr))` }}>
-          {CRM_COLUMNS.map((col) => {
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(0, 1fr))` }}
+        >
+          {MAIN_COLUMNS.map((col) => {
             const colLeads = leads.filter((l) => l.crmStage === col.stage);
             return (
               <PipelineColumn
@@ -218,10 +214,26 @@ export function PipelineView({
                 onOpen={onOpen}
                 onMoveStage={onMoveStage}
                 activeId={activeId}
+                headerActions={
+                  col.stage === "new"
+                    ? newHeaderActions
+                    : col.stage === "contacted"
+                      ? contactedHeaderActions
+                      : null
+                }
               />
             );
           })}
         </div>
+
+        <NotInterestedSection
+          open={lostOpen}
+          onToggle={() => setLostOpen((o) => !o)}
+          leads={lostLeads}
+          onOpen={onOpen}
+          onMoveStage={onMoveStage}
+          activeId={activeId}
+        />
 
         <DragOverlay>
           {activeLead ? (
@@ -244,12 +256,14 @@ function PipelineColumn({
   onOpen,
   onMoveStage,
   activeId,
+  headerActions,
 }: {
-  col: (typeof CRM_COLUMNS)[number];
+  col: (typeof MAIN_COLUMNS)[number] | typeof NOT_INTERESTED_COL;
   leads: LeadWithOutreach[];
   onOpen: (id: string) => void;
   onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
+  headerActions?: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.stage });
   return (
@@ -259,15 +273,18 @@ function PipelineColumn({
         isOver ? "border-aurora-400/40 bg-aurora-400/5" : "border-white/10 bg-ink-950/40"
       }`}
     >
-      <div className="border-b border-white/5 px-4 py-3">
+      <div className="border-b border-white/5 px-3 py-3 sm:px-4">
         <div className="flex items-baseline justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${col.color}`} />
-            <h3 className="text-sm font-semibold text-mist-100">{col.title}</h3>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
+            <h3 className="truncate text-sm font-semibold text-mist-100">{col.title}</h3>
           </div>
           <span className="font-display text-lg tabular-nums text-aurora-300">{leads.length}</span>
         </div>
         <p className="mt-0.5 text-[11px] text-mist-500">{col.hint}</p>
+        {headerActions && (
+          <div className="mt-2 flex flex-wrap items-center gap-1">{headerActions}</div>
+        )}
       </div>
       <div className="flex max-h-[min(60vh,520px)] flex-col gap-2 overflow-y-auto p-3">
         {leads.length === 0 ? (
@@ -290,6 +307,74 @@ function PipelineColumn({
   );
 }
 
+function NotInterestedSection({
+  open,
+  onToggle,
+  leads,
+  onOpen,
+  onMoveStage,
+  activeId,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  leads: LeadWithOutreach[];
+  onOpen: (id: string) => void;
+  onMoveStage: (leadId: string, stage: CrmStage) => void;
+  activeId: string | null;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: "not_interested" });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`rounded-xl2 border transition-colors ${
+        isOver ? "border-rose-400/40 bg-rose-400/5" : "border-white/10 bg-ink-950/30"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/5"
+        aria-expanded={open}
+      >
+        <span className={`h-2 w-2 rounded-full ${NOT_INTERESTED_COL.color}`} />
+        <span className="text-sm font-semibold text-mist-100">{NOT_INTERESTED_COL.title}</span>
+        <span className="font-display text-base tabular-nums text-mist-400">{leads.length}</span>
+        <span className="ml-auto text-xs text-mist-500">
+          {open ? "Hide" : "Show"} · drop here to park
+        </span>
+        <svg
+          viewBox="0 0 12 12"
+          className={`h-3 w-3 text-mist-500 transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        >
+          <path fill="currentColor" d="M2.5 4.5L6 8l3.5-3.5H2.5z" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="border-t border-white/5 p-3">
+          {leads.length === 0 ? (
+            <p className="px-2 py-4 text-center text-xs text-mist-500">{NOT_INTERESTED_COL.empty}</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {leads.map((l) => (
+                <DraggablePipelineCard
+                  key={l.id}
+                  lead={l}
+                  onOpen={onOpen}
+                  onMoveStage={onMoveStage}
+                  isDragging={l.id === activeId}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DraggablePipelineCard({
   lead,
   onOpen,
@@ -305,8 +390,6 @@ function DraggablePipelineCard({
   const emailBadge = lead.outreach ? EMAIL_STATUS_BADGE[lead.outreach.status] : undefined;
   const pendingFollowUps = lead.followUps?.filter((f) => !f.done).length ?? 0;
   const nextStage = lead.crmStage ? NEXT_CRM_STAGE[lead.crmStage] : undefined;
-
-  // Subtitle: category tag only (no location — keeps cards readable).
   const subtitle = lead.tags[0] ?? lead.emails[0] ?? lead.website ?? null;
 
   return (
@@ -318,7 +401,6 @@ function DraggablePipelineCard({
       {...attributes}
     >
       <div className="flex items-start gap-0.5">
-        {/* Drag grip */}
         <button
           {...listeners}
           className="cursor-grab touch-none px-1.5 py-3 text-mist-500 hover:text-mist-300 active:cursor-grabbing"
@@ -333,11 +415,10 @@ function DraggablePipelineCard({
           </svg>
         </button>
 
-        {/* Card body — click to open drawer */}
         <button
           type="button"
           onClick={() => onOpen(lead.id)}
-          className="min-w-0 flex-1 py-3 text-left transition-colors hover:bg-white/5 rounded-r-xl"
+          className="min-w-0 flex-1 rounded-r-xl py-3 text-left transition-colors hover:bg-white/5"
         >
           <p className="truncate text-sm font-medium text-mist-100">{lead.company}</p>
           {subtitle && (
@@ -373,13 +454,12 @@ function DraggablePipelineCard({
           </div>
         </button>
 
-        {/* Quick-advance button — appears on hover, moves to next stage */}
         {nextStage && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onMoveStage(lead.id, nextStage); }}
-            title={`Move to ${CRM_COLUMNS.find((c) => c.stage === nextStage)?.title ?? nextStage}`}
-            className="self-center mr-2 rounded-md p-1 text-mist-600 opacity-0 transition-all hover:bg-white/10 hover:text-aurora-300 group-hover:opacity-100"
+            title={`Move to ${ALL_COLUMNS.find((c) => c.stage === nextStage)?.title ?? nextStage}`}
+            className="mr-2 self-center rounded-md p-1 text-mist-600 opacity-0 transition-all hover:bg-white/10 hover:text-aurora-300 group-hover:opacity-100"
           >
             <ArrowIcon className="h-3.5 w-3.5" />
           </button>

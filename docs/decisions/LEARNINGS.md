@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-14 — Pipeline UX polish + chrome-devtools MCP
+- **chrome-devtools-mcp** wired in `~/.cursor/mcp.json` (`npx -y chrome-devtools-mcp@latest`).
+  Use it for live DOM/layout/network/memory debugging; keep Playwright for
+  scripted smoke. Reload MCP servers in Cursor after config changes.
+- **Pipeline bulk actions are column-local:** Draft/Approve on New; Send on
+  Contacted. Global bulk bar removed — actions sit next to the work.
+- **Not Interested collapses by default** so the main kanban is 4 equal columns
+  (more card width). Droppable target still accepts drags when collapsed.
+- **Map pins colored by `crmStage`** (mist/amber/aurora/aurora-light/rose) with
+  a small legend — same palette as Pipeline column dots.
+
 ### 2026-07-14 — Auth edge split, lockfile, Studio modularize, docs hygiene
 - **Email providers must not live in `auth.config.ts`.** Auth.js asserts an
   adapter whenever an email/magic-link provider is registered. Middleware uses

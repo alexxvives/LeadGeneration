@@ -12,11 +12,29 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { LeadWithOutreach } from "@/lib/types";
+import type { CrmStage, LeadWithOutreach } from "@/lib/types";
 import { api } from "@/lib/client-api";
 import { Spinner } from "@/components/ui";
 
 type Coords = { lat: number; lng: number };
+type Pin = { id: string; company: string; coords: Coords; crmStage: CrmStage };
+
+/** Hex colors aligned with Pipeline column dots. */
+const STAGE_PIN: Record<CrmStage, { fill: string; glow: string; label: string }> = {
+  new: { fill: "#7f92b3", glow: "rgba(127,146,179,0.35)", label: "New" },
+  contacted: { fill: "#f7b955", glow: "rgba(247,185,85,0.4)", label: "Contacted" },
+  in_conversation: { fill: "#43e0a8", glow: "rgba(67,224,168,0.4)", label: "In Conversation" },
+  closed: { fill: "#7ff2c8", glow: "rgba(127,242,200,0.45)", label: "Closed" },
+  not_interested: { fill: "#fb7185", glow: "rgba(251,113,133,0.4)", label: "Not Interested" },
+};
+
+const LEGEND_ORDER: CrmStage[] = [
+  "new",
+  "contacted",
+  "in_conversation",
+  "closed",
+  "not_interested",
+];
 
 const geocodeCache = new Map<string, Coords | null>();
 const geocodeInflight = new Map<string, Promise<Coords | null>>();
@@ -62,6 +80,11 @@ function ensureLeafletCss() {
   document.head.appendChild(link);
 }
 
+function pinIconHtml(stage: CrmStage): string {
+  const c = STAGE_PIN[stage] ?? STAGE_PIN.new;
+  return `<span style="display:block;width:14px;height:14px;border-radius:9999px;background:${c.fill};box-shadow:0 0 0 4px ${c.glow};border:2px solid #060a12"></span>`;
+}
+
 export function LeadMap({
   leads,
   locationHint,
@@ -80,7 +103,7 @@ export function LeadMap({
 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pins, setPins] = useState<{ id: string; company: string; coords: Coords }[]>([]);
+  const [pins, setPins] = useState<Pin[]>([]);
   const [loadingPins, setLoadingPins] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
 
@@ -90,7 +113,7 @@ export function LeadMap({
   );
 
   const leadKey = useMemo(
-    () => leads.map((l) => `${l.id}:${l.location ?? ""}`).join("|"),
+    () => leads.map((l) => `${l.id}:${l.location ?? ""}:${l.crmStage ?? "new"}`).join("|"),
     [leads],
   );
 
@@ -114,7 +137,7 @@ export function LeadMap({
       );
       if (cancelled) return;
 
-      const next: { id: string; company: string; coords: Coords }[] = [];
+      const next: Pin[] = [];
       for (const l of leads) {
         const loc = (l.location?.trim() || hint).trim();
         let coords = loc ? resolved.get(loc) ?? null : null;
@@ -125,7 +148,14 @@ export function LeadMap({
           const j = jitter(l.id || l.company, 0.02);
           coords = { lat: coords.lat + j.dLat, lng: coords.lng + j.dLng };
         }
-        if (coords) next.push({ id: l.id, company: l.company, coords });
+        if (coords) {
+          next.push({
+            id: l.id,
+            company: l.company,
+            coords,
+            crmStage: l.crmStage ?? "new",
+          });
+        }
       }
 
       if (cancelled) return;
@@ -172,7 +202,6 @@ export function LeadMap({
           attributionControl: true,
         }).setView([20, 0], 2);
 
-        // OSM tiles as primary — Carto CDN sometimes blocked; dark theme via filter on container.
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution:
             '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -230,17 +259,20 @@ export function LeadMap({
       if (cancelled || !markersRef.current || !mapRef.current) return;
       markersRef.current.clearLayers();
 
-      const icon = L.divIcon({
-        className: "lodestar-map-pin",
-        html: `<span style="display:block;width:14px;height:14px;border-radius:9999px;background:#43e0a8;box-shadow:0 0 0 4px rgba(67,224,168,0.35);border:2px solid #060a12"></span>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
-      });
-
       const latLngs: import("leaflet").LatLngExpression[] = [];
       for (const pin of pins) {
+        const icon = L.divIcon({
+          className: "lodestar-map-pin",
+          html: pinIconHtml(pin.crmStage),
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        });
         const marker = L.marker([pin.coords.lat, pin.coords.lng], { icon });
-        marker.bindTooltip(pin.company, { direction: "top", offset: [0, -8] });
+        const stageLabel = STAGE_PIN[pin.crmStage]?.label ?? pin.crmStage;
+        marker.bindTooltip(`${pin.company} · ${stageLabel}`, {
+          direction: "top",
+          offset: [0, -8],
+        });
         marker.on("click", () => onOpenRef.current(pin.id));
         markersRef.current.addLayer(marker);
         latLngs.push([pin.coords.lat, pin.coords.lng]);
@@ -263,34 +295,53 @@ export function LeadMap({
   }, [pins, ready]);
 
   return (
-    <div
-      ref={wrapRef}
-      className="relative overflow-hidden rounded-xl2 border border-white/10 bg-ink-900"
-      data-testid="lead-map"
-    >
+    <div className="space-y-3">
       <div
-        ref={mapElRef}
-        className="h-[min(70vh,560px)] w-full [&_.leaflet-tile-pane]:brightness-[0.72] [&_.leaflet-tile-pane]:contrast-[1.05] [&_.leaflet-tile-pane]:saturate-[0.85]"
-        style={{ minHeight: 360 }}
-      />
-      {(!ready || loadingPins) && !initError && (
-        <div className="absolute inset-0 z-[500] grid place-items-center bg-ink-900/70">
-          <Spinner className="h-7 w-7 text-aurora-400" />
-        </div>
-      )}
-      {(error || initError) && (
-        <div className="absolute bottom-4 left-4 right-4 z-[500] rounded-lg border border-amber-400/20 bg-ink-950/90 px-4 py-3 text-sm text-amber-200/90 backdrop-blur">
-          {initError ?? error}
-        </div>
-      )}
-      {ready && !error && !initError && pins.length > 0 && (
+        ref={wrapRef}
+        className="relative overflow-hidden rounded-xl2 border border-white/10 bg-ink-900"
+        data-testid="lead-map"
+      >
         <div
-          className="pointer-events-none absolute left-4 top-4 z-[500] rounded-full border border-white/10 bg-ink-950/80 px-3 py-1.5 text-xs text-mist-300 backdrop-blur"
-          data-testid="map-pin-count"
-        >
-          {pins.length} pin{pins.length === 1 ? "" : "s"}
-          {hint ? ` · ${hint}` : ""}
-        </div>
+          ref={mapElRef}
+          className="h-[min(70vh,560px)] w-full [&_.leaflet-tile-pane]:brightness-[0.72] [&_.leaflet-tile-pane]:contrast-[1.05] [&_.leaflet-tile-pane]:saturate-[0.85]"
+          style={{ minHeight: 360 }}
+        />
+        {(!ready || loadingPins) && !initError && (
+          <div className="absolute inset-0 z-[500] grid place-items-center bg-ink-900/70">
+            <Spinner className="h-7 w-7 text-aurora-400" />
+          </div>
+        )}
+        {(error || initError) && (
+          <div className="absolute bottom-4 left-4 right-4 z-[500] rounded-lg border border-amber-400/20 bg-ink-950/90 px-4 py-3 text-sm text-amber-200/90 backdrop-blur">
+            {initError ?? error}
+          </div>
+        )}
+        {ready && !error && !initError && pins.length > 0 && (
+          <div
+            className="pointer-events-none absolute left-4 top-4 z-[500] rounded-full border border-white/10 bg-ink-950/80 px-3 py-1.5 text-xs text-mist-300 backdrop-blur"
+            data-testid="map-pin-count"
+          >
+            {pins.length} pin{pins.length === 1 ? "" : "s"}
+            {hint ? ` · ${hint}` : ""}
+          </div>
+        )}
+      </div>
+
+      {pins.length > 0 && (
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[11px] text-mist-500">
+          {LEGEND_ORDER.map((stage) => {
+            const c = STAGE_PIN[stage];
+            return (
+              <li key={stage} className="inline-flex items-center gap-1.5">
+                <span
+                  className="h-2.5 w-2.5 rounded-full ring-2 ring-ink-950"
+                  style={{ backgroundColor: c.fill, boxShadow: `0 0 0 3px ${c.glow}` }}
+                />
+                {c.label}
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );
