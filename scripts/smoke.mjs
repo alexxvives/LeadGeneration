@@ -3,6 +3,9 @@
 // Exercises: create run → draft → approve → send, plus key guardrails.
 
 const BASE = process.env.SMOKE_BASE_URL || "http://localhost:3000";
+// When auth is enforced (production-like), the smoke test authenticates via a
+// shared header instead of a session. Set SMOKE_API_KEY to match the server's.
+const SMOKE_API_KEY = process.env.SMOKE_API_KEY || "";
 
 let passed = 0;
 let failed = 0;
@@ -20,7 +23,11 @@ function check(name, cond, detail = "") {
 async function json(path, init) {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...(SMOKE_API_KEY ? { "x-smoke-key": SMOKE_API_KEY } : {}),
+      ...(init?.headers || {}),
+    },
   });
   const body = await res.json().catch(() => ({}));
   return { status: res.status, body };

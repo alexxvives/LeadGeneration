@@ -44,3 +44,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0003 — Supabase for auth + database](0003-supabase-auth-and-db.md) _(superseded by 0005)_
 - [0004 — Cloudflare Workers via @opennextjs/cloudflare as the deploy target](0004-cloudflare-opennext-deploy.md)
 - [0005 — Switch database to Cloudflare D1 and auth to Auth.js](0005-switch-to-d1-auth-js.md)
+- [0006 — Workspace schema & service-layer isolation](0006-workspace-schema-and-isolation.md)
+- [0007 — Auth.js session strategy: JWT + split edge/server config](0007-authjs-jwt-sessions.md)
+- [0008 — Stripe billing + service-layer quota model](0008-stripe-quota-model.md)

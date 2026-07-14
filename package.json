@@ -8,27 +8,37 @@
     "start": "next start",
     "lint": "next lint",
     "seed": "node --experimental-strip-types scripts/seed.ts",
-    "smoke": "node --experimental-strip-types scripts/smoke.mjs"
+    "smoke": "node --experimental-strip-types scripts/smoke.mjs",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "cf:migrate": "wrangler d1 migrations apply lodestar-prod",
+    "cf:migrate:local": "wrangler d1 migrations apply lodestar-prod --local"
   },
   "dependencies": {
+    "@auth/d1-adapter": "^1.11.2",
+    "@opennextjs/cloudflare": "^1.20.1",
     "next": "^15.5.20",
-    "nodemailer": "^6.9.16",
+    "next-auth": "^5.0.0-beta.31",
+    "nodemailer": "^7.0.13",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "resend": "^4.5.1",
+    "stripe": "^22.3.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/node": "^22.10.5",
-    "@types/nodemailer": "^6.4.17",
+    "@types/nodemailer": "^6.4.24",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
     "eslint": "^9",
     "eslint-config-next": "^15.5.20",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.13",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "wrangler": "^4.110.0"
   }
 }

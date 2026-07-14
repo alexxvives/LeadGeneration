@@ -12,6 +12,16 @@ export interface Capabilities {
   smtp: boolean;
   canSearchLive: boolean; // firecrawl or exa present
   canSendEmail: boolean; // resend or smtp configured
+  /**
+   * Whether authentication is ENFORCED. True only when AUTH_SECRET is set
+   * (production / Wrangler secret). When false — local dev / demo with zero
+   * keys — the studio is open, no login is required, and usage is unmetered
+   * (constitution Art. I.2). This is the switch that keeps zero-key demo mode
+   * fully usable while still locking down production.
+   */
+  authRequired: boolean;
+  billing: boolean; // Stripe secret key present
+  turnstile: boolean; // Turnstile configured (signup bot check)
 }
 
 function has(v: string | undefined | null): boolean {
@@ -21,7 +31,7 @@ function has(v: string | undefined | null): boolean {
 export function getCapabilities(): Capabilities {
   const firecrawl = has(process.env.FIRECRAWL_API_KEY);
   const exa = has(process.env.EXA_API_KEY);
-  const resend = has(process.env.RESEND_API_KEY);
+  const resend = has(process.env.RESEND_API_KEY) || has(process.env.AUTH_RESEND_KEY);
   const smtp = has(process.env.SMTP_HOST) && has(process.env.SMTP_USER);
   return {
     firecrawl,
@@ -30,7 +40,15 @@ export function getCapabilities(): Capabilities {
     smtp,
     canSearchLive: firecrawl || exa,
     canSendEmail: resend || smtp,
+    authRequired: has(process.env.AUTH_SECRET),
+    billing: has(process.env.STRIPE_SECRET_KEY),
+    turnstile: has(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) && has(process.env.TURNSTILE_SECRET_KEY),
   };
+}
+
+/** True when auth is enforced (production). See Capabilities.authRequired. */
+export function authRequired(): boolean {
+  return has(process.env.AUTH_SECRET);
 }
 
 export const env = {
@@ -61,4 +79,37 @@ export const env = {
     const n = Number(process.env.MAX_LEADS_PER_RUN);
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : 12;
   },
+
+  // ── Auth (Auth.js) ──
+  // A dev fallback keeps `npm run dev` working with zero keys; it is NEVER
+  // used in production because AUTH_SECRET is always set there (a Wrangler
+  // secret). authRequired() distinguishes the two.
+  authSecret: () =>
+    process.env.AUTH_SECRET?.trim() ||
+    "lodestar-dev-insecure-secret-change-me-in-production",
+  authResendKey: () =>
+    process.env.AUTH_RESEND_KEY?.trim() || process.env.RESEND_API_KEY?.trim() || "",
+  appUrl: () =>
+    process.env.NEXTAUTH_URL?.trim() ||
+    process.env.AUTH_URL?.trim() ||
+    "http://localhost:3000",
+
+  // ── Billing (Stripe) ──
+  stripeSecretKey: () => process.env.STRIPE_SECRET_KEY?.trim() ?? "",
+  stripeWebhookSecret: () => process.env.STRIPE_WEBHOOK_SECRET?.trim() ?? "",
+  /** Map of planId → Stripe monthly Price ID, read from env (never hard-coded). */
+  stripePriceIds: () => ({
+    starter: process.env.STRIPE_STARTER_PRICE_ID?.trim() || undefined,
+    pro: process.env.STRIPE_PRO_PRICE_ID?.trim() || undefined,
+    agency: process.env.STRIPE_AGENCY_PRICE_ID?.trim() || undefined,
+  }),
+
+  // ── Turnstile (Cloudflare bot check, production signup only) ──
+  turnstileSiteKey: () => process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "",
+  turnstileSecretKey: () => process.env.TURNSTILE_SECRET_KEY?.trim() ?? "",
+
+  // ── Smoke test bypass ──
+  // When set, requests carrying `x-smoke-key: <value>` skip auth enforcement so
+  // the headless smoke test can exercise the API even with auth enabled.
+  smokeApiKey: () => process.env.SMOKE_API_KEY?.trim() ?? "",
 };

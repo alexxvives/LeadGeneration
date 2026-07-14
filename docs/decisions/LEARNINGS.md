@@ -4,6 +4,31 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-14 — Commercial build (Phases 1–4): auth, workspaces, plans, Stripe, deploy
+Shipped the full commercial MVP in one pass. Key facts learned:
+- **`@opennextjs/cloudflare` exposes `getCloudflareContext()`**, not the older
+  `getRequestContext()` (next-on-pages). Bindings are on `.env` (e.g. `env.DB`).
+- **A local D1 proxy IS available during `npm run dev`** (getCloudflareContext
+  resolves an empty miniflare D1), which broke demo mode with `no such table`.
+  Fix: `getD1Binding()` returns `undefined` unless `NODE_ENV === "production"`,
+  so `npm run dev` is always JSON-store/demo; use `npm run cf:preview` for D1.
+- **Auth.js edge split is mandatory:** `src/auth.config.ts` (no DB, used by
+  middleware) vs `src/auth.ts` (D1 adapter + workspace-provisioning jwt callback).
+  Importing `JsonStore` (which imports `fs`) into middleware breaks the edge build.
+- **JWT module augmentation path is `@auth/core/jwt`**, not `next-auth/jwt`
+  (the latter throws "module cannot be found" in a `declare module`).
+- **next-auth pulls `jose`**, which triggers benign build warnings about
+  `CompressionStream`/`DecompressionStream` not being in the Edge Runtime. Auth.js
+  doesn't compress JWTs and Workers provides these APIs, so it's a no-op.
+- **`nodemailer` had to bump 6→7** to satisfy `@auth/core`'s peer range.
+- **Metering is gated on the D1 binding** (`metered = !!binding`), NOT on auth —
+  guarantees the JSON-store/demo path is always free + unmetered (Art. I.2).
+- **Stripe webhook uses `constructEventAsync`** (Web Crypto) over the raw
+  `req.text()` body; App Router needs no body-parser opt-out (that's Pages Router).
+- Service functions now take a `Ctx { db, workspaceId, metered }`; `getCtx()`
+  (src/lib/request-context.ts) is the single place that resolves the binding +
+  session → scoped repo. See ADRs 0006/0007/0008.
+
 ### 2026-07-14 — Switched from Supabase to Cloudflare D1 + Auth.js (ADR 0005)
 Supabase was chosen in ADR 0003 for "auth + DB in one". Revisited immediately
 when it became clear the lead dev already uses Cloudflare D1 + Auth.js on

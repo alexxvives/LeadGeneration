@@ -32,8 +32,11 @@ const seeds = [
 const offerNotes =
   "We build booking sites that turn website visitors into scheduled appointments.";
 
+const WORKSPACE_ID = "local";
+
 const leads = seeds.map(([company, domain, mailbox, hasEmail, fit]) => ({
   id: id("lead"),
+  workspaceId: WORKSPACE_ID,
   runId,
   company,
   website: `https://${domain}`,
@@ -61,6 +64,7 @@ const outreach = leads.map((lead) => {
   const short = lead.company.replace(/\b(Co|Group|Studio|Partners|Collective)\b/gi, "").trim();
   return {
     id: id("out"),
+    workspaceId: WORKSPACE_ID,
     leadId: lead.id,
     runId,
     toEmail: lead.emails[0] ?? null,
@@ -91,9 +95,11 @@ const outreach = leads.map((lead) => {
 });
 
 const db = {
+  workspaces: [],
   runs: [
     {
       id: runId,
+      workspaceId: WORKSPACE_ID,
       niche,
       location,
       offerNotes,

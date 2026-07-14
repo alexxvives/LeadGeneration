@@ -86,6 +86,9 @@ export default function LandingPage() {
           <a href="#domain" className="hidden transition-colors hover:text-mist-100 sm:inline">
             Deliverability
           </a>
+          <Link href="/pricing" className="transition-colors hover:text-mist-100">
+            Pricing
+          </Link>
           <Link
             href="/app"
             className="rounded-full bg-aurora-400 px-4 py-2 font-medium text-ink-950 transition-transform hover:scale-105"

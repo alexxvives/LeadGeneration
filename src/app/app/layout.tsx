@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
 import { SettingsIcon } from "@/components/icons";
+import { authRequired } from "@/lib/config";
+import { AccountMenu } from "@/components/AccountMenu";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,12 +21,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               Studio
             </Link>
             <Link
+              href="/pricing"
+              className="rounded-lg px-3 py-1.5 text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100"
+            >
+              Pricing
+            </Link>
+            <Link
               href="/app/settings"
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100"
             >
               <SettingsIcon className="h-4 w-4" />
               Settings
             </Link>
+            {authRequired() && <AccountMenu />}
           </nav>
         </div>
       </header>

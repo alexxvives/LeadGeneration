@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getCtx } from "@/lib/request-context";
 import { sendApprovedOutreach } from "@/lib/service";
+import { isQuotaError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,10 +22,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "outreachId is required" }, { status: 400 });
   }
 
-  const result = await sendApprovedOutreach(parsed.data.outreachId);
-  if (!result.ok) {
-    const status = result.rateLimited ? 429 : result.error?.includes("approved") ? 409 : 400;
-    return NextResponse.json(result, { status });
+  try {
+    const ctx = await getCtx();
+    const result = await sendApprovedOutreach(ctx, parsed.data.outreachId);
+    if (!result.ok) {
+      const status = result.rateLimited
+        ? 429
+        : result.error?.includes("approved")
+          ? 409
+          : 400;
+      return NextResponse.json(result, { status });
+    }
+    return NextResponse.json(result);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: err.message,
+          quota: { kind: err.kind, planId: err.planId, limit: err.limit },
+        },
+        { status: 402 },
+      );
+    }
+    throw err;
   }
-  return NextResponse.json(result);
 }

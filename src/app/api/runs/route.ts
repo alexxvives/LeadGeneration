@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getDb } from "@/lib/db";
+import { getCtx } from "@/lib/request-context";
 import { createAndRunSearch } from "@/lib/service";
+import { isQuotaError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,8 @@ const CreateRunSchema = z.object({
 });
 
 export async function GET() {
-  const runs = await getDb().listRuns();
+  const ctx = await getCtx();
+  const runs = await ctx.db.listRuns();
   return NextResponse.json({ runs });
 }
 
@@ -34,6 +36,17 @@ export async function POST(req: Request) {
     );
   }
 
-  const run = await createAndRunSearch(parsed.data);
-  return NextResponse.json({ run }, { status: 201 });
+  try {
+    const ctx = await getCtx();
+    const run = await createAndRunSearch(ctx, parsed.data);
+    return NextResponse.json({ run }, { status: 201 });
+  } catch (err) {
+    if (isQuotaError(err)) {
+      return NextResponse.json(
+        { error: err.message, quota: { kind: err.kind, planId: err.planId, limit: err.limit } },
+        { status: 402 },
+      );
+    }
+    throw err;
+  }
 }

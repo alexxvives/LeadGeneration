@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getCtx } from "@/lib/request-context";
 import { editOutreach, setOutreachDecision } from "@/lib/service";
 
 export const runtime = "nodejs";
@@ -33,21 +34,21 @@ export async function PATCH(
   }
 
   const { decision, ...edits } = parsed.data;
+  const ctx = await getCtx();
 
   // Apply any content edits first, then the approve/reject decision.
   if (edits.subject !== undefined || edits.body !== undefined || edits.toEmail !== undefined) {
-    const edited = await editOutreach(id, edits);
+    const edited = await editOutreach(ctx, id, edits);
     if (!edited) return NextResponse.json({ error: "Outreach not found" }, { status: 404 });
   }
 
   if (decision) {
-    const decided = await setOutreachDecision(id, decision);
+    const decided = await setOutreachDecision(ctx, id, decision);
     if (!decided) return NextResponse.json({ error: "Outreach not found" }, { status: 404 });
     return NextResponse.json({ outreach: decided });
   }
 
-  const { getDb } = await import("@/lib/db");
-  const current = await getDb().getOutreach(id);
+  const current = await ctx.db.getOutreach(id);
   if (!current) return NextResponse.json({ error: "Outreach not found" }, { status: 404 });
   return NextResponse.json({ outreach: current });
 }

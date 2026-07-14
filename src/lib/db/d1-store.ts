@@ -1,5 +1,6 @@
-import type { Lead, Outreach, Run } from "@/lib/types";
+import type { Lead, Outreach, Run, Workspace, PlanId } from "@/lib/types";
 import type { LeadRepository } from "./index";
+import { LOCAL_WORKSPACE_ID } from "./index";
 
 /**
  * Minimal D1 type stubs — keeps this file type-safe without adding
@@ -35,11 +36,30 @@ export interface D1Database {
  *  - Batch inserts use db.batch() for a single round-trip.
  *  - UPSERT uses SQLite's ON CONFLICT DO UPDATE syntax.
  *
- * No workspace_id / RLS yet — that arrives in Phase 1 (Auth + workspaces).
+ * Workspace isolation: the store is constructed with a `workspaceId` and every
+ * runs/leads/outreach query is filtered by `workspace_id = ?`. Writes stamp the
+ * same id. Workspace + auth tables are global (not scoped). SQLite has no RLS;
+ * this service-layer scoping is the isolation mechanism (ADR 0006).
  */
+
+type WorkspaceRow = {
+  id: string;
+  name: string;
+  owner_user_id: string | null;
+  plan_id: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
+  leads_used_this_month: number | null;
+  sends_used_this_month: number | null;
+  resets_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 type RunRow = {
   id: string;
+  workspace_id: string;
   niche: string;
   location: string | null;
   offer_notes: string | null;
@@ -54,6 +74,7 @@ type RunRow = {
 
 type LeadRow = {
   id: string;
+  workspace_id: string;
   run_id: string;
   company: string;
   website: string | null;
@@ -72,6 +93,7 @@ type LeadRow = {
 
 type OutreachRow = {
   id: string;
+  workspace_id: string;
   lead_id: string;
   run_id: string;
   to_email: string | null;
@@ -93,9 +115,27 @@ const arr = (s: string | null | undefined): string[] => {
   }
 };
 
+function rowToWorkspace(r: WorkspaceRow): Workspace {
+  return {
+    id: r.id,
+    name: r.name,
+    ownerUserId: r.owner_user_id,
+    planId: (r.plan_id as PlanId) ?? "free",
+    stripeCustomerId: r.stripe_customer_id,
+    stripeSubscriptionId: r.stripe_subscription_id,
+    stripePriceId: r.stripe_price_id,
+    leadsUsedThisMonth: r.leads_used_this_month ?? 0,
+    sendsUsedThisMonth: r.sends_used_this_month ?? 0,
+    resetsAt: r.resets_at,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
 function rowToRun(r: RunRow): Run {
   return {
     id: r.id,
+    workspaceId: r.workspace_id ?? LOCAL_WORKSPACE_ID,
     niche: r.niche,
     location: r.location,
     offerNotes: r.offer_notes,
@@ -112,6 +152,7 @@ function rowToRun(r: RunRow): Run {
 function rowToLead(r: LeadRow): Lead {
   return {
     id: r.id,
+    workspaceId: r.workspace_id ?? LOCAL_WORKSPACE_ID,
     runId: r.run_id,
     company: r.company,
     website: r.website,
@@ -132,6 +173,7 @@ function rowToLead(r: LeadRow): Lead {
 function rowToOutreach(r: OutreachRow): Outreach {
   return {
     id: r.id,
+    workspaceId: r.workspace_id ?? LOCAL_WORKSPACE_ID,
     leadId: r.lead_id,
     runId: r.run_id,
     toEmail: r.to_email,
@@ -161,7 +203,88 @@ function buildSet(
 }
 
 export class D1Store implements LeadRepository {
-  constructor(private readonly db: D1Database) {}
+  constructor(
+    private readonly db: D1Database,
+    private readonly workspaceId: string = LOCAL_WORKSPACE_ID,
+  ) {}
+
+  // ---- Workspaces (global, not scoped) ----
+
+  async getWorkspace(id: string): Promise<Workspace | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM workspaces WHERE id = ?`)
+      .bind(id)
+      .first<WorkspaceRow>();
+    return row ? rowToWorkspace(row) : null;
+  }
+
+  async getWorkspaceByOwner(ownerUserId: string): Promise<Workspace | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM workspaces WHERE owner_user_id = ? LIMIT 1`)
+      .bind(ownerUserId)
+      .first<WorkspaceRow>();
+    return row ? rowToWorkspace(row) : null;
+  }
+
+  async getWorkspaceByStripeCustomer(customerId: string): Promise<Workspace | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM workspaces WHERE stripe_customer_id = ? LIMIT 1`)
+      .bind(customerId)
+      .first<WorkspaceRow>();
+    return row ? rowToWorkspace(row) : null;
+  }
+
+  async createWorkspace(w: Workspace): Promise<Workspace> {
+    await this.db
+      .prepare(
+        `INSERT INTO workspaces
+         (id, name, owner_user_id, plan_id, stripe_customer_id,
+          stripe_subscription_id, stripe_price_id, leads_used_this_month,
+          sends_used_this_month, resets_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+      )
+      .bind(
+        w.id,
+        w.name,
+        w.ownerUserId,
+        w.planId,
+        w.stripeCustomerId,
+        w.stripeSubscriptionId,
+        w.stripePriceId,
+        w.leadsUsedThisMonth,
+        w.sendsUsedThisMonth,
+        w.resetsAt,
+        w.createdAt,
+        w.updatedAt,
+      )
+      .run();
+    return w;
+  }
+
+  async updateWorkspace(id: string, patch: Partial<Workspace>): Promise<Workspace | null> {
+    const row: Record<string, unknown> = {};
+    if ("name" in patch) row.name = patch.name;
+    if ("ownerUserId" in patch) row.owner_user_id = patch.ownerUserId ?? null;
+    if ("planId" in patch) row.plan_id = patch.planId;
+    if ("stripeCustomerId" in patch) row.stripe_customer_id = patch.stripeCustomerId ?? null;
+    if ("stripeSubscriptionId" in patch)
+      row.stripe_subscription_id = patch.stripeSubscriptionId ?? null;
+    if ("stripePriceId" in patch) row.stripe_price_id = patch.stripePriceId ?? null;
+    if ("leadsUsedThisMonth" in patch) row.leads_used_this_month = patch.leadsUsedThisMonth;
+    if ("sendsUsedThisMonth" in patch) row.sends_used_this_month = patch.sendsUsedThisMonth;
+    if ("resetsAt" in patch) row.resets_at = patch.resetsAt ?? null;
+    if ("createdAt" in patch) row.created_at = patch.createdAt;
+    if ("updatedAt" in patch) row.updated_at = patch.updatedAt;
+
+    if (Object.keys(row).length === 0) return this.getWorkspace(id);
+    const { clause, values } = buildSet(row);
+    await this.db
+      .prepare(`UPDATE workspaces SET ${clause} WHERE id = ?`)
+      .bind(...values, id)
+      .run();
+    return this.getWorkspace(id);
+  }
 
   // ---- Runs ----
 
@@ -169,12 +292,13 @@ export class D1Store implements LeadRepository {
     await this.db
       .prepare(
         `INSERT INTO runs
-         (id, niche, location, offer_notes, status, mode, provider,
+         (id, workspace_id, niche, location, offer_notes, status, mode, provider,
           lead_count, error, created_at, completed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         run.id,
+        this.workspaceId,
         run.niche,
         run.location,
         run.offerNotes,
@@ -206,23 +330,24 @@ export class D1Store implements LeadRepository {
     if (Object.keys(row).length === 0) return this.getRun(id);
     const { clause, values } = buildSet(row);
     await this.db
-      .prepare(`UPDATE runs SET ${clause} WHERE id = ?`)
-      .bind(...values, id)
+      .prepare(`UPDATE runs SET ${clause} WHERE id = ? AND workspace_id = ?`)
+      .bind(...values, id, this.workspaceId)
       .run();
     return this.getRun(id);
   }
 
   async getRun(id: string): Promise<Run | null> {
     const row = await this.db
-      .prepare(`SELECT * FROM runs WHERE id = ?`)
-      .bind(id)
+      .prepare(`SELECT * FROM runs WHERE id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
       .first<RunRow>();
     return row ? rowToRun(row) : null;
   }
 
   async listRuns(): Promise<Run[]> {
     const { results } = await this.db
-      .prepare(`SELECT * FROM runs ORDER BY created_at DESC`)
+      .prepare(`SELECT * FROM runs WHERE workspace_id = ? ORDER BY created_at DESC`)
+      .bind(this.workspaceId)
       .all<RunRow>();
     return results.map(rowToRun);
   }
@@ -235,13 +360,14 @@ export class D1Store implements LeadRepository {
       this.db
         .prepare(
           `INSERT INTO leads
-           (id, run_id, company, website, emails, phones, contact_name,
+           (id, workspace_id, run_id, company, website, emails, phones, contact_name,
             location, about_blurb, tags, fit_score, fit_reasons, source_url,
             status, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           l.id,
+          this.workspaceId,
           l.runId,
           l.company,
           l.website,
@@ -282,16 +408,16 @@ export class D1Store implements LeadRepository {
     if (Object.keys(row).length === 0) return this.getLead(id);
     const { clause, values } = buildSet(row);
     await this.db
-      .prepare(`UPDATE leads SET ${clause} WHERE id = ?`)
-      .bind(...values, id)
+      .prepare(`UPDATE leads SET ${clause} WHERE id = ? AND workspace_id = ?`)
+      .bind(...values, id, this.workspaceId)
       .run();
     return this.getLead(id);
   }
 
   async getLead(id: string): Promise<Lead | null> {
     const row = await this.db
-      .prepare(`SELECT * FROM leads WHERE id = ?`)
-      .bind(id)
+      .prepare(`SELECT * FROM leads WHERE id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
       .first<LeadRow>();
     return row ? rowToLead(row) : null;
   }
@@ -299,11 +425,14 @@ export class D1Store implements LeadRepository {
   async listLeads(runId?: string): Promise<Lead[]> {
     const { results } = runId
       ? await this.db
-          .prepare(`SELECT * FROM leads WHERE run_id = ? ORDER BY fit_score DESC`)
-          .bind(runId)
+          .prepare(
+            `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? ORDER BY fit_score DESC`,
+          )
+          .bind(this.workspaceId, runId)
           .all<LeadRow>()
       : await this.db
-          .prepare(`SELECT * FROM leads ORDER BY fit_score DESC`)
+          .prepare(`SELECT * FROM leads WHERE workspace_id = ? ORDER BY fit_score DESC`)
+          .bind(this.workspaceId)
           .all<LeadRow>();
     return results.map(rowToLead);
   }
@@ -314,9 +443,9 @@ export class D1Store implements LeadRepository {
     await this.db
       .prepare(
         `INSERT INTO outreach
-         (id, lead_id, run_id, to_email, subject, body, status,
+         (id, workspace_id, lead_id, run_id, to_email, subject, body, status,
           sent_at, error, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            lead_id    = excluded.lead_id,
            run_id     = excluded.run_id,
@@ -330,6 +459,7 @@ export class D1Store implements LeadRepository {
       )
       .bind(
         outreach.id,
+        this.workspaceId,
         outreach.leadId,
         outreach.runId,
         outreach.toEmail,
@@ -364,31 +494,32 @@ export class D1Store implements LeadRepository {
     if (Object.keys(row).length === 0) return this.getOutreach(id);
     const { clause, values } = buildSet(row);
     await this.db
-      .prepare(`UPDATE outreach SET ${clause} WHERE id = ?`)
-      .bind(...values, id)
+      .prepare(`UPDATE outreach SET ${clause} WHERE id = ? AND workspace_id = ?`)
+      .bind(...values, id, this.workspaceId)
       .run();
     return this.getOutreach(id);
   }
 
   async getOutreach(id: string): Promise<Outreach | null> {
     const row = await this.db
-      .prepare(`SELECT * FROM outreach WHERE id = ?`)
-      .bind(id)
+      .prepare(`SELECT * FROM outreach WHERE id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
       .first<OutreachRow>();
     return row ? rowToOutreach(row) : null;
   }
 
   async getOutreachByLead(leadId: string): Promise<Outreach | null> {
     const row = await this.db
-      .prepare(`SELECT * FROM outreach WHERE lead_id = ?`)
-      .bind(leadId)
+      .prepare(`SELECT * FROM outreach WHERE lead_id = ? AND workspace_id = ?`)
+      .bind(leadId, this.workspaceId)
       .first<OutreachRow>();
     return row ? rowToOutreach(row) : null;
   }
 
   async listOutreach(): Promise<Outreach[]> {
     const { results } = await this.db
-      .prepare(`SELECT * FROM outreach`)
+      .prepare(`SELECT * FROM outreach WHERE workspace_id = ?`)
+      .bind(this.workspaceId)
       .all<OutreachRow>();
     return results.map(rowToOutreach);
   }

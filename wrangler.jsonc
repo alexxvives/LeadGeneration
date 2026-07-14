@@ -1,0 +1,27 @@
+{
+  // Cloudflare Workers deploy config for Lodestar (via @opennextjs/cloudflare).
+  // Local `npm run dev` does NOT use this — it runs plain Next.js in demo mode
+  // (JSON store, zero keys). Use `npm run cf:preview` to exercise D1 locally.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lodestar",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lodestar-prod",
+      // Create the DB then paste its id here (see README → Deploy):
+      //   npx wrangler d1 create lodestar-prod
+      "database_id": "FILL_IN",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

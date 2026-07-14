@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getCtx } from "@/lib/request-context";
 import { draftOutreach } from "@/lib/service";
 
 export const runtime = "nodejs";
@@ -20,7 +21,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "leadId is required" }, { status: 400 });
   }
 
-  const outreach = await draftOutreach(parsed.data.leadId);
+  const ctx = await getCtx();
+  const outreach = await draftOutreach(ctx, parsed.data.leadId);
   if (!outreach) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   return NextResponse.json({ outreach }, { status: 201 });
 }

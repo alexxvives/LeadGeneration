@@ -1,5 +1,9 @@
 import { env, getCapabilities } from "@/lib/config";
 import { CheckIcon, XIcon } from "@/components/icons";
+import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
+import { getPlan } from "@/lib/plans";
+import { UsageBar } from "@/components/studio/UpgradeModal";
+import { BillingActions } from "@/components/studio/BillingActions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,8 +11,11 @@ export const dynamic = "force-dynamic";
 // Settings is intentionally read-only status + guidance. Secrets live in .env
 // and are never rendered — only whether each capability is configured. This
 // keeps keys out of the browser and the file DB.
-export default function SettingsPage() {
+export default async function SettingsPage() {
   const caps = getCapabilities();
+  const ctx = await getCtx();
+  const usage = await getWorkspaceSummary(ctx);
+  const plan = getPlan(usage.planId);
 
   const providers = [
     {
@@ -47,6 +54,32 @@ export default function SettingsPage() {
         <code className="rounded bg-white/5 px-1.5 py-0.5 text-aurora-300">.env.example</code>)
         and restart the dev server. Nothing is stored in the browser.
       </p>
+
+      {/* Plan & usage */}
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Plan &amp; usage
+        </h2>
+        <div className="rounded-xl2 border border-white/10 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="font-display text-xl font-semibold">{plan.name} plan</p>
+              <p className="text-sm text-mist-500">
+                {usage.metered
+                  ? "Usage is metered monthly and resets on the 1st."
+                  : "Demo / local mode — unlimited and unmetered."}
+              </p>
+            </div>
+            {usage.metered && <BillingActions paid={usage.planId !== "free"} />}
+          </div>
+          {usage.metered && (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <UsageBar label="Lead credits" used={usage.leadsUsed} limit={usage.leadsLimit} />
+              <UsageBar label="Sends" used={usage.sendsUsed} limit={usage.sendsLimit} />
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Providers */}
       <section className="mt-8">

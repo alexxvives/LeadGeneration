@@ -72,29 +72,44 @@ Also see [`README.md`](README.md) for setup/run instructions.
 ## Commands
 
 ```bash
-npm run dev          # dev server (http://localhost:3000)
+npm run dev          # dev server (http://localhost:3000) — always demo/JSON store
 npm run seed         # pre-fill demo leads
 npm run build        # production build (run this to catch issues dev hides)
 npm run lint         # eslint
 npm run smoke        # end-to-end flow test (needs dev server running)
 npx tsc --noEmit     # typecheck
+npm run cf:preview   # build + run the Worker locally (real D1)
+npm run cf:deploy    # build + deploy to Cloudflare Workers
+npm run cf:migrate   # apply D1 migrations (prod); :local for local D1
 ```
 
 ## Project map
 
 ```
-src/app/            Routes. Pages + thin API handlers (api/*/route.ts).
+src/middleware.ts    Auth enforcement on /app + /api (production only).
+src/auth.config.ts   Edge-safe Auth.js base config (used by middleware).
+src/auth.ts          Full Auth.js: D1 adapter + workspace provisioning (server).
+src/app/             Routes. Pages + thin API handlers (api/*/route.ts).
+  pricing/ login/    Public marketing + sign-in pages.
+  api/{auth,billing,webhooks/stripe,turnstile}   Commercial endpoints.
 src/components/      UI. studio/* is the app; brand/icons/ui are primitives.
 src/lib/
-  types.ts           Domain models — the source of truth for shapes.
-  service.ts         Coordination layer. Business logic lives here.
-  config.ts          Env + capability detection (demo vs live).
-  db/                Repository interface (LeadRepository) + JSON store (dev) & D1Store (prod).
+  types.ts           Domain models (Workspace/Run/Lead/Outreach) — source of truth.
+  service.ts         Coordination layer + plan/quota enforcement (Ctx-based).
+  request-context.ts getCtx(): D1 binding + session → workspace-scoped repo.
+  config.ts          Env + capability detection (incl. authRequired).
+  plans.ts           Plans/quotas/price-env — single source of truth.
+  workspace.ts       Workspace provisioning + monthly usage window.
+  errors.ts          QuotaError (→ API 402).
+  cf.ts              Cloudflare D1 binding resolver (prod only).
+  db/                Repository (LeadRepository) + JsonStore (dev) & D1Store (prod), workspace-scoped.
   search/            Providers (firecrawl/exa), enrichment, demo fallback.
   outreach/          Draft generation + compliance footer.
   email/             Rate-limited sender (resend/smtp/demo).
+  billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.
-migrations/          SQL migrations for Cloudflare D1 (Wrangler format).
+migrations/          D1 SQL migrations (0001 init, 0002 workspaces+auth, 0003 usage).
+wrangler.jsonc, open-next.config.ts   Cloudflare Workers deploy config.
 data/                Local JSON DB (git-ignored).
 ```

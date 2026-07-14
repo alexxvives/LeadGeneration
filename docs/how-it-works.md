@@ -40,8 +40,12 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 ## 3. Screens
 
 - **`/` Landing** — full-bleed aurora hero, the five steps, and the ethics/
-  compliance section. Brand-first marketing view.
-- **`/app` Studio** — the core app:
+  compliance section. Brand-first marketing view. Public.
+- **`/pricing`** — the four plans (Free / Starter / Pro / Agency) with a
+  monthly↔annual toggle and Stripe Checkout CTAs. Public.
+- **`/login`** — sign-in. In local dev, any email + password (Credentials
+  provider); in production, a Resend magic-link (+ Turnstile bot check). Public.
+- **`/app` Studio** — the core app (behind login when auth is enforced):
   - Search hero (full when empty, compact "New search" once you have leads).
   - **Board** with a **Cards ⇄ Table** toggle (cards for scanning, table for
     density).
@@ -73,15 +77,24 @@ Strict layering (never skipped — see the constitution):
 Browser (components)
    │  fetch() via src/lib/client-api.ts
    ▼
-API routes  (src/app/api/*/route.ts)   ← thin: validate → call service → JSON
+Middleware (src/middleware.ts)         ← enforces auth on /app + /api (prod only)
    │
    ▼
-Service layer  (src/lib/service.ts)    ← all coordination/business logic
+API routes  (src/app/api/*/route.ts)   ← thin: build Ctx via getCtx() → service
+   │
+   ▼
+Service layer  (src/lib/service.ts)    ← all coordination + plan/quota logic
    │                      │
    ▼                      ▼
 Repository            Providers
 (src/lib/db/*)        (search/*, outreach/*, email/*)
 ```
+
+Every request is scoped by a **`Ctx { db, workspaceId, metered }`** built in
+`src/lib/request-context.ts` (`getCtx()`): it resolves the Cloudflare D1 binding
+(`src/lib/cf.ts`) and the session's workspace (Auth.js), then hands the service a
+repository already scoped to that workspace. `metered` follows the D1 binding, so
+the local JSON-store path is always unmetered/demo.
 
 ### Key modules
 
@@ -103,6 +116,31 @@ Repository            Providers
   approve/send flow.
 - **`src/lib/email/`** — `sendEmail()` (Resend → SMTP → demo) and a rolling
   per-minute `rate-limit.ts`.
+- **`src/auth.config.ts` / `src/auth.ts`** — Auth.js v5. The `.config` file is
+  edge-safe (used by middleware); `auth.ts` adds the D1 adapter + workspace
+  provisioning (server only). JWT sessions (ADR 0007).
+- **`src/lib/plans.ts`** — single source of truth for plans, quotas, and the env
+  var names holding Stripe Price IDs.
+- **`src/lib/workspace.ts`** — workspace provisioning + lazy monthly usage reset.
+- **`src/lib/billing/stripe.ts`** — Stripe client + plan↔price mapping (server
+  only; secret key never reaches the client).
+- **`src/lib/request-context.ts`** — `getCtx()` + `getWorkspaceSummary()`.
+- **`src/lib/errors.ts`** — `QuotaError` (→ API 402).
+
+## 5a. Auth, workspaces, plans & billing (commercial layer)
+
+- **Auth is enforced only when `AUTH_SECRET` is set** (`config.authRequired()`).
+  Local dev with zero keys → studio is open, unmetered (constitution Art. I.2).
+- **Workspaces** are the tenant. `workspaceId` is on every Run/Lead/Outreach and
+  every store query filters by it (ADR 0006). The `"local"` workspace is used in
+  demo/dev.
+- **Plans/quotas** (Free/Starter/Pro/Agency) are enforced in `service.ts` only:
+  `createAndRunSearch` checks lead credits; `sendApprovedOutreach` checks the
+  send quota *after* the approval gate. Over-limit throws `QuotaError` → 402,
+  which the UI turns into an upgrade modal. Metered workspaces track usage on the
+  workspace row (reset lazily monthly). ADR 0008.
+- **Stripe**: `/api/billing/checkout`, `/api/billing/portal`, and
+  `/api/webhooks/stripe` (signature-verified; entitlement written server-side).
 
 ### Data lifecycle
 

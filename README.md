@@ -64,8 +64,18 @@ Copy `.env.example` → `.env.local` and fill in what you have. All are optional
 | `OUTREACH_PHYSICAL_ADDRESS` | CAN-SPAM mailing address in footer | Placeholder |
 | `SEND_RATE_PER_MINUTE` | Outbound rate limit (default 5) | 5 |
 | `ENABLE_CONTACT_FORM_AUTOMATION` | Feature flag (see below) | `false` (off) |
+| `AUTH_SECRET` | **Enables + enforces auth/metering** (Auth.js) | Open studio, unmetered (demo) |
+| `AUTH_RESEND_KEY` | Resend key for magic-link login (prod) | Dev uses any email+password |
+| `NEXTAUTH_URL` | App base URL (redirects) | `http://localhost:3000` |
+| `STRIPE_SECRET_KEY` | Stripe billing (server-side) | Billing disabled |
+| `STRIPE_WEBHOOK_SECRET` | Verify Stripe webhooks | Webhook rejected |
+| `STRIPE_{STARTER,PRO,AGENCY}_PRICE_ID` | Monthly Stripe Price IDs | Upgrade to that plan disabled |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Signup bot check (prod) | No challenge |
+| `SMOKE_API_KEY` | Lets `npm run smoke` bypass auth via `x-smoke-key` | Not needed in dev |
 
-Check the **Settings** page in-app to see exactly which capabilities are live.
+Check the **Settings** page in-app to see exactly which capabilities are live,
+your plan, and usage. **Auth + metering are off until `AUTH_SECRET` is set** —
+so `npm run dev` is always the open, zero-key demo.
 
 ### What works without keys vs. with keys
 
@@ -87,6 +97,48 @@ Check the **Settings** page in-app to see exactly which capabilities are live.
 | `npm run seed` | Pre-fill the local DB with demo leads |
 | `npm run lint` | Lint |
 | `npm run smoke` | Headless smoke test of the core flow (needs dev server running) |
+| `npm run cf:build` | Build for Cloudflare Workers (OpenNext) |
+| `npm run cf:preview` | Build + run the Worker locally (exercises real D1) |
+| `npm run cf:deploy` | Build + deploy to Cloudflare Workers |
+| `npm run cf:migrate` / `:local` | Apply D1 migrations (prod / local) |
+
+---
+
+## Deploy to Cloudflare
+
+Local `npm run dev` runs plain Next.js in demo mode (JSON store, zero keys).
+Production runs on **Cloudflare Workers** via `@opennextjs/cloudflare`, backed by
+**D1**. One-time setup:
+
+```bash
+# 1. Create the D1 database, then paste the returned database_id into wrangler.jsonc
+npx wrangler d1 create lodestar-prod
+
+# 2. Apply migrations (creates workspaces/auth tables + adds workspace_id + usage)
+npm run cf:migrate            # production D1
+npm run cf:migrate:local      # local D1 (for `npm run cf:preview`)
+
+# 3. Set secrets (never commit these)
+npx wrangler secret put AUTH_SECRET            # npx auth secret to generate
+npx wrangler secret put AUTH_RESEND_KEY
+npx wrangler secret put STRIPE_SECRET_KEY
+npx wrangler secret put STRIPE_WEBHOOK_SECRET
+npx wrangler secret put STRIPE_STARTER_PRICE_ID
+npx wrangler secret put STRIPE_PRO_PRICE_ID
+npx wrangler secret put STRIPE_AGENCY_PRICE_ID
+npx wrangler secret put TURNSTILE_SECRET_KEY
+# (plus FIRECRAWL_API_KEY / RESEND_API_KEY / etc. as needed)
+
+# 4. Preview locally, then deploy
+npm run cf:preview
+npm run cf:deploy
+```
+
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `NEXTAUTH_URL` are non-secret and can live in
+`wrangler.jsonc` `vars` or the dashboard. Point your Stripe Dashboard webhook at
+`https://<your-domain>/api/webhooks/stripe` and use its signing secret as
+`STRIPE_WEBHOOK_SECRET`. In Stripe, create one **monthly recurring Price** per
+paid plan (Starter/Pro/Agency) and paste each Price ID into the matching secret.
 
 ---
 
@@ -94,24 +146,33 @@ Check the **Settings** page in-app to see exactly which capabilities are live.
 
 ```
 src/
+  middleware.ts              Auth enforcement on /app + /api (prod only)
+  auth.config.ts / auth.ts   Auth.js v5 (edge base / full server config)
   app/
     page.tsx                 Landing (full-bleed hero)
-    app/                     The studio (app shell)
+    pricing/                 Public pricing page (plans + Stripe CTAs)
+    login/                   Sign-in (dev credentials / prod magic-link)
+    app/                     The studio (app shell, behind login)
       page.tsx               Lead board + drawer + queue
-      settings/page.tsx      Capability status & compliance settings
-    api/                     Thin route handlers → services
-      runs/  board/  outreach/  send/  settings/  contact-form/
+      settings/page.tsx      Capabilities, plan & usage, billing
+    api/                     Thin route handlers → getCtx() → services
+      runs/ board/ outreach/ send/ settings/ contact-form/
+      auth/ billing/ webhooks/stripe/ turnstile/
   components/                UI (brand, icons, studio/*)
   lib/
-    types.ts                 Typed models: Run / Lead / Outreach
-    config.ts                Env + capability detection
+    types.ts                 Typed models: Workspace / Run / Lead / Outreach
+    config.ts                Env + capability detection (incl. authRequired)
+    plans.ts                 Plans/quotas/price-env — single source of truth
+    request-context.ts       getCtx(): binding + session → scoped repo
+    cf.ts                    Cloudflare D1 binding resolver
+    workspace.ts             Workspace provisioning + usage window
+    errors.ts                QuotaError (→ 402)
     fit-score.ts             Transparent heuristic scoring
-    service.ts               App services (the coordination layer)
-    db/                      Repository abstraction + JSON file store
-    search/                  Firecrawl + Exa providers, enrichment, demo data
-    outreach/                Draft generation + compliance footer
-    email/                   Rate-limited sender (Resend / SMTP / demo)
+    service.ts               App services + plan/quota enforcement
+    db/                      Repository abstraction + JSON store + D1 store
+    search/ outreach/ email/ billing/   providers + Stripe client
 data/                        Local JSON DB (git-ignored)
+migrations/                  D1 SQL migrations (0001 init, 0002 ws+auth, 0003 usage)
 scripts/                     seed + smoke test
 ```
 
@@ -126,12 +187,13 @@ Deeper docs live in [`docs/`](docs/), indexed by [`AGENTS.md`](AGENTS.md):
 - [`docs/business-plan.md`](docs/business-plan.md) / [`docs/commercialization.md`](docs/commercialization.md)
 - [`docs/decisions/`](docs/decisions/) — ADRs + learnings log
 
-### Swapping the database (→ Supabase later)
+### Persistence
 
 The app only talks to the `LeadRepository` interface in `src/lib/db/index.ts`.
-Today it's backed by a JSON file (`JsonStore`). To move to Supabase/Postgres,
-implement the same interface with the Supabase client and change the one-line
-factory in `getDb()`. No UI or API-route changes required.
+`getDb(binding?, workspaceId?)` returns a workspace-scoped `D1Store` when a
+Cloudflare D1 binding is present (production) and a `JsonStore` otherwise (local
+dev / demo). No UI or API-route changes are needed to switch backends — the
+service layer builds the scoped repo via `getCtx()`.
 
 ---
 

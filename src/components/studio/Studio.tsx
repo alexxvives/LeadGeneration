@@ -2,16 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { api, type BoardResponse } from "@/lib/client-api";
-import type { LeadWithOutreach } from "@/lib/types";
+import { api, QuotaExceededError, type BoardResponse } from "@/lib/client-api";
+import type { LeadWithOutreach, PlanId } from "@/lib/types";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
 import { LeadTable } from "./LeadTable";
 import { LeadDrawer } from "./LeadDrawer";
+import { UpgradeModal } from "./UpgradeModal";
 import { Spinner } from "@/components/ui";
 import { ArrowIcon, CheckIcon, SparkIcon } from "@/components/icons";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
+type UpgradePrompt = { kind: "leads" | "sends"; planId: PlanId };
 
 export function Studio() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
@@ -21,12 +23,25 @@ export function Studio() {
   const [view, setView] = useState<"board" | "queue">("board");
   const [layout, setLayout] = useState<"cards" | "table">("cards");
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [upgrade, setUpgrade] = useState<UpgradePrompt | null>(null);
 
   const toast = useCallback((kind: Toast["kind"], text: string) => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t, { id, kind, text }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200);
   }, []);
+
+  // Quota rejections (402) surface an upgrade modal instead of a plain error.
+  const handleError = useCallback(
+    (e: unknown) => {
+      if (e instanceof QuotaExceededError) {
+        setUpgrade({ kind: e.kind, planId: e.planId });
+      } else {
+        toast("err", (e as Error).message);
+      }
+    },
+    [toast],
+  );
 
   const refresh = useCallback(async () => {
     const data = await api.board();
@@ -39,6 +54,16 @@ export function Studio() {
       .catch((e) => toast("err", e.message))
       .finally(() => setLoading(false));
   }, [refresh, toast]);
+
+  // Celebrate a completed Stripe upgrade (success_url = /app?upgraded=1).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("upgraded") === "1") {
+      toast("ok", "Upgrade complete — your new plan is active.");
+      window.history.replaceState({}, "", "/app");
+    }
+  }, [toast]);
 
   const runSearch = async (v: SearchValues) => {
     setRunning(true);
@@ -57,7 +82,7 @@ export function Studio() {
       );
       setView("board");
     } catch (e) {
-      toast("err", (e as Error).message);
+      handleError(e);
     } finally {
       setRunning(false);
     }
@@ -118,7 +143,7 @@ export function Studio() {
       await refresh();
       toast("ok", board?.capabilities.canSendEmail ? "Email sent." : "Sent in demo mode (not delivered).");
     } catch (e) {
-      toast("err", (e as Error).message);
+      handleError(e);
     }
   };
 
@@ -222,6 +247,14 @@ export function Studio() {
         />
       )}
 
+      {upgrade && (
+        <UpgradeModal
+          kind={upgrade.kind}
+          planId={upgrade.planId}
+          onClose={() => setUpgrade(null)}
+        />
+      )}
+
       {/* Toasts */}
       <div className="pointer-events-none fixed bottom-6 right-6 z-[60] flex flex-col gap-2">
         {toasts.map((t) => (
@@ -244,18 +277,30 @@ export function Studio() {
 
 function ModeBanner({ board }: { board: BoardResponse }) {
   const live = board.capabilities.canSearchLive;
+  const ws = board.workspace;
   return (
-    <div className="glass flex items-center gap-3 rounded-full px-4 py-2 text-sm">
-      <span
-        className={`h-2 w-2 rounded-full ${live ? "bg-aurora-400 pulse-ring" : "bg-amber-400"}`}
-      />
-      <span className="text-mist-300">
-        {live ? "Live search enabled" : "Demo mode — sample leads"}
-      </span>
-      <span className="text-mist-500">·</span>
-      <span className="text-mist-300">
-        {board.capabilities.canSendEmail ? "Email live" : "Email demo"}
-      </span>
+    <div className="flex flex-wrap items-center gap-2">
+      {ws?.metered && (
+        <span className="glass inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm">
+          <span className="font-medium capitalize text-aurora-300">{ws.planId}</span>
+          <span className="text-mist-500">·</span>
+          <span className="text-mist-300 tabular-nums">
+            {ws.leadsUsed}/{ws.leadsLimit} leads
+          </span>
+        </span>
+      )}
+      <div className="glass flex items-center gap-3 rounded-full px-4 py-2 text-sm">
+        <span
+          className={`h-2 w-2 rounded-full ${live ? "bg-aurora-400 pulse-ring" : "bg-amber-400"}`}
+        />
+        <span className="text-mist-300">
+          {live ? "Live search enabled" : "Demo mode — sample leads"}
+        </span>
+        <span className="text-mist-500">·</span>
+        <span className="text-mist-300">
+          {board.capabilities.canSendEmail ? "Email live" : "Email demo"}
+        </span>
+      </div>
     </div>
   );
 }
