@@ -3,7 +3,7 @@
   // Local `npm run dev` does NOT use this — it runs plain Next.js in demo mode
   // (JSON store, zero keys). Use `npm run cf:preview` to exercise D1 locally.
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "lodestar",
+  "name": "leadgeneration",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -18,9 +18,7 @@
     {
       "binding": "DB",
       "database_name": "lodestar-prod",
-      // Create the DB then paste its id here (see README → Deploy):
-      //   npx wrangler d1 create lodestar-prod
-      "database_id": "FILL_IN",
+      "database_id": "f990d480-83aa-4123-8979-e47d11347069",
       "migrations_dir": "migrations"
     }
   ]

@@ -137,4 +137,19 @@
   .pulse-ring {
     animation: pulse-ring 2s infinite;
   }
+
+  /* Leaflet map (LeadMap) — keep tiles under app chrome / modals */
+  .leaflet-container {
+    width: 100%;
+    height: 100%;
+    background: #0a1120;
+    font: inherit;
+  }
+  .leaflet-control-attribution {
+    background: rgba(6, 10, 18, 0.75) !important;
+    color: #7f92b3 !important;
+  }
+  .leaflet-control-attribution a {
+    color: #7ff2c8 !important;
+  }
 }

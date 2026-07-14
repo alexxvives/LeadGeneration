@@ -31,7 +31,7 @@ function has(v: string | undefined | null): boolean {
 export function getCapabilities(): Capabilities {
   const firecrawl = has(process.env.FIRECRAWL_API_KEY);
   const exa = has(process.env.EXA_API_KEY);
-  const resend = has(process.env.RESEND_API_KEY) || has(process.env.AUTH_RESEND_KEY);
+  const resend = has(process.env.RESEND_API_KEY);
   const smtp = has(process.env.SMTP_HOST) && has(process.env.SMTP_USER);
   return {
     firecrawl,
@@ -87,8 +87,7 @@ export const env = {
   authSecret: () =>
     process.env.AUTH_SECRET?.trim() ||
     "lodestar-dev-insecure-secret-change-me-in-production",
-  authResendKey: () =>
-    process.env.AUTH_RESEND_KEY?.trim() || process.env.RESEND_API_KEY?.trim() || "",
+  authResendKey: () => process.env.RESEND_API_KEY?.trim() || "",
   appUrl: () =>
     process.env.NEXTAUTH_URL?.trim() ||
     process.env.AUTH_URL?.trim() ||

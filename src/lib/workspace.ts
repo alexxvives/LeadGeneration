@@ -34,6 +34,11 @@ export function newWorkspace(args: {
     resetsAt: firstOfNextMonthIso(),
     createdAt: now,
     updatedAt: now,
+    fromName: null,
+    fromEmail: null,
+    replyTo: null,
+    physicalAddress: null,
+    resendApiKey: null,
   };
 }
 

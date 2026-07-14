@@ -11,6 +11,32 @@ interface DbShape {
   outreach: Outreach[];
 }
 
+/** Back-fills email setting fields added in migration 0006 to workspace rows from older JSON files. */
+function normalizeWorkspace(w: Workspace): Workspace {
+  const raw = w as unknown as Record<string, unknown>;
+  return {
+    ...w,
+    fromName: (raw.fromName as string | undefined) ?? null,
+    fromEmail: (raw.fromEmail as string | undefined) ?? null,
+    replyTo: (raw.replyTo as string | undefined) ?? null,
+    physicalAddress: (raw.physicalAddress as string | undefined) ?? null,
+    resendApiKey: (raw.resendApiKey as string | undefined) ?? null,
+  };
+}
+
+/** Back-fills CRM fields that didn't exist on leads created before migration 0005. */
+function normalizeLead(l: Lead): Lead {
+  // Cast through unknown so TS doesn't treat these as always-defined on old JSON rows.
+  const raw = l as unknown as Record<string, unknown>;
+  return {
+    ...l,
+    crmStage: (raw.crmStage as Lead["crmStage"] | undefined) ?? "new",
+    contactMethod: (raw.contactMethod as Lead["contactMethod"] | undefined) ?? null,
+    notes: (raw.notes as Lead["notes"] | undefined) ?? null,
+    followUps: (raw.followUps as Lead["followUps"] | undefined) ?? [],
+  };
+}
+
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 
@@ -76,17 +102,20 @@ export class JsonStore implements LeadRepository {
   // ---- Workspaces (global, not scoped) ----
   async getWorkspace(id: string): Promise<Workspace | null> {
     const data = await this.read();
-    return data.workspaces.find((w) => w.id === id) ?? null;
+    const w = data.workspaces.find((w) => w.id === id);
+    return w ? normalizeWorkspace(w) : null;
   }
 
   async getWorkspaceByOwner(ownerUserId: string): Promise<Workspace | null> {
     const data = await this.read();
-    return data.workspaces.find((w) => w.ownerUserId === ownerUserId) ?? null;
+    const w = data.workspaces.find((w) => w.ownerUserId === ownerUserId);
+    return w ? normalizeWorkspace(w) : null;
   }
 
   async getWorkspaceByStripeCustomer(customerId: string): Promise<Workspace | null> {
     const data = await this.read();
-    return data.workspaces.find((w) => w.stripeCustomerId === customerId) ?? null;
+    const w = data.workspaces.find((w) => w.stripeCustomerId === customerId);
+    return w ? normalizeWorkspace(w) : null;
   }
 
   createWorkspace(workspace: Workspace): Promise<Workspace> {
@@ -153,7 +182,9 @@ export class JsonStore implements LeadRepository {
 
   async getLead(id: string): Promise<Lead | null> {
     const data = await this.read();
-    return data.leads.find((l) => l.id === id && this.inScope(l)) ?? null;
+    const l = data.leads.find((l) => l.id === id && this.inScope(l));
+    if (!l) return null;
+    return normalizeLead(l);
   }
 
   async listLeads(runId?: string): Promise<Lead[]> {
@@ -161,7 +192,7 @@ export class JsonStore implements LeadRepository {
     const leads = data.leads.filter(
       (l) => this.inScope(l) && (runId ? l.runId === runId : true),
     );
-    return [...leads].sort((a, b) => b.fitScore - a.fitScore);
+    return [...leads].map(normalizeLead).sort((a, b) => b.fitScore - a.fitScore);
   }
 
   // ---- Outreach ----
@@ -196,5 +227,14 @@ export class JsonStore implements LeadRepository {
   async listOutreach(): Promise<Outreach[]> {
     const data = await this.read();
     return data.outreach.filter((o) => this.inScope(o));
+  }
+
+  clearWorkspaceData(): Promise<void> {
+    return this.mutate((data) => {
+      data.runs = data.runs.filter((r) => !this.inScope(r));
+      data.leads = data.leads.filter((l) => !this.inScope(l));
+      data.outreach = data.outreach.filter((o) => !this.inScope(o));
+      return { data, result: undefined };
+    });
   }
 }

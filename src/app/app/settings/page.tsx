@@ -1,20 +1,23 @@
 import { env, getCapabilities } from "@/lib/config";
-import { CheckIcon, XIcon } from "@/components/icons";
+import { CheckIcon, XIcon, HelpIcon, SparkIcon } from "@/components/icons";
 import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
 import { getPlan } from "@/lib/plans";
 import { UsageBar } from "@/components/studio/UpgradeModal";
 import { BillingActions } from "@/components/studio/BillingActions";
+import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
+import { EmailSettingsForm } from "@/components/studio/EmailSettingsForm";
+import Link from "next/link";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Settings is intentionally read-only status + guidance. Secrets live in .env
-// and are never rendered — only whether each capability is configured. This
-// keeps keys out of the browser and the file DB.
+// Settings: editable outreach profile (browser) + read-only env capability status.
+// Secrets live in .env and are never rendered.
 export default async function SettingsPage() {
   const caps = getCapabilities();
   const ctx = await getCtx();
   const usage = await getWorkspaceSummary(ctx);
+  const ws = ctx.metered ? await ctx.db.getWorkspace(ctx.workspaceId) : null;
   const plan = getPlan(usage.planId);
 
   const providers = [
@@ -22,40 +25,63 @@ export default async function SettingsPage() {
       name: "Firecrawl",
       envVar: "FIRECRAWL_API_KEY",
       on: caps.firecrawl,
-      desc: "Live web search + full-page scrape for enrichment.",
+      desc: "Primary live search provider — web search + full-page scrape for enrichment.",
     },
     {
       name: "Exa",
       envVar: "EXA_API_KEY",
       on: caps.exa,
-      desc: "Alternative live search provider (used if Firecrawl is absent).",
+      desc: "Fallback search provider (used when Firecrawl key is absent). Either one is enough.",
     },
     {
-      name: "Resend",
-      envVar: "RESEND_API_KEY",
-      on: caps.resend,
-      desc: "Transactional email sending for approved outreach.",
-    },
-    {
-      name: "SMTP (Nodemailer)",
-      envVar: "SMTP_HOST + SMTP_USER",
+      name: "SMTP / Maileroo",
+      envVar: "SMTP_HOST + SMTP_USER + SMTP_PASS",
       on: caps.smtp,
-      desc: "Alternative email transport if you don't use Resend.",
+      desc: "Email sending for approved outreach. Recommended: Maileroo (smtp.maileroo.com) with your own domain.",
     },
   ];
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10">
-      <h1 className="font-display text-3xl font-semibold sm:text-4xl">Settings</h1>
-      <p className="mt-2 text-mist-300">
-        Lodestar reads secrets from environment variables. Set them in a{" "}
-        <code className="rounded bg-white/5 px-1.5 py-0.5 text-aurora-300">.env.local</code>{" "}
-        file (see{" "}
-        <code className="rounded bg-white/5 px-1.5 py-0.5 text-aurora-300">.env.example</code>)
-        and restart the dev server. Nothing is stored in the browser.
-      </p>
+    <main className="mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-8">
+      <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
 
-      {/* Plan & usage */}
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Outreach profile
+        </h2>
+        <SenderProfileForm />
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Resources
+        </h2>
+        <div className="overflow-hidden rounded-xl2 border border-white/10">
+          <Link
+            href="/how-it-works"
+            className="flex items-center gap-4 p-5 transition-colors hover:bg-white/[0.03]"
+          >
+            <HelpIcon className="h-5 w-5 shrink-0 text-mist-500" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">How it works</p>
+              <p className="text-sm text-mist-500">The full product walkthrough — search, enrich, approve, send.</p>
+            </div>
+            <span className="text-mist-500">→</span>
+          </Link>
+          <Link
+            href="/pricing"
+            className="flex items-center gap-4 border-t border-white/5 p-5 transition-colors hover:bg-white/[0.03]"
+          >
+            <SparkIcon className="h-5 w-5 shrink-0 text-mist-500" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">Plans &amp; pricing</p>
+              <p className="text-sm text-mist-500">Compare plans, upgrade, or manage your subscription.</p>
+            </div>
+            <span className="text-mist-500">→</span>
+          </Link>
+        </div>
+      </section>
+
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Plan &amp; usage
@@ -81,7 +107,52 @@ export default async function SettingsPage() {
         </div>
       </section>
 
-      {/* Providers */}
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Connect domain / SMTP
+        </h2>
+        <div className="rounded-xl2 border border-white/10 p-5">
+          <p className="text-sm text-mist-300">
+            Sending identity and SMTP credentials are configured via environment variables so
+            keys never hit the browser or the local JSON store. For production deliverability,
+            use a dedicated warmed domain (Maileroo or similar).
+          </p>
+          <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-mist-300">
+            <li>
+              Set <code className="text-aurora-300">SMTP_HOST</code>,{" "}
+              <code className="text-aurora-300">SMTP_PORT</code>,{" "}
+              <code className="text-aurora-300">SMTP_USER</code>,{" "}
+              <code className="text-aurora-300">SMTP_PASS</code> in{" "}
+              <code className="text-aurora-300">.env.local</code> (or Wrangler secrets).
+            </li>
+            <li>
+              Set <code className="text-aurora-300">OUTREACH_FROM_EMAIL</code>,{" "}
+              <code className="text-aurora-300">OUTREACH_FROM_NAME</code>, and{" "}
+              <code className="text-aurora-300">OUTREACH_PHYSICAL_ADDRESS</code>.
+            </li>
+            <li>Restart the server (or redeploy) — status below updates automatically.</li>
+          </ol>
+          <p className="mt-4 text-sm">
+            <Link href="/deliverability" className="text-aurora-300 hover:underline">
+              Deliverability guide →
+            </Link>
+          </p>
+          <div className="mt-5 flex items-center gap-3 rounded-lg border border-white/5 bg-ink-900/40 px-4 py-3">
+            <StatusDot on={caps.smtp} />
+            <div>
+              <p className="text-sm font-medium">
+                {caps.smtp ? "SMTP connected" : "No SMTP configured"}
+              </p>
+              <p className="text-xs text-mist-500">
+                {caps.canSendEmail
+                  ? "Approved sends will be delivered from your domain."
+                  : "Sends run in demo mode — configure SMTP above to go live."}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Integrations
@@ -106,39 +177,38 @@ export default async function SettingsPage() {
         <p className="mt-3 text-sm text-mist-500">
           {caps.canSearchLive
             ? "Live search is active."
-            : "No search key detected — searches use built-in demo leads."}{" "}
-          {caps.canSendEmail
-            ? "Email sending is active."
-            : "No email provider — sends run in demo mode and are not delivered."}
+            : "No search key detected — searches use built-in demo leads."}
         </p>
       </section>
 
-      {/* Sending identity */}
       <section className="mt-10">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Sending identity &amp; compliance
+        <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Sending identity
         </h2>
-        <div className="grid gap-3 rounded-xl2 border border-white/10 p-5 sm:grid-cols-2">
-          <Detail label="From name" value={env.fromName()} envVar="OUTREACH_FROM_NAME" />
-          <Detail label="From email" value={env.fromEmail()} envVar="OUTREACH_FROM_EMAIL" />
-          <Detail label="Reply-to" value={env.replyTo() || "(from email)"} envVar="OUTREACH_REPLY_TO" />
-          <Detail label="Send rate / min" value={String(env.sendRatePerMinute())} envVar="SEND_RATE_PER_MINUTE" />
-          <Detail
-            label="Physical address (CAN-SPAM)"
-            value={env.physicalAddress()}
-            envVar="OUTREACH_PHYSICAL_ADDRESS"
-            full
+        <p className="mb-4 text-sm text-mist-500">
+          Every outbound email uses these values. Placeholders show the platform defaults
+          (set via env vars); filling a field overrides it for your workspace only.
+        </p>
+        <div className="rounded-xl2 border border-white/10 p-5">
+          <EmailSettingsForm
+            initial={{
+              fromName: ws?.fromName ?? null,
+              fromEmail: ws?.fromEmail ?? null,
+              replyTo: ws?.replyTo ?? null,
+              physicalAddress: ws?.physicalAddress ?? null,
+              resendApiKey: ws?.resendApiKey ?? null,
+            }}
+            defaults={{
+              fromName: env.fromName(),
+              fromEmail: env.fromEmail(),
+              replyTo: env.replyTo(),
+              physicalAddress: env.physicalAddress(),
+            }}
+            canEdit={ctx.metered}
           />
         </div>
-        <p className="mt-3 text-sm text-mist-500">
-          Every outbound email includes this from-identity, your physical mailing
-          address, and an unsubscribe placeholder. Wire the unsubscribe link to a
-          real opt-out handler before commercial sending, and review CAN-SPAM /
-          GDPR / CASL as applicable.
-        </p>
       </section>
 
-      {/* Feature flags */}
       <section className="mt-10">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Feature flags
@@ -150,8 +220,7 @@ export default async function SettingsPage() {
               <p className="font-medium">Contact-form automation</p>
               <p className="text-sm text-mist-500">
                 Demo-only stub. OFF by default. Even when enabled it only simulates a
-                submission and never posts to a real site. Requires ToS / legal review
-                before any real use.
+                submission and never posts to a real site.
               </p>
             </div>
             <code className="hidden rounded bg-white/5 px-2 py-1 text-xs text-mist-300 sm:block">
@@ -176,22 +245,3 @@ function StatusDot({ on }: { on: boolean }) {
   );
 }
 
-function Detail({
-  label,
-  value,
-  envVar,
-  full,
-}: {
-  label: string;
-  value: string;
-  envVar: string;
-  full?: boolean;
-}) {
-  return (
-    <div className={full ? "sm:col-span-2" : ""}>
-      <p className="text-xs font-medium text-mist-500">{label}</p>
-      <p className="mt-0.5 break-words text-mist-100">{value}</p>
-      <code className="text-[11px] text-mist-500">{envVar}</code>
-    </div>
-  );
-}

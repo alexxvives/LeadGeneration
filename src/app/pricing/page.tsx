@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { BrandMark } from "@/components/BrandMark";
+import { SiteNav } from "@/components/SiteNav";
+import { authRequired, env, getCapabilities } from "@/lib/config";
 import { PricingCards } from "./PricingCards";
 
 export const metadata = {
@@ -9,28 +9,19 @@ export const metadata = {
 };
 
 export default function PricingPage() {
+  const caps = getCapabilities();
   return (
     <main className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10 aurora-glow opacity-40" />
 
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <Link href="/">
-          <BrandMark />
-        </Link>
-        <nav className="flex items-center gap-6 text-sm text-mist-300">
-          <Link href="/" className="transition-colors hover:text-mist-100">
-            Home
-          </Link>
-          <Link
-            href="/app"
-            className="rounded-full bg-aurora-400 px-4 py-2 font-medium text-ink-950 transition-transform hover:scale-105"
-          >
-            Open the studio
-          </Link>
-        </nav>
-      </header>
+      <SiteNav
+        authRequired={authRequired()}
+        credentialsMode={!authRequired()}
+        magicLink={caps.smtp || caps.resend}
+        turnstileSiteKey={env.turnstileSiteKey() || null}
+      />
 
-      <section className="mx-auto max-w-6xl px-6 pb-24 pt-10 text-center">
+      <section className="mx-auto max-w-7xl px-5 pb-24 pt-10 text-center sm:px-8">
         <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-widest text-aurora-300">
           Pricing
         </span>

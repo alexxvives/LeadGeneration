@@ -1,6 +1,6 @@
 import type { LeadRepository } from "@/lib/db";
 import { newId, nowIso } from "@/lib/id";
-import { runSearch } from "@/lib/search";
+import { runSearch, SearchUnavailableError } from "@/lib/search";
 import { generateDraft } from "@/lib/outreach/draft";
 import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
@@ -8,7 +8,10 @@ import { getPlan } from "@/lib/plans";
 import { QuotaError } from "@/lib/errors";
 import { ensureUsageWindow } from "@/lib/workspace";
 import type {
+  ContactMethod,
+  CrmStage,
   CreateRunInput,
+  FollowUp,
   Lead,
   LeadWithOutreach,
   Outreach,
@@ -77,6 +80,7 @@ export async function createAndRunSearch(
     niche: input.niche.trim(),
     location: input.location?.trim() || null,
     offerNotes: input.offerNotes?.trim() || null,
+    senderName: input.senderName?.trim() || null,
     status: "running",
     mode: "demo",
     provider: "pending",
@@ -105,6 +109,10 @@ export async function createAndRunSearch(
       fitReasons: l.fitReasons,
       sourceUrl: l.sourceUrl,
       status: "new",
+      crmStage: "new",
+      contactMethod: null,
+      notes: null,
+      followUps: [],
       createdAt: nowIso(),
     }));
     await db.createLeads(leads);
@@ -143,13 +151,20 @@ export async function createAndRunSearch(
     return updated ?? run;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const updated = await db.updateRun(run.id, {
+    await db.updateRun(run.id, {
       status: "failed",
       error: message,
       completedAt: nowIso(),
     });
-    return updated ?? run;
+    // Surface "no provider / use Load demo" as a clean client error, not a
+    // successful 201 with an empty board wiping the previous run.
+    if (err instanceof SearchUnavailableError) throw err;
+    throw err instanceof Error ? err : new Error(message);
   }
+}
+
+export async function clearBoard(ctx: Ctx): Promise<void> {
+  await ctx.db.clearWorkspaceData();
 }
 
 export async function getRunWithLeads(
@@ -168,7 +183,8 @@ export async function getLatestBoard(ctx: Ctx): Promise<{
   leads: LeadWithOutreach[];
 }> {
   const runs = await ctx.db.listRuns();
-  const run = runs[0] ?? null;
+  // Prefer the latest completed run so a failed search doesn't blank the board.
+  const run = runs.find((r) => r.status === "complete") ?? runs[0] ?? null;
   if (!run) return { run: null, leads: [] };
   const leads = await ctx.db.listLeads(run.id);
   return { run, leads: await attachOutreach(ctx.db, leads) };
@@ -305,11 +321,21 @@ export async function sendApprovedOutreach(
     };
   }
 
-  const result = await sendEmail({
-    to: outreach.toEmail,
-    subject: outreach.subject,
-    body: outreach.body,
-  });
+  // Pass workspace email identity overrides so each tenant's outreach uses
+  // their own from-name, from-email etc. (configured in Settings → Sending).
+  const wsForEmail = ctx.metered ? await db.getWorkspace(ctx.workspaceId) : null;
+  const result = await sendEmail(
+    { to: outreach.toEmail, subject: outreach.subject, body: outreach.body },
+    wsForEmail
+      ? {
+          fromName: wsForEmail.fromName,
+          fromEmail: wsForEmail.fromEmail,
+          replyTo: wsForEmail.replyTo,
+          physicalAddress: wsForEmail.physicalAddress,
+          resendApiKey: wsForEmail.resendApiKey,
+        }
+      : undefined,
+  );
 
   if (result.ok) {
     recordSend();
@@ -319,7 +345,14 @@ export async function sendApprovedOutreach(
       error: null,
       updatedAt: nowIso(),
     });
-    await db.updateLead(outreach.leadId, { status: "sent" });
+    // Auto-advance CRM stage to "contacted" via email on first send.
+    const lead = await db.getLead(outreach.leadId);
+    const crmPatch: Partial<Lead> = { status: "sent" };
+    if (lead && lead.crmStage === "new") {
+      crmPatch.crmStage = "contacted";
+      crmPatch.contactMethod = "email";
+    }
+    await db.updateLead(outreach.leadId, crmPatch);
     if (ctx.metered) {
       const ws = await db.getWorkspace(ctx.workspaceId);
       if (ws) {
@@ -339,4 +372,32 @@ export async function sendApprovedOutreach(
   });
   await db.updateLead(outreach.leadId, { status: "failed" });
   return { ok: false, outreach: updated ?? undefined, error: result.error };
+}
+
+/** Update per-workspace email sending identity (from name, email, reply-to, etc.). */
+export async function updateWorkspaceEmailSettings(
+  ctx: Ctx,
+  patch: {
+    fromName?: string | null;
+    fromEmail?: string | null;
+    replyTo?: string | null;
+    physicalAddress?: string | null;
+    resendApiKey?: string | null;
+  },
+): Promise<void> {
+  await ctx.db.updateWorkspace(ctx.workspaceId, { ...patch, updatedAt: nowIso() });
+}
+
+/** Update user-managed CRM fields on a lead (stage, contact method, notes, follow-ups). */
+export async function updateLeadCrm(
+  ctx: Ctx,
+  leadId: string,
+  patch: {
+    crmStage?: CrmStage;
+    contactMethod?: ContactMethod | null;
+    notes?: string | null;
+    followUps?: FollowUp[];
+  },
+): Promise<Lead | null> {
+  return ctx.db.updateLead(leadId, patch);
 }

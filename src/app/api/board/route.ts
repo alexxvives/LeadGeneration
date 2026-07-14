@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
-import { getLatestBoard } from "@/lib/service";
+import { clearBoard, getLatestBoard } from "@/lib/service";
 import { getCapabilities } from "@/lib/config";
 
 export const runtime = "nodejs";
@@ -15,4 +15,11 @@ export async function GET() {
     capabilities: getCapabilities(),
     workspace,
   });
+}
+
+/** Clear all runs/leads/outreach for the current workspace. */
+export async function DELETE() {
+  const ctx = await getCtx();
+  await clearBoard(ctx);
+  return NextResponse.json({ ok: true });
 }

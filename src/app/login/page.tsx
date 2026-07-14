@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BrandMark } from "@/components/BrandMark";
+import { SiteNav } from "@/components/SiteNav";
 import { authRequired, env, getCapabilities } from "@/lib/config";
 import { LoginForm } from "./LoginForm";
 
@@ -15,28 +15,30 @@ export default async function LoginPage({
   const caps = getCapabilities();
 
   return (
-    <main className="relative grid min-h-screen place-items-center overflow-hidden px-6 py-16">
+    <main className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10 aurora-glow opacity-40" />
-      <div className="w-full max-w-md">
-        <div className="mb-8 flex justify-center">
-          <Link href="/">
-            <BrandMark size="lg" />
-          </Link>
-        </div>
+      <SiteNav
+        authRequired={authRequired()}
+        credentialsMode={!authRequired()}
+        magicLink={caps.smtp || caps.resend}
+        turnstileSiteKey={caps.turnstile ? env.turnstileSiteKey() : null}
+      />
 
-        <div className="glass rounded-xl2 p-8">
+      <div className="mx-auto grid max-w-md place-items-center px-6 py-10">
+        <div className="glass w-full rounded-xl2 p-8">
           <h1 className="font-display text-2xl font-semibold">Sign in to Lodestar</h1>
           <p className="mt-2 text-sm text-mist-300">
             {authRequired()
-              ? "Enter your email and we'll send you a secure sign-in link."
-              : "Local dev mode — sign in with any email to open the studio."}
+              ? "Enter your email and we'll send you a secure sign-in link (Maileroo SMTP or Resend)."
+              : "Local demo — sign in with any email, or use Open the studio → Continue as guest."}
           </p>
 
           <LoginForm
             credentialsMode={!authRequired()}
-            magicLink={caps.resend}
+            magicLink={caps.smtp || caps.resend}
             turnstileSiteKey={caps.turnstile ? env.turnstileSiteKey() : null}
             callbackUrl={callbackUrl ?? "/app"}
+            preferSmtp={caps.smtp}
           />
         </div>
 

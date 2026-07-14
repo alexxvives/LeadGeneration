@@ -10,6 +10,9 @@ const { auth } = NextAuth(authConfig);
 const PUBLIC_PREFIXES = [
   "/login",
   "/pricing",
+  "/how-it-works",
+  "/ethics",
+  "/deliverability",
   "/api/auth",
   "/api/webhooks/stripe",
   "/api/turnstile",

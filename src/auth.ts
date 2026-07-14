@@ -1,8 +1,10 @@
 import NextAuth from "next-auth";
+import Nodemailer from "next-auth/providers/nodemailer";
 import { D1Adapter } from "@auth/d1-adapter";
 import { authConfig } from "@/auth.config";
 import { getD1Binding } from "@/lib/cf";
 import { getDb } from "@/lib/db";
+import { env, getCapabilities } from "@/lib/config";
 import { getOrCreateWorkspaceForUser } from "@/lib/workspace";
 
 /**
@@ -12,25 +14,40 @@ import { getOrCreateWorkspaceForUser } from "@/lib/workspace";
  * by server helpers (getCtx) — NEVER by middleware, so `fs`/DB stay out of the
  * edge bundle.
  *
- * Lazy (async) config so the D1 binding is resolved per request via
- * getCloudflareContext(). In local dev there is no binding → no adapter (the
- * Credentials provider needs none) and workspaces live in the JSON store.
+ * Magic-link preference: Maileroo via SMTP (Nodemailer) when configured,
+ * otherwise Resend from auth.config. See docs/email-providers.md.
  */
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
   const binding = await getD1Binding();
+  const caps = getCapabilities();
+  const smtp = env.smtp();
+
+  const providers = [...authConfig.providers];
+  if (caps.smtp && smtp.host && smtp.user) {
+    // Prefer Maileroo/SMTP for magic links — insert ahead of Resend if both exist.
+    providers.unshift(
+      Nodemailer({
+        id: "nodemailer",
+        name: "Email",
+        server: {
+          host: smtp.host,
+          port: smtp.port,
+          auth: { user: smtp.user, pass: smtp.pass },
+        },
+        from: env.fromEmail(),
+      }),
+    );
+  }
+
   return {
     ...authConfig,
-    // The adapter's D1Database type comes from @cloudflare/workers-types /
-    // @miniflare; ours is a structural subset. Cast at the boundary.
+    providers,
     adapter: binding
       ? D1Adapter(binding as unknown as Parameters<typeof D1Adapter>[0])
       : undefined,
     callbacks: {
       ...authConfig.callbacks,
       async jwt({ token, user }) {
-        // `user` is only set at sign-in. Provision (or find) the default
-        // workspace once, then cache its id on the token for every later
-        // request — so middleware never needs the DB.
         if (user) {
           const db = getDb(binding);
           const email = user.email ?? null;

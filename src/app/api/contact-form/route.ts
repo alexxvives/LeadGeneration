@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * CONTACT-FORM AUTOMATION — STUB / DEMO ONLY.
+ * Constitution Article I.4 — this invariant must not be removed without an ADR.
  *
  * This endpoint deliberately DOES NOT submit anything to any third-party site.
  * It is gated behind the ENABLE_CONTACT_FORM_AUTOMATION flag (OFF by default)

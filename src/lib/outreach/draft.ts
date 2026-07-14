@@ -42,6 +42,9 @@ export function generateDraft(lead: Lead, run: Run): DraftResult {
   const company = shortCompany(lead);
   const offer = run.offerNotes?.trim();
   const nicheHint = run.niche.trim();
+  // Sign-off uses the sender's display name (from the run, sourced client-side
+  // from the sender profile). Falls back to the configured from-name.
+  const signOff = run.senderName?.trim() || env.fromName();
 
   const subject = offer
     ? `Quick idea for ${company}`
@@ -65,7 +68,7 @@ export function generateDraft(lead: Lead, run: Run): DraftResult {
     "Would it be worth a quick 10-minute call next week to see if it's a fit? If not, no worries at all — just reply and let me know.",
     "",
     `Best,`,
-    env.fromName(),
+    signOff,
     complianceFooter(),
   ].join("\n");
 

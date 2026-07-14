@@ -4,21 +4,13 @@ import ResendProvider from "next-auth/providers/resend";
 import { authRequired, env } from "@/lib/config";
 
 /**
- * Edge-safe base Auth.js config, shared by middleware and the full server
- * config (src/auth.ts). It MUST NOT import the DB (JsonStore pulls in `fs`,
- * which is illegal in the edge/middleware bundle). Anything that touches the
- * database — workspace provisioning, the D1 adapter — lives in src/auth.ts,
- * which is only imported by the Node/Worker route handler + server helpers.
+ * Edge-safe base Auth.js config (used by middleware). Must NOT import
+ * Nodemailer/SMTP — that lives in src/auth.ts (server only).
  *
- * Session strategy is JWT (ADR 0007): no session table, no per-request DB
- * round-trip, and it plays nicely with Cloudflare Workers + the Credentials
- * provider used for local dev.
+ * Magic-link: Resend is registered here when present (fetch-based, edge-safe).
+ * Maileroo/SMTP Nodemailer is added in auth.ts and takes precedence for sends.
  */
 
-// Local-dev credentials provider: accepts any email + password so `npm run dev`
-// works with zero external keys. It is ONLY registered when auth is NOT enforced
-// (i.e. AUTH_SECRET unset), so it can never become an any-password backdoor in
-// production. Production uses the Resend magic-link provider below.
 const devCredentials = Credentials({
   id: "credentials",
   name: "Dev login",
@@ -44,6 +36,7 @@ if (!authRequired()) {
 if (env.authResendKey()) {
   providers.push(
     ResendProvider({
+      id: "resend",
       apiKey: env.authResendKey(),
       from: env.fromEmail(),
     }),
@@ -57,9 +50,6 @@ export const authConfig = {
   pages: { signIn: "/login" },
   providers,
   callbacks: {
-    // Surface workspace + user id onto the session for the app to consume.
-    // The values are put on the token by the DB-aware jwt callback in
-    // src/auth.ts at sign-in; here we only read them (edge-safe, no DB).
     session({ session, token }) {
       if (typeof token.workspaceId === "string") session.workspaceId = token.workspaceId;
       if (typeof token.userId === "string") session.userId = token.userId;

@@ -51,6 +51,9 @@ export interface LeadRepository {
   getOutreach(id: string): Promise<Outreach | null>;
   getOutreachByLead(leadId: string): Promise<Outreach | null>;
   listOutreach(): Promise<Outreach[]>;
+
+  /** Wipe runs/leads/outreach for this workspace (keeps the workspace row). */
+  clearWorkspaceData(): Promise<void>;
 }
 
 /**

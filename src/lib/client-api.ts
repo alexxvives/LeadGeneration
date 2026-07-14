@@ -2,6 +2,10 @@ import type {
   Capabilities,
 } from "@/lib/config";
 import type {
+  ContactMethod,
+  CrmStage,
+  FollowUp,
+  Lead,
   LeadWithOutreach,
   Outreach,
   PlanId,
@@ -9,6 +13,7 @@ import type {
   SearchStrategy,
   WorkspaceSummary,
 } from "@/lib/types";
+import type { LocationSuggestion } from "@/app/api/geocode/route";
 
 export interface BoardResponse {
   run: Run | null;
@@ -56,12 +61,24 @@ export const api = {
     niche: string;
     location?: string;
     offerNotes?: string;
+    senderName?: string;
     searchStrategy?: SearchStrategy;
+    demo?: boolean;
   }) =>
     jsonFetch<{ run: Run }>("/api/runs", {
       method: "POST",
       body: JSON.stringify(input),
     }),
+
+  clearBoard: () =>
+    jsonFetch<{ ok: boolean }>("/api/board", { method: "DELETE" }),
+
+  geocode: (q: string) =>
+    jsonFetch<{ coords: { lat: number; lng: number } | null }>(
+      `/api/geocode?q=${encodeURIComponent(q)}`,
+    ),
+
+  listRuns: () => jsonFetch<{ runs: Run[] }>("/api/runs"),
 
   runWithLeads: (id: string) =>
     jsonFetch<{ run: Run; leads: LeadWithOutreach[] }>(`/api/runs/${id}`),
@@ -87,6 +104,21 @@ export const api = {
       body: JSON.stringify({ outreachId }),
     }),
 
+  updateLead: (
+    id: string,
+    patch: {
+      crmStage?: CrmStage;
+      contactMethod?: ContactMethod | null;
+      notes?: string | null;
+      followUps?: FollowUp[];
+    },
+  ) => jsonFetch<{ lead: Lead }>(`/api/leads/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+
+  suggestLocations: (q: string) =>
+    jsonFetch<{ suggestions: LocationSuggestion[] }>(
+      `/api/geocode?suggest=1&q=${encodeURIComponent(q)}`,
+    ),
+
   checkout: (planId: PlanId) =>
     jsonFetch<{ url: string | null }>("/api/billing/checkout", {
       method: "POST",
@@ -95,4 +127,15 @@ export const api = {
 
   portal: () =>
     jsonFetch<{ url: string | null }>("/api/billing/portal", { method: "POST" }),
+
+  firecrawlUsage: () =>
+    jsonFetch<FirecrawlUsage>("/api/providers/firecrawl/usage"),
+};
+
+export type FirecrawlUsage = {
+  available: boolean;
+  provider: "firecrawl";
+  remainingCredits: number | null;
+  planCredits: number | null;
+  error?: string;
 };

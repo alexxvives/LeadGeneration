@@ -24,11 +24,13 @@ export function LoginForm({
   magicLink,
   turnstileSiteKey,
   callbackUrl,
+  preferSmtp = false,
 }: {
   credentialsMode: boolean;
   magicLink: boolean;
   turnstileSiteKey: string | null;
   callbackUrl: string;
+  preferSmtp?: boolean;
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -102,7 +104,25 @@ export function LoginForm({
           router.refresh();
         }
       } else {
-        await signIn("resend", { email: trimmed, redirect: false, redirectTo: callbackUrl });
+        const provider = preferSmtp ? "nodemailer" : "resend";
+        const primary = await signIn(provider, {
+          email: trimmed,
+          redirect: false,
+          redirectTo: callbackUrl,
+        });
+        if (primary?.error && preferSmtp) {
+          await signIn("resend", {
+            email: trimmed,
+            redirect: false,
+            redirectTo: callbackUrl,
+          });
+        } else if (primary?.error && !preferSmtp) {
+          await signIn("nodemailer", {
+            email: trimmed,
+            redirect: false,
+            redirectTo: callbackUrl,
+          });
+        }
         setSent(true);
       }
     } catch {
@@ -170,8 +190,8 @@ export function LoginForm({
 
       {!useCredentials && !magicLink && (
         <p className="rounded-lg bg-amber-400/10 px-3 py-2 text-sm text-amber-200/80">
-          No sign-in provider is configured. Set <code>AUTH_RESEND_KEY</code> to enable
-          magic-link login.
+          No sign-in provider is configured. Set SMTP (Maileroo recommended) or{" "}
+          <code>AUTH_RESEND_KEY</code> to enable magic-link login.
         </p>
       )}
 

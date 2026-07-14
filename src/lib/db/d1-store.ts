@@ -1,4 +1,4 @@
-import type { Lead, Outreach, Run, Workspace, PlanId } from "@/lib/types";
+import type { Lead, Outreach, Run, Workspace, PlanId, CrmStage, ContactMethod, FollowUp } from "@/lib/types";
 import type { LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -55,6 +55,12 @@ type WorkspaceRow = {
   resets_at: string | null;
   created_at: string;
   updated_at: string;
+  // Email settings (migration 0006)
+  from_name: string | null;
+  from_email: string | null;
+  reply_to: string | null;
+  physical_address: string | null;
+  resend_api_key: string | null;
 };
 
 type RunRow = {
@@ -63,6 +69,7 @@ type RunRow = {
   niche: string;
   location: string | null;
   offer_notes: string | null;
+  sender_name: string | null;
   status: Run["status"];
   mode: Run["mode"];
   provider: string;
@@ -88,6 +95,10 @@ type LeadRow = {
   fit_reasons: string;
   source_url: string;
   status: Lead["status"];
+  crm_stage: string | null;
+  contact_method: string | null;
+  notes: string | null;
+  follow_ups: string | null; // JSON-encoded FollowUp[]
   created_at: string;
 };
 
@@ -129,6 +140,11 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
     resetsAt: r.resets_at,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    fromName: r.from_name ?? null,
+    fromEmail: r.from_email ?? null,
+    replyTo: r.reply_to ?? null,
+    physicalAddress: r.physical_address ?? null,
+    resendApiKey: r.resend_api_key ?? null,
   };
 }
 
@@ -139,6 +155,7 @@ function rowToRun(r: RunRow): Run {
     niche: r.niche,
     location: r.location,
     offerNotes: r.offer_notes,
+    senderName: r.sender_name ?? null,
     status: r.status,
     mode: r.mode,
     provider: r.provider,
@@ -148,6 +165,10 @@ function rowToRun(r: RunRow): Run {
     completedAt: r.completed_at,
   };
 }
+
+const parseFollowUps = (s: string | null | undefined): FollowUp[] => {
+  try { return JSON.parse(s ?? "[]"); } catch { return []; }
+};
 
 function rowToLead(r: LeadRow): Lead {
   return {
@@ -166,6 +187,10 @@ function rowToLead(r: LeadRow): Lead {
     fitReasons: arr(r.fit_reasons),
     sourceUrl: r.source_url,
     status: r.status,
+    crmStage: (r.crm_stage as CrmStage) ?? "new",
+    contactMethod: (r.contact_method as ContactMethod) ?? null,
+    notes: r.notes ?? null,
+    followUps: parseFollowUps(r.follow_ups),
     createdAt: r.created_at,
   };
 }
@@ -276,6 +301,11 @@ export class D1Store implements LeadRepository {
     if ("resetsAt" in patch) row.resets_at = patch.resetsAt ?? null;
     if ("createdAt" in patch) row.created_at = patch.createdAt;
     if ("updatedAt" in patch) row.updated_at = patch.updatedAt;
+    if ("fromName" in patch) row.from_name = patch.fromName ?? null;
+    if ("fromEmail" in patch) row.from_email = patch.fromEmail ?? null;
+    if ("replyTo" in patch) row.reply_to = patch.replyTo ?? null;
+    if ("physicalAddress" in patch) row.physical_address = patch.physicalAddress ?? null;
+    if ("resendApiKey" in patch) row.resend_api_key = patch.resendApiKey ?? null;
 
     if (Object.keys(row).length === 0) return this.getWorkspace(id);
     const { clause, values } = buildSet(row);
@@ -292,9 +322,9 @@ export class D1Store implements LeadRepository {
     await this.db
       .prepare(
         `INSERT INTO runs
-         (id, workspace_id, niche, location, offer_notes, status, mode, provider,
+         (id, workspace_id, niche, location, offer_notes, sender_name, status, mode, provider,
           lead_count, error, created_at, completed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         run.id,
@@ -302,6 +332,7 @@ export class D1Store implements LeadRepository {
         run.niche,
         run.location,
         run.offerNotes,
+        run.senderName,
         run.status,
         run.mode,
         run.provider,
@@ -319,6 +350,7 @@ export class D1Store implements LeadRepository {
     if ("niche" in patch) row.niche = patch.niche;
     if ("location" in patch) row.location = patch.location ?? null;
     if ("offerNotes" in patch) row.offer_notes = patch.offerNotes ?? null;
+    if ("senderName" in patch) row.sender_name = patch.senderName ?? null;
     if ("status" in patch) row.status = patch.status;
     if ("mode" in patch) row.mode = patch.mode;
     if ("provider" in patch) row.provider = patch.provider;
@@ -362,8 +394,8 @@ export class D1Store implements LeadRepository {
           `INSERT INTO leads
            (id, workspace_id, run_id, company, website, emails, phones, contact_name,
             location, about_blurb, tags, fit_score, fit_reasons, source_url,
-            status, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            status, crm_stage, contact_method, notes, follow_ups, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           l.id,
@@ -381,6 +413,10 @@ export class D1Store implements LeadRepository {
           str(l.fitReasons),
           l.sourceUrl,
           l.status,
+          l.crmStage ?? "new",
+          l.contactMethod ?? null,
+          l.notes ?? null,
+          JSON.stringify(l.followUps ?? []),
           l.createdAt,
         ),
     );
@@ -403,6 +439,10 @@ export class D1Store implements LeadRepository {
     if ("fitReasons" in patch) row.fit_reasons = str(patch.fitReasons!);
     if ("sourceUrl" in patch) row.source_url = patch.sourceUrl;
     if ("status" in patch) row.status = patch.status;
+    if ("crmStage" in patch) row.crm_stage = patch.crmStage;
+    if ("contactMethod" in patch) row.contact_method = patch.contactMethod ?? null;
+    if ("notes" in patch) row.notes = patch.notes ?? null;
+    if ("followUps" in patch) row.follow_ups = JSON.stringify(patch.followUps ?? []);
     if ("createdAt" in patch) row.created_at = patch.createdAt;
 
     if (Object.keys(row).length === 0) return this.getLead(id);
@@ -522,5 +562,20 @@ export class D1Store implements LeadRepository {
       .bind(this.workspaceId)
       .all<OutreachRow>();
     return results.map(rowToOutreach);
+  }
+
+  async clearWorkspaceData(): Promise<void> {
+    await this.db
+      .prepare(`DELETE FROM outreach WHERE workspace_id = ?`)
+      .bind(this.workspaceId)
+      .run();
+    await this.db
+      .prepare(`DELETE FROM leads WHERE workspace_id = ?`)
+      .bind(this.workspaceId)
+      .run();
+    await this.db
+      .prepare(`DELETE FROM runs WHERE workspace_id = ?`)
+      .bind(this.workspaceId)
+      .run();
   }
 }

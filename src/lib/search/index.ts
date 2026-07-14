@@ -7,6 +7,7 @@ import {
   domainFromUrl,
   extractBlurb,
   extractEmails,
+  extractLocation,
   extractPhones,
 } from "./enrich";
 import { exaProvider } from "./exa";
@@ -27,11 +28,19 @@ export interface SearchOutcome {
   provider: string;
   mode: "demo" | "live";
   leads: ScoredLead[];
+  /** Human-readable reason when a live search produced no leads. */
+  emptyReason?: string;
+}
+
+export class SearchUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SearchUnavailableError";
+  }
 }
 
 function pickProvider(): SearchProvider | null {
   const caps = getCapabilities();
-  // Prefer Firecrawl (scrapes full page content) then Exa.
   if (caps.firecrawl) return firecrawlProvider();
   if (caps.exa) return exaProvider();
   return null;
@@ -39,12 +48,14 @@ function pickProvider(): SearchProvider | null {
 
 function pageToRawLead(page: PageResult, input: CreateRunInput): RawLead {
   const haystack = `${page.title ?? ""}\n${page.description ?? ""}\n${page.content}`;
+  const scrapedLocation = extractLocation(haystack);
   return {
     company: companyFromTitleOrUrl(page.title, page.url),
     website: domainFromUrl(page.url) ? `https://${domainFromUrl(page.url)}` : page.url,
     emails: extractEmails(haystack),
     phones: extractPhones(haystack),
-    location: input.location?.trim() || null,
+    // Prefer a page-scraped address; fall back to the search Location field.
+    location: scrapedLocation || input.location?.trim() || null,
     aboutBlurb: extractBlurb(page.content || page.description || "") ?? page.description ?? null,
     tags: [input.niche.split(/\s+/)[0]?.toLowerCase() ?? "lead"],
   };
@@ -55,7 +66,6 @@ function finalize(raw: RawLead, sourceUrl: string, input: CreateRunInput): Score
   return { ...raw, sourceUrl, fitScore: score, fitReasons: reasons, contactName: null };
 }
 
-/** Normalize a URL for dedup (drop protocol, trailing slash, and #fragment). */
 function urlKey(url: string): string {
   return url
     .replace(/^https?:\/\//i, "")
@@ -64,12 +74,6 @@ function urlKey(url: string): string {
     .toLowerCase();
 }
 
-/**
- * Run every query for the chosen strategy against the live provider, merging
- * the results. Queries run sequentially so a single upstream 429 doesn't
- * cascade, and a failure on one variant doesn't sink the whole run. Returns the
- * deduped page set, or an empty array if the provider produced nothing usable.
- */
 async function collectPages(
   provider: SearchProvider,
   queries: string[],
@@ -91,43 +95,54 @@ async function collectPages(
 }
 
 /**
- * Run search + enrichment. Uses a live provider when a key is present, and
- * gracefully falls back to demo data if no key exists OR the live call fails.
+ * Run search + enrichment.
  *
- * `smart`/`local` strategies expand the ICP into several queries (more
- * provider calls / credits) and rank the merged, deduped results by fit score.
+ * Demo leads are returned ONLY when `input.demo === true` (Load demo data).
+ * Live searches never silently fall back to demo — empty/missing providers
+ * surface a clear error so the board stays empty until the user chooses.
  */
 export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
   const limit = env.maxLeadsPerRun();
+
+  if (input.demo) {
+    const demo = demoLeads(input, limit).map((raw, i) =>
+      finalize(raw, raw.website ?? `https://demo.example.com/${i}`, input),
+    );
+    return { provider: "demo", mode: "demo", leads: demo };
+  }
+
   const strategy = input.searchStrategy ?? "standard";
   const queries = buildQueries(input, strategy);
   const multiQuery = queries.length > 1;
   const provider = pickProvider();
 
-  if (provider) {
-    const pages = await collectPages(provider, queries, limit);
-    if (pages.length > 0) {
-      const seen = new Set<string>();
-      const leads = pages
-        .map((p) => finalize(pageToRawLead(p, input), p.url, input))
-        .filter((l) => {
-          const key = domainFromUrl(l.website) ?? l.company;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-      // For expanded searches, surface the strongest fits first and cap to the
-      // per-run limit (single-query keeps the provider's native ranking).
-      const ranked = multiQuery
-        ? leads.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit)
-        : leads;
-      return { provider: provider.name, mode: "live", leads: ranked };
-    }
-    // Live provider returned nothing — fall through to demo so the UI is usable.
+  if (!provider) {
+    throw new SearchUnavailableError(
+      "No search provider configured. Add FIRECRAWL_API_KEY or EXA_API_KEY, or click “Load demo data”.",
+    );
   }
 
-  const demo = demoLeads(input, limit).map((raw, i) =>
-    finalize(raw, raw.website ?? `https://demo.example.com/${i}`, input),
-  );
-  return { provider: "demo", mode: "demo", leads: demo };
+  const pages = await collectPages(provider, queries, limit);
+  if (pages.length === 0) {
+    return {
+      provider: provider.name,
+      mode: "live",
+      leads: [],
+      emptyReason: "Search returned no usable pages. Try a broader niche or different location.",
+    };
+  }
+
+  const seen = new Set<string>();
+  const leads = pages
+    .map((p) => finalize(pageToRawLead(p, input), p.url, input))
+    .filter((l) => {
+      const key = domainFromUrl(l.website) ?? l.company;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  const ranked = multiQuery
+    ? leads.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit)
+    : leads;
+  return { provider: provider.name, mode: "live", leads: ranked };
 }

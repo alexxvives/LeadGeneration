@@ -18,6 +18,7 @@ export function LeadTable({
           <thead>
             <tr className="border-b border-white/10 text-left text-xs uppercase tracking-widest text-mist-500">
               <th className="px-5 py-3 font-medium">Company</th>
+              <th className="px-5 py-3 font-medium">Location</th>
               <th className="px-5 py-3 font-medium">Contact</th>
               <th className="px-5 py-3 font-medium">Fit</th>
               <th className="px-5 py-3 font-medium">Status</th>
@@ -37,6 +38,7 @@ export function LeadTable({
                     <p className="font-medium text-mist-100">{l.company}</p>
                     {domain && <p className="text-xs text-mist-500">{domain}</p>}
                   </td>
+                  <td className="px-5 py-3.5 text-mist-300">{l.location ?? "—"}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3 text-xs">
                       <span className={`inline-flex items-center gap-1 ${l.emails.length ? "text-aurora-300" : "text-mist-500"}`}>

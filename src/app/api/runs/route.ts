@@ -11,7 +11,9 @@ const CreateRunSchema = z.object({
   niche: z.string().min(2, "Describe who you want to reach").max(200),
   location: z.string().max(120).optional().nullable(),
   offerNotes: z.string().max(1000).optional().nullable(),
+  senderName: z.string().max(120).optional().nullable(),
   searchStrategy: z.enum(["standard", "smart", "local"]).optional(),
+  demo: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -46,6 +48,9 @@ export async function POST(req: Request) {
         { error: err.message, quota: { kind: err.kind, planId: err.planId, limit: err.limit } },
         { status: 402 },
       );
+    }
+    if (err instanceof Error && err.name === "SearchUnavailableError") {
+      return NextResponse.json({ error: err.message }, { status: 400 });
     }
     throw err;
   }

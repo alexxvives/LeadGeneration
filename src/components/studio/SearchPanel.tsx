@@ -1,22 +1,142 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SearchIcon, ArrowIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import type { SearchStrategy } from "@/lib/types";
+import { loadSenderProfile } from "@/lib/sender-profile";
+import { api } from "@/lib/client-api";
+import type { LocationSuggestion } from "@/app/api/geocode/route";
 
 export interface SearchValues {
   niche: string;
   location: string;
-  offerNotes: string;
+  senderName: string;
   searchStrategy: SearchStrategy;
 }
 
-const STRATEGIES: { id: SearchStrategy; label: string; hint: string }[] = [
-  { id: "standard", label: "Standard", hint: "One quick query — fastest, fewest credits." },
-  { id: "smart", label: "Smart", hint: "Expands your ICP into several queries and ranks the best fits. Uses more credits." },
-  { id: "local", label: "Local", hint: "Tuned for brick-and-mortar / near-me businesses (directories, reviews, phone)." },
+const STRATEGIES: {
+  id: SearchStrategy;
+  label: string;
+  summary: string;
+  detail: string;
+  credits: string;
+  bestFor: string;
+}[] = [
+  {
+    id: "standard",
+    label: "Standard",
+    summary: "One focused query — fastest path from ICP to a shortlist.",
+    detail:
+      'Runs a single search like "[niche] [location] contact email". Best when you already know the niche and just want a first pass of websites with contact hints. Lowest provider usage (~1 credit unit per run).',
+    credits: "~1× credits",
+    bestFor: "Quick tests, narrow niches, demo runs",
+  },
+  {
+    id: "smart",
+    label: "Smart",
+    summary: "Expands your ICP into several queries, merges results, ranks by fit.",
+    detail:
+      "Builds multiple query variants (contact email, official website, top/best lists), runs them sequentially, dedupes by domain, then sorts by Lodestar's transparent fit score. Higher recall for vague or competitive niches.",
+    credits: "~3× credits",
+    bestFor: "Competitive markets, vague ICPs, quality over speed",
+  },
 ];
+
+// ─── Location autocomplete combobox ──────────────────────────────────────────
+
+function LocationCombobox({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [inputValue, setInputValue] = useState(value);
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Keep internal input in sync when parent resets.
+  useEffect(() => { setInputValue(value); }, [value]);
+
+  // Close dropdown on outside click.
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleInput = (raw: string) => {
+    setInputValue(raw);
+    onChange(raw); // keep parent in sync with freetext too
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (raw.trim().length < 2) { setSuggestions([]); setOpen(false); return; }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const { suggestions: s } = await api.suggestLocations(raw);
+        setSuggestions(s);
+        setOpen(s.length > 0);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 350);
+  };
+
+  const pick = (s: LocationSuggestion) => {
+    setInputValue(s.value);
+    onChange(s.value);
+    setSuggestions([]);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="relative">
+        <input
+          value={inputValue}
+          onChange={(e) => handleInput(e.target.value)}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          placeholder=""
+          className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60 pr-8"
+        />
+        {loading && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2">
+            <Spinner className="h-3.5 w-3.5 text-mist-500" />
+          </span>
+        )}
+      </div>
+
+      {open && suggestions.length > 0 && (
+        <ul className="absolute z-40 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-ink-900 shadow-xl">
+          {suggestions.map((s, i) => (
+            <li key={`${s.label}-${i}`}>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); pick(s); }}
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-mist-100 transition-colors hover:bg-white/5"
+              >
+                <span className="text-mist-500">📍</span>
+                {s.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ─── Search panel ─────────────────────────────────────────────────────────────
 
 export function SearchPanel({
   onSearch,
@@ -29,17 +149,22 @@ export function SearchPanel({
 }) {
   const [niche, setNiche] = useState("");
   const [location, setLocation] = useState("");
-  const [offerNotes, setOfferNotes] = useState("");
   const [searchStrategy, setSearchStrategy] = useState<SearchStrategy>("standard");
+  const [senderName, setSenderName] = useState("");
   const [open, setOpen] = useState(!compact);
+
+  useEffect(() => {
+    const profile = loadSenderProfile();
+    setSenderName(profile.displayName);
+  }, []);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!niche.trim() || running) return;
-    onSearch({ niche, location, offerNotes, searchStrategy });
+    onSearch({ niche, location, senderName, searchStrategy });
   };
 
-  const activeHint = STRATEGIES.find((s) => s.id === searchStrategy)?.hint ?? "";
+  const active = STRATEGIES.find((s) => s.id === searchStrategy) ?? STRATEGIES[0]!;
 
   if (compact && !open) {
     return (
@@ -61,28 +186,12 @@ export function SearchPanel({
             autoFocus
             value={niche}
             onChange={(e) => setNiche(e.target.value)}
-            placeholder="dentist clinics, indie coffee roasters, HVAC contractors…"
+            placeholder=""
             className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60"
           />
         </Field>
-        <Field label="Location" hint="Optional">
-          <input
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="Austin, TX"
-            className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60"
-          />
-        </Field>
-      </div>
-      <div className="mt-4">
-        <Field label="Your offer / pitch notes" hint="Optional — used to personalize drafts">
-          <textarea
-            value={offerNotes}
-            onChange={(e) => setOfferNotes(e.target.value)}
-            rows={2}
-            placeholder="We build booking sites that turn website visitors into scheduled appointments…"
-            className="w-full resize-none rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60"
-          />
+        <Field label="Location" hint="Optional — narrows search + powers map">
+          <LocationCombobox value={location} onChange={setLocation} />
         </Field>
       </div>
       <div className="mt-4">
@@ -96,17 +205,17 @@ export function SearchPanel({
           className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1"
         >
           {STRATEGIES.map((s) => {
-            const active = s.id === searchStrategy;
+            const isActive = s.id === searchStrategy;
             return (
               <button
                 key={s.id}
                 type="button"
                 role="radio"
-                aria-checked={active}
-                title={s.hint}
+                aria-checked={isActive}
+                title={s.summary}
                 onClick={() => setSearchStrategy(s.id)}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  active
+                  isActive
                     ? "bg-aurora-400 text-ink-950"
                     : "text-mist-300 hover:text-mist-100"
                 }`}
@@ -116,9 +225,16 @@ export function SearchPanel({
             );
           })}
         </div>
+
+        <div className="mt-3 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
+          <p className="text-sm font-medium text-mist-100">{active.summary}</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-mist-400">{active.detail}</p>
+          <p className="mt-2 text-[11px] uppercase tracking-wider text-mist-500">
+            Best for · {active.bestFor}
+          </p>
+        </div>
       </div>
-      <div className="mt-5 flex items-center justify-between gap-4">
-        <p className="text-xs text-mist-500">{activeHint}</p>
+      <div className="mt-5 flex items-center justify-end gap-4">
         <button
           type="submit"
           disabled={!niche.trim() || running}
