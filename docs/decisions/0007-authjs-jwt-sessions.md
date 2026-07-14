@@ -32,11 +32,14 @@ present) purely so the magic-link flow can store `users`/`verification_tokens`.
 Sessions remain JWT; the adapter is not used for session storage.
 
 **Config is split** to respect the edge boundary:
-- `src/auth.config.ts` — edge-safe base (providers, secret, JWT strategy, the
-  `session` callback). No DB imports. Used by `middleware.ts`.
-- `src/auth.ts` — full server config: adds the D1 adapter and the
-  workspace-provisioning `jwt` callback (which touches the DB). Imported only by
-  the `/api/auth` route and server helpers (`getCtx`) — never by middleware.
+- `src/auth.config.ts` — edge-safe base (Credentials for keyless dev, secret,
+  JWT strategy, the `session` callback). **No email providers, no DB.** Used by
+  `middleware.ts`. Email/magic-link providers require an adapter; registering
+  them here caused Auth.js `MissingAdapter` noise in middleware.
+- `src/auth.ts` — full server config: D1 adapter (when a binding exists),
+  email providers (Nodemailer/SMTP preferred, else Resend) **only when the
+  adapter is present**, and the workspace-provisioning `jwt` callback. Imported
+  only by the `/api/auth` route and server helpers (`getCtx`) — never by middleware.
 
 Workspace provisioning happens in the `jwt` callback **only at sign-in** (when
 `user` is set): it finds-or-creates the user's default workspace and caches

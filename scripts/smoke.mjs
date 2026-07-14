@@ -43,6 +43,7 @@ async function main() {
       niche: "smoke-test roofers",
       location: "Denver, CO",
       offerNotes: "We build lead-capture landing pages.",
+      demo: true,
     }),
   });
   check("run created (201)", run.status === 201, `got ${run.status}`);

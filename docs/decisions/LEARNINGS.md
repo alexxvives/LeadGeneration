@@ -4,6 +4,117 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-14 — Auth edge split, lockfile, Studio modularize, docs hygiene
+- **Email providers must not live in `auth.config.ts`.** Auth.js asserts an
+  adapter whenever an email/magic-link provider is registered. Middleware uses
+  the edge config with no adapter → `MissingAdapter` spam whenever
+  `RESEND_API_KEY` is set locally. Fix: Credentials-only on the edge; Resend +
+  Nodemailer only in `auth.ts` **and only when a D1 adapter exists**.
+- **`package.json` / `package-lock.json` must stay in sync for Cloudflare.**
+  CF builds use `npm ci`. Adding `@dnd-kit/*` + `leaflet` to `package.json`
+  without regenerating/committing the lockfile fails install with "Missing: …".
+- **Studio split:** keep orchestration in `Studio.tsx`; Pipeline kanban →
+  `PipelineView.tsx`, runs list → `RunsView.tsx`, empty/layout chrome →
+  `StudioHelpers.tsx`. Dead `AccountMenu.tsx` removed (sign-out is in shell).
+- **Docs inventory:** keep all ADRs (superseded 0003 is history, not clutter).
+  Keep `business-plan.md` (strategy) vs `commercialization.md` (build) separate —
+  cross-link only. No merge of email-providers into how-it-works.
+- **Chrome DevTools for agents** (Chrome 150+ / chrome-devtools-mcp): memory
+  snapshots, extension mgmt, bundled skills, URL allow/block patterns. Useful
+  for agent UI debugging when Playwright alone isn't enough — see
+  https://developer.chrome.com/blog/new-in-devtools-150/#devtools-for-agents
+
+### 2026-07-14 — CRM stage model + Pipeline dnd-kit + follow-ups + location autocomplete
+- **CRM stage is a separate field from email-workflow status.** `LeadStatus`
+  (queued/approved/sent/…) drives the email flow; `CrmStage` (new/contacted/
+  in_conversation/closed/not_interested) drives the Pipeline kanban. The two
+  concerns are fully independent — both live on the Lead.
+- **Auto-advancing crmStage on send.** When `sendApprovedOutreach` succeeds,
+  `service.ts` reads the current lead's `crmStage` and advances it from "new"
+  to "contacted" (with `contactMethod: "email"`) only if it's still "new". Any
+  manually set stage is left untouched.
+- **dnd-kit PointerSensor + `distance: 8` cleanly separates click from drag.**
+  Cards have a separate grip handle icon for the drag `listeners`; the click
+  area (`onClick`) is a sibling button. This avoids the drag/click collision
+  without any custom state tracking.
+- **LocationSuggestion type exported from the route file.** The geocode route
+  exports `LocationSuggestion` as a named type so `client-api.ts` can import
+  it with `import type` — keeps the type colocated with the API that produces it.
+- **Unicode curly quotes inside TypeScript string literals break the parser.**
+  `"` (U+201C) and `"` (U+201D) are treated as string terminators by the tsc
+  parser, not as ordinary characters. Fix: use ASCII `"` or single-quote strings.
+- **`followUps` stored as JSON TEXT in D1** (same pattern as `emails`, `phones`,
+  etc.). The `parseFollowUps` helper in `d1-store.ts` deserialises safely.
+
+### 2026-07-14 — Codebase + docs audit
+
+- **`docs/commercialization.md` was actively misleading.** It was written when
+  Supabase was the planned stack (before ADR 0005 switched to D1/Auth.js). The
+  copy-paste prompt inside it said "Auth + DB: Supabase" — an agent following it
+  would build the wrong thing. Rewritten to reflect the actual D1/Auth.js stack
+  and current phase status (all four commercial phases built; only deployment
+  remains).
+- **`GET /api/outreach` does not exist** — the route file only has `POST`. No
+  dead route to clean up. `listOutreach()` exists on `LeadRepository` but is not
+  exposed to the client, which is correct (board data comes through `/api/board`).
+- **"New" pipeline column is intentionally always empty.** Auto-drafting during
+  the run moves every lead from `new` → `queued` immediately. This is a known
+  UX quirk documented now in `how-it-works.md` §3. The fix (when desired) is a
+  separate `crmStage` field on Lead that the user advances manually — keeping the
+  email-workflow status (`queued/approved/sent`) separate from the CRM stage
+  (`New/Contacted/In Conversation/Closed/Not Interested`).
+- **Improvement backlog recorded.** Top items: location geo-picker (multi-select
+  country/city), CRM stage model (prerequisite for drag-and-drop + follow-ups),
+  bulk draft/approve, lead notes, saved ICPs, Outreach tab consolidation into
+  Pipeline, keyboard shortcuts in the drawer.
+
+### 2026-07-14 — Phase A finish + Phase B lead quality
+- **Sender name is API-safe via the Run, not localStorage.** Added `Run.senderName`
+  (types → both stores → migration `0004`). The client puts the sender-profile
+  `displayName` into the create-run payload; `generateDraft` reads `run.senderName`.
+  The compliance footer keeps the **env** from-identity (`OUTREACH_FROM_*`) — only the
+  sign-off is personalized. Keeps constitution Art. III.5 (no secrets/localStorage on
+  server) intact and makes re-drafts consistent.
+- **"Open run on board" = pin an `activeRunId` and overlay it in `refresh()`.** The
+  board API still returns the latest run + capabilities/workspace; when a run is pinned
+  we fetch `/api/runs/{id}` and overlay `{run, leads}`. A new search / demo / clear
+  resets the pin. Avoids a second board endpoint.
+- **Better company names:** many scraped titles are page names ("Contact Us", "Home").
+  Split the title on separators, skip a generic-segment set, take the first brand
+  segment, else prettify the domain base. Existing saved leads keep old names — only
+  new runs benefit (naming happens at enrich time).
+- **Email hygiene** lives in `extractEmails`: plausibility (single @, dotted 2–24 TLD,
+  no edge/double dots), disposable-domain + no-reply/junk filtering, and personal-
+  before-generic (`info@`, `hello@`) ranking so the most contactable address is primary.
+- **`City, ST` needs a real region code.** Validating the 2-letter code against a
+  US/CA set removes prose false-positives ("Learn, MO…") that were polluting map pins.
+- **`npm run smoke` aborts natively on Windows** (`Assertion failed:
+  !(handle->flags & UV_HANDLE_CLOSING)`, libuv async.c) on the **2nd** `fetch` —
+  localhost *and* 127.0.0.1, with/without `--experimental-strip-types`. It's a Node/
+  undici keep-alive teardown bug, not app code (create-run + all executed asserts pass;
+  the browser hits `/api/board` fine). Verified the flow via Playwright + in-page
+  `fetch` instead. TODO: give the harness a no-keep-alive dispatcher.
+
+### 2026-07-14 — Funnel UX + map Playwright proof + credit copy
+- Map blank was Leaflet remount + tile CDN fragility; Playwright confirmed fix
+  (tiles + 11 markers). OSM tiles used instead of Carto-only.
+- Firecrawl remaining can exceed monthly plan allotment (rollovers) — never render
+  as `remaining / plan left`; show `N credits left · plan/mo`.
+- Marketing Sign in ≠ Open studio. Sidebar gained Pipeline / Runs / Export / Help.
+- Strategy recorded in `docs/roadmap-next.md`: features/funnel before more UI MCPs.
+
+### 2026-07-14 — UX pass: nav consistency, sidebar, map, Maileroo-first, Firecrawl formats
+- Shared `SiteNav` on landing/pricing/login; studio uses `StudioShell` sidebar with
+  hover-animated icons. Auth modal gates "Open the studio" (guest continue in demo).
+- Leads default to **table**; added **Map** view (Leaflet + Nominatim geocode of
+  search location, jittered pins — leads only store a location string today).
+- Firecrawl search no longer sends `scrapeOptions.formats` on `/v1/search` (that
+  path was returning format validation errors); search first, then `/v1/scrape`
+  markdown for top hits.
+- Email preference aligned with `docs/email-providers.md`: **SMTP/Maileroo first**,
+  Resend optional. Magic-link Nodemailer provider registered in `auth.ts` (server);
+  sender.ts tries SMTP before Resend.
+
 ### 2026-07-14 — Commercial build (Phases 1–4): auth, workspaces, plans, Stripe, deploy
 Shipped the full commercial MVP in one pass. Key facts learned:
 - **`@opennextjs/cloudflare` exposes `getCloudflareContext()`**, not the older

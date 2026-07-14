@@ -2,6 +2,9 @@
 
 _Working draft. Market figures/pricing sampled mid-2026; validate before acting._
 
+> **Sibling doc:** technical build status for auth/plans/Stripe lives in
+> [`commercialization.md`](commercialization.md). This file is strategy/market only.
+
 ---
 
 ## 1. Executive summary

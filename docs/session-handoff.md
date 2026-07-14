@@ -9,76 +9,48 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-14
+## ⏱️ Status — updated 2026-07-14 (auth fix, Studio split, docs sync, lockfile)
 
-**Stage:** **Commercial MVP built — Phases 1–4 complete** (Auth.js + workspaces,
-plans + usage metering, `/pricing` + Stripe, Cloudflare Workers deploy config).
-Code is `tsc`/`lint`/`smoke`-clean and `next build`-clean. **Not yet deployed or
-live-verified** — needs a Cloudflare account + real Stripe/Resend keys (see below).
+**Stage:** CRM Pipeline working. Studio UI modularized. Docs synced to Search /
+Pipeline product shape. Commercial code complete; deploy remains.
 
-**Works today (local, zero keys):** full Search → Enrich → Draft → Approve → Send
-flow in demo mode, per-lead approval + rate limiting — unchanged. Auth + metering
-stay OFF until `AUTH_SECRET` is set, so `npm run dev` is always the open demo.
+**Works today (local, zero keys):** Search → Enrich → Draft → Approve → Send.
+Sidebar: **Search, Pipeline, Runs, Settings.**
+Auth/metering OFF until `AUTH_SECRET` is set.
 
-**Live keys configured** (in `.env.local`, not committed): Firecrawl, Exa.
-Everything commercial (auth/Stripe/Turnstile/Resend/D1) is **not yet configured**.
+**Live keys** (`.env.local`): Firecrawl, Resend. SMTP/Stripe/Turnstile/D1 not yet.
 
-### Recently done
-- **Commercialization Phases 1–4 (this session)** — full commercial layer:
-  - **Auth.js v5 (JWT sessions)** — split config: `src/auth.config.ts` (edge,
-    used by middleware) + `src/auth.ts` (D1 adapter + workspace provisioning).
-    Credentials provider (any password) for keyless dev; Resend magic-link for
-    prod. `src/middleware.ts` protects `/app` + `/api` (with `SMOKE_API_KEY`
-    bypass) only when `AUTH_SECRET` is set. ADR 0007.
-  - **Workspaces** — `workspaceId` on Run/Lead/Outreach; `getDb(binding?, wsId?)`
-    returns a workspace-scoped store; isolation enforced via `Ctx` in
-    `service.ts`. Migration `0002`. ADR 0006.
-  - **Plans + metering** — `src/lib/plans.ts` (Free/Starter $29/Pro $79/Agency
-    $199); usage counters (migration `0003`) reset lazily monthly; `QuotaError`
-    → 402. Demo/JSON path always free + unmetered (`metered = !!binding`). ADR 0008.
-  - **`/pricing` + Stripe** — checkout, portal, signature-verified webhook;
-    upgrade modal on quota hit; plan/usage in `/app/settings`.
-  - **Cloudflare deploy** — `@opennextjs/cloudflare`, `wrangler.jsonc` (D1 binding
-    `DB`, `database_id` = FILL_IN), `cf:*` scripts, Turnstile on signup (prod only).
-  - Verified: `tsc` clean, `lint` clean, `npm run smoke` 11/11 (JSON path),
-    `next build` clean (benign `jose`/Edge `CompressionStream` warnings only).
-- **Commercialization Phase 0 — D1 repository swap**: `D1Store` behind
-  `LeadRepository`; `migrations/0001_init.sql`; Supabase fully removed. ADRs 0003
-  (superseded), 0004, 0005. Repo: https://github.com/alexxvives/LeadGeneration.
-- **Search "mode" toggle**, **deliverability guide** on landing, **v0 MCP**,
-  **`.cursor/skills/lodestar-ui/SKILL.md`** — see git history / LEARNINGS.
+### Recently done (this session)
+- **Auth MissingAdapter fix.** Email/magic-link providers (Resend, Nodemailer)
+  live only in `src/auth.ts` when a D1 adapter exists. Edge `auth.config.ts`
+  keeps Credentials (dev) only — middleware no longer logs MissingAdapter when
+  `RESEND_API_KEY` is set locally.
+- **`package-lock.json` synced** for `@dnd-kit/*` + `leaflet` (unblocks Cloudflare
+  `npm ci`).
+- **Studio split:** `PipelineView.tsx`, `RunsView.tsx`, `StudioHelpers.tsx`;
+  `Studio.tsx` ~420 lines orchestrator. Deleted dead `AccountMenu.tsx`.
+- **Docs synced:** `how-it-works` screens/flow, AGENTS/README maps (migrations
+  0001–0006), commercialization, ADR 0007, roadmap Phase A, handoff.
+- Docs review: kept all ADRs (incl. superseded 0003); kept business-plan vs
+  commercialization as separate strategy vs build docs — no merges needed.
 
-### In flight / decisions pending
-- **Go live** — code is ready but unconfigured. To deploy: create D1
-  (`wrangler d1 create lodestar-prod` → paste `database_id`), apply migrations,
-  set Wrangler secrets (AUTH_SECRET, AUTH_RESEND_KEY, STRIPE_*, TURNSTILE_*),
-  create Stripe products/prices, point the Stripe webhook at
-  `/api/webhooks/stripe`. Full steps in README → "Deploy to Cloudflare".
-- **Live verification pending** — auth-enforced flows, Stripe checkout/webhook,
-  Turnstile, and real D1 queries are type-checked + build-clean but not exercised
-  with live credentials.
-- **Email deliverability** — use a dedicated warmed sending domain for cold
-  outreach; do NOT use Postmark/transactional ESPs for cold. See
-  `docs/email-providers.md`.
+### In flight / next
+- **Deploy path** (D1/SMTP/Stripe): `npm run cf:migrate` (through 0006) then
+  `npm run cf:deploy`.
+- **Phase C** — bulk polish already partly in Pipeline; saved ICPs, reply stubs.
 
 ### Known issues / gotchas
-- **21st.dev Magic MCP** — credits exhausted on free tier (100/month). Now using
-  v0 MCP instead. To re-enable 21st.dev generation: upgrade at 21st.dev/pricing
-  ($20/mo Pro). Logo search still works (unlimited, no credits used).
-- **v0 MCP** — needs `V0_API_KEY` in `~/.cursor/mcp.json`. Get from v0.dev/account.
-- PowerShell shell: `&&` is not a valid separator — chain with `;`.
-- Node 24 type-strips TS scripts; `@/…` aliases don't resolve in `scripts/*`.
+- **`npm run smoke` crashes on Windows** (native libuv abort on 2nd `fetch`).
+  Prefer Playwright/browser; Chrome DevTools MCP / agent skills are useful for
+  UI debugging (see LEARNINGS).
+- Dev server recompiles can briefly return HTML to API calls mid-edit; retry.
+- PowerShell: use `;` not `&&`.
 
 ### Next likely steps
-1. **Deploy + live-verify** — fill Cloudflare/Stripe/Resend keys, deploy, and
-   walk the auth → checkout → webhook → quota path end-to-end (README Deploy).
-2. Search quality Tier 1: structured extraction + email verification
-   (`docs/search-and-enrichment.md`).
+1. Deploy + live-verify commercial path.
+2. Or continue Phase C from `docs/roadmap-next.md`.
 
 ---
 
 ## How to update this file
-At the end of a session that changed state, rewrite the **Status** block:
-bump the date, move finished items to "Recently done", refresh "In flight",
-"Known issues", and "Next likely steps". Delete stale bullets — this is a
-snapshot, not a changelog (that's `LEARNINGS.md`).
+Rewrite the **Status** block at end of any session that changes state.

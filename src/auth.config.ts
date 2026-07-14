@@ -1,14 +1,12 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import ResendProvider from "next-auth/providers/resend";
 import { authRequired, env } from "@/lib/config";
 
 /**
  * Edge-safe base Auth.js config (used by middleware). Must NOT import
- * Nodemailer/SMTP — that lives in src/auth.ts (server only).
- *
- * Magic-link: Resend is registered here when present (fetch-based, edge-safe).
- * Maileroo/SMTP Nodemailer is added in auth.ts and takes precedence for sends.
+ * Nodemailer/SMTP, Resend email provider, or a DB adapter — those live in
+ * src/auth.ts (server only). Email/magic-link providers require an adapter;
+ * registering them here caused MissingAdapter noise in middleware.
  */
 
 const devCredentials = Credentials({
@@ -32,15 +30,6 @@ const devCredentials = Credentials({
 const providers: NextAuthConfig["providers"] = [];
 if (!authRequired()) {
   providers.push(devCredentials);
-}
-if (env.authResendKey()) {
-  providers.push(
-    ResendProvider({
-      id: "resend",
-      apiKey: env.authResendKey(),
-      from: env.fromEmail(),
-    }),
-  );
 }
 
 export const authConfig = {

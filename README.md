@@ -31,20 +31,19 @@ Open <http://localhost:3000> for the landing page, or go straight to
 
 **Search → Enrich → Draft → Approve → Send**
 
-1. **Search** — Enter a niche/ICP (e.g. "dentist clinics"), optional location and
-   offer notes on the studio's search hero.
+1. **Search** — Enter a niche/ICP (e.g. "dentist clinics") and optional location
+   on the studio **Search** view.
 2. **Enrich** — Each result is scraped for website, emails, phones, and an about
    blurb, then given a transparent 0–100 **fit score** (every point is explained).
 3. **Draft** — A personalized first email is **auto-generated for every lead** as
-   part of the run, so prospects land already drafted and "in review". Open any
-   lead to edit or **Regenerate** the draft.
-4. **Approve** — Review and edit the draft, then **Approve** or **Reject** per lead.
-   Switch the board between **Cards** and **Table** views.
+   part of the run. Open any lead to edit or **Regenerate** the draft.
+4. **Approve** — Review in the drawer, then **Approve** or **Reject** per lead.
+   Use **Pipeline** for CRM stages and bulk draft/approve/send.
 5. **Send** — Approved emails send via your provider, rate-limited, with a
-   compliance footer. Status is tracked: `draft → approved → sent / failed`.
+   compliance footer. Status: `queued → approved → sent / failed`.
 
-The **Approval queue** tab groups everything awaiting a decision and lets you
-send all approved emails in one rate-limited pass.
+After a search, Lodestar opens **Pipeline** (kanban + leads table/cards/map).
+Nothing is sent without per-lead approval.
 
 ---
 
@@ -147,18 +146,18 @@ paid plan (Starter/Pro/Agency) and paste each Price ID into the matching secret.
 ```
 src/
   middleware.ts              Auth enforcement on /app + /api (prod only)
-  auth.config.ts / auth.ts   Auth.js v5 (edge base / full server config)
+  auth.config.ts / auth.ts   Auth.js v5 (edge base / full server + email providers)
   app/
     page.tsx                 Landing (full-bleed hero)
     pricing/                 Public pricing page (plans + Stripe CTAs)
     login/                   Sign-in (dev credentials / prod magic-link)
     app/                     The studio (app shell, behind login)
-      page.tsx               Lead board + drawer + queue
-      settings/page.tsx      Capabilities, plan & usage, billing
+      page.tsx               Search / Pipeline / Runs + lead drawer
+      settings/page.tsx      Capabilities, plan & usage, billing, resources
     api/                     Thin route handlers → getCtx() → services
-      runs/ board/ outreach/ send/ settings/ contact-form/
-      auth/ billing/ webhooks/stripe/ turnstile/
-  components/                UI (brand, icons, studio/*)
+      runs/ board/ outreach/ send/ settings/ contact-form/ geocode/
+      leads/ providers/ auth/ billing/ webhooks/stripe/ turnstile/
+  components/                UI (BrandMark, icons, ui, studio/*)
   lib/
     types.ts                 Typed models: Workspace / Run / Lead / Outreach
     config.ts                Env + capability detection (incl. authRequired)
@@ -172,7 +171,7 @@ src/
     db/                      Repository abstraction + JSON store + D1 store
     search/ outreach/ email/ billing/   providers + Stripe client
 data/                        Local JSON DB (git-ignored)
-migrations/                  D1 SQL migrations (0001 init, 0002 ws+auth, 0003 usage)
+migrations/                  D1 SQL 0001–0006
 scripts/                     seed + smoke test
 ```
 
@@ -184,7 +183,9 @@ Deeper docs live in [`docs/`](docs/), indexed by [`AGENTS.md`](AGENTS.md):
 - [`docs/constitution.md`](docs/constitution.md) — the principles all code follows
 - [`docs/search-and-enrichment.md`](docs/search-and-enrichment.md) — how search works + roadmap
 - [`docs/email-providers.md`](docs/email-providers.md) — Resend vs Maileroo vs SES
-- [`docs/business-plan.md`](docs/business-plan.md) / [`docs/commercialization.md`](docs/commercialization.md)
+- [`docs/business-plan.md`](docs/business-plan.md) — market / positioning (strategy)
+- [`docs/commercialization.md`](docs/commercialization.md) — auth / plans / Stripe build status
+- [`docs/roadmap-next.md`](docs/roadmap-next.md) — next product value phases
 - [`docs/decisions/`](docs/decisions/) — ADRs + learnings log
 
 ### Persistence

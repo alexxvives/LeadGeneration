@@ -27,6 +27,7 @@ repository interface, provider-agnostic search (Firecrawl/Exa) and email
 | Doc | Read it when you need to… |
 | --- | --- |
 | [`docs/session-handoff.md`](docs/session-handoff.md) | **At session start.** Current state, what's in flight, next steps. |
+| [`docs/roadmap-next.md`](docs/roadmap-next.md) | Next value plan + copy-paste execution prompt for agents. |
 | [`docs/constitution.md`](docs/constitution.md) | **Always first (before coding).** Principles + rules all code must follow. |
 | [`docs/how-it-works.md`](docs/how-it-works.md) | Understand the product, the user flow, and the architecture. |
 | [`docs/search-and-enrichment.md`](docs/search-and-enrichment.md) | Touch search, scraping, enrichment, or fit scoring. |
@@ -92,7 +93,7 @@ src/auth.ts          Full Auth.js: D1 adapter + workspace provisioning (server).
 src/app/             Routes. Pages + thin API handlers (api/*/route.ts).
   pricing/ login/    Public marketing + sign-in pages.
   api/{auth,billing,webhooks/stripe,turnstile}   Commercial endpoints.
-src/components/      UI. studio/* is the app; brand/icons/ui are primitives.
+src/components/      UI. studio/* is the app; BrandMark / icons / ui are primitives.
 src/lib/
   types.ts           Domain models (Workspace/Run/Lead/Outreach) — source of truth.
   service.ts         Coordination layer + plan/quota enforcement (Ctx-based).
@@ -109,7 +110,7 @@ src/lib/
   billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.
-migrations/          D1 SQL migrations (0001 init, 0002 workspaces+auth, 0003 usage).
+migrations/          D1 SQL 0001–0006 (init, workspaces+auth, usage, run sender_name, crm_stage, workspace email settings).
 wrangler.jsonc, open-next.config.ts   Cloudflare Workers deploy config.
 data/                Local JSON DB (git-ignored).
 ```

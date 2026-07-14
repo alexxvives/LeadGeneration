@@ -18,44 +18,62 @@ for each, and lets you review, approve, and send — one lead at a time.
 Search  →  Enrich  →  Draft  →  Approve  →  Send
 ```
 
-1. **Search** — On the studio's search hero you enter a **niche/ICP** (e.g.
-   "dentist clinics"), an optional **location**, and optional **offer notes**.
-   Submitting creates a `Run`.
+1. **Search** — On the studio **Search** view you enter a **niche/ICP** (e.g.
+   "dentist clinics") and an optional **location**. Submitting creates a `Run`.
+   After a successful search (or demo load), the app navigates to **Pipeline**.
 2. **Enrich** — Each web result is turned into a `Lead`: company name, website,
    emails, phones, an "about" blurb, plus a transparent **fit score (0–100)**
    where every point is explained. (See
    [`search-and-enrichment.md`](search-and-enrichment.md).)
 3. **Draft** — An `Outreach` email is **auto-generated for every lead** as part
-   of the run, using the lead's profile + your offer notes. So leads arrive in
-   the board already **"In review"** — your job is just review + send. You can
-   edit or **Regenerate** any draft.
-4. **Approve** — Open a lead (card or table row) to see the detail drawer. Edit
-   the subject/body/recipient, then **Approve** or **Reject**. Nothing sends on
-   approval alone.
+   of the run (lead email-status becomes `queued`). CRM stage stays **New** until
+   you move the card or a send auto-advances it to **Contacted**. Edit any draft
+   in the drawer, or **Regenerate**. Sign-off uses your **sender-profile display
+   name** (Settings), passed via the API — the server never reads browser storage.
+   The compliance footer keeps the env from-identity (`OUTREACH_FROM_*`).
+4. **Approve** — Open a lead (pipeline card, table row, or map pin) to see the
+   detail drawer. Edit subject/body/recipient, then **Approve** or **Reject**.
+   Nothing sends on approval alone. Pipeline bulk actions can draft/approve/send
+   in batches (send still requires each outreach to be `approved` — Art. I.1).
 5. **Send** — Approved emails send via your provider (or simulate in demo mode),
    **rate-limited**, with a compliance footer. Status flows
-   `draft → approved → sent` (or `failed`). The **Approval queue** tab groups
-   everything and can send all approved items in one throttled pass.
+   `queued → approved → sent` (or `failed`). Successful send advances CRM stage
+   to **Contacted**.
 
 ## 3. Screens
 
 - **`/` Landing** — full-bleed aurora hero, the five steps, and the ethics/
   compliance section. Brand-first marketing view. Public.
-- **`/pricing`** — the four plans (Free / Starter / Pro / Agency) with a
-  monthly↔annual toggle and Stripe Checkout CTAs. Public.
+- **`/pricing`** — the four plans (Free / Starter / Pro / Agency) with Stripe
+  Checkout CTAs. Public.
 - **`/login`** — sign-in. In local dev, any email + password (Credentials
-  provider); in production, a Resend magic-link (+ Turnstile bot check). Public.
-- **`/app` Studio** — the core app (behind login when auth is enforced):
-  - Search hero (full when empty, compact "New search" once you have leads).
-  - **Board** with a **Cards ⇄ Table** toggle (cards for scanning, table for
-    density).
-  - **Approval queue** tab with per-lead status and a "send all approved" action.
-  - **Lead detail drawer** — contact info, the fit-score reasoning, the source
-    URL (audit trail), and the outreach composer.
-  - A **mode banner** showing whether search + email are live or demo.
-- **`/app/settings`** — read-only status of which integrations are configured,
-  the sending identity/compliance settings, and feature flags. Secrets are never
-  shown; they come from `.env.local`.
+  provider); in production, magic-link via SMTP (Nodemailer) or Resend
+  (+ Turnstile bot check). Public.
+- **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar
+  nav: **Search · Pipeline · Runs · Settings**. Views use `?view=`:
+
+  - **Search** (default / no `?view=`) — always-expanded search form. Live search
+    when Firecrawl/Exa is configured; otherwise load demo data. After a run, the
+    app redirects to Pipeline. Integration status lives in Settings (no mode banner).
+
+  - **Pipeline** (`?view=pipeline`) — CRM kanban of **all** leads across five
+    stages: *New · Contacted · In Conversation · Closed · Not Interested*.
+    Drag cards between columns, or use quick-advance. Bulk bar: draft all /
+    approve all drafts / send all approved. Below the kanban: full leads list
+    (table / cards / map) + **Export CSV**.
+
+  - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
+    mode, lead count, status). **"Open on board"** loads that run's leads into
+    Pipeline.
+
+  - **Lead detail drawer** — opens from any lead card/row/pin. Contact info,
+    about blurb, fit-score reasons + source URL, CRM fields (notes, follow-ups,
+    contact method), and the outreach composer (draft → edit → approve → send).
+
+- **`/app/settings`** — sender profile (display name + default offer in
+  localStorage, forwarded to runs via API), plan/usage bars, SMTP instructions,
+  integration status (Firecrawl primary / Exa fallback / SMTP), sending identity,
+  Resources (How it works + Plans). Secrets are never shown.
 
 ## 4. Demo mode vs live mode
 
@@ -107,7 +125,7 @@ the local JSON-store path is always unmetered/demo.
   (a serialized read-modify-write JSON file store, the zero-key default) and
   `D1Store` (Cloudflare D1 / SQLite, the production backend). `getDb(binding?)`
   selects D1Store when a D1Database binding is passed (Workers runtime), else
-  JsonStore. Schema lives in `migrations/0001_init.sql` (Wrangler format).
+  JsonStore. Schema lives in `migrations/` (`0001`–`0006`, Wrangler format).
 - **`src/lib/search/`** — `runSearch()` picks a provider (Firecrawl → Exa),
   scrapes/enriches to leads, and **falls back to demo data** on missing key or
   error. `enrich.ts` extracts emails/phones/blurb; `fit-score.ts` scores.
@@ -117,8 +135,13 @@ the local JSON-store path is always unmetered/demo.
 - **`src/lib/email/`** — `sendEmail()` (Resend → SMTP → demo) and a rolling
   per-minute `rate-limit.ts`.
 - **`src/auth.config.ts` / `src/auth.ts`** — Auth.js v5. The `.config` file is
-  edge-safe (used by middleware); `auth.ts` adds the D1 adapter + workspace
-  provisioning (server only). JWT sessions (ADR 0007).
+  edge-safe (Credentials for keyless dev only — used by middleware). `auth.ts`
+  adds the D1 adapter, email/magic-link providers (SMTP then Resend), and
+  workspace provisioning — **server only**, never imported by middleware.
+  JWT sessions (ADR 0007).
+- **`src/components/studio/`** — Studio UI: `Studio.tsx` orchestrates Search /
+  Pipeline / Runs; `PipelineView.tsx`, `RunsView.tsx`, `SearchPanel.tsx`,
+  drawer/table/map/card modules are separate.
 - **`src/lib/plans.ts`** — single source of truth for plans, quotas, and the env
   var names holding Stripe Price IDs.
 - **`src/lib/workspace.ts`** — workspace provisioning + lazy monthly usage reset.
@@ -146,7 +169,8 @@ the local JSON-store path is always unmetered/demo.
 
 A `Run` has many `Lead`s; each `Lead` has at most one `Outreach`. By default everything is persisted to `data/db.json` (git-ignored — delete it
 to reset); in production on Cloudflare Workers, `getDb()` receives a D1 binding
-and uses `D1Store` instead. The board always shows the most recent run.
+and uses `D1Store` instead. The board shows the most recent run by default, but
+**Runs → Open on board** loads any earlier completed run's leads instead.
 
 ## 6. Guardrails baked into the flow
 

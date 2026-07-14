@@ -6,37 +6,51 @@ genuinely good.**
 
 ---
 
-## What happens today (MVP)
+## What happens today (Phase B)
 
 Code: `src/lib/search/` (`index.ts`, `query.ts`, `firecrawl.ts`, `exa.ts`,
 `enrich.ts`, `demo.ts`) and `src/lib/fit-score.ts`.
 
 1. **Query building** (`query.ts` → `buildQueries`): the search hero exposes a
    **Search mode** toggle backed by `CreateRunInput.searchStrategy`:
-   - `standard` — one naive query (`niche + location + "contact email"`).
-     Fastest, one provider call. This is the default and the legacy behavior.
+   - `standard` — one focused query (`niche + location + "contact email"`).
+     Fastest, one provider call. Default.
    - `smart` — expands the ICP into several phrasings (contact page, official
      site, "top … in …") that are run and merged. Higher recall, ~3× credits.
    - `local` — phrasings tuned for brick-and-mortar / near-me businesses
-     (directory-style, reviews, phone/address).
-   For expanded modes, results across queries are deduped by URL, enriched,
-   deduped again by domain, then **ranked by fit score** and capped to the
-   per-run limit. Single-query keeps the provider's native ranking. This is
-   Tier 1 item #3 below; it does **not** need any new key and still degrades to
-   demo data.
-2. **Provider search**: calls **Firecrawl** `/v1/search` (preferred) with
-   `scrapeOptions: markdown`, which searches the web **and** scrapes each result
-   page's main content in one call. Falls back to **Exa** if only that key exists.
-3. **Enrichment** (`enrich.ts`): from each page's title/description/markdown it
-   uses **regexes** to pull emails and phone numbers, derives a company name from
-   the title/domain, and grabs the first substantial sentence as an "about"
-   blurb.
-4. **Dedup**: collapses results by domain/company.
+     (directory-style, reviews, phone/address). Best when Location is filled in.
+   For expanded modes, results are deduped by URL, enriched, deduped again by
+   domain, then **ranked by fit score** and capped to the per-run limit.
+   Single-query keeps the provider's native ranking.
+2. **Provider search**: calls **Firecrawl** `/v1/search` (preferred), which
+   searches the web and scrapes each result page's main content. Falls back to
+   **Exa** if only that key exists. Both degrade to demo data with no key.
+3. **Enrichment** (`enrich.ts`) — Phase B improvements shipped 2026-07-14:
+   - **Company name**: splits the page title on common separators (` | `, ` - `,
+     ` — `, `:`), skips generic segments ("Contact Us", "Home", "About", "Welcome
+     to"), and takes the first non-generic brand segment. If no title segment
+     survives, falls back to a prettified domain base ("bright-dental" →
+     "Bright Dental").
+   - **Email extraction**: regex pull of email addresses, then a hygiene pipeline:
+     plausibility check (single `@`, valid TLD length, no edge/double dots),
+     disposable-domain block list, junk-pattern filter (`noreply`, `donotreply`,
+     `admin`, etc.), and **personal-before-generic ranking** so the most
+     contactable address (e.g. `sarah@co.com`) outranks role addresses
+     (`info@`, `hello@`).
+   - **Phone extraction**: E.164-style regex, international + NANP formats.
+   - **Location**: `City, ST` format is only accepted for valid US/CA region
+     codes (2-letter, against a known set) — prevents prose false-positives
+     ("Learn, MO…") from polluting map pins. Street addresses are preferred over
+     city+state when present.
+   - **About blurb**: first substantial sentence from the scraped markdown,
+     used for personalization in drafts.
+4. **Dedup**: collapses results by domain, then by company name (case-insensitive).
 5. **Fit score** (`fit-score.ts`): a **transparent heuristic** — base points for
    matching the query, plus points for having an email, phone, website, a rich
-   blurb, and location alignment. Every point is explained in `fitReasons`.
-6. **Fallback**: no key, zero results, or any error → deterministic **demo
-   leads** so the UI always works.
+   blurb, and location alignment. Every point is explained in `fitReasons` and
+   shown in the Lead detail drawer.
+6. **Fallback**: no key, zero results, or any provider error → deterministic
+   **demo leads** from `demo.ts` so the UI always works (constitution Art. I.2).
 
 ## Is it "smart"? — Honest answer
 
@@ -76,10 +90,10 @@ won't disturb the approval/send flow.
    (Maileroo includes one; also NeverBounce/ZeroBounce) and store a
    `deliverable` flag. Down-rank or hide undeliverable addresses. **This alone
    dramatically improves outreach outcomes.**
-3. **Smarter query building.** ✅ _Shipped (basic)_ — `query.ts` expands the
-   niche into multiple queries for the `smart`/`local` strategies and merges
-   them. Still to do: LLM-driven synonym/ICP expansion and site-type hints
-   (e.g. exclude aggregators/directories when you want the business's own site).
+3. **Smarter query building.** ✅ _Shipped_ — `query.ts` expands the niche into
+   multiple queries for the `smart`/`local` strategies and merges them. Still to
+   do: LLM-driven synonym/ICP expansion and site-type hints (e.g. exclude
+   aggregators/directories when you want the business's own site).
 
 ### Tier 2 — the local-business unlock
 4. **Places/Maps data for local ICPs.** For "dentists in Austin"-type queries, a

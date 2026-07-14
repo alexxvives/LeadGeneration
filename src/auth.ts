@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Nodemailer from "next-auth/providers/nodemailer";
+import ResendProvider from "next-auth/providers/resend";
 import { D1Adapter } from "@auth/d1-adapter";
 import { authConfig } from "@/auth.config";
 import { getD1Binding } from "@/lib/cf";
@@ -15,36 +16,51 @@ import { getOrCreateWorkspaceForUser } from "@/lib/workspace";
  * edge bundle.
  *
  * Magic-link preference: Maileroo via SMTP (Nodemailer) when configured,
- * otherwise Resend from auth.config. See docs/email-providers.md.
+ * otherwise Resend. Email providers are registered only when a D1 adapter is
+ * available (Auth.js requires an adapter for email login). See docs/email-providers.md.
  */
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
   const binding = await getD1Binding();
   const caps = getCapabilities();
   const smtp = env.smtp();
+  const adapter = binding
+    ? D1Adapter(binding as unknown as Parameters<typeof D1Adapter>[0])
+    : undefined;
 
   const providers = [...authConfig.providers];
-  if (caps.smtp && smtp.host && smtp.user) {
-    // Prefer Maileroo/SMTP for magic links — insert ahead of Resend if both exist.
-    providers.unshift(
-      Nodemailer({
-        id: "nodemailer",
-        name: "Email",
-        server: {
-          host: smtp.host,
-          port: smtp.port,
-          auth: { user: smtp.user, pass: smtp.pass },
-        },
-        from: env.fromEmail(),
-      }),
-    );
+
+  // Email/magic-link providers need an adapter for verification tokens.
+  if (adapter) {
+    if (caps.smtp && smtp.host && smtp.user) {
+      // Prefer Maileroo/SMTP for magic links — insert ahead of Resend if both exist.
+      providers.unshift(
+        Nodemailer({
+          id: "nodemailer",
+          name: "Email",
+          server: {
+            host: smtp.host,
+            port: smtp.port,
+            auth: { user: smtp.user, pass: smtp.pass },
+          },
+          from: env.fromEmail(),
+        }),
+      );
+    }
+    if (env.authResendKey()) {
+      providers.push(
+        ResendProvider({
+          id: "resend",
+          apiKey: env.authResendKey(),
+          from: env.fromEmail(),
+        }),
+      );
+    }
   }
 
   return {
     ...authConfig,
     providers,
-    adapter: binding
-      ? D1Adapter(binding as unknown as Parameters<typeof D1Adapter>[0])
-      : undefined,
+    adapter,
     callbacks: {
       ...authConfig.callbacks,
       async jwt({ token, user }) {
