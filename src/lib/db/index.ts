@@ -1,16 +1,25 @@
-import { databaseProvider } from "@/lib/config";
 import type { Lead, Outreach, Run } from "@/lib/types";
 import { JsonStore } from "./json-store";
-import { SupabaseStore } from "./supabase-store";
+import { D1Store, type D1Database } from "./d1-store";
 
 /**
  * Repository abstraction for persistence.
  *
  * The app only ever talks to this interface, never to a concrete store. The
- * concrete backend is chosen by `getDb()` from env (see config.ts):
- *  - Supabase/Postgres when its env vars are set (commercialization backend);
- *  - the local JSON file store otherwise — the zero-key demo/offline default.
- * No UI or API-route changes are required to switch.
+ * concrete backend is chosen by getDb():
+ *
+ *  • D1Store  — selected when a Cloudflare D1Database binding is passed in.
+ *               In production (Workers + OpenNext), API routes call:
+ *                 import { getRequestContext } from "@opennextjs/cloudflare";
+ *                 const db = getDb(getRequestContext().env.DB);
+ *               That wiring happens in the Cloudflare deploy phase (Phase 4).
+ *
+ *  • JsonStore — the zero-key default used in local dev, demo mode, and CI.
+ *               Works offline with no external services (constitution Art. I.2).
+ *
+ * No binding is needed today: local dev always lands on JsonStore. Adding the
+ * D1 binding at deploy time is a one-liner in each API route — no service or
+ * UI changes required.
  */
 export interface LeadRepository {
   // Runs
@@ -33,12 +42,16 @@ export interface LeadRepository {
   listOutreach(): Promise<Outreach[]>;
 }
 
-let instance: LeadRepository | null = null;
+// Singleton for the JSON store only — preserves its in-process write chain.
+// D1Store is not a singleton: D1 bindings are request-scoped in Workers.
+let jsonInstance: LeadRepository | null = null;
 
-export function getDb(): LeadRepository {
-  if (!instance) {
-    instance =
-      databaseProvider() === "supabase" ? new SupabaseStore() : new JsonStore();
+export function getDb(binding?: D1Database): LeadRepository {
+  if (binding) {
+    return new D1Store(binding);
   }
-  return instance;
+  if (!jsonInstance) {
+    jsonInstance = new JsonStore();
+  }
+  return jsonInstance;
 }

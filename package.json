@@ -11,7 +11,6 @@
     "smoke": "node --experimental-strip-types scripts/smoke.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.110.3",
     "next": "^15.5.20",
     "nodemailer": "^6.9.16",
     "react": "19.1.1",

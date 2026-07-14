@@ -89,12 +89,12 @@ src/lib/
   types.ts           Domain models — the source of truth for shapes.
   service.ts         Coordination layer. Business logic lives here.
   config.ts          Env + capability detection (demo vs live).
-  db/                Repository interface (LeadRepository) + JSON & Supabase stores.
+  db/                Repository interface (LeadRepository) + JSON store (dev) & D1Store (prod).
   search/            Providers (firecrawl/exa), enrichment, demo fallback.
   outreach/          Draft generation + compliance footer.
   email/             Rate-limited sender (resend/smtp/demo).
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.
-supabase/            SQL migrations for the Supabase/Postgres backend.
+migrations/          SQL migrations for Cloudflare D1 (Wrangler format).
 data/                Local JSON DB (git-ignored).
 ```

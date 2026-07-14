@@ -92,9 +92,9 @@ Repository            Providers
   `getCapabilities()`.
 - **`src/lib/db/`** — `LeadRepository` interface with two backends: `JsonStore`
   (a serialized read-modify-write JSON file store, the zero-key default) and
-  `SupabaseStore` (Postgres). `getDb()` picks between them via
-  `config.ts::databaseProvider()`: Supabase when its env vars are set, JSON
-  otherwise. Schema lives in `supabase/migrations/`.
+  `D1Store` (Cloudflare D1 / SQLite, the production backend). `getDb(binding?)`
+  selects D1Store when a D1Database binding is passed (Workers runtime), else
+  JsonStore. Schema lives in `migrations/0001_init.sql` (Wrangler format).
 - **`src/lib/search/`** — `runSearch()` picks a provider (Firecrawl → Exa),
   scrapes/enriches to leads, and **falls back to demo data** on missing key or
   error. `enrich.ts` extracts emails/phones/blurb; `fit-score.ts` scores.
@@ -106,10 +106,9 @@ Repository            Providers
 
 ### Data lifecycle
 
-A `Run` has many `Lead`s; each `Lead` has at most one `Outreach`. By default
-everything is persisted to `data/db.json` (git-ignored — delete it to reset);
-when Supabase is configured the same shapes live in Postgres instead. The board
-always shows the most recent run.
+A `Run` has many `Lead`s; each `Lead` has at most one `Outreach`. By default everything is persisted to `data/db.json` (git-ignored — delete it
+to reset); in production on Cloudflare Workers, `getDb()` receives a D1 binding
+and uses `D1Store` instead. The board always shows the most recent run.
 
 ## 6. Guardrails baked into the flow
 
@@ -127,5 +126,5 @@ always shows the most recent run.
 | Improve search quality / add a provider | `src/lib/search/` (see its doc) |
 | Change the email copy | `src/lib/outreach/draft.ts` |
 | Add an email provider | `src/lib/email/sender.ts` (+ `config.ts`) |
-| Change persistence backend | set Supabase env (see `.env.example`); impl in `src/lib/db/supabase-store.ts` |
+| Change persistence backend | pass D1 binding to `getDb()`; impl in `src/lib/db/d1-store.ts` |
 | Restyle UI | `src/components/**` + `src/app/globals.css` (stay on-brand) |

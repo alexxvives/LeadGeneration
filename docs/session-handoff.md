@@ -11,8 +11,8 @@ first, and update the top block at the end of any session that changes state.**
 
 ## ⏱️ Status — updated 2026-07-14
 
-**Stage:** MVP complete; **commercialization Phase 0 done** (Supabase repository
-swap). Awaiting review before Phase 1.
+**Stage:** MVP complete; **commercialization Phase 0 done** (D1 repository swap;
+Supabase removed). Awaiting review before Phase 1.
 
 **Works today:** full Search → Enrich → Draft → Approve → Send flow, demo mode
 with zero keys, per-lead approval + rate limiting. Persistence now selects
@@ -24,16 +24,17 @@ Email defaults to demo unless Resend/SMTP set. Supabase not yet configured →
 still on JSON store.
 
 ### Recently done
-- **Commercialization Phase 0 — Supabase swap** (no user-visible change):
-  `SupabaseStore` (`src/lib/db/supabase-store.ts`) behind `LeadRepository`;
-  `getDb()` selects it via `config.ts::databaseProvider()` (Supabase when
-  `SUPABASE_URL` + a key are set, else JSON). SQL in
-  `supabase/migrations/0001_init.sql` (mirrors current shapes; **no workspace_id
-  / RLS yet — that's Phase 1**). `.env.example` updated. ADRs
-  [0003 Supabase](decisions/0003-supabase-auth-and-db.md) +
-  [0004 Cloudflare/OpenNext](decisions/0004-cloudflare-opennext-deploy.md).
-  Verified: `tsc` clean, `lint` clean, `npm run smoke` 11/11 on the JSON path.
-  **Not yet verified against a real Supabase instance** (needs keys — see below).
+- **Commercialization Phase 0 — D1 repository swap** (no user-visible change):
+  `D1Store` (`src/lib/db/d1-store.ts`) behind `LeadRepository`; `getDb(binding?)`
+  returns D1Store when a Cloudflare D1 binding is passed (Workers runtime) else
+  JsonStore (local/demo). SQLite migration at `migrations/0001_init.sql`
+  (arrays → JSON TEXT; Wrangler format). Supabase fully removed (`@supabase/supabase-js`
+  uninstalled, `supabase/` dir deleted). Auth strategy switched to **Auth.js**
+  (wired in Phase 1). ADRs [0003](decisions/0003-supabase-auth-and-db.md) (superseded),
+  [0004](decisions/0004-cloudflare-opennext-deploy.md),
+  [0005](decisions/0005-switch-to-d1-auth-js.md). Verified: `tsc` clean, `lint`
+  clean, `npm run smoke` 11/11 on JSON path. Repo live at
+  https://github.com/alexxvives/LeadGeneration.
 - **Search "mode" toggle** — `standard` / `smart` / `local` strategies
   (`src/lib/search/query.ts` + `runSearch`). Smart/local expand + merge + rank.
 - **Deliverability guide** added to landing page (`/` → #domain section) — 6-step
@@ -49,9 +50,10 @@ still on JSON store.
   (see above); **Phase 1 (Auth + workspaces + RLS) not started** — awaiting
   review + Supabase project setup. Locked choices: Supabase (auth+DB), Stripe
   (billing), workspaces (multi-tenancy), Cloudflare/OpenNext deploy, phased build.
-- **Supabase verification pending keys** — to smoke the live DB path: create a
-  Supabase project, run `supabase/migrations/0001_init.sql`, put `SUPABASE_URL`
-  + `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, restart dev, re-run smoke.
+- **D1 live verification** — D1Store is implemented and type-checked; actual D1
+  binding is injected at Workers deploy time. Full live verification happens when
+  the Cloudflare deploy phase (Phase 4/later) runs `wrangler d1 migrations apply`
+  and wires `getRequestContext().env.DB` into the API routes.
 - **Email deliverability** — use a dedicated warmed sending domain for cold
   outreach; do NOT use Postmark/transactional ESPs for cold. See
   `docs/email-providers.md`.
@@ -65,8 +67,9 @@ still on JSON store.
 - Node 24 type-strips TS scripts; `@/…` aliases don't resolve in `scripts/*`.
 
 ### Next likely steps
-1. **Review Phase 0**, provide Supabase keys, verify the live DB path, then start
-   **Phase 1 — Auth + workspaces + RLS** (`docs/commercialization.md`).
+1. **Review Phase 0**, then start **Phase 1 — Auth.js + workspaces**
+   (`docs/commercialization.md`). RLS is not used (D1/SQLite); workspace
+   isolation is enforced in the service layer.
 2. Search quality Tier 1: structured extraction + email verification
    (`docs/search-and-enrichment.md`).
 

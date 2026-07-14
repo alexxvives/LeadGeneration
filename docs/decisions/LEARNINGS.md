@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-14 — Switched from Supabase to Cloudflare D1 + Auth.js (ADR 0005)
+Supabase was chosen in ADR 0003 for "auth + DB in one". Revisited immediately
+when it became clear the lead dev already uses Cloudflare D1 + Auth.js on
+another project, eliminating the learning-curve advantage of Supabase. Key
+findings: (1) RLS is defense-in-depth, not the primary isolation mechanism —
+service-layer workspace scoping is. (2) D1 reads are faster at the edge than
+single-region Postgres. (3) Staying 100% Cloudflare reduces vendor count.
+SQLite array limitation: `emails[]` etc. serialised as JSON TEXT — handled
+transparently in `d1-store.ts` with `JSON.parse/stringify`. `getDb(binding?)`
+is the injection point; no binding → JsonStore (local/demo unchanged).
+
 ### 2026-07-14 — Phase 0 Supabase swap: selection is env-driven, JSON is default
 `getDb()` now returns `SupabaseStore` only when `SUPABASE_URL` + a Supabase key
 are set (`config.ts::databaseProvider()`), else `JsonStore`. This keeps zero-key

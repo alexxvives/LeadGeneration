@@ -41,5 +41,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 
 - [0001 — Local JSON file DB behind a repository interface](0001-json-file-db.md)
 - [0002 — Provider-agnostic search & email with demo fallback](0002-provider-agnostic-integrations.md)
-- [0003 — Supabase for auth + database](0003-supabase-auth-and-db.md)
+- [0003 — Supabase for auth + database](0003-supabase-auth-and-db.md) _(superseded by 0005)_
 - [0004 — Cloudflare Workers via @opennextjs/cloudflare as the deploy target](0004-cloudflare-opennext-deploy.md)
+- [0005 — Switch database to Cloudflare D1 and auth to Auth.js](0005-switch-to-d1-auth-js.md)
