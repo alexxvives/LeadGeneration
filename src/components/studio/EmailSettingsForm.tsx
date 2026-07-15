@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { CheckIcon } from "@/components/icons";
+import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
+import { loadSenderProfile, saveSenderProfile } from "@/lib/sender-profile";
 
 export interface EmailSettingsValues {
   fromName: string | null;
@@ -24,12 +26,15 @@ export function EmailSettingsForm({
   initial,
   defaults,
   canEdit,
+  liveAppUrl,
 }: {
   initial: EmailSettingsValues;
-  /** Platform env-var fallback values — shown as placeholders. */
+  /** Shown as input hints when the workspace has no override. */
   defaults: EmailSettingsDefaults;
-  /** False in demo/local mode (no D1) — form is read-only. */
+  /** False on local preview (no workspace DB) — form is read-only. */
   canEdit: boolean;
+  /** Link to the live app Settings when the form can’t be edited here. */
+  liveAppUrl?: string;
 }) {
   const [values, setValues] = useState<EmailSettingsValues>(initial);
   const [saving, setSaving] = useState(false);
@@ -55,6 +60,11 @@ export function EmailSettingsForm({
         const data = (await res.json()) as { error?: string };
         setError(data.error ?? "Save failed");
       } else {
+        // Keep draft sign-off in sync — one name field for From + drafts.
+        if (values.fromName) {
+          const profile = loadSenderProfile();
+          saveSenderProfile({ ...profile, displayName: values.fromName });
+        }
         setSaved(true);
       }
     } catch {
@@ -70,14 +80,26 @@ export function EmailSettingsForm({
   return (
     <div className="space-y-4">
       {!canEdit && (
-        <p className="rounded-lg border border-amber-400/20 bg-amber-400/5 px-4 py-2 text-xs text-amber-300">
-          Running in local / demo mode — these settings are stored per-workspace
-          in D1 and only take effect in production.
+        <p className="rounded-lg border border-amber-400/20 bg-amber-400/5 px-4 py-2 text-sm text-amber-200/90">
+          To edit these fields, open the{" "}
+          {liveAppUrl ? (
+            <a
+              href={liveAppUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-amber-100 underline-offset-2 hover:underline"
+            >
+              live app → Settings → Sending identity
+            </a>
+          ) : (
+            <span className="font-medium text-amber-100">live app → Settings → Sending identity</span>
+          )}
+          , sign in, and save your from name, from email, and mailing address there.
         </p>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="From name" hint="How you appear in the inbox">
+        <Field label="Your name" hint="Inbox From + draft sign-off">
           <input
             value={values.fromName ?? ""}
             onChange={(e) => set("fromName", e.target.value)}
@@ -98,7 +120,7 @@ export function EmailSettingsForm({
         </Field>
         <Field
           label="Reply-to"
-          hint="Where replies land (optional — defaults to from email)"
+          hint="Where their reply lands (optional)"
         >
           <input
             type="email"
@@ -109,7 +131,10 @@ export function EmailSettingsForm({
             className={inputCls}
           />
         </Field>
-        <Field label="Physical address" hint="Required for CAN-SPAM compliance">
+        <Field
+          label="Mailing address"
+          hint="CAN-SPAM — required for real commercial sends"
+        >
           <input
             value={values.physicalAddress ?? ""}
             onChange={(e) => set("physicalAddress", e.target.value)}
@@ -119,19 +144,23 @@ export function EmailSettingsForm({
           />
         </Field>
       </div>
+      <p className="text-xs text-mist-500">
+        Reply-to is for routing replies to a different inbox than the From address.
+        We don&apos;t CC teammates on cold outreach — that hurts deliverability and
+        looks spammy. Share the thread yourself after they reply.
+      </p>
 
       <Field
         label="Resend API key"
         hint="Your own Resend account → sends from your verified domain"
       >
-        <input
-          type="password"
+        <PasswordField
           autoComplete="off"
           value={values.resendApiKey ?? ""}
           onChange={(e) => set("resendApiKey", e.target.value)}
           placeholder="re_xxxxxxxxxxxx"
           disabled={!canEdit}
-          className={inputCls}
+          inputClassName={`${inputCls} pr-11`}
         />
         <p className="mt-1 text-[11px] text-mist-500">
           Go to{" "}

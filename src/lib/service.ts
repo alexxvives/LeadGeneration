@@ -1,20 +1,23 @@
 import type { LeadRepository } from "@/lib/db";
 import { newId, nowIso } from "@/lib/id";
 import { runSearch, SearchUnavailableError } from "@/lib/search";
-import { generateDraft } from "@/lib/outreach/draft";
+import { generateDraft, complianceFooter } from "@/lib/outreach/draft";
 import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
-import { getPlan } from "@/lib/plans";
+import { env } from "@/lib/config";
+import { FREE_MAX_LEADS_PER_RUN, getPlan } from "@/lib/plans";
 import { QuotaError } from "@/lib/errors";
 import { ensureUsageWindow } from "@/lib/workspace";
 import type {
   ContactMethod,
   CrmStage,
   CreateRunInput,
+  DeliveryStatus,
   FollowUp,
   Lead,
   LeadWithOutreach,
   Outreach,
+  PlanId,
   Run,
 } from "@/lib/types";
 
@@ -36,23 +39,49 @@ export interface Ctx {
 }
 
 /**
- * Enforce the monthly lead-credit quota for metered workspaces. Throws a
- * QuotaError (→ 402) when the workspace is out of credits. No-op in demo mode.
+ * Resolve how many leads this run may return, enforcing Free-tier per-run caps
+ * and remaining monthly credits. Throws QuotaError when nothing is left.
  */
-async function assertLeadCredit(ctx: Ctx): Promise<void> {
-  if (!ctx.metered) return;
-  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
-  if (!ws) return; // no workspace row → treat as unmetered (defensive)
-  const fresh = await ensureUsageWindow(ctx.db, ws);
-  const plan = getPlan(fresh.planId);
-  if (fresh.leadsUsedThisMonth >= plan.leadCreditsPerMonth) {
+async function resolveRunLeadLimit(
+  ctx: Ctx,
+  requested?: number | null,
+): Promise<number> {
+  const hardCap = env.maxLeadsPerRun();
+  let planCap = hardCap;
+  let remaining = Number.POSITIVE_INFINITY;
+  let planId: PlanId = "free";
+
+  if (ctx.metered) {
+    const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+    if (ws) {
+      const fresh = await ensureUsageWindow(ctx.db, ws);
+      const plan = getPlan(fresh.planId);
+      planId = fresh.planId;
+      planCap = plan.id === "free" ? Math.min(hardCap, FREE_MAX_LEADS_PER_RUN) : hardCap;
+      remaining = plan.leadCreditsPerMonth - fresh.leadsUsedThisMonth;
+      if (remaining <= 0) {
+        throw new QuotaError({
+          kind: "leads",
+          planId: fresh.planId,
+          limit: plan.leadCreditsPerMonth,
+          used: fresh.leadsUsedThisMonth,
+        });
+      }
+    }
+  }
+
+  const want = requested && requested > 0 ? Math.floor(requested) : Math.min(10, planCap);
+  if (want > planCap) {
     throw new QuotaError({
       kind: "leads",
-      planId: fresh.planId,
-      limit: plan.leadCreditsPerMonth,
-      used: fresh.leadsUsedThisMonth,
+      planId,
+      limit: planCap,
+      used: 0,
+      message: `Free plan allows up to ${planCap} leads per search. Upgrade to request more.`,
     });
   }
+
+  return Math.max(1, Math.min(want, planCap, remaining, hardCap));
 }
 
 async function recordLeadUsage(ctx: Ctx, count: number): Promise<void> {
@@ -65,13 +94,24 @@ async function recordLeadUsage(ctx: Ctx, count: number): Promise<void> {
   });
 }
 
+/** TEMP developer helper — zero monthly lead/send counters for the workspace. */
+export async function resetWorkspaceUsage(ctx: Ctx): Promise<void> {
+  if (!ctx.metered) return;
+  await ctx.db.updateWorkspace(ctx.workspaceId, {
+    leadsUsedThisMonth: 0,
+    sendsUsedThisMonth: 0,
+    updatedAt: nowIso(),
+  });
+}
+
 export async function createAndRunSearch(
   ctx: Ctx,
   input: CreateRunInput,
 ): Promise<Run> {
-  // Quota gate BEFORE creating the run, so an over-limit request doesn't leave
-  // a stray failed run behind and can surface a clean 402.
-  await assertLeadCredit(ctx);
+  // Quota + per-run cap BEFORE creating the run, so an over-limit request
+  // doesn't leave a stray failed run behind and can surface a clean 402.
+  const maxLeads = await resolveRunLeadLimit(ctx, input.maxLeads);
+  const searchInput: CreateRunInput = { ...input, maxLeads };
 
   const db = ctx.db;
   const run: Run = {
@@ -92,7 +132,7 @@ export async function createAndRunSearch(
   await db.createRun(run);
 
   try {
-    const outcome = await runSearch(input);
+    const outcome = await runSearch(searchInput);
     const leads: Lead[] = outcome.leads.map((l) => ({
       id: newId("lead"),
       workspaceId: ctx.workspaceId,
@@ -130,6 +170,7 @@ export async function createAndRunSearch(
       toEmail: lead.emails[0] ?? null,
       ...generateDraft(lead, run),
       status: "draft",
+      deliveryStatus: "unknown",
       sentAt: null,
       error: null,
       createdAt: now,
@@ -225,6 +266,7 @@ export async function draftOutreach(
         subject,
         body,
         status: "draft",
+        deliveryStatus: "unknown",
         sentAt: null,
         error: null,
         createdAt: now,
@@ -325,7 +367,17 @@ export async function sendApprovedOutreach(
   // their own from-name, from-email etc. (configured in Settings → Sending).
   const wsForEmail = ctx.metered ? await db.getWorkspace(ctx.workspaceId) : null;
   const result = await sendEmail(
-    { to: outreach.toEmail, subject: outreach.subject, body: outreach.body },
+    {
+      to: outreach.toEmail,
+      subject: outreach.subject,
+      body:
+        outreach.body +
+        complianceFooter({
+          physicalAddress: wsForEmail?.physicalAddress,
+          fromName: wsForEmail?.fromName,
+          fromEmail: wsForEmail?.fromEmail,
+        }),
+    },
     wsForEmail
       ? {
           fromName: wsForEmail.fromName,
@@ -341,6 +393,7 @@ export async function sendApprovedOutreach(
     recordSend();
     const updated = await db.updateOutreach(outreachId, {
       status: "sent",
+      deliveryStatus: "sent",
       sentAt: nowIso(),
       error: null,
       updatedAt: nowIso(),
@@ -372,6 +425,28 @@ export async function sendApprovedOutreach(
   });
   await db.updateLead(outreach.leadId, { status: "failed" });
   return { ok: false, outreach: updated ?? undefined, error: result.error };
+}
+
+/** Manual delivery outcome stub (bounce / reply). Webhooks can call the same path later. */
+export async function setOutreachDeliveryStatus(
+  ctx: Ctx,
+  outreachId: string,
+  deliveryStatus: DeliveryStatus,
+): Promise<Outreach | null> {
+  const outreach = await ctx.db.updateOutreach(outreachId, {
+    deliveryStatus,
+    updatedAt: nowIso(),
+  });
+  if (!outreach) return null;
+
+  // Convenience: marking replied advances CRM into conversation when still early.
+  if (deliveryStatus === "replied") {
+    const lead = await ctx.db.getLead(outreach.leadId);
+    if (lead && (lead.crmStage === "new" || lead.crmStage === "contacted")) {
+      await ctx.db.updateLead(outreach.leadId, { crmStage: "in_conversation" });
+    }
+  }
+  return outreach;
 }
 
 /** Update per-workspace email sending identity (from name, email, reply-to, etc.). */

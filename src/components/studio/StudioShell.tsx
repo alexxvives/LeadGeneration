@@ -7,6 +7,13 @@ import { signOut, useSession } from "next-auth/react";
 import { BrandMark } from "@/components/BrandMark";
 import { AuthModal } from "@/components/AuthModal";
 import {
+  GettingStartedWizard,
+  useGettingStartedOpen,
+  GETTING_STARTED_KEY,
+  type GettingStartedCaps,
+  type GettingStartedIdentity,
+} from "@/components/studio/GettingStartedWizard";
+import {
   SearchIcon,
   SettingsIcon,
   GlobeIcon,
@@ -28,17 +35,22 @@ export function StudioShell({
   credentialsMode,
   magicLink,
   turnstileSiteKey,
+  caps,
+  identity,
 }: {
   children: React.ReactNode;
   authRequired: boolean;
   credentialsMode: boolean;
   magicLink: boolean;
   turnstileSiteKey: string | null;
+  caps: GettingStartedCaps;
+  identity: GettingStartedIdentity;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
+  const { open: setupOpen, setOpen: setSetupOpen } = useGettingStartedOpen();
 
   const view = searchParams.get("view");
 
@@ -49,6 +61,29 @@ export function StudioShell({
       setAuthOpen(true);
     }
   }, [authRequired, status]);
+
+  // Don't stack the setup wizard on top of the auth gate.
+  useEffect(() => {
+    if (authOpen && setupOpen && searchParams.get("setup") !== "1") {
+      setSetupOpen(false);
+    }
+  }, [authOpen, setupOpen, setSetupOpen, searchParams]);
+
+  // After guest continue / sign-in, offer Getting Started if not done.
+  useEffect(() => {
+    if (authOpen || typeof window === "undefined") return;
+    if (searchParams.get("setup") === "1") return;
+    try {
+      if (localStorage.getItem(GETTING_STARTED_KEY) !== "done") {
+        const guest = sessionStorage.getItem("lodestar_guest") === "1";
+        if (guest || status === "authenticated" || authRequired) {
+          setSetupOpen(true);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [authOpen, status, authRequired, setSetupOpen, searchParams]);
 
   const markGuest = () => {
     sessionStorage.setItem("lodestar_guest", "1");
@@ -236,6 +271,13 @@ export function StudioShell({
         turnstileSiteKey={turnstileSiteKey}
         callbackUrl="/app"
         allowGuest={!authRequired}
+      />
+
+      <GettingStartedWizard
+        open={setupOpen && !authOpen}
+        onClose={() => setSetupOpen(false)}
+        caps={caps}
+        identity={identity}
       />
     </div>
   );

@@ -29,8 +29,8 @@ export default async function LoginPage({
           <h1 className="font-display text-2xl font-semibold">Sign in to Lodestar</h1>
           <p className="mt-2 text-sm text-mist-300">
             {authRequired()
-              ? "Enter your email and we'll send you a secure sign-in link (Maileroo SMTP or Resend)."
-              : "Local demo — sign in with any email, or use Open the studio → Continue as guest."}
+              ? "Enter your email and we’ll send a secure sign-in link."
+              : "Local preview — sign in with any email, or continue as guest from the studio."}
           </p>
 
           <LoginForm

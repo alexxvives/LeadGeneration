@@ -37,6 +37,14 @@ function normalizeLead(l: Lead): Lead {
   };
 }
 
+function normalizeOutreach(o: Outreach): Outreach {
+  const raw = o as unknown as Record<string, unknown>;
+  return {
+    ...o,
+    deliveryStatus: (raw.deliveryStatus as Outreach["deliveryStatus"] | undefined) ?? "unknown",
+  };
+}
+
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 
@@ -216,17 +224,19 @@ export class JsonStore implements LeadRepository {
 
   async getOutreach(id: string): Promise<Outreach | null> {
     const data = await this.read();
-    return data.outreach.find((o) => o.id === id && this.inScope(o)) ?? null;
+    const o = data.outreach.find((x) => x.id === id && this.inScope(x));
+    return o ? normalizeOutreach(o) : null;
   }
 
   async getOutreachByLead(leadId: string): Promise<Outreach | null> {
     const data = await this.read();
-    return data.outreach.find((o) => o.leadId === leadId && this.inScope(o)) ?? null;
+    const o = data.outreach.find((x) => x.leadId === leadId && this.inScope(x));
+    return o ? normalizeOutreach(o) : null;
   }
 
   async listOutreach(): Promise<Outreach[]> {
     const data = await this.read();
-    return data.outreach.filter((o) => this.inScope(o));
+    return data.outreach.filter((o) => this.inScope(o)).map(normalizeOutreach);
   }
 
   clearWorkspaceData(): Promise<void> {

@@ -29,6 +29,12 @@ export interface Plan {
 /** Annual billing discount (industry norm ≈ 20%). */
 export const ANNUAL_DISCOUNT = 0.2;
 
+/** Free plan hard cap on leads returned per search run (paid uses MAX_LEADS_PER_RUN). */
+export const FREE_MAX_LEADS_PER_RUN = 10;
+
+/** Selectable lead-count options in the search UI (higher values locked on Free). */
+export const LEAD_COUNT_OPTIONS = [5, 10, 15, 25] as const;
+
 export const PLANS: Record<PlanId, Plan> = {
   free: {
     id: "free",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, QuotaExceededError, type BoardResponse, type FirecrawlUsage } from "@/lib/client-api";
 import type { CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
@@ -9,14 +9,14 @@ import { LeadCard } from "./LeadCard";
 import { LeadTable } from "./LeadTable";
 import { LeadMap } from "./LeadMap";
 import { LeadDrawer } from "./LeadDrawer";
-import { UpgradeModal } from "./UpgradeModal";
+import { UpgradeModal, UsageBar } from "./UpgradeModal";
 import { FirecrawlUsageBadge } from "./FirecrawlUsageBadge";
 import { Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
 import { PipelineView } from "./PipelineView";
 import { RunsView } from "./RunsView";
-import { LayoutToggle, EmptyState } from "./StudioHelpers";
+import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
 type UpgradePrompt = { kind: "leads" | "sends"; planId: PlanId };
@@ -131,6 +131,8 @@ export function Studio() {
         location: v.location,
         senderName: v.senderName,
         searchStrategy: v.searchStrategy,
+        offerNotes: v.offerNotes.trim() || undefined,
+        maxLeads: v.maxLeads,
       });
       const data = await refresh();
       const n = data.leads.length;
@@ -235,9 +237,31 @@ export function Studio() {
     try {
       await api.send(outreachId);
       await refresh();
-      toast("ok", board?.capabilities.canSendEmail ? "Email sent." : "Sent in demo mode (not delivered).");
+      toast("ok", board?.capabilities.canSendEmail ? "Email sent." : "Sent (simulated — not delivered).");
     } catch (e) {
       handleError(e);
+    }
+  };
+
+  const onSetDelivery = async (
+    outreachId: string,
+    deliveryStatus: "unknown" | "sent" | "bounced" | "replied",
+  ) => {
+    try {
+      const { outreach } = await api.updateOutreach(outreachId, { deliveryStatus });
+      await refresh();
+      const lead = findLeadByOutreach(outreachId);
+      if (lead) patchLeadLocal(lead.id, { outreach });
+      toast(
+        "ok",
+        deliveryStatus === "replied"
+          ? "Marked replied — moved to In Conversation."
+          : deliveryStatus === "bounced"
+            ? "Marked bounced."
+            : "Delivery status updated.",
+      );
+    } catch (e) {
+      toast("err", (e as Error).message);
     }
   };
 
@@ -269,11 +293,6 @@ export function Studio() {
 
   const selected = board?.leads.find((l) => l.id === selectedId) ?? null;
 
-  const approvedLeads = useMemo(
-    () => board?.leads.filter((l) => l.status === "approved" && l.outreach) ?? [],
-    [board],
-  );
-
   if (loading) {
     return (
       <div className="grid min-h-[60vh] place-items-center">
@@ -303,6 +322,20 @@ export function Studio() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {board?.workspace?.metered && (
+            <div className="hidden min-w-[16rem] grid-cols-2 gap-3 sm:grid sm:min-w-[20rem]">
+              <UsageBar
+                label="Leads"
+                used={board.workspace.leadsUsed}
+                limit={board.workspace.leadsLimit}
+              />
+              <UsageBar
+                label="Sends"
+                used={board.workspace.sendsUsed}
+                limit={board.workspace.sendsLimit}
+              />
+            </div>
+          )}
           {view === "board" && board?.capabilities.firecrawl && (
             <FirecrawlUsageBadge refreshKey={fcUsageKey} before={fcBefore} />
           )}
@@ -312,15 +345,26 @@ export function Studio() {
       {/* Search view — always show the full panel */}
       {view === "board" && (
         <div className="mb-8">
-          <SearchPanel onSearch={runSearch} running={running} compact={false} />
-          {!canSearchLive && !hasLeads && (
+          <SearchPanel
+            onSearch={runSearch}
+            running={running}
+            compact={false}
+            planId={board?.workspace?.planId ?? "free"}
+            leadsRemaining={
+              board?.workspace?.metered
+                ? Math.max(0, board.workspace.leadsLimit - board.workspace.leadsUsed)
+                : null
+            }
+          />
+          {running && <SearchProgress running={running} />}
+          {!canSearchLive && !hasLeads && !running && (
             <p className="mt-3 text-xs text-mist-500">
               No Firecrawl/Exa key — live search is unavailable. Use{" "}
               <span className="text-mist-300">Load demo data</span> below, or add a key in
               Settings.
             </p>
           )}
-          {hasLeads && (
+          {hasLeads && !running && (
             <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/5 bg-ink-900/40 px-4 py-3">
               <span className="text-sm text-mist-300">
                 <span className="font-semibold text-aurora-300">{board!.leads.length}</span>{" "}
@@ -343,23 +387,20 @@ export function Studio() {
               </button>
             </div>
           )}
-          {!hasLeads && <EmptyState onLoadDemo={loadDemo} running={running} />}
+          {!hasLeads && !running && <div className="mt-6"><EmptyState onLoadDemo={loadDemo} running={running} /></div>}
         </div>
       )}
 
       {/* Pipeline view — kanban + full leads table below */}
       {view === "pipeline" && (
         hasLeads ? (
-          <>
+          <div data-tour="pipeline">
             <PipelineView
               leads={board!.leads}
-              approvedLeads={approvedLeads}
               onOpen={(id) => setSelectedId(id)}
               onMoveStage={onMoveStage}
               onDraft={onDraft}
               onDecide={onDecide}
-              onSend={onSend}
-              canSend={board!.capabilities.canSendEmail}
             />
             <div className="mt-10">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -397,9 +438,11 @@ export function Studio() {
                 <LeadTable leads={board!.leads} onOpen={(id) => setSelectedId(id)} />
               )}
             </div>
-          </>
+          </div>
         ) : (
-          <EmptyState onLoadDemo={loadDemo} running={running} />
+          <div data-tour="pipeline">
+            <EmptyState onLoadDemo={loadDemo} running={running} />
+          </div>
         )
       )}
 
@@ -420,6 +463,7 @@ export function Studio() {
           onSaveDraft={onSaveDraft}
           onDecide={onDecide}
           onSend={onSend}
+          onSetDelivery={onSetDelivery}
           onUpdateCrm={onUpdateLeadCrm}
         />
       )}

@@ -39,18 +39,16 @@ export function SenderProfileForm() {
   return (
     <form onSubmit={onSave} className="space-y-4 rounded-xl2 border border-white/10 p-5">
       <p className="text-sm text-mist-300">
-        Used to personalize outreach drafts and prefill offer notes on new searches.
-        Stored in this browser only — not synced to the server.
+        Pitch notes and sign-off for drafts. Your display name lives under Sending
+        identity (one place). Stored in this browser only — not synced to the server.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Your name" value={profile.displayName} onChange={set("displayName")} placeholder="Alex Rivera" />
         <Field label="Title" value={profile.title} onChange={set("title")} placeholder="Founder" />
         <Field
           label="Company"
           value={profile.company}
           onChange={set("company")}
           placeholder="Northstar Studio"
-          className="sm:col-span-2"
         />
       </div>
       <label className="block">

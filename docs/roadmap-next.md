@@ -45,62 +45,45 @@ Order of work:
 - [x] Per-lead address → real map pins (region-code-validated `City, ST`; street pref)
 - [x] Fit-score explainability in the drawer (transparent reasons list — already shown)
 
-### Phase C — Act on leads
-- Bulk: draft all / approve selected (still per-lead send — Art. I.1)
-- Reply / bounce status (webhook later)
-- Saved ICPs (niche + location + offer templates)
-- SMTP connect wizard that writes env guidance clearly (no secrets in browser)
+### Phase C — Act on leads ✅ shipped
+- [x] Bulk: draft all / approve selected (checkboxes; Send remains **per-lead** in drawer)
+- [x] Reply / bounce status stub (`deliveryStatus` on Outreach + drawer controls; webhook later)
+- [x] Saved ICPs (niche + location + offer templates — browser localStorage)
+- [x] SMTP connect wizard (stepped env guidance in Settings — no secrets in browser)
 
-### Phase D — Commercial readiness
-- Deploy D1 + auth + Stripe live path
-- Deliverability checklist in Settings
-- Usage caps UX when metered
+### Phase D — Commercial readiness ✅ code shipped / ⏳ ops for live secrets
+- [x] D1 + auth + Stripe **wired in code**; live secrets/webhook are deploy ops
+  (`AUTH_SECRET`, Stripe keys, `cf:migrate` through 0007, Turnstile optional)
+- [x] Deliverability checklist in Settings (capability ticks + link to full guide)
+- [x] Usage caps UX when metered (Studio header `UsageBar` + existing UpgradeModal)
 
 ---
 
 ## Copy-paste execution prompt
 
-Use this in a new Cursor agent chat when you want the next build executed:
+Use this when you want a follow-up polish or Phase D **ops** deploy:
 
 ```
 You are working in the Lodestar repo (LeadGenerator). Read AGENTS.md,
 docs/constitution.md, docs/session-handoff.md, and docs/roadmap-next.md first.
 
-MISSION: Ship Phase B + remaining Phase A from docs/roadmap-next.md so a user
-can find higher-quality leads and act on them in a clear sales funnel.
+MISSION: Phase A–D product code is shipped. Either (1) polish UX friction on
+Pipeline/Search/Settings, or (2) run commercial deploy ops: AUTH_SECRET,
+cf:migrate (through 0007), Stripe keys + webhook, verify metered usage bars.
 
 HARD RULES
 - Obey constitution: UI → API → service → repo/providers; human approval before
   send; zero-key demo still works; no secrets in the browser.
-- Types first in src/lib/types.ts. Update docs/session-handoff.md + LEARNINGS
-  in the same session.
-- Use .cursor/skills/lodestar-ui/SKILL.md for any UI. Verify map/pipeline with
-  Playwright MCP (127.0.0.1:3000) — screenshot + DOM asserts, don’t guess.
-- Do NOT add auto-blast / approve-all-and-send that skips approval.
-
-BUILD (in order)
-1. Finish Phase A: load a selected run onto the board; pass sender profile
-   displayName into generateDraft (API-safe, not reading localStorage on server).
-2. Phase B lead quality: improve page→company naming; basic email hygiene;
-   scrape/geocode better locations when present.
-3. Pipeline UX: click a card opens LeadDrawer; show counts; empty-column copy.
-4. Keep Export CSV + Runs working.
-
-DONE WHEN
-- npx tsc --noEmit and npm run lint clean
-- Playwright: Board → Pipeline shows columns; Map shows tiles+pins; Export
-  downloads CSV
-- session-handoff Status block rewritten
-
-Out of scope: Stripe live deploy, LLM drafting, contact-form automation.
+- Do NOT add approve-all-and-send that skips approval.
+- Update docs/session-handoff.md + LEARNINGS in the same session.
 ```
 
 ---
 
 ## What not to do next
-- Don’t chase Fable / 21st.dev for polish before Phase B quality.
 - Don’t store SMTP passwords in the UI.
 - Don’t break demo mode.
+- Don’t treat “Retry deploy” on an old CF commit as a fresh build (lockfile drift).
 
 ---
 

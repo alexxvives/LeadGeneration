@@ -3,7 +3,7 @@ import { getDb, LOCAL_WORKSPACE_ID } from "@/lib/db";
 import { authRequired } from "@/lib/config";
 import { auth } from "@/auth";
 import { getPlan } from "@/lib/plans";
-import { ensureUsageWindow } from "@/lib/workspace";
+import { ensureUsageWindow, getOrCreateWorkspaceForUser } from "@/lib/workspace";
 import type { Ctx } from "@/lib/service";
 import type { WorkspaceSummary } from "@/lib/types";
 
@@ -15,17 +15,35 @@ import type { WorkspaceSummary } from "@/lib/types";
  *    session; the repo is a workspace-scoped D1Store; metered = true.
  *  • Local dev / demo (no AUTH_SECRET, no binding): workspaceId = "local"; repo
  *    is the JSON store; metered = false → unmetered (constitution Art. I.2).
- *
- * This is the single wiring point the task calls for: the D1 binding is passed
- * to getDb() here, so no API route touches Cloudflare internals directly.
  */
 export async function getCtx(): Promise<Ctx> {
   const binding = await getD1Binding();
   let workspaceId = LOCAL_WORKSPACE_ID;
+
   if (authRequired()) {
-    const session = await auth();
-    if (session?.workspaceId) workspaceId = session.workspaceId;
+    try {
+      const session = await auth();
+      if (session?.workspaceId) {
+        workspaceId = session.workspaceId;
+      } else if (session?.user?.email || session?.userId || session?.user?.id) {
+        // Token missing workspaceId (e.g. provision failed at sign-in) — recover.
+        const db = getDb(binding);
+        const userId =
+          session.userId ??
+          session.user?.id ??
+          (session.user?.email ? `user_${session.user.email}` : "unknown");
+        const ws = await getOrCreateWorkspaceForUser(
+          db,
+          userId,
+          session.user?.email ?? null,
+        );
+        workspaceId = ws.id;
+      }
+    } catch (err) {
+      console.error("[getCtx] auth/session failed", err);
+    }
   }
+
   const db = getDb(binding, workspaceId);
   return { db, workspaceId, metered: !!binding };
 }
@@ -48,8 +66,35 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
       resetsAt: null,
     };
   }
-  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
-  if (!ws) {
+  try {
+    const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+    if (!ws) {
+      const free = getPlan("free");
+      return {
+        workspaceId: ctx.workspaceId,
+        planId: "free",
+        metered: true,
+        leadsUsed: 0,
+        leadsLimit: free.leadCreditsPerMonth,
+        sendsUsed: 0,
+        sendsLimit: free.sendsPerMonth,
+        resetsAt: null,
+      };
+    }
+    const fresh = await ensureUsageWindow(ctx.db, ws);
+    const plan = getPlan(fresh.planId);
+    return {
+      workspaceId: fresh.id,
+      planId: fresh.planId,
+      metered: true,
+      leadsUsed: fresh.leadsUsedThisMonth,
+      leadsLimit: plan.leadCreditsPerMonth,
+      sendsUsed: fresh.sendsUsedThisMonth,
+      sendsLimit: plan.sendsPerMonth,
+      resetsAt: fresh.resetsAt,
+    };
+  } catch (err) {
+    console.error("[getWorkspaceSummary] failed", err);
     const free = getPlan("free");
     return {
       workspaceId: ctx.workspaceId,
@@ -62,16 +107,4 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
       resetsAt: null,
     };
   }
-  const fresh = await ensureUsageWindow(ctx.db, ws);
-  const plan = getPlan(fresh.planId);
-  return {
-    workspaceId: fresh.id,
-    planId: fresh.planId,
-    metered: true,
-    leadsUsed: fresh.leadsUsedThisMonth,
-    leadsLimit: plan.leadCreditsPerMonth,
-    sendsUsed: fresh.sendsUsedThisMonth,
-    sendsLimit: plan.sendsPerMonth,
-    resetsAt: fresh.resetsAt,
-  };
 }

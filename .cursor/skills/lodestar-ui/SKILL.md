@@ -106,7 +106,7 @@ intentional and minimal (2–3 cues max per screen).
 ## Icons
 All icons live in `src/components/icons.tsx` — inline SVG, no dependency.
 Available: `SearchIcon ArrowIcon MailIcon CheckIcon XIcon GlobeIcon PhoneIcon
-SparkIcon StarIcon ShieldIcon SettingsIcon`.
+SparkIcon StarIcon ShieldIcon SettingsIcon EyeIcon EyeOffIcon`.
 Add new icons there (same pattern: `SVGProps<SVGSVGElement>`, `currentColor`).
 
 ## Architecture rules (never break)

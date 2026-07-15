@@ -43,11 +43,23 @@ export function scoreLead(
     reasons.push("Rich profile to personalize on");
   }
 
-  // Location alignment bonus.
+  // Location alignment.
   const wantLoc = input.location?.toLowerCase().trim();
-  if (wantLoc && lead.location?.toLowerCase().includes(wantLoc.split(",")[0])) {
-    score += 12;
-    reasons.push(`In target location (${input.location})`);
+  if (wantLoc) {
+    const city = wantLoc.split(",")[0]?.trim() ?? wantLoc;
+    const leadLoc = lead.location?.toLowerCase() ?? "";
+    const hay = `${leadLoc} ${lead.website ?? ""} ${lead.company}`.toLowerCase();
+    if (city && leadLoc.includes(city)) {
+      score += 12;
+      reasons.push(`In target location (${input.location})`);
+    } else if (city && leadLoc && !leadLoc.includes(city)) {
+      // Scraped address is elsewhere — heavy penalty (filtered later if severe).
+      score -= 28;
+      reasons.push(`Location mismatch — page says ${lead.location}, not ${input.location}`);
+    } else if (city && /\b(ny|nyc|new york|usa|united states)\b/i.test(hay) && /spain|españa|catalonia|catalunya/i.test(wantLoc)) {
+      score -= 30;
+      reasons.push("Looks US-based while you asked for Spain");
+    }
   }
 
   return { score: Math.max(0, Math.min(100, score)), reasons };

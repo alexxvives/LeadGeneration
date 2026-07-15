@@ -4,6 +4,32 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-14 — Search lead-count, quieter compliance, Spanish drafts
+- **`maxLeads` on CreateRunInput** — UI offers 5/10/15/25; Free capped at
+  `FREE_MAX_LEADS_PER_RUN` (10) + monthly credits; paid uses `MAX_LEADS_PER_RUN`
+  (default now 25).
+- **Drafts no longer embed the scammy “Sent by… STOP…” block.** Editable body
+  stays human; a quiet address + opt-out line is appended only at send time
+  (`complianceFooter` in `sendApprovedOutreach`).
+- **One name field:** Sending identity “Your name” syncs to localStorage
+  `displayName` for draft sign-off; Outreach profile no longer asks again.
+- **Reply-to ≠ CC.** Reply-to routes replies; CC on cold outreach hurts
+  deliverability — keep sharing threads after they reply.
+- **Physical address** remains for CAN-SPAM / ready-to-send checklist, even
+  though the draft UI no longer shows the verbose footer.
+
+### 2026-07-14 — Phase C + D product code (roadmap complete)
+- **Bulk send removed from Pipeline.** Roadmap “per-lead send” means Approve
+  can be bulk/selected; Send stays in the drawer only (Art. I.1).
+- **`deliveryStatus` on Outreach** (`unknown|sent|bounced|replied`) is the
+  stub for future Resend webhooks — same field, no schema churn. Marking
+  `replied` also advances CRM → `in_conversation`.
+- **Saved ICPs = localStorage** (`src/lib/saved-icps.ts`) for zero-key demo;
+  server persistence can wait until metered multi-user needs sync.
+- **Phase D deploy is ops, not missing architecture** — D1/auth/Stripe already
+  wired; live path needs `AUTH_SECRET`, Stripe secrets, `cf:migrate` through
+  **0007**, webhook URL. Usage bars only appear when `workspace.metered`.
+
 ### 2026-07-14 — Table Status = CRM stage; Excel export; Settings on account card
 - **Two status models confuse users in the table.** `LeadStatus` (“In review”)
   is email-workflow; Pipeline columns use `crmStage`. Table Status must show
@@ -238,3 +264,40 @@ Do not transmit the key value from the agent to external services to "test" it.
 ### 2026-07-13 — next 15.5.4 had a security advisory
 Bumped to the patched `15.5.20` (the `backport` dist-tag of the 15.5 line) during
 setup. Watch for further advisories on the 15.x line.
+
+### 2026-07-14 — Go-live wizard; demo fallback kept
+Do not delete zero-key fallbacks (constitution Art. I.2). Instead: (1) soften
+“demo” copy when `canSearchLive` / `canSendEmail` are true, (2) treat placeholder
+`OUTREACH_*` values as incomplete via `src/lib/identity.ts`, (3) first-visit
+Getting Started wizard + Settings reopen (`/app?setup=1`). Settings Email delivery
+now lists Resend and SMTP separately — Resend was missing from Integrations and
+the old SMTP-only footer falsely said “demo” when Resend was already configured.
+
+### 2026-07-14 — Onboarding tour + location pick + search UX
+- Wizard jumped to step 3 because it auto-selected the first “incomplete”
+  checklist item (search/email already green on prod). Always open on step 1.
+- Replaced checklist modal with a coach-mark tour (Search → Pipeline →
+  Settings); Settings has a temporary “Replay product tour” button.
+- EmptyState image+`from-ink-950` gradient removed from Search — looked like a
+  stray overlay under the form.
+- Location must be picked from Photon suggestions (or cleared); free-typed
+  “barcelona” let FC return Barcelona SC (NY). Also stop stamping search city
+  onto every lead; filter scraped geo mismatches.
+- Search progress is staged UI only — run is still one blocking request (true
+  streaming needs async runs + poll).
+
+Worker logs: `Page changed from static to dynamic at runtime /app, reason:
+headers` after magic-link. `auth()`/`getCtx` called `headers()` on a route Next
+had prerendered as static → OpenNext 500 (user saw “505”). Fix:
+`export const dynamic = "force-dynamic"` on `/app` layout + page; remove
+`getCtx` from layout entirely (wizard uses env identity defaults). Prior jwt
+try/catch was necessary but not sufficient. Deploy on Windows: `npm run cf:build`
+then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` (`cf:deploy` hits
+miniflare spawn UNKNOWN).
+
+### 2026-07-14 — Magic-link From fix + /app harden + landing
+Auth mail From placeholder caused silent Resend rejects (fixed earlier). Post-
+login `/app` 505: harden jwt provision (try/catch), recover workspace in
+`getCtx` if token lacks `workspaceId`, and never let layout getCtx throw.
+Branded magic-link HTML via `src/lib/auth-email.ts`. Landing redesigned with
+live product preview (map + pipeline) — dropped missing hero image dependency.

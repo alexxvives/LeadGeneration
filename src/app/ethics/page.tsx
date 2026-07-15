@@ -13,7 +13,7 @@ const POINTS: [string, string][] = [
   ["Rate limited", "Outbound sends are throttled per minute to protect deliverability."],
   [
     "Clear identity + opt-out",
-    "Every draft carries a from-identity, mailing address, and unsubscribe placeholder.",
+    "Outbound sends include a quiet mailing-address + opt-out line (not baked into the editable draft).",
   ],
   ["Public web only", "Enrichment never touches content behind a login."],
   [

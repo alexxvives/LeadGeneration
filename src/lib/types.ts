@@ -53,6 +53,22 @@ export type OutreachStatus =
   | "sent"
   | "failed";
 
+/**
+ * Post-send delivery outcome. Manual stub today; Resend/SMTP webhooks can write
+ * the same field later without a schema change.
+ */
+export type DeliveryStatus = "unknown" | "sent" | "bounced" | "replied";
+
+/** Saved search template (niche + location + offer). Client-local in demo. */
+export interface SavedIcp {
+  id: string;
+  name: string;
+  niche: string;
+  location: string;
+  offerNotes: string;
+  createdAt: string;
+}
+
 /** Billing plan identifiers. Definitions/quotas/prices live in src/lib/plans.ts. */
 export type PlanId = "free" | "starter" | "pro" | "agency";
 
@@ -141,6 +157,8 @@ export interface Outreach {
   subject: string;
   body: string;
   status: OutreachStatus;
+  /** Post-send outcome (stub until provider webhooks). */
+  deliveryStatus: DeliveryStatus;
   sentAt: string | null;
   error: string | null;
   createdAt: string;
@@ -179,6 +197,11 @@ export interface CreateRunInput {
   senderName?: string | null;
   /** Search depth/strategy. Defaults to "standard" when omitted. */
   searchStrategy?: SearchStrategy;
+  /**
+   * How many leads to return for this run (capped by plan + remaining credits +
+   * MAX_LEADS_PER_RUN). Optional — defaults to a sensible mid value.
+   */
+  maxLeads?: number;
   /**
    * When true, load canned demo leads instead of calling search providers.
    * Demo data is NEVER used as a silent fallback — only via this explicit flag

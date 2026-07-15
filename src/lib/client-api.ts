@@ -63,12 +63,16 @@ export const api = {
     offerNotes?: string;
     senderName?: string;
     searchStrategy?: SearchStrategy;
+    maxLeads?: number;
     demo?: boolean;
   }) =>
     jsonFetch<{ run: Run }>("/api/runs", {
       method: "POST",
       body: JSON.stringify(input),
     }),
+
+  resetUsage: () =>
+    jsonFetch<{ ok: boolean }>("/api/workspace/reset-usage", { method: "POST" }),
 
   clearBoard: () =>
     jsonFetch<{ ok: boolean }>("/api/board", { method: "DELETE" }),
@@ -91,7 +95,13 @@ export const api = {
 
   updateOutreach: (
     id: string,
-    patch: { subject?: string; body?: string; toEmail?: string | null; decision?: "approved" | "rejected" },
+    patch: {
+      subject?: string;
+      body?: string;
+      toEmail?: string | null;
+      decision?: "approved" | "rejected";
+      deliveryStatus?: "unknown" | "sent" | "bounced" | "replied";
+    },
   ) =>
     jsonFetch<{ outreach: Outreach }>(`/api/outreach/${id}`, {
       method: "PATCH",

@@ -33,7 +33,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
    The compliance footer keeps the env from-identity (`OUTREACH_FROM_*`).
 4. **Approve** — Open a lead (pipeline card, table row, or map pin) to see the
    detail drawer. Edit subject/body/recipient, then **Approve** or **Reject**.
-   Nothing sends on approval alone. Pipeline bulk actions can draft/approve/send
+   Nothing sends on approval alone. Pipeline can **draft all** / **approve
+   selected**; **send stays per-lead** in the drawer (constitution Art. I.1).
    in batches (send still requires each outreach to be `approved` — Art. I.1).
 5. **Send** — Approved emails send via your provider (or simulate in demo mode),
    **rate-limited**, with a compliance footer. Status flows
@@ -72,22 +73,27 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     about blurb, fit-score reasons + source URL, CRM fields (notes, follow-ups,
     contact method), and the outreach composer (draft → edit → approve → send).
 
-- **`/app/settings`** — sender profile (display name + default offer in
-  localStorage, forwarded to runs via API), plan/usage bars, SMTP instructions,
-  integration status (Firecrawl primary / Exa fallback / SMTP), sending identity,
-  Resources (How it works + Plans). Secrets are never shown.
+- **`/app/settings`** — sender profile, **Sending identity** (from name / email /
+  address — editable on the live app), plan/usage, email delivery status,
+  “Ready to send?” checklist, Integrations (search + email connected or not),
+  Resources (Getting started wizard, How it works, Plans). No env-var names in
+  the UI. Secrets are never shown. Reopen the guide via **Getting started**.
 
 ## 4. Demo mode vs live mode
 
 The app detects capabilities from environment variables (`config.ts`):
 
-| Capability | No key (demo) | With key (live) |
+| Capability | No key (fallback) | With key (live) |
 | --- | --- | --- |
 | Search + enrichment | Realistic generated sample leads | Real web results (Firecrawl → Exa) |
 | Drafting / editing / approval | Full | Full |
 | Email send | Simulated + logged, never delivered | Delivered via Resend or SMTP |
 
-This is a hard product invariant: the whole UI works with zero keys.
+This is a hard product invariant: the whole UI works with zero keys. The
+**Getting Started** wizard walks new users from fallback → live (search key,
+email transport, real `OUTREACH_*` identity). Placeholder from-email / address
+values are treated as incomplete in Settings even though config returns string
+defaults.
 
 ## 5. How the code is arranged
 

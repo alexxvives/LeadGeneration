@@ -13,6 +13,7 @@ const CreateRunSchema = z.object({
   offerNotes: z.string().max(1000).optional().nullable(),
   senderName: z.string().max(120).optional().nullable(),
   searchStrategy: z.enum(["standard", "smart", "local"]).optional(),
+  maxLeads: z.number().int().min(1).max(50).optional(),
   demo: z.boolean().optional(),
 });
 

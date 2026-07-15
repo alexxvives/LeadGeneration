@@ -12,29 +12,33 @@ export interface DraftResult {
 }
 
 function firstName(lead: Lead): string {
-  if (lead.contactName) return lead.contactName.split(/\s+/)[0];
-  return "there";
+  if (lead.contactName) return lead.contactName.split(/\s+/)[0]!;
+  return "";
 }
 
 function shortCompany(lead: Lead): string {
-  return lead.company.replace(/\b(LLC|Inc|Co|Group|Studio|Partners|Collective|Labs)\b\.?/gi, "").trim() ||
-    lead.company;
+  return (
+    lead.company.replace(/\b(LLC|Inc|Co|Group|Studio|Partners|Collective|Labs|Academy|Academia)\b\.?/gi, "").trim() ||
+    lead.company
+  );
 }
 
-/** Build the compliance footer required for cold email (CAN-SPAM style). */
-export function complianceFooter(): string {
-  // NOTE: The unsubscribe link is a PLACEHOLDER. Wire it to a real opt-out
-  // handler before sending to anyone. Including a clear from-identity and a
-  // physical mailing address is required by CAN-SPAM (US) and good practice
-  // everywhere. Review local laws (GDPR/CASL/etc.) before commercial sending.
-  const from = `${env.fromName()} <${env.fromEmail()}>`;
-  return [
-    "",
-    "—",
-    `Sent by ${from}`,
-    `${env.physicalAddress()}`,
-    "Don't want to hear from us? Reply STOP or unsubscribe: {{unsubscribe_url}}",
-  ].join("\n");
+/**
+ * Quiet compliance block appended only at send time (not in the editable draft).
+ * Keeps CAN-SPAM essentials without the scammy "Sent by… Reply STOP" chrome.
+ */
+export function complianceFooter(opts?: {
+  physicalAddress?: string | null;
+  fromName?: string | null;
+  fromEmail?: string | null;
+}): string {
+  const address = (opts?.physicalAddress || env.physicalAddress()).trim();
+  const lines = ["", "—"];
+  if (address && !/placeholder|your city|00000/i.test(address)) {
+    lines.push(address);
+  }
+  lines.push("Si prefieres no recibir más mensajes, responde STOP.");
+  return lines.join("\n");
 }
 
 export function generateDraft(lead: Lead, run: Run): DraftResult {
@@ -42,34 +46,41 @@ export function generateDraft(lead: Lead, run: Run): DraftResult {
   const company = shortCompany(lead);
   const offer = run.offerNotes?.trim();
   const nicheHint = run.niche.trim();
-  // Sign-off uses the sender's display name (from the run, sourced client-side
-  // from the sender profile). Falls back to the configured from-name.
   const signOff = run.senderName?.trim() || env.fromName();
 
-  const subject = offer
-    ? `Quick idea for ${company}`
-    : `Helping ${nicheHint || company} win more customers`;
+  const subject = `Propuesta para ${company}`;
 
-  const personalLine = lead.aboutBlurb
-    ? `I came across ${company} — "${truncate(lead.aboutBlurb, 120)}" — and thought I'd reach out.`
-    : `I came across ${company} and thought I'd reach out.`;
+  const greeting = name ? `Hola ${name},` : `Hola,`;
 
-  const pitchLine = offer
+  // Prefer a concrete hook over quoting privacy-policy blurbs (common scrape noise).
+  const blurb = lead.aboutBlurb?.trim() ?? "";
+  const blurbLooksLikePolicy =
+    /cookie|privacy|identif|gdpr|personalize your experience|terms of/i.test(blurb);
+
+  let opener: string;
+  if (blurb && !blurbLooksLikePolicy) {
+    opener = `Vi ${company} y me llamó la atención lo que hacen — especialmente: "${truncate(blurb, 90)}".`;
+  } else if (lead.website) {
+    opener = `Estuve mirando ${company} (${lead.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}) y me pareció un buen momento para escribirles.`;
+  } else {
+    opener = `Estuve revisando ${company} y quise contactarlos directamente.`;
+  }
+
+  const pitch = offer
     ? offer
-    : `I help ${nicheHint || "businesses like yours"} turn their website traffic into booked calls, without adding to your workload.`;
+    : `Trabajo con ${nicheHint || "equipos como el suyo"} para convertir visitas web en conversaciones reales — sin sumar más carga operativa al día a día.`;
 
   const body = [
-    `Hi ${name},`,
+    greeting,
     "",
-    personalLine,
+    opener,
     "",
-    pitchLine,
+    pitch,
     "",
-    "Would it be worth a quick 10-minute call next week to see if it's a fit? If not, no worries at all — just reply and let me know.",
+    "¿Tendrían 10 minutos la semana que viene para ver si encaja? Si no es el momento, no hay problema — con un “no” me alcanza.",
     "",
-    `Best,`,
+    "Un saludo,",
     signOff,
-    complianceFooter(),
   ].join("\n");
 
   return { subject, body };

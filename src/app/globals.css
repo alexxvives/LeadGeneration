@@ -152,4 +152,22 @@
   .leaflet-control-attribution a {
     color: #7ff2c8 !important;
   }
+
+  /* Landing hero map tooltips */
+  .lodestar-hero-tooltip {
+    background: rgba(6, 10, 18, 0.92) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: #eaf1fb !important;
+    border-radius: 8px !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    box-shadow: none !important;
+  }
+  .lodestar-hero-tooltip::before {
+    border-top-color: rgba(6, 10, 18, 0.92) !important;
+  }
+  .lodestar-hero-pin {
+    background: transparent !important;
+    border: none !important;
+  }
 }

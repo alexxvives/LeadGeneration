@@ -61,6 +61,26 @@ export const env = {
   physicalAddress: () =>
     process.env.OUTREACH_PHYSICAL_ADDRESS?.trim() ||
     "123 Placeholder St, Your City, ST 00000",
+  /**
+   * From-address for Auth.js magic links. Resend rejects unverified domains —
+   * placeholder OUTREACH_FROM_EMAIL values must NOT be used here or sign-in
+   * mail silently fails. Falls back to Resend's onboarding sender until a real
+   * domain is configured.
+   */
+  authFromEmail: () => {
+    const raw = process.env.OUTREACH_FROM_EMAIL?.trim() || "";
+    const lower = raw.toLowerCase();
+    if (
+      !raw ||
+      lower === "you@example.com" ||
+      lower === "you@yourdomain.com" ||
+      lower.endsWith("@example.com")
+    ) {
+      return "Lodestar <onboarding@resend.dev>";
+    }
+    const name = process.env.OUTREACH_FROM_NAME?.trim() || "Lodestar";
+    return `${name} <${raw}>`;
+  },
   // Compliance: how many sends allowed per rolling minute.
   sendRatePerMinute: () => {
     const n = Number(process.env.SEND_RATE_PER_MINUTE);
@@ -77,7 +97,7 @@ export const env = {
     process.env.ENABLE_CONTACT_FORM_AUTOMATION === "true",
   maxLeadsPerRun: () => {
     const n = Number(process.env.MAX_LEADS_PER_RUN);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 12;
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 25;
   },
 
   // ── Auth (Auth.js) ──

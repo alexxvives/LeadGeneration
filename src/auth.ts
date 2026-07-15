@@ -3,6 +3,7 @@ import Nodemailer from "next-auth/providers/nodemailer";
 import ResendProvider from "next-auth/providers/resend";
 import { D1Adapter } from "@auth/d1-adapter";
 import { authConfig } from "@/auth.config";
+import { magicLinkEmail } from "@/lib/auth-email";
 import { getD1Binding } from "@/lib/cf";
 import { getDb } from "@/lib/db";
 import { env, getCapabilities } from "@/lib/config";
@@ -29,10 +30,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
 
   const providers = [...authConfig.providers];
 
+  const sendVerificationRequest = async ({
+    identifier,
+    url,
+    provider,
+  }: {
+    identifier: string;
+    url: string;
+    provider: { from?: string };
+  }) => {
+    const { host } = new URL(url);
+    const { html, text } = magicLinkEmail({ url, host, email: identifier });
+    const from = provider.from ?? env.authFromEmail();
+    const key = env.authResendKey();
+    if (!key) throw new Error("RESEND_API_KEY is not configured");
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [identifier],
+        subject: `Sign in to Lodestar`,
+        html,
+        text,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Resend magic-link failed (${res.status}): ${body.slice(0, 200)}`);
+    }
+  };
+
   // Email/magic-link providers need an adapter for verification tokens.
   if (adapter) {
     if (caps.smtp && smtp.host && smtp.user) {
-      // Prefer Maileroo/SMTP for magic links — insert ahead of Resend if both exist.
       providers.unshift(
         Nodemailer({
           id: "nodemailer",
@@ -42,7 +77,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             port: smtp.port,
             auth: { user: smtp.user, pass: smtp.pass },
           },
-          from: env.fromEmail(),
+          from: env.authFromEmail(),
+          sendVerificationRequest: async ({ identifier, url, provider }) => {
+            const { host } = new URL(url);
+            const { html, text } = magicLinkEmail({ url, host, email: identifier });
+            const nodemailer = await import("nodemailer");
+            const transport = nodemailer.createTransport(provider.server as object);
+            await transport.sendMail({
+              to: identifier,
+              from: provider.from,
+              subject: "Sign in to Lodestar",
+              text,
+              html,
+            });
+          },
         }),
       );
     }
@@ -51,7 +99,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
         ResendProvider({
           id: "resend",
           apiKey: env.authResendKey(),
-          from: env.fromEmail(),
+          from: env.authFromEmail(),
+          sendVerificationRequest,
         }),
       );
     }
@@ -65,12 +114,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       ...authConfig.callbacks,
       async jwt({ token, user }) {
         if (user) {
-          const db = getDb(binding);
-          const email = user.email ?? null;
-          const userId = (user.id as string | undefined) ?? `user_${email ?? "unknown"}`;
-          const ws = await getOrCreateWorkspaceForUser(db, userId, email);
-          token.workspaceId = ws.id;
-          token.userId = userId;
+          try {
+            const db = getDb(binding);
+            const email = user.email ?? null;
+            const userId =
+              (user.id as string | undefined) ?? `user_${email ?? "unknown"}`;
+            const ws = await getOrCreateWorkspaceForUser(db, userId, email);
+            token.workspaceId = ws.id;
+            token.userId = userId;
+          } catch (err) {
+            // Never fail sign-in because workspace provisioning hiccuped —
+            // getCtx() will retry on the next authenticated request.
+            console.error("[auth] workspace provision failed", err);
+            if (user.id) token.userId = user.id as string;
+            if (user.email) token.email = user.email;
+          }
         }
         return token;
       },

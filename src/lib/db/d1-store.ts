@@ -1,4 +1,4 @@
-import type { Lead, Outreach, Run, Workspace, PlanId, CrmStage, ContactMethod, FollowUp } from "@/lib/types";
+import type { Lead, Outreach, Run, Workspace, PlanId, CrmStage, ContactMethod, FollowUp, DeliveryStatus } from "@/lib/types";
 import type { LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -111,6 +111,7 @@ type OutreachRow = {
   subject: string;
   body: string;
   status: Outreach["status"];
+  delivery_status: string | null;
   sent_at: string | null;
   error: string | null;
   created_at: string;
@@ -205,6 +206,7 @@ function rowToOutreach(r: OutreachRow): Outreach {
     subject: r.subject,
     body: r.body,
     status: r.status,
+    deliveryStatus: (r.delivery_status as DeliveryStatus) ?? "unknown",
     sentAt: r.sent_at,
     error: r.error,
     createdAt: r.created_at,
@@ -484,18 +486,19 @@ export class D1Store implements LeadRepository {
       .prepare(
         `INSERT INTO outreach
          (id, workspace_id, lead_id, run_id, to_email, subject, body, status,
-          sent_at, error, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          delivery_status, sent_at, error, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
-           lead_id    = excluded.lead_id,
-           run_id     = excluded.run_id,
-           to_email   = excluded.to_email,
-           subject    = excluded.subject,
-           body       = excluded.body,
-           status     = excluded.status,
-           sent_at    = excluded.sent_at,
-           error      = excluded.error,
-           updated_at = excluded.updated_at`,
+           lead_id          = excluded.lead_id,
+           run_id           = excluded.run_id,
+           to_email         = excluded.to_email,
+           subject          = excluded.subject,
+           body             = excluded.body,
+           status           = excluded.status,
+           delivery_status  = excluded.delivery_status,
+           sent_at          = excluded.sent_at,
+           error            = excluded.error,
+           updated_at       = excluded.updated_at`,
       )
       .bind(
         outreach.id,
@@ -506,6 +509,7 @@ export class D1Store implements LeadRepository {
         outreach.subject,
         outreach.body,
         outreach.status,
+        outreach.deliveryStatus ?? "unknown",
         outreach.sentAt,
         outreach.error,
         outreach.createdAt,
@@ -526,6 +530,7 @@ export class D1Store implements LeadRepository {
     if ("subject" in patch) row.subject = patch.subject;
     if ("body" in patch) row.body = patch.body;
     if ("status" in patch) row.status = patch.status;
+    if ("deliveryStatus" in patch) row.delivery_status = patch.deliveryStatus ?? "unknown";
     if ("sentAt" in patch) row.sent_at = patch.sentAt ?? null;
     if ("error" in patch) row.error = patch.error ?? null;
     if ("createdAt" in patch) row.created_at = patch.createdAt;

@@ -110,7 +110,7 @@ src/lib/
   billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.
-migrations/          D1 SQL 0001–0006 (init, workspaces+auth, usage, run sender_name, crm_stage, workspace email settings).
+migrations/          D1 SQL 0001–0007 (init, workspaces+auth, usage, run sender_name, crm_stage, workspace email settings, outreach delivery_status).
 wrangler.jsonc, open-next.config.ts   Cloudflare Workers deploy config.
 data/                Local JSON DB (git-ignored).
 ```

@@ -2,42 +2,61 @@ import { env, getCapabilities } from "@/lib/config";
 import { CheckIcon, XIcon, HelpIcon, SparkIcon } from "@/components/icons";
 import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
 import { getPlan } from "@/lib/plans";
+import type { Workspace } from "@/lib/types";
 import { UsageBar } from "@/components/studio/UpgradeModal";
 import { BillingActions } from "@/components/studio/BillingActions";
 import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
 import { EmailSettingsForm } from "@/components/studio/EmailSettingsForm";
+import { DeveloperModePanel } from "@/components/studio/DeveloperModePanel";
+import {
+  isPlaceholderAddress,
+  isPlaceholderEmail,
+  isPlaceholderName,
+} from "@/lib/identity";
 import Link from "next/link";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Settings: editable outreach profile (browser) + read-only env capability status.
-// Secrets live in .env and are never rendered.
+// Settings: editable outreach profile + capability status.
+// Secrets are never rendered in the UI.
 export default async function SettingsPage() {
   const caps = getCapabilities();
-  const ctx = await getCtx();
-  const usage = await getWorkspaceSummary(ctx);
-  const ws = ctx.metered ? await ctx.db.getWorkspace(ctx.workspaceId) : null;
+
+  let ctx: Awaited<ReturnType<typeof getCtx>>;
+  let usage: Awaited<ReturnType<typeof getWorkspaceSummary>>;
+  let ws: Workspace | null = null;
+  try {
+    ctx = await getCtx();
+    usage = await getWorkspaceSummary(ctx);
+    ws = ctx.metered ? await ctx.db.getWorkspace(ctx.workspaceId) : null;
+  } catch (err) {
+    console.error("[settings] getCtx failed", err);
+    const { getDb, LOCAL_WORKSPACE_ID } = await import("@/lib/db");
+    ctx = { db: getDb(undefined, LOCAL_WORKSPACE_ID), workspaceId: LOCAL_WORKSPACE_ID, metered: false };
+    usage = await getWorkspaceSummary(ctx);
+    ws = null;
+  }
   const plan = getPlan(usage.planId);
+
+  const fromEmail = ws?.fromEmail || env.fromEmail();
+  const fromName = ws?.fromName || env.fromName();
+  const physicalAddress = ws?.physicalAddress || env.physicalAddress();
 
   const providers = [
     {
-      name: "Firecrawl",
-      envVar: "FIRECRAWL_API_KEY",
-      on: caps.firecrawl,
-      desc: "Primary live search provider — web search + full-page scrape for enrichment.",
+      name: "Web search",
+      on: caps.firecrawl || caps.exa,
+      desc: caps.firecrawl || caps.exa
+        ? "Connected — searches find real companies on the web."
+        : "Not connected — searches use sample leads until search is set up.",
     },
     {
-      name: "Exa",
-      envVar: "EXA_API_KEY",
-      on: caps.exa,
-      desc: "Fallback search provider (used when Firecrawl key is absent). Either one is enough.",
-    },
-    {
-      name: "SMTP / Maileroo",
-      envVar: "SMTP_HOST + SMTP_USER + SMTP_PASS",
-      on: caps.smtp,
-      desc: "Email sending for approved outreach. Recommended: Maileroo (smtp.maileroo.com) with your own domain.",
+      name: "Email delivery",
+      on: caps.canSendEmail,
+      desc: caps.canSendEmail
+        ? "Connected — approved messages can reach real inboxes."
+        : "Not connected — approved messages stay inside the app.",
     },
   ];
 
@@ -52,6 +71,41 @@ export default async function SettingsPage() {
         <SenderProfileForm />
       </section>
 
+      <section id="sending-identity" className="mt-8 scroll-mt-8" data-tour="sending-identity">
+        <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Sending identity
+        </h2>
+        <p className="mb-4 text-sm text-mist-500">
+          This is who your emails come from. Fill these in before sending real outreach.
+        </p>
+        <div className="rounded-xl2 border border-white/10 p-5">
+          <EmailSettingsForm
+            initial={{
+              fromName: ws?.fromName ?? null,
+              fromEmail: ws?.fromEmail ?? null,
+              replyTo: ws?.replyTo ?? null,
+              physicalAddress: ws?.physicalAddress ?? null,
+              resendApiKey: ws?.resendApiKey ?? null,
+            }}
+            defaults={{
+              fromName: env.fromName(),
+              fromEmail: env.fromEmail(),
+              replyTo: env.replyTo(),
+              physicalAddress: env.physicalAddress(),
+            }}
+            canEdit={ctx.metered}
+            liveAppUrl="https://leadgeneration.alexxvives.workers.dev/app/settings#sending-identity"
+          />
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Developer mode
+        </h2>
+        <DeveloperModePanel metered={usage.metered} />
+      </section>
+
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Resources
@@ -64,7 +118,7 @@ export default async function SettingsPage() {
             <HelpIcon className="h-5 w-5 shrink-0 text-mist-500" />
             <div className="min-w-0 flex-1">
               <p className="font-medium">How it works</p>
-              <p className="text-sm text-mist-500">The full product walkthrough — search, enrich, approve, send.</p>
+              <p className="text-sm text-mist-500">Search, enrich, approve, send — the full walkthrough.</p>
             </div>
             <span className="text-mist-500">→</span>
           </Link>
@@ -92,8 +146,8 @@ export default async function SettingsPage() {
               <p className="font-display text-xl font-semibold">{plan.name} plan</p>
               <p className="text-sm text-mist-500">
                 {usage.metered
-                  ? "Usage is metered monthly and resets on the 1st."
-                  : "Demo / local mode — unlimited and unmetered."}
+                  ? "Usage resets on the 1st of each month."
+                  : "You’re on the local preview — open the live app to save sending details and use your plan."}
               </p>
             </div>
             {usage.metered && <BillingActions paid={usage.planId !== "free"} />}
@@ -109,46 +163,92 @@ export default async function SettingsPage() {
 
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Connect domain / SMTP
+          Email delivery
         </h2>
         <div className="rounded-xl2 border border-white/10 p-5">
           <p className="text-sm text-mist-300">
-            Sending identity and SMTP credentials are configured via environment variables so
-            keys never hit the browser or the local JSON store. For production deliverability,
-            use a dedicated warmed domain (Maileroo or similar).
+            Status of outbound email on this site. To send from your own domain, add it in{" "}
+            <a
+              href="https://resend.com/domains"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-aurora-300 hover:underline"
+            >
+              Resend → Domains
+            </a>
+            , finish DNS, then put that address under{" "}
+            <a href="#sending-identity" className="text-aurora-300 hover:underline">
+              Sending identity
+            </a>
+            .
           </p>
-          <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-mist-300">
-            <li>
-              Set <code className="text-aurora-300">SMTP_HOST</code>,{" "}
-              <code className="text-aurora-300">SMTP_PORT</code>,{" "}
-              <code className="text-aurora-300">SMTP_USER</code>,{" "}
-              <code className="text-aurora-300">SMTP_PASS</code> in{" "}
-              <code className="text-aurora-300">.env.local</code> (or Wrangler secrets).
-            </li>
-            <li>
-              Set <code className="text-aurora-300">OUTREACH_FROM_EMAIL</code>,{" "}
-              <code className="text-aurora-300">OUTREACH_FROM_NAME</code>, and{" "}
-              <code className="text-aurora-300">OUTREACH_PHYSICAL_ADDRESS</code>.
-            </li>
-            <li>Restart the server (or redeploy) — status below updates automatically.</li>
-          </ol>
-          <p className="mt-4 text-sm">
-            <Link href="/deliverability" className="text-aurora-300 hover:underline">
-              Deliverability guide →
-            </Link>
-          </p>
-          <div className="mt-5 flex items-center gap-3 rounded-lg border border-white/5 bg-ink-900/40 px-4 py-3">
-            <StatusDot on={caps.smtp} />
-            <div>
-              <p className="text-sm font-medium">
-                {caps.smtp ? "SMTP connected" : "No SMTP configured"}
-              </p>
-              <p className="text-xs text-mist-500">
-                {caps.canSendEmail
-                  ? "Approved sends will be delivered from your domain."
-                  : "Sends run in demo mode — configure SMTP above to go live."}
-              </p>
+          <div className="mt-5 space-y-2">
+            <div className="flex items-center gap-3 rounded-lg border border-white/5 bg-ink-900/40 px-4 py-3">
+              <StatusDot on={caps.canSendEmail} />
+              <div>
+                <p className="text-sm font-medium">
+                  {caps.canSendEmail ? "Email delivery is on" : "Email delivery is off"}
+                </p>
+                <p className="text-xs text-mist-500">
+                  {caps.canSendEmail
+                    ? "Approved outreach can leave the app."
+                    : "Approved messages won’t be delivered until delivery is connected."}
+                </p>
+              </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Ready to send?
+        </h2>
+        <div className="overflow-hidden rounded-xl2 border border-white/10">
+          {(
+            [
+              {
+                ok: !isPlaceholderEmail(fromEmail),
+                label: "From email",
+                hint: "Set under Sending identity — use an address on your verified domain",
+              },
+              {
+                ok: !isPlaceholderName(fromName),
+                label: "From name",
+                hint: "Set under Sending identity — how you appear in the inbox",
+              },
+              {
+                ok: !isPlaceholderAddress(physicalAddress),
+                label: "Mailing address",
+                hint: "Set under Sending identity — required on every commercial email",
+              },
+              {
+                ok: caps.canSendEmail,
+                label: "Email delivery",
+                hint: "Must be connected so approved messages can reach inboxes",
+              },
+              {
+                ok: caps.canSearchLive,
+                label: "Live search",
+                hint: "Must be connected so searches find real companies",
+              },
+            ] as const
+          ).map((item, i) => (
+            <div
+              key={item.label}
+              className={`flex items-start gap-4 p-4 ${i > 0 ? "border-t border-white/5" : ""}`}
+            >
+              <StatusDot on={item.ok} />
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">{item.label}</p>
+                <p className="text-sm text-mist-500">{item.hint}</p>
+              </div>
+            </div>
+          ))}
+          <div className="border-t border-white/5 px-4 py-3">
+            <Link href="/deliverability" className="text-sm text-aurora-300 hover:underline">
+              Full deliverability guide →
+            </Link>
           </div>
         </div>
       </section>
@@ -168,50 +268,14 @@ export default async function SettingsPage() {
                 <p className="font-medium">{p.name}</p>
                 <p className="text-sm text-mist-500">{p.desc}</p>
               </div>
-              <code className="hidden rounded bg-white/5 px-2 py-1 text-xs text-mist-300 sm:block">
-                {p.envVar}
-              </code>
             </div>
           ))}
-        </div>
-        <p className="mt-3 text-sm text-mist-500">
-          {caps.canSearchLive
-            ? "Live search is active."
-            : "No search key detected — searches use built-in demo leads."}
-        </p>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Sending identity
-        </h2>
-        <p className="mb-4 text-sm text-mist-500">
-          Every outbound email uses these values. Placeholders show the platform defaults
-          (set via env vars); filling a field overrides it for your workspace only.
-        </p>
-        <div className="rounded-xl2 border border-white/10 p-5">
-          <EmailSettingsForm
-            initial={{
-              fromName: ws?.fromName ?? null,
-              fromEmail: ws?.fromEmail ?? null,
-              replyTo: ws?.replyTo ?? null,
-              physicalAddress: ws?.physicalAddress ?? null,
-              resendApiKey: ws?.resendApiKey ?? null,
-            }}
-            defaults={{
-              fromName: env.fromName(),
-              fromEmail: env.fromEmail(),
-              replyTo: env.replyTo(),
-              physicalAddress: env.physicalAddress(),
-            }}
-            canEdit={ctx.metered}
-          />
         </div>
       </section>
 
       <section className="mt-10">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Feature flags
+          Advanced
         </h2>
         <div className="rounded-xl2 border border-white/10 p-5">
           <div className="flex items-center gap-4">
@@ -219,13 +283,10 @@ export default async function SettingsPage() {
             <div className="flex-1">
               <p className="font-medium">Contact-form automation</p>
               <p className="text-sm text-mist-500">
-                Demo-only stub. OFF by default. Even when enabled it only simulates a
-                submission and never posts to a real site.
+                Off by default. Even when on, it only simulates a form fill — never posts to a
+                real site.
               </p>
             </div>
-            <code className="hidden rounded bg-white/5 px-2 py-1 text-xs text-mist-300 sm:block">
-              ENABLE_CONTACT_FORM_AUTOMATION
-            </code>
           </div>
         </div>
       </section>
@@ -244,4 +305,3 @@ function StatusDot({ on }: { on: boolean }) {
     </span>
   );
 }
-

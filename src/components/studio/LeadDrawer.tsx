@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ContactMethod, CrmStage, FollowUp, LeadWithOutreach } from "@/lib/types";
+import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
 import { FitMeter, Spinner, StatusPill } from "@/components/ui";
 import {
@@ -26,6 +26,7 @@ interface DrawerProps {
   ) => Promise<void>;
   onDecide: (outreachId: string, decision: "approved" | "rejected") => Promise<void>;
   onSend: (outreachId: string) => Promise<void>;
+  onSetDelivery: (outreachId: string, deliveryStatus: DeliveryStatus) => Promise<void>;
   onUpdateCrm: (
     leadId: string,
     patch: {
@@ -383,7 +384,23 @@ export function LeadDrawer(props: DrawerProps) {
 
           {/* Fit score reasoning */}
           <section>
-            <SectionLabel>Why this fit score</SectionLabel>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <SectionLabel>Why this fit score</SectionLabel>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`font-display text-2xl font-semibold tabular-nums leading-none ${
+                    lead.fitScore >= 75
+                      ? "text-aurora-300"
+                      : lead.fitScore >= 55
+                        ? "text-amber-300"
+                        : "text-mist-400"
+                  }`}
+                >
+                  {lead.fitScore}
+                  <span className="text-sm font-normal text-mist-500">%</span>
+                </span>
+              </div>
+            </div>
             <ul className="space-y-1.5">
               {lead.fitReasons.map((r) => (
                 <li key={r} className="flex items-start gap-2 text-sm text-mist-300">
@@ -514,22 +531,66 @@ export function LeadDrawer(props: DrawerProps) {
                         className="inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
                       >
                         {busy === "send" ? <Spinner className="h-3.5 w-3.5" /> : <ArrowIcon className="h-4 w-4" />}
-                        {capabilities.canSendEmail ? "Send email" : "Send (demo)"}
+                        {capabilities.canSendEmail ? "Send email" : "Send (simulate)"}
                       </button>
                     )}
                   </div>
                 )}
 
                 {sent && (
-                  <p className="inline-flex items-center gap-2 rounded-lg bg-aurora-500/10 px-3 py-2 text-sm text-aurora-300">
-                    <CheckIcon className="h-4 w-4" /> Sent
-                    {outreach.sentAt ? ` · ${new Date(outreach.sentAt).toLocaleString()}` : ""}
-                  </p>
+                  <div className="space-y-3">
+                    <p className="inline-flex items-center gap-2 rounded-lg bg-aurora-500/10 px-3 py-2 text-sm text-aurora-300">
+                      <CheckIcon className="h-4 w-4" /> Sent
+                      {outreach.sentAt ? ` · ${new Date(outreach.sentAt).toLocaleString()}` : ""}
+                    </p>
+                    <div>
+                      <p className="mb-2 text-xs font-medium uppercase tracking-widest text-mist-500">
+                        Delivery outcome
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {(
+                          [
+                            { id: "sent", label: "Delivered" },
+                            { id: "replied", label: "Replied" },
+                            { id: "bounced", label: "Bounced" },
+                          ] as const
+                        ).map((opt) => {
+                          const active = (outreach.deliveryStatus ?? "unknown") === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              disabled={busy === "delivery"}
+                              onClick={() =>
+                                run("delivery", () =>
+                                  props.onSetDelivery(outreach.id, opt.id),
+                                )
+                              }
+                              className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition-colors ${
+                                active
+                                  ? opt.id === "bounced"
+                                    ? "bg-rose-500/15 text-rose-300 ring-rose-400/30"
+                                    : opt.id === "replied"
+                                      ? "bg-sky-400/15 text-sky-300 ring-sky-400/30"
+                                      : "bg-aurora-400/15 text-aurora-300 ring-aurora-400/30"
+                                  : "text-mist-400 ring-white/10 hover:bg-white/5 hover:text-mist-100"
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-[11px] text-mist-600">
+                        Manual stub for now — provider bounce/reply webhooks can write the same field later.
+                      </p>
+                    </div>
+                  </div>
                 )}
 
                 {!capabilities.canSendEmail && !sent && (
                   <p className="text-xs text-mist-500">
-                    No email provider configured — sending runs in demo mode and won&apos;t
+                    No email provider configured — sending is simulated and won&apos;t
                     actually deliver. Add a Resend or SMTP key in Settings.
                   </p>
                 )}

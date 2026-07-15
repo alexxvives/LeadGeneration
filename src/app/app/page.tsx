@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { Studio } from "@/components/studio/Studio";
 import { Spinner } from "@/components/ui";
 
+export const dynamic = "force-dynamic";
+
 export default function StudioPage() {
   return (
     <Suspense

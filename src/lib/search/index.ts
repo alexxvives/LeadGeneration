@@ -54,8 +54,9 @@ function pageToRawLead(page: PageResult, input: CreateRunInput): RawLead {
     website: domainFromUrl(page.url) ? `https://${domainFromUrl(page.url)}` : page.url,
     emails: extractEmails(haystack),
     phones: extractPhones(haystack),
-    // Prefer a page-scraped address; fall back to the search Location field.
-    location: scrapedLocation || input.location?.trim() || null,
+    // Keep scraped location only — do not invent the search city onto every lead
+    // (that hid geo mismatches like "Barcelona SC" in New York).
+    location: scrapedLocation || null,
     aboutBlurb: extractBlurb(page.content || page.description || "") ?? page.description ?? null,
     tags: [input.niche.split(/\s+/)[0]?.toLowerCase() ?? "lead"],
   };
@@ -64,6 +65,21 @@ function pageToRawLead(page: PageResult, input: CreateRunInput): RawLead {
 function finalize(raw: RawLead, sourceUrl: string, input: CreateRunInput): ScoredLead {
   const { score, reasons } = scoreLead(raw, input);
   return { ...raw, sourceUrl, fitScore: score, fitReasons: reasons, contactName: null };
+}
+
+/** Drop leads whose scraped address clearly conflicts with the requested city. */
+function passesLocationGate(lead: ScoredLead, input: CreateRunInput): boolean {
+  const want = input.location?.trim();
+  if (!want) return true;
+  const city = want.split(",")[0]?.trim().toLowerCase();
+  if (!city) return true;
+  const scraped = lead.location?.trim();
+  // Only gate when we scraped a real address (not the fallback copy of input.location).
+  if (!scraped) return true;
+  if (scraped.toLowerCase() === want.toLowerCase()) return true;
+  if (scraped.toLowerCase().includes(city)) return true;
+  // Scraped somewhere else entirely.
+  return false;
 }
 
 function urlKey(url: string): string {
@@ -102,7 +118,10 @@ async function collectPages(
  * surface a clear error so the board stays empty until the user chooses.
  */
 export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
-  const limit = env.maxLeadsPerRun();
+  const limit =
+    input.maxLeads && input.maxLeads > 0
+      ? Math.floor(input.maxLeads)
+      : env.maxLeadsPerRun();
 
   if (input.demo) {
     const demo = demoLeads(input, limit).map((raw, i) =>
@@ -139,10 +158,10 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
       const key = domainFromUrl(l.website) ?? l.company;
       if (seen.has(key)) return false;
       seen.add(key);
-      return true;
+      return passesLocationGate(l, input);
     });
   const ranked = multiQuery
     ? leads.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit)
-    : leads;
+    : leads.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit);
   return { provider: provider.name, mode: "live", leads: ranked };
 }

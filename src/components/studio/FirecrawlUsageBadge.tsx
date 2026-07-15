@@ -34,7 +34,6 @@ export function FirecrawlUsageBadge({
   if (!usage?.available || usage.remainingCredits == null) return null;
 
   const remaining = usage.remainingCredits;
-  const plan = usage.planCredits;
   const usedThisRun =
     before?.available && before.remainingCredits != null
       ? Math.max(0, before.remainingCredits - remaining)
@@ -53,12 +52,6 @@ export function FirecrawlUsageBadge({
       )}
       <span className="text-mist-500">·</span>
       <span className="tabular-nums">{remaining.toLocaleString()} credits left</span>
-      {plan != null && plan > 0 && (
-        <>
-          <span className="text-mist-500">·</span>
-          <span className="tabular-nums text-mist-500">{plan.toLocaleString()}/mo plan</span>
-        </>
-      )}
     </div>
   );
 }

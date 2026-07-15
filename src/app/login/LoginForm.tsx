@@ -5,6 +5,7 @@ import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { ArrowIcon, MailIcon } from "@/components/icons";
+import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
 
 interface TurnstileApi {
@@ -170,14 +171,13 @@ export function LoginForm({
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-mist-100">
             Password{" "}
-            <span className="font-normal text-mist-500">(any value — dev mode)</span>
+            <span className="font-normal text-mist-500">(any value — local only)</span>
           </span>
-          <input
-            type="password"
+          <PasswordField
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60"
+            autoComplete="current-password"
           />
         </label>
       )}
