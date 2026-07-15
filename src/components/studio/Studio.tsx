@@ -50,6 +50,7 @@ export function Studio() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
   const [layout, setLayout] = useState<"table" | "cards" | "map">("table");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [upgrade, setUpgrade] = useState<UpgradePrompt | null>(null);
@@ -251,7 +252,20 @@ export function Studio() {
       await refresh();
       toast("ok", board?.capabilities.canSendEmail ? "Email sent." : "Sent (simulated — not delivered).");
     } catch (e) {
-      handleError(e);
+      await refresh();
+      const msg = (e as Error).message;
+      if (/must be approved/i.test(msg)) {
+        toast("err", "Approve the draft first, then send. (If a prior send failed, re-approve and retry.)");
+      } else if (/undeliverable/i.test(msg)) {
+        toast("err", msg);
+      } else if (/domain|verified|from/i.test(msg)) {
+        toast(
+          "err",
+          `${msg} — In Settings: set From email on a Resend-verified domain, paste your Resend API key, then retry.`,
+        );
+      } else {
+        handleError(e);
+      }
     }
   };
 
@@ -333,7 +347,30 @@ export function Studio() {
     }
   };
 
+  const openInfo = (id: string) => {
+    setDrawerMode("info");
+    setSelectedId(id);
+  };
+  const openDraft = (id: string) => {
+    setDrawerMode("draft");
+    setSelectedId(id);
+  };
+
   const selected = board?.leads.find((l) => l.id === selectedId) ?? null;
+
+  const outreachSetupHint = (() => {
+    if (!board) return null;
+    const parts: string[] = [];
+    if (!board.capabilities.canSendEmail) {
+      parts.push(
+        "No Resend/SMTP key on the server — clicks will simulate. Add RESEND_API_KEY (or a workspace Resend key in Settings → Sending) for real delivery.",
+      );
+    }
+    parts.push(
+      "From email must be on a domain verified in Resend (DNS: SPF + DKIM; DMARC recommended). Set name/email under Settings → Sending identity.",
+    );
+    return parts.join(" ");
+  })();
 
   if (loading) {
     return (
@@ -460,7 +497,7 @@ export function Studio() {
           <div data-tour="pipeline-board">
             <PipelineView
               leads={board!.leads}
-              onOpen={(id) => setSelectedId(id)}
+              onOpen={openInfo}
               onMoveStage={onMoveStage}
               onDraft={onDraft}
               onDecide={onDecide}
@@ -495,16 +532,16 @@ export function Studio() {
               <LeadMap
                 leads={board!.leads}
                 locationHint={board!.run?.location ?? null}
-                onOpen={(id) => setSelectedId(id)}
+                onOpen={openInfo}
               />
             ) : layout === "cards" ? (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {board!.leads.map((lead, i) => (
-                  <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => setSelectedId(lead.id)} />
+                  <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => openInfo(lead.id)} />
                 ))}
               </div>
             ) : (
-              <LeadTable leads={board!.leads} onOpen={(id) => setSelectedId(id)} />
+              <LeadTable leads={board!.leads} onOpen={openInfo} />
             )}
           </div>
         ) : (
@@ -519,7 +556,9 @@ export function Studio() {
             leads={board!.leads}
             canSendEmail={!!board!.capabilities.canSendEmail}
             busyId={outreachBusy}
-            onOpen={(id) => setSelectedId(id)}
+            setupHint={outreachSetupHint}
+            onOpenInfo={openInfo}
+            onOpenDraft={openDraft}
             onDraft={async (id) => {
               setOutreachBusy(id);
               try {
@@ -563,6 +602,7 @@ export function Studio() {
       {selected && board && (
         <LeadDrawer
           lead={selected}
+          mode={drawerMode}
           capabilities={board.capabilities}
           onClose={() => setSelectedId(null)}
           onDraft={onDraft}

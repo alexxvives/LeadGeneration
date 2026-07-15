@@ -15,6 +15,7 @@ const PUBLIC_PREFIXES = [
   "/deliverability",
   "/api/auth",
   "/api/webhooks/stripe",
+  "/api/webhooks/resend",
   "/api/turnstile",
 ];
 

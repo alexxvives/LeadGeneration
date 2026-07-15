@@ -9,20 +9,27 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (Leads + Outreach IA)
+## ⏱️ Status — updated 2026-07-15 (Outreach UX + P1 bets)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**This pass:** SkillRepo skills copied locally; competitor backlog doc;
-Search mode ∥ leads-to-find swapped; new **Leads** + **Outreach** nav tabs;
-Pipeline kanban-only; dated notes journal; full address in drawer; no “In
-review” pill; About privacy-junk filter; fit Source URL removed.
+**This pass:** Outreach 3-column queue (Generate all / Approve all beside
+headers); Edit = draft-only drawer; info icon = profile; info drawer has no
+Outreach block; send failures stay approved + clearer toasts; HITL Day+3/+7
+sequence notes; Resend webhooks; cross-run domain/email dedupe; Settings domain
+health checklist.
+
+### Send setup (400 / 409 explained)
+- **400:** usually Resend rejected the From domain / key, or verify blocked the
+  address. Fix: Settings → Sending identity on a **verified** domain + Resend
+  key (workspace or `RESEND_API_KEY`).
+- **409 was “must be approved”** after a failed send flipped status to failed —
+  now we keep `approved` so retry works once DNS/key is fixed.
 
 ### Next for you
-1. Hard-refresh and click through Search → Pipeline → Leads → Outreach.
-2. Re-search a site like barcaacademy to confirm About is no longer consent copy.
-3. Optional: `npx skillrepo init` with your key if you want auto-sync of skills.
-4. Next product bets from `docs/decisions/competitor-features-2026-07.md` (P1:
-   HITL sequence stubs, reply webhooks, cross-run dedupe).
+1. Hard-refresh Outreach — confirm three columns fit one viewport.
+2. Configure Resend domain + key; optional `RESEND_WEBHOOK_SECRET` + webhook URL
+   `/api/webhooks/resend`.
+3. Tick SPF/DKIM/DMARC in Settings → Domain health after DNS verifies.
 
 ---
 

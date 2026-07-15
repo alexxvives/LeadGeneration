@@ -2,7 +2,13 @@
 
 import type { LeadWithOutreach } from "@/lib/types";
 import { FitMeter, Spinner, StatusPill } from "@/components/ui";
-import { ArrowIcon, CheckIcon, MailIcon, SparkIcon } from "@/components/icons";
+import {
+  ArrowIcon,
+  CheckIcon,
+  HelpIcon,
+  MailIcon,
+  SparkIcon,
+} from "@/components/icons";
 
 type OutreachBucket = "needs_draft" | "review" | "ready" | "sent";
 
@@ -23,35 +29,37 @@ const BUCKET_META: Record<
 > = {
   needs_draft: {
     title: "Needs draft",
-    hint: "Has email — generate a first touch",
-    empty: "Every contactable lead already has a draft.",
+    hint: "Generate a first touch",
+    empty: "All contactable leads have drafts.",
   },
   review: {
     title: "Review & approve",
-    hint: "Edit if needed, then approve to unlock send",
+    hint: "Edit, then approve to unlock send",
     empty: "Nothing waiting for approval.",
   },
   ready: {
     title: "Ready to send",
-    hint: "Approved — one click to deliver (or simulate)",
-    empty: "No approved drafts waiting to send.",
+    hint: "Approved — deliver (or simulate)",
+    empty: "No approved drafts yet.",
   },
   sent: {
     title: "Sent",
-    hint: "Already delivered this run",
+    hint: "Already delivered",
     empty: "No sends yet.",
   },
 };
 
 /**
- * Dedicated send queue — draft → approve → send is easier here than buried
- * inside the lead drawer. Clicking a row still opens the drawer for edits.
+ * Compact 3-column send queue so Needs draft → Review → Ready stay visible
+ * together. Edit opens draft-only; info icon opens the lead profile.
  */
 export function OutreachView({
   leads,
   canSendEmail,
   busyId,
-  onOpen,
+  setupHint,
+  onOpenInfo,
+  onOpenDraft,
   onDraft,
   onDecide,
   onSend,
@@ -61,7 +69,10 @@ export function OutreachView({
   leads: LeadWithOutreach[];
   canSendEmail: boolean;
   busyId: string | null;
-  onOpen: (id: string) => void;
+  /** Shown when identity / provider isn't ready for real delivery. */
+  setupHint?: string | null;
+  onOpenInfo: (id: string) => void;
+  onOpenDraft: (id: string) => void;
   onDraft: (leadId: string) => Promise<void>;
   onDecide: (outreachId: string, decision: "approved" | "rejected") => Promise<void>;
   onSend: (outreachId: string) => Promise<void>;
@@ -82,92 +93,136 @@ export function OutreachView({
   const actionable =
     groups.needs_draft.length + groups.review.length + groups.ready.length;
 
+  const columns: OutreachBucket[] = ["needs_draft", "review", "ready"];
+
   return (
-    <div data-tour="outreach-queue" className="space-y-8">
-      <div className="flex flex-wrap items-end justify-end gap-3">
-        <div className="flex flex-wrap gap-2">
-          {groups.needs_draft.length > 0 && (
-            <button
-              type="button"
-              onClick={() => void onDraftAll()}
-              disabled={busyId === "draft-all"}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-mist-100 transition-colors hover:bg-white/5 disabled:opacity-40"
-            >
-              {busyId === "draft-all" ? (
-                <Spinner className="h-3.5 w-3.5" />
-              ) : (
-                <SparkIcon className="h-3.5 w-3.5" />
-              )}
-              Draft all ({groups.needs_draft.length})
-            </button>
-          )}
-          {groups.review.length > 0 && (
-            <button
-              type="button"
-              onClick={() => void onApproveAll()}
-              disabled={busyId === "approve-all"}
-              className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-4 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.02] disabled:opacity-50"
-            >
-              {busyId === "approve-all" ? (
-                <Spinner className="h-3.5 w-3.5" />
-              ) : (
-                <CheckIcon className="h-3.5 w-3.5" />
-              )}
-              Approve all drafts ({groups.review.length})
-            </button>
-          )}
+    <div data-tour="outreach-queue" className="space-y-4">
+      {setupHint ? (
+        <div className="rounded-xl border border-amber-400/25 bg-amber-400/5 px-4 py-3 text-sm text-amber-100/90">
+          <p className="font-medium text-amber-200">Before real inbox delivery</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-100/70">{setupHint}</p>
         </div>
-      </div>
+      ) : null}
+
+      <p className="text-xs text-mist-500">
+        Sequence stub: after a send we schedule Day +3 / Day +7 follow-up notes
+        (still require approve → send — no auto-blast).
+      </p>
 
       {actionable === 0 && groups.sent.length === 0 ? (
         <p className="rounded-xl2 border border-white/10 bg-ink-900/40 px-5 py-8 text-center text-sm text-mist-400">
           No outreach yet. Run a search, then come back here to draft and send.
         </p>
-      ) : null}
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-3 lg:items-start">
+          {columns.map((key) => {
+            const meta = BUCKET_META[key];
+            const rows = groups[key];
+            return (
+              <section
+                key={key}
+                className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-widest text-mist-500">
+                      {meta.title}
+                      <span className="ml-1.5 tabular-nums text-mist-400">{rows.length}</span>
+                    </h3>
+                    <p className="mt-0.5 text-[11px] text-mist-600">{meta.hint}</p>
+                  </div>
+                  {key === "needs_draft" && rows.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => void onDraftAll()}
+                      disabled={busyId === "draft-all"}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-medium text-mist-100 hover:bg-white/5 disabled:opacity-40"
+                    >
+                      {busyId === "draft-all" ? (
+                        <Spinner className="h-3 w-3" />
+                      ) : (
+                        <SparkIcon className="h-3 w-3" />
+                      )}
+                      Generate all
+                    </button>
+                  ) : null}
+                  {key === "review" && rows.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => void onApproveAll()}
+                      disabled={busyId === "approve-all"}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
+                    >
+                      {busyId === "approve-all" ? (
+                        <Spinner className="h-3 w-3" />
+                      ) : (
+                        <CheckIcon className="h-3 w-3" />
+                      )}
+                      Approve all
+                    </button>
+                  ) : null}
+                </div>
 
-      {(["needs_draft", "review", "ready", "sent"] as const).map((key) => {
-        const meta = BUCKET_META[key];
-        const rows = groups[key];
-        if (rows.length === 0 && key === "sent") return null;
-        return (
-          <section key={key}>
-            <div className="mb-3 flex items-baseline justify-between gap-3">
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-mist-500">
-                  {meta.title}
-                  <span className="ml-2 tabular-nums text-mist-400">{rows.length}</span>
-                </h3>
-                <p className="mt-0.5 text-xs text-mist-500">{meta.hint}</p>
-              </div>
-            </div>
-            {rows.length === 0 ? (
-              <p className="text-xs text-mist-600">{meta.empty}</p>
-            ) : (
-              <ul className="divide-y divide-white/5 overflow-hidden rounded-xl2 border border-white/10">
-                {rows.map((lead) => (
-                  <OutreachRow
-                    key={lead.id}
-                    lead={lead}
-                    bucket={key}
-                    busy={busyId === lead.id || busyId === lead.outreach?.id}
-                    canSendEmail={canSendEmail}
-                    onOpen={() => onOpen(lead.id)}
-                    onDraft={() => onDraft(lead.id)}
-                    onApprove={() =>
-                      lead.outreach
-                        ? onDecide(lead.outreach.id, "approved")
-                        : Promise.resolve()
-                    }
-                    onSend={() =>
-                      lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
-                    }
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
-        );
-      })}
+                <ul className="max-h-[min(42vh,22rem)] divide-y divide-white/5 overflow-y-auto">
+                  {rows.length === 0 ? (
+                    <li className="px-3 py-6 text-center text-[11px] text-mist-600">
+                      {meta.empty}
+                    </li>
+                  ) : (
+                    rows.map((lead) => (
+                      <OutreachRow
+                        key={lead.id}
+                        lead={lead}
+                        bucket={key}
+                        busy={busyId === lead.id || busyId === lead.outreach?.id}
+                        canSendEmail={canSendEmail}
+                        onOpenInfo={() => onOpenInfo(lead.id)}
+                        onOpenDraft={() => onOpenDraft(lead.id)}
+                        onDraft={() => onDraft(lead.id)}
+                        onApprove={() =>
+                          lead.outreach
+                            ? onDecide(lead.outreach.id, "approved")
+                            : Promise.resolve()
+                        }
+                        onSend={() =>
+                          lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
+                        }
+                      />
+                    ))
+                  )}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {groups.sent.length > 0 ? (
+        <section className="rounded-xl2 border border-white/10 bg-ink-950/30">
+          <div className="border-b border-white/5 px-3 py-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-mist-500">
+              Sent
+              <span className="ml-1.5 tabular-nums text-mist-400">{groups.sent.length}</span>
+            </h3>
+          </div>
+          <ul className="max-h-36 divide-y divide-white/5 overflow-y-auto">
+            {groups.sent.map((lead) => (
+              <OutreachRow
+                key={lead.id}
+                lead={lead}
+                bucket="sent"
+                busy={false}
+                canSendEmail={canSendEmail}
+                onOpenInfo={() => onOpenInfo(lead.id)}
+                onOpenDraft={() => onOpenDraft(lead.id)}
+                onDraft={() => Promise.resolve()}
+                onApprove={() => Promise.resolve()}
+                onSend={() => Promise.resolve()}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -177,7 +232,8 @@ function OutreachRow({
   bucket,
   busy,
   canSendEmail,
-  onOpen,
+  onOpenInfo,
+  onOpenDraft,
   onDraft,
   onApprove,
   onSend,
@@ -186,35 +242,49 @@ function OutreachRow({
   bucket: OutreachBucket;
   busy: boolean;
   canSendEmail: boolean;
-  onOpen: () => void;
+  onOpenInfo: () => void;
+  onOpenDraft: () => void;
   onDraft: () => Promise<void>;
   onApprove: () => Promise<void>;
   onSend: () => Promise<void>;
 }) {
   const email = lead.outreach?.toEmail ?? lead.emails[0] ?? null;
   return (
-    <li className="flex flex-wrap items-center gap-3 bg-ink-900/30 px-4 py-3 transition-colors hover:bg-white/[0.03] sm:flex-nowrap">
-      <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate font-medium text-mist-100">{lead.company}</span>
+    <li className="flex flex-col gap-2 px-3 py-2.5 transition-colors hover:bg-white/[0.03]">
+      <div className="flex min-w-0 items-start gap-1.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1">
+            <span className="truncate text-sm font-medium text-mist-100">{lead.company}</span>
+            <button
+              type="button"
+              onClick={onOpenInfo}
+              className="shrink-0 rounded p-0.5 text-mist-600 transition-colors hover:bg-white/5 hover:text-mist-300"
+              aria-label={`Lead info for ${lead.company}`}
+              title="Lead info"
+            >
+              <HelpIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-mist-500">
+            <MailIcon className="h-3 w-3 shrink-0" />
+            <span className="truncate">{email ?? "No email"}</span>
+          </p>
+          {lead.outreach?.status === "failed" && lead.outreach.error ? (
+            <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
           <FitMeter score={lead.fitScore} />
           {lead.outreach && <StatusPill status={lead.outreach.status} />}
         </div>
-        <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-mist-500">
-          <MailIcon className="h-3 w-3 shrink-0" />
-          {email ?? "No email"}
-          {lead.outreach?.subject ? (
-            <span className="truncate text-mist-600"> · {lead.outreach.subject}</span>
-          ) : null}
-        </p>
-      </button>
-      <div className="flex shrink-0 items-center gap-2">
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
         {bucket === "needs_draft" && (
           <button
             type="button"
             disabled={busy}
             onClick={() => void onDraft()}
-            className="inline-flex items-center gap-1 rounded-full bg-aurora-400 px-3 py-1.5 text-xs font-medium text-ink-950 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
           >
             {busy ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3 w-3" />}
             Draft
@@ -224,8 +294,8 @@ function OutreachRow({
           <>
             <button
               type="button"
-              onClick={onOpen}
-              className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-mist-300 hover:bg-white/5"
+              onClick={onOpenDraft}
+              className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-300 hover:bg-white/5"
             >
               Edit
             </button>
@@ -233,7 +303,7 @@ function OutreachRow({
               type="button"
               disabled={busy}
               onClick={() => void onApprove()}
-              className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-3 py-1.5 text-xs font-medium text-ink-950 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
             >
               {busy ? <Spinner className="h-3 w-3" /> : <CheckIcon className="h-3 w-3" />}
               Approve
@@ -241,23 +311,32 @@ function OutreachRow({
           </>
         )}
         {bucket === "ready" && (
-          <button
-            type="button"
-            disabled={busy || !email}
-            onClick={() => void onSend()}
-            className="inline-flex items-center gap-1 rounded-full bg-aurora-400 px-3 py-1.5 text-xs font-medium text-ink-950 disabled:opacity-50"
-          >
-            {busy ? <Spinner className="h-3 w-3" /> : <ArrowIcon className="h-3 w-3" />}
-            {canSendEmail ? "Send" : "Send (simulate)"}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onOpenDraft}
+              className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-300 hover:bg-white/5"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              disabled={busy || !email}
+              onClick={() => void onSend()}
+              className="inline-flex items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
+            >
+              {busy ? <Spinner className="h-3 w-3" /> : <ArrowIcon className="h-3 w-3" />}
+              {canSendEmail ? "Send" : "Send (simulate)"}
+            </button>
+          </>
         )}
         {bucket === "sent" && (
           <button
             type="button"
-            onClick={onOpen}
-            className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-mist-400 hover:bg-white/5"
+            onClick={onOpenDraft}
+            className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-400 hover:bg-white/5"
           >
-            View
+            View draft
           </button>
         )}
       </div>

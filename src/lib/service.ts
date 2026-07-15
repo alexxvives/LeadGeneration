@@ -143,7 +143,26 @@ export async function createAndRunSearch(
 
   try {
     const outcome = await runSearch(searchInput);
-    const leads: Lead[] = outcome.leads.map((l) => ({
+
+    // Cross-run dedupe: skip domains (and emails) already in this workspace.
+    const prior = await db.listLeads();
+    const knownDomains = new Set(
+      prior
+        .map((l) => domainKey(l.website))
+        .filter((d): d is string => !!d),
+    );
+    const knownEmails = new Set(
+      prior.flatMap((l) => l.emails.map((e) => e.toLowerCase())),
+    );
+    const fresh = outcome.leads.filter((l) => {
+      const d = domainKey(l.website);
+      if (d && knownDomains.has(d)) return false;
+      if (l.emails.some((e) => knownEmails.has(e.toLowerCase()))) return false;
+      return true;
+    });
+    const dropped = outcome.leads.length - fresh.length;
+
+    const leads: Lead[] = fresh.map((l) => ({
       id: newId("lead"),
       workspaceId: ctx.workspaceId,
       runId: run.id,
@@ -197,6 +216,10 @@ export async function createAndRunSearch(
       mode: outcome.mode,
       provider: outcome.provider,
       leadCount: leads.length,
+      error:
+        dropped > 0
+          ? `Skipped ${dropped} duplicate domain/email already in workspace`
+          : null,
       completedAt: nowIso(),
     });
     return updated ?? run;
@@ -424,6 +447,18 @@ export async function sendApprovedOutreach(
       crmPatch.crmStage = "contacted";
       crmPatch.contactMethod = "email";
     }
+    // HITL sequence stubs — Day +3 / Day +7 reminders (still require approve→send).
+    if (lead) {
+      const existing = lead.followUps ?? [];
+      const hasSeq = existing.some((f) => f.note.startsWith("Sequence ·"));
+      if (!hasSeq) {
+        crmPatch.followUps = [
+          ...existing,
+          sequenceFollowUp(3, 2),
+          sequenceFollowUp(7, 3),
+        ];
+      }
+    }
     await db.updateLead(outreach.leadId, crmPatch);
     // Track sends locally too (bars); quota enforcement stays metered-only above.
     const ws = await db.getWorkspace(ctx.workspaceId);
@@ -436,13 +471,40 @@ export async function sendApprovedOutreach(
     return { ok: true, outreach: updated ?? undefined };
   }
 
+  // Keep status "approved" so the user can fix setup and retry without re-approving.
+  // Persist the provider error for the Outreach UI.
   const updated = await db.updateOutreach(outreachId, {
-    status: "failed",
+    status: "approved",
     error: result.error ?? "Unknown send error",
     updatedAt: nowIso(),
   });
-  await db.updateLead(outreach.leadId, { status: "failed" });
   return { ok: false, outreach: updated ?? undefined, error: result.error };
+}
+
+function domainKey(website: string | null | undefined): string | null {
+  if (!website) return null;
+  try {
+    const host = new URL(
+      website.startsWith("http") ? website : `https://${website}`,
+    ).hostname
+      .replace(/^www\./, "")
+      .toLowerCase();
+    return host || null;
+  } catch {
+    return website.replace(/^https?:\/\//i, "").replace(/^www\./, "").split("/")[0]?.toLowerCase() || null;
+  }
+}
+
+function sequenceFollowUp(daysFromNow: number, step: number): FollowUp {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  const iso = d.toISOString().slice(0, 10);
+  return {
+    id: newId("fu"),
+    date: iso,
+    note: `Sequence · Follow-up #${step} (day +${daysFromNow}) — draft & approve in Outreach before sending`,
+    done: false,
+  };
 }
 
 /** Manual delivery outcome stub (bounce / reply). Webhooks can call the same path later. */

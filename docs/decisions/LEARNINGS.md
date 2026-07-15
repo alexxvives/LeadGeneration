@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Outreach UX + send 400/409 + P1 bets
+- **Send 400 then 409:** Resend/provider failure returned 400 and used to set
+  outreach `failed`; retry then 409 (not approved). Now keep `approved` + store
+  error so retry works after fixing domain/key.
+- **Setup:** verified From domain in Resend + API key (platform or workspace).
+- **Outreach UI:** 3-column Needs/Review/Ready; section batch buttons; Edit =
+  draft-only drawer; ℹ = lead info (no composer).
+- **P1:** sequence Day+3/+7 notes on send; `/api/webhooks/resend`; cross-run
+  dedupe; Settings domain-health checklist; `RESEND_WEBHOOK_SECRET` in
+  `.env.example`.
+
 ### 2026-07-15 — Studio IA + enrichment polish + competitor backlog
 - **Nav:** Leads (`?view=leads`) and Outreach (`?view=outreach`) tabs; Pipeline
   is kanban-only. Search mode sits left of leads-to-find.

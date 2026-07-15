@@ -32,14 +32,13 @@ solo founders / agencies who care about quality and compliance, not blast scale.
    separate “lead stage” from “email state”; we were mixing them.
 
 ### P1 — next performance wins
-6. **Sequence stubs (day 0 / day 3 / day 7) with HITL per step** — competitors’
-   sequences are auto-send; we can offer *scheduled draft reminders* that still
-   require approve+send. Big retention without breaking Art. I.1.
-7. **Mailbox / domain health checklist in Settings** — SPF/DKIM/DMARC ticks,
-   warmup tips (we already point to Instantly/Smartlead for scale).
-8. **Reply / bounce webhooks → auto CRM move** — deliveryStatus stub exists;
-   wire Resend events so “replied” → In Conversation without manual clicks.
-9. **Lead dedupe across runs** — competitors suppress already-contacted domains.
+6. **Sequence stubs (day 0 / day 3 / day 7) with HITL per step** — ✅ shipped:
+   after first send, Day +3 / +7 notes are scheduled; still require approve→send.
+7. **Mailbox / domain health checklist in Settings** — ✅ shipped (manual SPF /
+   DKIM / DMARC / warm-up ticks in browser).
+8. **Reply / bounce webhooks → auto CRM move** — ✅ `/api/webhooks/resend`
+   maps bounce/complaint → bounced, email.received → replied (+ CRM).
+9. **Lead dedupe across runs** — ✅ skip known domains/emails in workspace.
 10. **Export + CRM sync polish** (HubSpot/Sheets) — agencies live in external CRM.
 
 ### P2 — later / only if we chase volume

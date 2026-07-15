@@ -8,6 +8,7 @@ import { BillingActions } from "@/components/studio/BillingActions";
 import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
 import { EmailSettingsForm } from "@/components/studio/EmailSettingsForm";
 import { DeveloperModePanel } from "@/components/studio/DeveloperModePanel";
+import { DomainHealthChecklist } from "@/components/studio/DomainHealthChecklist";
 import {
   isPlaceholderAddress,
   isPlaceholderEmail,
@@ -256,6 +257,9 @@ export default async function SettingsPage() {
               Full deliverability guide →
             </Link>
           </div>
+        </div>
+        <div className="mt-4">
+          <DomainHealthChecklist />
         </div>
       </section>
 

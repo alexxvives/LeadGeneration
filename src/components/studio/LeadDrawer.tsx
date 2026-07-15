@@ -44,6 +44,8 @@ function formatNoteDate(iso: string): string {
 interface DrawerProps {
   lead: LeadWithOutreach;
   capabilities: Capabilities;
+  /** info = CRM/profile only; draft = outreach composer only */
+  mode?: "info" | "draft";
   onClose: () => void;
   onDraft: (leadId: string) => Promise<void>;
   onSaveDraft: (
@@ -85,6 +87,7 @@ const CONTACT_METHODS: { method: ContactMethod; label: string }[] = [
 
 export function LeadDrawer(props: DrawerProps) {
   const { lead, capabilities, onClose } = props;
+  const mode = props.mode ?? "info";
   const outreach = lead.outreach;
 
   const [subject, setSubject] = useState(outreach?.subject ?? "");
@@ -120,10 +123,11 @@ export function LeadDrawer(props: DrawerProps) {
   }, [lead.id, lead.crmStage, lead.contactMethod, lead.followUps,
       outreach?.id, outreach?.subject, outreach?.body, outreach?.toEmail, lead.emails]);
 
-  // Keyboard shortcuts — skip when focus is in an input/textarea.
+  // Keyboard shortcuts — draft mode only; skip when focus is in an input.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { onClose(); return; }
+      if (mode !== "draft") return;
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.key === "a" || e.key === "A") {
@@ -142,7 +146,7 @@ export function LeadDrawer(props: DrawerProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, outreach, lead.id, props]);
+  }, [onClose, outreach, lead.id, props, mode]);
 
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key);
@@ -205,10 +209,21 @@ export function LeadDrawer(props: DrawerProps) {
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <CrmStagePill stage={lead.crmStage ?? "new"} />
+              {mode === "info" ? (
+                <CrmStagePill stage={lead.crmStage ?? "new"} />
+              ) : outreach ? (
+                <StatusPill status={outreach.status} />
+              ) : (
+                <CrmStagePill stage={lead.crmStage ?? "new"} />
+              )}
               <FitMeter score={lead.fitScore} />
             </div>
-            <h2 className="mt-2 truncate font-display text-2xl font-semibold">{lead.company}</h2>
+            <h2 className="mt-2 truncate font-display text-2xl font-semibold">
+              {mode === "draft" ? "Draft" : lead.company}
+            </h2>
+            {mode === "draft" ? (
+              <p className="mt-1 truncate text-sm text-mist-500">{lead.company}</p>
+            ) : null}
           </div>
           <button
             onClick={onClose}
@@ -221,7 +236,8 @@ export function LeadDrawer(props: DrawerProps) {
         </div>
 
         <div className="space-y-6 p-6">
-
+          {mode === "info" ? (
+            <>
           {/* CRM Stage picker */}
           <section>
             <SectionLabel>Sales stage</SectionLabel>
@@ -289,7 +305,7 @@ export function LeadDrawer(props: DrawerProps) {
               {lead.emails.length ? (
                 lead.emails.join(", ")
               ) : (
-                <span className="text-mist-500">No email discovered — add one below to send.</span>
+                <span className="text-mist-500">No email discovered — add one in Outreach → Edit.</span>
               )}
             </InfoRow>
             {lead.phones.length > 0 && (
@@ -447,11 +463,13 @@ export function LeadDrawer(props: DrawerProps) {
               ))}
             </ul>
           </section>
-
-          {/* Outreach composer */}
+            </>
+          ) : (
+            <>
+          {/* Draft-only composer */}
           <section className="rounded-xl2 border border-white/10 bg-ink-850/60 p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-lg font-semibold">Outreach</h3>
+              <h3 className="font-display text-lg font-semibold">Email</h3>
               <div className="flex items-center gap-2">
                 {outreach && !sent && (
                   <button
@@ -507,14 +525,15 @@ export function LeadDrawer(props: DrawerProps) {
                     value={body}
                     onChange={(e) => { setBody(e.target.value); setDirty(true); }}
                     disabled={sent}
-                    rows={12}
+                    rows={14}
                     className="w-full resize-y rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 font-sans text-sm leading-relaxed outline-none focus:border-aurora-400/60 disabled:opacity-60"
                   />
                 </FieldMini>
 
-                {outreach.status === "failed" && outreach.error && (
+                {outreach.error && (
                   <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-                    Send failed: {outreach.error}
+                    {outreach.status === "failed" ? "Send failed: " : ""}
+                    {outreach.error}
                   </p>
                 )}
 
@@ -611,7 +630,7 @@ export function LeadDrawer(props: DrawerProps) {
                         })}
                       </div>
                       <p className="mt-2 text-[11px] text-mist-600">
-                        Manual stub for now — provider bounce/reply webhooks can write the same field later.
+                        Manual for now — Resend bounce/reply webhooks write the same field when configured.
                       </p>
                     </div>
                   </div>
@@ -627,13 +646,14 @@ export function LeadDrawer(props: DrawerProps) {
             )}
           </section>
 
-          {/* Keyboard shortcuts hint */}
           <p className="text-center text-[11px] text-mist-600">
             Shortcuts: <kbd className="rounded bg-white/5 px-1">G</kbd> generate ·{" "}
             <kbd className="rounded bg-white/5 px-1">A</kbd> approve ·{" "}
             <kbd className="rounded bg-white/5 px-1">R</kbd> reject ·{" "}
             <kbd className="rounded bg-white/5 px-1">Esc</kbd> close
           </p>
+            </>
+          )}
         </div>
       </aside>
     </div>

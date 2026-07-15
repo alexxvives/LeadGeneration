@@ -93,6 +93,9 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - Quotas + rate limits in `service.ts`.
 - Identity + BYO key in Settings → workspace row.
 - Stay pluggable: swapping to SES/Maileroo/Google is config, not a rewrite.
+- **Webhooks:** `POST /api/webhooks/resend` (public) — bounce/complaint →
+  `deliveryStatus=bounced`; inbound `email.received` → `replied` (+ CRM).
+  Set `RESEND_WEBHOOK_SECRET` in production.
 
 **Bottom line:** Resend is the right **API shape** for v1 BYO sending; Zeruh is
 the **verify** layer. Deliverability still needs the customer’s domain, DNS,
