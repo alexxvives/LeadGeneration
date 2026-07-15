@@ -9,19 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (pipeline UX + Discarded + dev plan)
+## ⏱️ Status — updated 2026-07-15 (CI + verify + UI polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Local this pass:** Pipeline column scroll (`min-h-0`), vertically centered
-cards, subtitle = email/location/website (not niche tag); Parked =
-Not Interested + Discarded; Settings → Developer mode → Override plan;
-blurb junk filter; answers on cold-email domain / SMTP / Instantly vs Smartlead
-in chat (see `docs/email-providers.md`).
+**This pass:** GitHub Actions CI; Resend=send / Zeruh=verify (ADR 0009);
+hero copy trimmed; search mode ∥ leads-to-find; Not Interested ∥ Discarded
+(no nested Parked); select-ink styling; plan dropdown auto-applies beside
+Reset credits.
 
 ### Next for you
-1. Hard-refresh → Pipeline: confirm column scroll + card centering.
-2. Settings → Developer mode → change plan + refresh to see quotas.
-3. Drag a bad lead into Discarded under Parked.
+1. Add `MAILEROO_VERIFY_API_KEY` (Zeruh) in `.env.local` / Wrangler secrets.
+2. Hard-refresh Pipeline + Search layout.
+3. Confirm CI green on GitHub after push.
 
 ---
 

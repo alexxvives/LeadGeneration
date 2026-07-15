@@ -55,21 +55,18 @@ const PARKED_COLUMNS: {
   title: string;
   empty: string;
   color: string;
-  hint: string;
 }[] = [
   {
     stage: "not_interested",
     title: "Not Interested",
     empty: "Move here when they decline.",
     color: "bg-rose-400",
-    hint: "Prospect declined",
   },
   {
     stage: "discarded",
     title: "Discarded",
     empty: "Move bad-fit or incorrect leads here.",
     color: "bg-mist-600",
-    hint: "Wrong lead / bad fit",
   },
 ];
 
@@ -109,7 +106,6 @@ export function PipelineView({
   const [draftingAll, setDraftingAll] = useState(false);
   const [approvingSelected, setApprovingSelected] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [parkedOpen, setParkedOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const queuedLeads = leads.filter((l) => l.status === "queued" && l.outreach);
@@ -134,12 +130,6 @@ export function PipelineView({
     const newStage = over.id as CrmStage;
     if (!lead || lead.crmStage === newStage) return;
     onMoveStage(String(active.id), newStage);
-    if (
-      (newStage === "not_interested" || newStage === "discarded") &&
-      !parkedOpen
-    ) {
-      setParkedOpen(true);
-    }
   }
 
   const toggleSelect = (leadId: string) => {
@@ -196,10 +186,6 @@ export function PipelineView({
     </>
   );
 
-  const parkedCount = leads.filter(
-    (l) => l.crmStage === "not_interested" || l.crmStage === "discarded",
-  ).length;
-
   return (
     <div className="space-y-4">
       <p className="text-xs uppercase tracking-widest text-mist-500">
@@ -236,15 +222,22 @@ export function PipelineView({
           })}
         </div>
 
-        <ParkedSection
-          open={parkedOpen}
-          onToggle={() => setParkedOpen((o) => !o)}
-          totalCount={parkedCount}
-          leads={leads}
-          onOpen={onOpen}
-          onMoveStage={onMoveStage}
-          activeId={activeId}
-        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {PARKED_COLUMNS.map((col) => {
+            const colLeads = leads.filter((l) => l.crmStage === col.stage);
+            return (
+              <PipelineColumn
+                key={col.stage}
+                col={col}
+                leads={colLeads}
+                onOpen={onOpen}
+                onMoveStage={onMoveStage}
+                activeId={activeId}
+                compact
+              />
+            );
+          })}
+        </div>
 
         <DragOverlay>
           {activeLead ? (
@@ -323,68 +316,6 @@ function PipelineColumn({
           ))
         )}
       </div>
-    </div>
-  );
-}
-
-function ParkedSection({
-  open,
-  onToggle,
-  totalCount,
-  leads,
-  onOpen,
-  onMoveStage,
-  activeId,
-}: {
-  open: boolean;
-  onToggle: () => void;
-  totalCount: number;
-  leads: LeadWithOutreach[];
-  onOpen: (id: string) => void;
-  onMoveStage: (leadId: string, stage: CrmStage) => void;
-  activeId: string | null;
-}) {
-  return (
-    <div className="rounded-xl2 border border-white/10 bg-ink-950/30">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/5"
-        aria-expanded={open}
-      >
-        <span className="h-2 w-2 rounded-full bg-mist-500" />
-        <span className="text-sm font-semibold text-mist-100">Parked</span>
-        <span className="font-display text-base tabular-nums text-mist-400">{totalCount}</span>
-        <span className="ml-auto text-xs text-mist-500">
-          {open ? "Hide" : "Show"} · Not Interested + Discarded
-        </span>
-        <svg
-          viewBox="0 0 12 12"
-          className={`h-3 w-3 text-mist-500 transition-transform ${open ? "rotate-180" : ""}`}
-          aria-hidden
-        >
-          <path fill="currentColor" d="M2.5 4.5L6 8l3.5-3.5H2.5z" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="grid gap-3 border-t border-white/5 p-3 sm:grid-cols-2">
-          {PARKED_COLUMNS.map((col) => {
-            const colLeads = leads.filter((l) => l.crmStage === col.stage);
-            return (
-              <PipelineColumn
-                key={col.stage}
-                col={col}
-                leads={colLeads}
-                onOpen={onOpen}
-                onMoveStage={onMoveStage}
-                activeId={activeId}
-                compact
-              />
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

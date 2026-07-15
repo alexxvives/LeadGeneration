@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — CI, verify path, Resend≠Maileroo, pipeline parked flat
+- **GitHub Actions** `.github/workflows/ci.yml` — `tsc` + lint on push/PR.
+- **ADR 0009:** Resend = send; Zeruh (Maileroo Verify) = verify
+  (`MAILEROO_VERIFY_API_KEY`). Filter on enrich; block undeliverable on send.
+- **Pipeline:** Not Interested + Discarded are peer columns (no nested Parked).
+- **Selects:** `.select-ink` + `color-scheme: dark` for option menus.
+- **Skills:** see `.cursor/skills/lodestar-agent-boosters` + SkillRepo links
+  (accessibility, ADR, dogfood).
+
 ### 2026-07-15 — Pipeline polish, Discarded, dev plan override
 - **Pipeline cards:** vertical centering via `items-center` + content
   `justify-center`; column scroll needs outer `max-h` + body `min-h-0

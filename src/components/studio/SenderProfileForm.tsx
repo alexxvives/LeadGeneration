@@ -81,7 +81,7 @@ export function SenderProfileForm() {
                   }
                   patch({ title: e.target.value });
                 }}
-                className="w-full appearance-none rounded-lg border border-white/10 bg-ink-900/60 py-3 pl-4 pr-11 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+                className="select-ink w-full text-sm"
               >
                 <option value="">Select a role…</option>
                 {TITLE_OPTIONS.map((t) => (
@@ -91,14 +91,6 @@ export function SenderProfileForm() {
                 ))}
                 <option value="__custom__">Custom…</option>
               </select>
-              <span
-                className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-mist-500"
-                aria-hidden
-              >
-                <svg viewBox="0 0 12 12" className="h-3.5 w-3.5 fill-current">
-                  <path d="M2.5 4.5L6 8l3.5-3.5H2.5z" />
-                </svg>
-              </span>
             </div>
           )}
           {customTitle && (

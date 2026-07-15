@@ -55,10 +55,12 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   expect; aggressive cold can violate AUP and share-pool reputation.
 - **Recommendation for Lodestar now:**
   1. **BYO Resend key + customer domain** (current Settings field) for real
-     sends.
-  2. Keep **SMTP path** for Maileroo / SES / Google SMTP.
-  3. Do **not** market a shared Lodestar From-domain for client outreach.
-  4. Later (agency plans): optional Instantly/Smartlead-style multi-inbox, or
+     sends — **Resend is the send path** (ADR 0009).
+  2. **Maileroo Verify (Zeruh API)** via `MAILEROO_VERIFY_API_KEY` — verify on
+     enrich + block undeliverable on send. Not a replacement for Resend.
+  3. Keep **SMTP path** as optional fallback (Maileroo / SES / Google SMTP).
+  4. Do **not** market a shared Lodestar From-domain for client outreach.
+  5. Later (agency plans): optional Instantly/Smartlead-style multi-inbox, or
      SES dedicated IPs — behind the same `sendEmail()` interface.
 
 ---
@@ -87,10 +89,11 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 ## How this maps to code
 
 - `src/lib/email/sender.ts`: Resend (workspace key → platform key) → SMTP → demo.
+- `src/lib/email/verify.ts`: Zeruh/Maileroo verify on enrich + before send.
 - Quotas + rate limits in `service.ts`.
 - Identity + BYO key in Settings → workspace row.
 - Stay pluggable: swapping to SES/Maileroo/Google is config, not a rewrite.
 
-**Bottom line:** Resend is the right **API shape** for v1 BYO sending; it is
-**not** a silver bullet against spam. Deliverability comes from the customer’s
-domain, DNS, warm-up, list hygiene, and Lodestar’s human-in-the-loop limits.
+**Bottom line:** Resend is the right **API shape** for v1 BYO sending; Zeruh is
+the **verify** layer. Deliverability still needs the customer’s domain, DNS,
+warm-up, list hygiene, and Lodestar’s human-in-the-loop limits.

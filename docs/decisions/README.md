@@ -47,3 +47,4 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0006 — Workspace schema & service-layer isolation](0006-workspace-schema-and-isolation.md)
 - [0007 — Auth.js session strategy: JWT + split edge/server config](0007-authjs-jwt-sessions.md)
 - [0008 — Stripe billing + service-layer quota model](0008-stripe-quota-model.md)
+- [0009 — Resend for send, Maileroo/Zeruh for verify](0009-resend-send-maileroo-verify.md)

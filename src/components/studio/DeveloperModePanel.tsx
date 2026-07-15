@@ -39,16 +39,17 @@ export function DeveloperModePanel({
     }
   };
 
-  const applyPlan = async () => {
+  const onPlanChange = async (next: PlanId) => {
+    setPlanId(next);
+    if (next === currentPlanId) return;
     setSettingPlan(true);
     setMsg(null);
     setErr(null);
     try {
-      await api.setPlanDev(planId);
-      setMsg(
-        `Plan set to ${PLANS[planId].name}. Refresh the page to see updated quotas.`,
-      );
+      await api.setPlanDev(next);
+      setMsg(`Plan set to ${PLANS[next].name}. Refresh to see updated quotas.`);
     } catch (e) {
+      setPlanId(currentPlanId);
       setErr(e instanceof Error ? e.message : "Plan change failed");
     } finally {
       setSettingPlan(false);
@@ -81,35 +82,23 @@ export function DeveloperModePanel({
           {resetting ? <Spinner className="h-3.5 w-3.5" /> : null}
           Reset credits
         </button>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-white/5 pt-4">
-        <label className="flex min-w-[10rem] flex-col gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-mist-500">
-            Override plan
-          </span>
+        <label className="inline-flex items-center gap-2">
+          <span className="text-xs font-medium text-mist-500">Plan</span>
           <select
             value={planId}
-            onChange={(e) => setPlanId(e.target.value as PlanId)}
-            className="rounded-lg border border-white/10 bg-ink-950 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/40"
+            disabled={settingPlan}
+            onChange={(e) => void onPlanChange(e.target.value as PlanId)}
+            className="select-ink py-2 text-sm"
+            aria-label="Override plan"
           >
             {PLAN_ORDER.map((id) => (
               <option key={id} value={id}>
                 {PLANS[id].name}
-                {id === currentPlanId ? " (current)" : ""}
               </option>
             ))}
           </select>
+          {settingPlan ? <Spinner className="h-3.5 w-3.5 text-mist-500" /> : null}
         </label>
-        <button
-          type="button"
-          onClick={() => void applyPlan()}
-          disabled={settingPlan || planId === currentPlanId}
-          className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-400/15 disabled:opacity-40"
-        >
-          {settingPlan ? <Spinner className="h-3.5 w-3.5" /> : null}
-          Apply plan
-        </button>
       </div>
 
       {msg && <p className="mt-3 text-sm text-aurora-300">{msg}</p>}

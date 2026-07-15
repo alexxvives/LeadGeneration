@@ -10,6 +10,7 @@ import {
   extractLocation,
   extractPhones,
 } from "./enrich";
+import { filterVerifiableEmails } from "@/lib/email/verify";
 import { exaProvider } from "./exa";
 import { firecrawlProvider } from "./firecrawl";
 import type { PageResult, SearchProvider } from "./providers";
@@ -144,7 +145,6 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
 
   const strategy = input.searchStrategy ?? "standard";
   const queries = buildQueries(input, strategy);
-  const multiQuery = queries.length > 1;
   const provider = pickProvider();
 
   if (!provider) {
@@ -164,7 +164,7 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
   }
 
   const seen = new Set<string>();
-  const leads = pages
+  const candidates = pages
     .map((p) => finalize(pageToRawLead(p, input), p.url, input))
     .filter((l) => {
       const key = domainFromUrl(l.website) ?? l.company;
@@ -172,8 +172,14 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
       seen.add(key);
       return passesLocationGate(l, input);
     });
-  const ranked = multiQuery
-    ? leads.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit)
-    : leads.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit);
-  return { provider: provider.name, mode: "live", leads: ranked };
+  const ranked = candidates.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit);
+
+  // Verify emails when a Maileroo/Zeruh key is present (no-op heuristics otherwise).
+  const leads: ScoredLead[] = [];
+  for (const lead of ranked) {
+    const emails = await filterVerifiableEmails(lead.emails);
+    leads.push({ ...lead, emails });
+  }
+
+  return { provider: provider.name, mode: "live", leads };
 }

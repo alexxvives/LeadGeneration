@@ -22,6 +22,8 @@ export interface Capabilities {
   authRequired: boolean;
   billing: boolean; // Stripe secret key present
   turnstile: boolean; // Turnstile configured (signup bot check)
+  /** Zeruh / Maileroo email verification API key present. */
+  emailVerify: boolean;
 }
 
 function has(v: string | undefined | null): boolean {
@@ -43,6 +45,7 @@ export function getCapabilities(): Capabilities {
     authRequired: has(process.env.AUTH_SECRET),
     billing: has(process.env.STRIPE_SECRET_KEY),
     turnstile: has(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) && has(process.env.TURNSTILE_SECRET_KEY),
+    emailVerify: has(process.env.MAILEROO_VERIFY_API_KEY) || has(process.env.ZERUH_API_KEY),
   };
 }
 
@@ -92,6 +95,14 @@ export const env = {
     user: process.env.SMTP_USER?.trim() ?? "",
     pass: process.env.SMTP_PASS?.trim() ?? "",
   }),
+  /**
+   * Zeruh (Maileroo Verify) API key. Prefer MAILEROO_VERIFY_API_KEY; ZERUH_API_KEY
+   * accepted as alias. See docs/decisions/0009-resend-send-maileroo-verify.md.
+   */
+  emailVerifyKey: () =>
+    process.env.MAILEROO_VERIFY_API_KEY?.trim() ||
+    process.env.ZERUH_API_KEY?.trim() ||
+    "",
   // Feature flag: contact-form automation. OFF by default and demo-only.
   contactFormAutomationEnabled: () =>
     process.env.ENABLE_CONTACT_FORM_AUTOMATION === "true",

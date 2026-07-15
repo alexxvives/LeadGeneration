@@ -5,6 +5,7 @@ import { generateDraft, complianceFooter, leadLooksLikeUsa } from "@/lib/outreac
 import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
+import { verifyEmail } from "@/lib/email/verify";
 import { FREE_MAX_LEADS_PER_RUN, getPlan } from "@/lib/plans";
 import { QuotaError } from "@/lib/errors";
 import { ensureUsageWindow } from "@/lib/workspace";
@@ -343,6 +344,15 @@ export async function sendApprovedOutreach(
   }
   if (!outreach.toEmail) {
     return { ok: false, error: "No recipient email on this lead" };
+  }
+
+  // List hygiene — block hard undeliverables when a verify key is configured.
+  const verified = await verifyEmail(outreach.toEmail);
+  if (!verified.okToSend) {
+    return {
+      ok: false,
+      error: `Email looks undeliverable (${verified.reason ?? verified.status}). Pick another address or discard this lead.`,
+    };
   }
 
   // Send quota (metered only). Throws QuotaError → the route returns 402.

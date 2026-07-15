@@ -383,100 +383,101 @@ export function SearchPanel({
         </div>
       )}
 
-      <div className="mt-4">
-        <span className="mb-1.5 flex items-center justify-between text-sm font-medium text-mist-100">
-          Leads to find
-          <span className="text-xs font-normal text-mist-500">
-            {freeTierLocked ? `Free · up to ${FREE_MAX_LEADS_PER_RUN}/run` : "Per search"}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <span className="mb-1.5 flex items-center justify-between text-sm font-medium text-mist-100">
+            Leads to find
+            <span className="text-xs font-normal text-mist-500">
+              {freeTierLocked ? `Free · up to ${FREE_MAX_LEADS_PER_RUN}/run` : "Per search"}
+            </span>
           </span>
-        </span>
-        <div
-          role="radiogroup"
-          aria-label="Number of leads"
-          className="inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-ink-900/60 p-1"
-        >
-          {LEAD_COUNT_OPTIONS.map((n) => {
-            const locked = n > planCap;
-            const overCredits =
-              leadsRemaining != null && leadsRemaining > 0 && n > leadsRemaining;
-            const disabled = locked || overCredits;
-            const isActive = maxLeads === n;
-            return (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={isActive}
-                disabled={disabled}
-                title={
-                  locked
-                    ? "Upgrade to unlock larger batches"
-                    : overCredits
-                      ? `Only ${leadsRemaining} lead credit${leadsRemaining === 1 ? "" : "s"} left this month`
-                      : undefined
-                }
-                onClick={() => !disabled && setMaxLeads(n)}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-aurora-400 text-ink-950"
-                    : disabled
-                      ? "cursor-not-allowed text-mist-600 opacity-50"
+          <div
+            role="radiogroup"
+            aria-label="Number of leads"
+            className="inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-ink-900/60 p-1"
+          >
+            {LEAD_COUNT_OPTIONS.map((n) => {
+              const locked = n > planCap;
+              const overCredits =
+                leadsRemaining != null && leadsRemaining > 0 && n > leadsRemaining;
+              const disabled = locked || overCredits;
+              const isActive = maxLeads === n;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  role="radio"
+                  aria-checked={isActive}
+                  disabled={disabled}
+                  title={
+                    locked
+                      ? "Upgrade to unlock larger batches"
+                      : overCredits
+                        ? `Only ${leadsRemaining} lead credit${leadsRemaining === 1 ? "" : "s"} left this month`
+                        : undefined
+                  }
+                  onClick={() => !disabled && setMaxLeads(n)}
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-aurora-400 text-ink-950"
+                      : disabled
+                        ? "cursor-not-allowed text-mist-600 opacity-50"
+                        : "text-mist-300 hover:text-mist-100"
+                  }`}
+                >
+                  {n}
+                  {locked ? (
+                    <span className="ml-1 text-[10px] opacity-70">Pro</span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+          {freeTierLocked && (
+            <p className="mt-2 text-xs text-mist-500">
+              Larger batches (15+) need a paid plan. Monthly Free cap is also 50 leads.
+            </p>
+          )}
+        </div>
+
+        <div>
+          <span className="mb-1.5 flex items-center justify-between text-sm font-medium text-mist-100">
+            Search mode
+            <span className="text-xs font-normal text-mist-500">How hard to look</span>
+          </span>
+          <div
+            role="radiogroup"
+            aria-label="Search mode"
+            className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1"
+          >
+            {STRATEGIES.map((s) => {
+              const isActive = s.id === searchStrategy;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={isActive}
+                  title={s.summary}
+                  onClick={() => setSearchStrategy(s.id)}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-aurora-400 text-ink-950"
                       : "text-mist-300 hover:text-mist-100"
-                }`}
-              >
-                {n}
-                {locked ? (
-                  <span className="ml-1 text-[10px] opacity-70">Pro</span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-        {freeTierLocked && (
-          <p className="mt-2 text-xs text-mist-500">
-            Larger batches (15+) need a paid plan. Monthly Free cap is also 50 leads.
-          </p>
-        )}
-      </div>
-
-      <div className="mt-4">
-        <span className="mb-1.5 flex items-center justify-between text-sm font-medium text-mist-100">
-          Search mode
-          <span className="text-xs font-normal text-mist-500">How hard to look</span>
-        </span>
-        <div
-          role="radiogroup"
-          aria-label="Search mode"
-          className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1"
-        >
-          {STRATEGIES.map((s) => {
-            const isActive = s.id === searchStrategy;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                role="radio"
-                aria-checked={isActive}
-                title={s.summary}
-                onClick={() => setSearchStrategy(s.id)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-aurora-400 text-ink-950"
-                    : "text-mist-300 hover:text-mist-100"
-                }`}
-              >
-                {s.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-3 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
-          <p className="text-sm font-medium text-mist-100">{active.summary}</p>
-          <p className="mt-1.5 text-xs leading-relaxed text-mist-400">{active.detail}</p>
-          <p className="mt-2 text-[11px] uppercase tracking-wider text-mist-500">
-            Best for · {active.bestFor}
-          </p>
+                  }`}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-3 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
+            <p className="text-sm font-medium text-mist-100">{active.summary}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-mist-400">{active.detail}</p>
+            <p className="mt-2 text-[11px] uppercase tracking-wider text-mist-500">
+              Best for · {active.bestFor}
+            </p>
+          </div>
         </div>
       </div>
       <div className="mt-5 flex items-center justify-end gap-4">

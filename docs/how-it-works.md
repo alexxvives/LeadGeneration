@@ -59,9 +59,9 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     app redirects to Pipeline. Integration status lives in Settings (no mode banner).
 
   - **Pipeline** (`?view=pipeline`) — CRM kanban of **all** leads across four
-    active stages (*New · Contacted · In Conversation · Closed*) plus a collapsible
-    **Parked** row with *Not Interested* (declined) and *Discarded* (bad fit /
-    incorrect lead) side by side. Drag cards between columns, or use quick-advance.
+    active stages (*New · Contacted · In Conversation · Closed*) plus two
+    side-by-side columns: *Not Interested* (declined) and *Discarded* (bad fit /
+    incorrect lead). Drag cards between columns, or use quick-advance.
     Bulk bar: draft all / approve selected. Below the kanban: full leads list
     (table / cards / map) + **Export Excel** (styled `.xlsx`).
     Table Status column shows **CRM stage** (same funnel as Pipeline columns).

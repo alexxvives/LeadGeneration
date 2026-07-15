@@ -57,6 +57,16 @@
   * {
     scrollbar-color: var(--color-ink-600) transparent;
   }
+
+  /* Native <select> / <option> — match ink palette (OS menus otherwise go white). */
+  select {
+    color-scheme: dark;
+  }
+  select option,
+  select optgroup {
+    background-color: var(--color-ink-900);
+    color: var(--color-mist-100);
+  }
 }
 
 @layer utilities {
@@ -81,6 +91,27 @@
     );
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  /* Native select chrome matched to ink fields */
+  .select-ink {
+    appearance: none;
+    background-color: rgb(10 17 32 / 0.6);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%237f92b3' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+    background-size: 0.875rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    color: var(--color-mist-100);
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  .select-ink:focus {
+    border-color: rgb(67 224 168 / 0.6);
+  }
+  .select-ink:disabled {
+    opacity: 0.4;
   }
   .card-hover {
     transition:

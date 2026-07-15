@@ -89,6 +89,9 @@ npm run cf:deploy    # build + deploy to Cloudflare Workers
 npm run cf:migrate   # apply D1 migrations (prod); :local for local D1
 ```
 
+CI (GitHub Actions): on push/PR to `master`/`main` runs `tsc --noEmit` + `npm run lint`
+(`.github/workflows/ci.yml`).
+
 ## Project map
 
 ```
