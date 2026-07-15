@@ -27,6 +27,10 @@ export function EmailSettingsForm({
   defaults,
   canEdit,
   liveAppUrl,
+  /** Easy = full form + Resend key. Pro = name / reply-to / address (From from mailbox). */
+  variant = "easy",
+  /** When set (Pro connected), From email is read-only. */
+  lockedFromEmail,
 }: {
   initial: EmailSettingsValues;
   /** Shown as input hints when the workspace has no override. */
@@ -35,11 +39,16 @@ export function EmailSettingsForm({
   canEdit: boolean;
   /** Link to the live app Settings when the form can’t be edited here. */
   liveAppUrl?: string;
+  variant?: "easy" | "pro";
+  lockedFromEmail?: string | null;
 }) {
   const [values, setValues] = useState<EmailSettingsValues>(initial);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isPro = variant === "pro";
+  const fromLocked = isPro && !!lockedFromEmail;
 
   const set = (key: keyof EmailSettingsValues, v: string) => {
     setSaved(false);
@@ -51,10 +60,19 @@ export function EmailSettingsForm({
     setSaved(false);
     setError(null);
     try {
+      const payload = isPro
+        ? {
+            fromName: values.fromName,
+            replyTo: values.replyTo,
+            physicalAddress: values.physicalAddress,
+            // Keep From aligned with mailbox when connected.
+            ...(fromLocked ? { fromEmail: lockedFromEmail } : {}),
+          }
+        : values;
       const res = await fetch("/api/workspace/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
@@ -116,13 +134,16 @@ export function EmailSettingsForm({
             className={inputCls}
           />
         </Field>
-        <Field label="From email" hint="The sending address">
+        <Field
+          label="From email"
+          hint={fromLocked ? "From your connected mailbox" : "The sending address"}
+        >
           <input
             type="email"
-            value={values.fromEmail ?? ""}
+            value={fromLocked ? lockedFromEmail! : (values.fromEmail ?? "")}
             onChange={(e) => set("fromEmail", e.target.value)}
             placeholder={defaults.fromEmail}
-            disabled={!canEdit}
+            disabled={!canEdit || fromLocked}
             className={inputCls}
           />
         </Field>
@@ -158,38 +179,40 @@ export function EmailSettingsForm({
         looks spammy. Share the thread yourself after they reply.
       </p>
 
-      <div
-        data-tour="resend-key"
-        className="rounded-xl border border-aurora-400/20 bg-aurora-400/[0.04] p-4"
-      >
-        <Field
-          label="Your Resend API key"
-          hint="BYO domain — not a shared Lodestar sender"
+      {!isPro && (
+        <div
+          data-tour="resend-key"
+          className="rounded-xl border border-aurora-400/20 bg-aurora-400/[0.04] p-4"
         >
-          <PasswordField
-            autoComplete="off"
-            value={values.resendApiKey ?? ""}
-            onChange={(e) => set("resendApiKey", e.target.value)}
-            placeholder="re_xxxxxxxxxxxx"
-            disabled={!canEdit}
-            inputClassName={`${inputCls} pr-11`}
-          />
-          <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
-            Customers send from <span className="text-mist-300">their</span> verified domain.
-            Create a free account at{" "}
-            <a
-              href="https://resend.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-aurora-300 hover:underline"
-            >
-              resend.com
-            </a>
-            , add DNS for your domain, then paste the API key here. Platform keys are for
-            local/dev demos only — a shared outreach domain would land in spam.
-          </p>
-        </Field>
-      </div>
+          <Field
+            label="Your Resend API key"
+            hint="BYO domain — not a shared Lodestar sender"
+          >
+            <PasswordField
+              autoComplete="off"
+              value={values.resendApiKey ?? ""}
+              onChange={(e) => set("resendApiKey", e.target.value)}
+              placeholder="re_xxxxxxxxxxxx"
+              disabled={!canEdit}
+              inputClassName={`${inputCls} pr-11`}
+            />
+            <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
+              Customers send from <span className="text-mist-300">their</span> verified domain.
+              Create a free account at{" "}
+              <a
+                href="https://resend.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-aurora-300 hover:underline"
+              >
+                resend.com
+              </a>
+              , add DNS for your domain, then paste the API key here. Platform keys are for
+              local/dev demos only — a shared outreach domain would land in spam.
+            </p>
+          </Field>
+        </div>
+      )}
 
       <div className="flex items-center justify-end gap-3">
         {error && <p className="text-sm text-rose-300">{error}</p>}

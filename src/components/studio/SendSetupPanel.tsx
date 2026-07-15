@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CheckIcon, MailIcon } from "@/components/icons";
 import { EmailSettingsForm, type EmailSettingsDefaults, type EmailSettingsValues } from "@/components/studio/EmailSettingsForm";
 import { DomainHealthPanel } from "@/components/studio/DomainHealthChecklist";
 import {
@@ -14,6 +15,48 @@ import {
 import type { MailboxPublicStatus } from "@/lib/types";
 
 type PathId = "easy" | "pro";
+
+/** Single warmth choice → age/volume bands for soft daily recommend. */
+type WarmthId = "new" | "warming" | "active";
+
+const WARMTH: {
+  id: WarmthId;
+  label: string;
+  hint: string;
+  ageBand: MailboxAgeBand;
+  volumeBand: MailboxVolumeBand;
+}[] = [
+  {
+    id: "new",
+    label: "New / cold",
+    hint: "~15/day",
+    ageBand: "new",
+    volumeBand: "none",
+  },
+  {
+    id: "warming",
+    label: "A few months old",
+    hint: "~40/day",
+    ageBand: "months",
+    volumeBand: "light",
+  },
+  {
+    id: "active",
+    label: "Established & active",
+    hint: "~80/day",
+    ageBand: "established",
+    volumeBand: "regular",
+  },
+];
+
+function warmthFromBands(
+  age: MailboxAgeBand | null | undefined,
+  volume: MailboxVolumeBand | null | undefined,
+): WarmthId {
+  if (age === "established" || volume === "regular") return "active";
+  if (age === "months" || age === "weeks" || volume === "light") return "warming";
+  return "new";
+}
 
 /**
  * Dual send-path framing: Easy (Resend) is the default wizard; Pro mailbox
@@ -36,20 +79,18 @@ export function SendSetupPanel({
 }) {
   const [path, setPath] = useState<PathId>(defaultPath);
   const [mailbox, setMailbox] = useState(mailboxInitial);
-  const [ageBand, setAgeBand] = useState<MailboxAgeBand>(
-    mailboxInitial.ageBand ?? "new",
-  );
-  const [volumeBand, setVolumeBand] = useState<MailboxVolumeBand>(
-    mailboxInitial.volumeBand ?? "none",
+  const [warmth, setWarmth] = useState<WarmthId>(
+    warmthFromBands(mailboxInitial.ageBand, mailboxInitial.volumeBand),
   );
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setMailbox(mailboxInitial);
-    if (mailboxInitial.ageBand) setAgeBand(mailboxInitial.ageBand);
-    if (mailboxInitial.volumeBand) setVolumeBand(mailboxInitial.volumeBand);
+    setWarmth(warmthFromBands(mailboxInitial.ageBand, mailboxInitial.volumeBand));
   }, [mailboxInitial]);
+
+  const warmthMeta = WARMTH.find((w) => w.id === warmth) ?? WARMTH[0];
 
   // Sync self-report into client warmup soft-cap when connected.
   useEffect(() => {
@@ -57,16 +98,16 @@ export function SendSetupPanel({
     const profile = loadWarmupProfile();
     saveWarmupProfile({
       ...profile,
-      ageBand: mailbox.ageBand ?? ageBand,
-      volumeBand: mailbox.volumeBand ?? volumeBand,
+      ageBand: warmthMeta.ageBand,
+      volumeBand: warmthMeta.volumeBand,
       startedOn: profile.startedOn || todayKey(),
     });
-  }, [mailbox.connected, mailbox.ageBand, mailbox.volumeBand, ageBand, volumeBand]);
+  }, [mailbox.connected, warmthMeta.ageBand, warmthMeta.volumeBand]);
 
   const softCap = recommendedDailySoftCap({
     startedOn: todayKey(),
-    ageBand,
-    volumeBand,
+    ageBand: warmthMeta.ageBand,
+    volumeBand: warmthMeta.volumeBand,
     days: {},
   });
 
@@ -95,8 +136,8 @@ export function SendSetupPanel({
 
   function connectGoogle() {
     const params = new URLSearchParams({
-      ageBand,
-      volumeBand,
+      ageBand: warmthMeta.ageBand,
+      volumeBand: warmthMeta.volumeBand,
     });
     window.location.href = `/api/mailbox/google/start?${params.toString()}`;
   }
@@ -109,8 +150,8 @@ export function SendSetupPanel({
             How do you want to send?
           </h2>
           <p className="text-sm text-mist-500">
-            Pick a path. Easy uses Resend + your domain. Pro sends from your real Gmail
-            mailbox after you approve each outreach.
+            Easy = any domain via Resend (Zoho, Hostinger, Cloudflare DNS…). Pro = send
+            through your real Google or Microsoft mailbox.
           </p>
         </div>
         <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-ink-900/60 p-1">
@@ -161,7 +202,7 @@ export function SendSetupPanel({
               <span className="font-display text-lg font-semibold text-aurora-300">2</span>
               <span>
                 Paste your From name, From email, and Resend API key below — then copy the DNS
-                rows into your registrar (Hostinger, GoDaddy, Cloudflare, Namecheap, etc.).
+                rows into Cloudflare / GoDaddy / Hostinger (wherever DNS lives).
               </span>
             </li>
             <li className="flex gap-3">
@@ -179,7 +220,12 @@ export function SendSetupPanel({
             data-tour="sending-identity"
           >
             <h3 className="mb-4 text-sm font-semibold text-mist-100">Sending identity</h3>
-            <EmailSettingsForm initial={initial} defaults={defaults} canEdit={canEdit} />
+            <EmailSettingsForm
+              initial={initial}
+              defaults={defaults}
+              canEdit={canEdit}
+              variant="easy"
+            />
           </div>
 
           <DomainHealthPanel />
@@ -191,61 +237,78 @@ export function SendSetupPanel({
               Connect Google or Microsoft
             </p>
             <p className="mt-2 max-w-xl text-sm text-mist-300">
-              Send approved outreach from your real Gmail or Outlook mailbox (better inbox
-              placement for cold volume). Same human-approve step. Easy (Resend) stays available
-              anytime.
-            </p>
-            <p className="mt-3 text-xs text-mist-500">
-              Warmup: ramp slowly for free (soft daily suggest ~{softCap}/day from your answers
-              below), or use a paid partner later — we won&apos;t run an in-house warmup network.
+              Pro sends through a <span className="text-mist-100">Gmail / Google Workspace</span>{" "}
+              or <span className="text-mist-100">Outlook / Microsoft 365</span> mailbox — not
+              Zoho, Hostinger mail, or generic SMTP. Those use Easy (Resend) with your domain
+              DNS instead. Same human-approve step either way.
             </p>
 
             {mailbox.connected ? (
-              <div className="mt-5 space-y-3">
-                <div className="rounded-lg border border-aurora-400/30 bg-aurora-400/10 px-4 py-3 text-sm text-mist-100">
-                  Connected ·{" "}
-                  <span className="font-medium text-aurora-300">
-                    {mailbox.provider === "google" ? "Google" : mailbox.provider} ·{" "}
-                    {mailbox.email}
-                  </span>
+              <div className="mt-5 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl2 border border-aurora-400/25 bg-gradient-to-br from-aurora-400/10 to-transparent px-5 py-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-aurora-400/15 text-aurora-300">
+                      <MailIcon className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-mist-100">
+                        <CheckIcon className="h-4 w-4 text-aurora-300" />
+                        Connected
+                        <span className="rounded-full border border-white/10 bg-ink-950/40 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-mist-400">
+                          {mailbox.provider === "google" ? "Google" : mailbox.provider}
+                        </span>
+                      </p>
+                      <p className="mt-1 truncate font-display text-lg text-aurora-300">
+                        {mailbox.email}
+                      </p>
+                      <p className="mt-1 text-xs text-mist-500">
+                        Soft warmup suggest ~{softCap}/day — warning only, never a hard block.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy || !canEdit}
+                    onClick={() => void disconnect()}
+                    className="shrink-0 rounded-full border border-white/12 bg-ink-950/50 px-4 py-2 text-sm font-medium text-mist-300 transition-colors hover:border-rose-400/40 hover:bg-rose-400/10 hover:text-rose-200 disabled:opacity-50"
+                  >
+                    {busy ? "Disconnecting…" : "Disconnect"}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={busy || !canEdit}
-                  onClick={() => void disconnect()}
-                  className="rounded-full border border-white/15 px-5 py-2 text-sm font-medium text-mist-200 transition-colors hover:border-white/30 hover:text-mist-50 disabled:opacity-50"
-                >
-                  {busy ? "Disconnecting…" : "Disconnect"}
-                </button>
               </div>
             ) : (
-              <div className="mt-5 space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="block text-sm">
-                    <span className="mb-1.5 block text-mist-400">How old is this inbox?</span>
-                    <select
-                      value={ageBand}
-                      onChange={(e) => setAgeBand(e.target.value as MailboxAgeBand)}
-                      className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2.5 text-mist-100 outline-none focus:border-aurora-400/60"
-                    >
-                      <option value="new">Brand new (&lt; 2 weeks)</option>
-                      <option value="weeks">A few weeks</option>
-                      <option value="months">A few months</option>
-                      <option value="established">Established (6+ months)</option>
-                    </select>
-                  </label>
-                  <label className="block text-sm">
-                    <span className="mb-1.5 block text-mist-400">Typical send volume?</span>
-                    <select
-                      value={volumeBand}
-                      onChange={(e) => setVolumeBand(e.target.value as MailboxVolumeBand)}
-                      className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2.5 text-mist-100 outline-none focus:border-aurora-400/60"
-                    >
-                      <option value="none">Almost none yet</option>
-                      <option value="light">Light (a few / day)</option>
-                      <option value="regular">Regular (dozens / day)</option>
-                    </select>
-                  </label>
+              <div className="mt-5 space-y-5">
+                <div>
+                  <p className="mb-2 text-sm font-medium text-mist-100">
+                    How warm is this inbox?
+                  </p>
+                  <p className="mb-3 text-xs text-mist-500">
+                    Sets a soft daily suggest (you can still send more). No paid warmup network.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {WARMTH.map((w) => {
+                      const on = warmth === w.id;
+                      return (
+                        <button
+                          key={w.id}
+                          type="button"
+                          onClick={() => setWarmth(w.id)}
+                          className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+                            on
+                              ? "border-aurora-400/50 bg-aurora-400/10 text-mist-100"
+                              : "border-white/10 bg-ink-950/40 text-mist-300 hover:border-white/20 hover:text-mist-100"
+                          }`}
+                        >
+                          <span className="block text-sm font-medium">{w.label}</span>
+                          <span
+                            className={`mt-0.5 block text-xs ${on ? "text-aurora-300" : "text-mist-500"}`}
+                          >
+                            Suggest {w.hint}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -253,32 +316,52 @@ export function SendSetupPanel({
                     type="button"
                     disabled={!mailbox.googleReady || !canEdit}
                     onClick={connectGoogle}
-                    className="inline-flex items-center rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+                    className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-6 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
                   >
+                    <MailIcon className="h-4 w-4" />
                     Connect Google
                   </button>
                   <button
                     type="button"
                     disabled
                     title="Microsoft Graph send ships after Google (ADR 0010)"
-                    className="inline-flex items-center rounded-full border border-white/10 px-5 py-2.5 text-sm font-medium text-mist-500 opacity-60"
+                    className="inline-flex items-center rounded-full border border-white/10 bg-ink-950/30 px-5 py-2.5 text-sm font-medium text-mist-500"
                   >
                     Connect Microsoft — soon
                   </button>
                 </div>
 
                 {!mailbox.googleReady && (
-                  <p className="text-xs text-amber-300/90">
+                  <p className="rounded-lg border border-amber-400/20 bg-amber-400/5 px-4 py-2 text-xs text-amber-200/90">
                     Google OAuth is not configured on this server yet. Add{" "}
                     <code className="text-mist-300">GMAIL_OAUTH_CLIENT_ID</code> /{" "}
-                    <code className="text-mist-300">GMAIL_OAUTH_CLIENT_SECRET</code> (see{" "}
-                    <code className="text-mist-300">docs/gmail-oauth-setup.md</code>), then restart.
+                    <code className="text-mist-300">GMAIL_OAUTH_CLIENT_SECRET</code>, then
+                    restart.
                   </p>
                 )}
               </div>
             )}
 
             {msg && <p className="mt-3 text-sm text-mist-300">{msg}</p>}
+          </div>
+
+          <div
+            id="sending-identity-pro"
+            className="scroll-mt-8 rounded-xl2 border border-white/10 p-5"
+            data-tour="sending-identity"
+          >
+            <h3 className="mb-1 text-sm font-semibold text-mist-100">Sending identity</h3>
+            <p className="mb-4 text-xs text-mist-500">
+              Same compliance fields as Easy. From email comes from the connected mailbox when
+              linked.
+            </p>
+            <EmailSettingsForm
+              initial={initial}
+              defaults={defaults}
+              canEdit={canEdit}
+              variant="pro"
+              lockedFromEmail={mailbox.connected ? mailbox.email : null}
+            />
           </div>
         </div>
       )}

@@ -12,6 +12,9 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 - **Hostinger/GoDaddy:** registrar doesn't matter for Resend — user pastes
   SPF/DKIM/DMARC at wherever DNS is hosted; Resend never needs the registrar
   account. Same for Cloudflare/Namecheap.
+- **Pro ≠ Hostinger/Zoho mail:** Pro OAuth is Google Workspace / Microsoft 365
+  only. Zoho/Hostinger/cPanel mailboxes → Easy (Resend) + domain DNS. No
+  Hostinger OAuth — they aren't a Gmail-style send API.
 - Prod still needs Wrangler secrets + D1 migration 0008.
 
 ### 2026-07-15 — ADR 0010 accepted + studio UX fixes
