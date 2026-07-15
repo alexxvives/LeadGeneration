@@ -274,7 +274,7 @@ export function SendSetupPanel({
                   Maileroo dashboard
                 </a>
                 , copy SPF / DKIM / DMARC into your DNS host, and wait until Maileroo marks
-                the domain verified. Lodestar&apos;s live DNS panel is Resend-only for now.
+                the domain verified.
               </p>
             </div>
           ) : (

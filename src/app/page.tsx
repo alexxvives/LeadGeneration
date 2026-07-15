@@ -17,7 +17,7 @@ import {
 const CAPABILITIES = [
   {
     title: "Live web search",
-    body: "Describe a niche and city. Lodestar finds real businesses and enriches contact details.",
+    body: "Describe a niche and city. Leadify finds real businesses and enriches contact details.",
     icon: SearchIcon,
   },
   {
@@ -66,7 +66,7 @@ export default function LandingPage() {
         <div className="grid w-full items-center gap-10 lg:grid-cols-2 lg:gap-12 xl:gap-16">
           <div className="max-w-xl">
             <p className="animate-float-up font-display text-4xl font-semibold tracking-tight text-mist-100 sm:text-5xl">
-              Lodestar
+              Leadify
             </p>
             <h1 className="animate-float-up mt-4 font-display text-4xl font-semibold leading-[1.08] tracking-tight text-balance sm:text-5xl xl:text-6xl">
               Navigate to your

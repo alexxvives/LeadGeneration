@@ -42,7 +42,7 @@ const STRATEGIES: {
     label: "Smart",
     summary: "Expands your ICP into several queries, merges results, ranks by fit.",
     detail:
-      "Builds multiple query variants (contact email, official website, top/best lists), runs them sequentially, dedupes by domain, then sorts by Lodestar's transparent fit score. Higher recall for vague or competitive niches.",
+      "Builds multiple query variants (contact email, official website, top/best lists), runs them sequentially, dedupes by domain, then sorts by Leadify's transparent fit score. Higher recall for vague or competitive niches.",
     credits: "~3× credits",
     bestFor: "Competitive markets, vague ICPs, quality over speed",
   },

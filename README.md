@@ -1,7 +1,7 @@
-# Lodestar
+# Leadify
 
 **Navigate to your next customer.** A human-in-the-loop lead generation studio.
-Describe an ideal customer in plain English → Lodestar searches the web,
+Describe an ideal customer in plain English → Leadify searches the web,
 enriches each prospect, scores fit, drafts a personalized outreach email, and
 puts every message in an approval queue. **Nothing is sent without your explicit
 per-lead approval.**

@@ -26,7 +26,7 @@ export default async function LoginPage({
 
       <div className="mx-auto grid max-w-md place-items-center px-6 py-10">
         <div className="glass w-full rounded-xl2 p-8">
-          <h1 className="font-display text-2xl font-semibold">Sign in to Lodestar</h1>
+          <h1 className="font-display text-2xl font-semibold">Sign in to Leadify</h1>
           <p className="mt-2 text-sm text-mist-300">
             {authRequired()
               ? "Enter your email and we’ll send a secure sign-in link."

@@ -6,7 +6,7 @@ import { ExportIcon } from "@/components/icons";
 import { Spinner, crmStageLabel } from "@/components/ui";
 import type { CrmStage } from "@/lib/types";
 
-/** Lodestar ink/aurora palette as ARGB hex for ExcelJS. */
+/** Leadify ink/aurora palette as ARGB hex for ExcelJS. */
 const INK = "FF0A1120";
 const AURORA = "FF43E0A8";
 const AURORA_DARK = "FF0E9D74";
@@ -47,7 +47,7 @@ export function ExportButton() {
       const rows = board.leads;
 
       const wb = new ExcelJS.Workbook();
-      wb.creator = "Lodestar";
+      wb.creator = "Leadify";
       wb.created = new Date();
 
       const ws = wb.addWorksheet("Leads", {
@@ -148,7 +148,7 @@ export function ExportButton() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `lodestar-leads-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.download = `leadify-leads-${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
     } finally {

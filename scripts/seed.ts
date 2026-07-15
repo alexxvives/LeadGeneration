@@ -79,7 +79,7 @@ const outreach = leads.map((lead) => {
       "¿Tendrían 10 minutos la semana que viene para ver si encaja? Si no es el momento, no hay problema.",
       "",
       "Un saludo,",
-      "Lodestar Outreach",
+      "Leadify Outreach",
     ].join("\n"),
     status: "draft",
     deliveryStatus: "unknown",

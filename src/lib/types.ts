@@ -1,4 +1,4 @@
-// Core domain models for Lodestar.
+// Core domain models for Leadify.
 // These types are storage-agnostic on purpose: the JSON file DB today and a
 // future Supabase/Postgres backend both implement the same repository shapes
 // (see src/lib/db/index.ts), so swapping persistence should not touch the UI.

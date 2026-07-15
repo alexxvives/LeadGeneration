@@ -9,23 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (Settings save fix pass)
+## ⏱️ Status — updated 2026-07-15 (Leadify rename + Maileroo send fix)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Fixed Settings “Saved but gone”: fail-closed `getCtx`, no silent null updates,
-  dirty-only key PATCH, keys never SSR’d (`hasResendKey` / `hasMailerooKey`).
-- `preferredSendPath` (Easy vs Pro) + migration 0010; demo send no longer advances
-  CRM when metered; magic-link only claims success on real `signIn`.
-- NEXTAUTH_URL localhost guard in Pro Settings.
+- Brand rename **Lodestar → Leadify** (user-facing UI/copy; internal keys/tags still `lodestar_*`).
+- Settings UX: shorter import copy; masked API key fields; removed position/company + footer hint; removed Maileroo “Resend-only DNS” note.
+- **Send bug:** Easy path no longer falls through to platform Resend when Maileroo/Resend BYO is selected (was surfacing Resend “domain not verified” for Maileroo users).
 
 ### Next
 1. Confirm Wrangler `NEXTAUTH_URL` = live Workers URL (Connect Google).
 2. Soft-cap warning popup on send; Maileroo live DNS panel.
-3. Perf follow-up: board `listOutreach` N+1, import full-lead scan (deferred).
-4. Microsoft Graph Mail.Send.
+3. Optional: outreach language setting (drafts are hardcoded Spanish today).
+4. Optional: free LLM path (Workers AI / Groq) for blurbs + default pitch.
+5. Perf follow-up: board `listOutreach` N+1, import full-lead scan (deferred).
+6. Microsoft Graph Mail.Send.
 
 ---
 

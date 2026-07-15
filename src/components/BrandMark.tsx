@@ -19,7 +19,7 @@ export function BrandMark({
       </span>
       {withWordmark && (
         <span className={`font-display font-semibold tracking-tight ${text}`}>
-          Lodestar
+          Leadify
         </span>
       )}
     </span>

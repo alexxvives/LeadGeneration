@@ -22,7 +22,7 @@ export function isPlaceholderAddress(address: string | null | undefined): boolea
 export function isPlaceholderName(name: string | null | undefined): boolean {
   if (!name || !name.trim()) return true;
   const n = name.trim().toLowerCase();
-  return n === "your name" || n === "lodestar outreach";
+  return n === "your name" || n === "lodestar outreach" || n === "leadify outreach";
 }
 
 /** True when from name, email, and physical address all look real. */

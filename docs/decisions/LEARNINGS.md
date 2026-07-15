@@ -442,3 +442,17 @@ login `/app` 505: harden jwt provision (try/catch), recover workspace in
 `getCtx` if token lacks `workspaceId`, and never let layout getCtx throw.
 Branded magic-link HTML via `src/lib/auth-email.ts`. Landing redesigned with
 live product preview (map + pipeline) — dropped missing hero image dependency.
+
+### 2026-07-15 — Leadify rename + Easy send must not fall through to platform Resend
+- **Brand:** user-facing “Lodestar” → “Leadify”. Keep internal `lodestar_*`
+  storage keys / Resend tags for compatibility.
+- **Easy send bug:** when a workspace Maileroo (or Resend) key was set, failure
+  or missing preferred key still fell through to **platform** `RESEND_API_KEY`,
+  producing Resend’s “domain is not verified” while the UI showed Maileroo.
+  Fix: return the BYO Easy result (ok or error); only use platform Resend/SMTP
+  when no workspace Easy key exists.
+- **API key UX:** never SSR the real secret; show a masked value in the input
+  when `has*Key` so the field looks filled.
+- **Sender profile:** position/company fields were redundant with the editable
+  sign-off textarea — removed from Settings UI (localStorage fields kept).
+

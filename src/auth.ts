@@ -54,7 +54,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       body: JSON.stringify({
         from,
         to: [identifier],
-        subject: `Sign in to Lodestar`,
+        subject: `Sign in to Leadify`,
         html,
         text,
       }),
@@ -86,7 +86,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             await transport.sendMail({
               to: identifier,
               from: provider.from,
-              subject: "Sign in to Lodestar",
+              subject: "Sign in to Leadify",
               text,
               html,
             });

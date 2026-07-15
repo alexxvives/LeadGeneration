@@ -217,8 +217,7 @@ export function ImportLeadsPanel({
           <p className="text-sm font-medium text-mist-100">Already have a list?</p>
           <p className="mt-1 text-xs leading-relaxed text-mist-500">
             Drop a CSV or Excel file. We auto-detect columns like Company, Email, Website,
-            Phone, Location — no fixed template required. Only a company name or email is
-            needed per row.
+            Phone, Location.
           </p>
         </div>
         <button

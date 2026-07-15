@@ -269,7 +269,7 @@ export function Studio() {
       } else if (/domain|verified|from/i.test(msg)) {
         toast(
           "err",
-          `${msg} — In Settings: set From email on a Resend-verified domain, paste your Resend API key, then retry.`,
+          `${msg} — In Settings → Sending: set From email on the domain verified with the provider you selected (Resend or Maileroo), then retry.`,
         );
       } else {
         handleError(e);
@@ -668,7 +668,7 @@ export function Studio() {
             <p className="font-display text-xl font-semibold text-mist-100">Simulate send?</p>
             <p className="mt-2 text-sm text-mist-300">
               No email provider is configured yet, so this won&apos;t leave the app. Add your
-              Resend key under Settings → Sending for real inbox delivery — or continue to
+              provider key under Settings → Sending for real inbox delivery — or continue to
               simulate.
             </p>
             <div className="mt-5 flex flex-wrap justify-end gap-2">

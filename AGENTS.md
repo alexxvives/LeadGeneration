@@ -16,7 +16,7 @@ this repository. Read it first. It is intentionally short: the details live in
 
 ## What this project is
 
-**Lodestar** — a human-in-the-loop lead-generation studio. Search a niche →
+**Leadify** — a human-in-the-loop lead-generation studio. Search a niche →
 enrich prospects → auto-draft outreach → human approves per lead → send.
 Next.js (App Router) + TypeScript + Tailwind, local JSON file DB behind a
 repository interface, provider-agnostic search (Firecrawl/Exa) and email

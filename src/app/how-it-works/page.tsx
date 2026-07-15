@@ -5,7 +5,7 @@ import { authRequired, env, getCapabilities } from "@/lib/config";
 import { SearchIcon, SparkIcon, MailIcon, CheckIcon, ArrowIcon } from "@/components/icons";
 
 export const metadata = {
-  title: "How it works — Lodestar",
+  title: "How it works — Leadify",
   description: "Search, enrich, draft, approve, send — human-in-the-loop lead generation.",
 };
 
@@ -13,7 +13,7 @@ const STEPS = [
   {
     n: "01",
     title: "Search",
-    body: "Describe your ideal customer — a niche, a city, an offer. Lodestar charts a search across the open web.",
+    body: "Describe your ideal customer — a niche, a city, an offer. Leadify charts a search across the open web.",
     icon: SearchIcon,
   },
   {
@@ -53,7 +53,7 @@ export default function HowItWorksPage() {
           Four steps, one steady hand
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-mist-300">
-          Search → Enrich → Draft → Approve → Send. Lodestar does the busywork; you stay
+          Search → Enrich → Draft → Approve → Send. Leadify does the busywork; you stay
           in control of every message that leaves.
         </p>
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">

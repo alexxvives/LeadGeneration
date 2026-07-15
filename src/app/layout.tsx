@@ -17,7 +17,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Lodestar — Navigate to your next customer",
+  title: "Leadify — Navigate to your next customer",
   description:
     "A human-in-the-loop lead generation studio. Search a niche, enrich prospects, draft outreach, approve, and send — on your terms.",
 };

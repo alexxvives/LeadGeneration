@@ -62,7 +62,7 @@ export const env = {
   exaKey: () => process.env.EXA_API_KEY?.trim() ?? "",
   resendKey: () => process.env.RESEND_API_KEY?.trim() ?? "",
   fromEmail: () => process.env.OUTREACH_FROM_EMAIL?.trim() || "you@example.com",
-  fromName: () => process.env.OUTREACH_FROM_NAME?.trim() || "Lodestar Outreach",
+  fromName: () => process.env.OUTREACH_FROM_NAME?.trim() || "Leadify Outreach",
   replyTo: () => process.env.OUTREACH_REPLY_TO?.trim() || "",
   physicalAddress: () =>
     process.env.OUTREACH_PHYSICAL_ADDRESS?.trim() ||
@@ -82,9 +82,9 @@ export const env = {
       lower === "you@yourdomain.com" ||
       lower.endsWith("@example.com")
     ) {
-      return "Lodestar <onboarding@resend.dev>";
+      return "Leadify <onboarding@resend.dev>";
     }
-    const name = process.env.OUTREACH_FROM_NAME?.trim() || "Lodestar";
+    const name = process.env.OUTREACH_FROM_NAME?.trim() || "Leadify";
     return `${name} <${raw}>`;
   },
   // Compliance: how many sends allowed per rolling minute.

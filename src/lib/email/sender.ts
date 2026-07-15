@@ -91,9 +91,9 @@ function resolveSendPath(ws?: WorkspaceEmailSettings): "easy" | "pro" {
  * Send a single already-approved email.
  *
  * Priority depends on Settings preferred path:
- *   • Pro → Google mailbox first (when connected)
- *   • Easy → workspace Resend/Maileroo first
- * Then: other BYO key → platform Resend → SMTP → demo.
+ *   • Pro → Google mailbox first (when connected), then workspace Easy key
+ *   • Easy → workspace Resend or Maileroo only (selected provider; no cross-fallback)
+ * Then (no workspace Easy key): platform Resend → SMTP → demo.
  *
  * Workspace identity (fromName, fromEmail etc.) overrides env vars so each
  * workspace's outreach appears to come from its own representative.
@@ -167,20 +167,21 @@ export async function sendEmail(
     });
   };
 
-  /** Prefer first transport that succeeds; skip missing keys; fall through on failure. */
+  /**
+   * Easy BYO: use the selected provider when its key exists.
+   * Do not cross-fallback to the other provider on failure — that surfaces
+   * Resend domain errors while the user has Maileroo selected (and vice versa).
+   * Only try the other key if the preferred key is missing.
+   */
   const tryEasyKeys = async (): Promise<SendResult | null> => {
-    const order =
-      preferred === "maileroo"
-        ? [tryMaileroo, tryResend]
-        : [tryResend, tryMaileroo];
-    let lastFail: SendResult | null = null;
-    for (const attempt of order) {
-      const r = await attempt();
-      if (!r) continue;
-      if (r.ok) return r;
-      lastFail = r;
+    if (preferred === "maileroo") {
+      if (wsMailerooKey) return tryMaileroo();
+      if (wsResendKey) return tryResend();
+      return null;
     }
-    return lastFail;
+    if (wsResendKey) return tryResend();
+    if (wsMailerooKey) return tryMaileroo();
+    return null;
   };
 
   let proGoogleFail: SendResult | null = null;
@@ -190,14 +191,16 @@ export async function sendEmail(
     if (g?.ok) return g;
     if (g && !g.ok) proGoogleFail = g;
     const easy = await tryEasyKeys();
-    if (easy?.ok) return easy;
+    if (easy) return easy; // success or BYO failure
   } else {
     const easy = await tryEasyKeys();
-    if (easy?.ok) return easy;
+    // Return BYO success or failure — never fall through to platform Resend
+    // when the user configured Easy (would show Resend "domain not verified").
+    if (easy) return easy;
     // Easy path does not auto-use Google (user chose Easy in Settings).
   }
 
-  // Platform Resend key (primary — simple API key, no SMTP config needed).
+  // Platform Resend — only when no workspace Easy key is configured.
   if (caps.resend) {
     return sendWithResendKey(env.resendKey(), {
       from,

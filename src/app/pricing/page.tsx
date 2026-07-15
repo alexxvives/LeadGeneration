@@ -3,7 +3,7 @@ import { authRequired, env, getCapabilities } from "@/lib/config";
 import { PricingCards } from "./PricingCards";
 
 export const metadata = {
-  title: "Pricing — Lodestar",
+  title: "Pricing — Leadify",
   description:
     "Simple, flat pricing for human-in-the-loop lead generation. Start free, upgrade when you grow.",
 };
