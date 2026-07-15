@@ -30,7 +30,7 @@ export default function PricingPage() {
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-mist-300">
           Flat plans, not per-seat. Every tier keeps the guardrails — per-lead
-          approval, compliance-by-default, and full demo mode. Start free.
+          approval, rate limits, and full demo mode. Start free.
         </p>
 
         <PricingCards />

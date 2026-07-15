@@ -264,7 +264,7 @@ export function LeadMap({
       const latLngs: import("leaflet").LatLngExpression[] = [];
       for (const pin of pins) {
         const icon = L.divIcon({
-          className: "lodestar-map-pin",
+          className: "leadify-map-pin",
           html: pinIconHtml(pin.crmStage),
           iconSize: [14, 14],
           iconAnchor: [7, 7],

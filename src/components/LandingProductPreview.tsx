@@ -155,7 +155,7 @@ export function LandingProductPreview() {
       const active = tick % PINS.length;
       PINS.forEach((p, i) => {
         const icon = L.divIcon({
-          className: "lodestar-hero-pin",
+          className: "leadify-hero-pin",
           html: pinHtml(p.stage, i === active),
           iconSize: [16, 16],
           iconAnchor: [8, 8],
@@ -166,7 +166,7 @@ export function LandingProductPreview() {
             permanent: true,
             direction: "top",
             offset: [0, -10],
-            className: "lodestar-hero-tooltip",
+            className: "leadify-hero-tooltip",
           });
         }
         marker.addTo(mapRef.current!);

@@ -10,7 +10,7 @@ export async function sendViaMaileroo(opts: {
   subject: string;
   body: string;
   replyTo?: string;
-  /** Custom tags echoed on webhooks (lodestar_ws / lodestar_outreach). */
+  /** Custom tags echoed on webhooks (leadify_ws / leadify_outreach). */
   tags?: Record<string, string>;
 }): Promise<{ ok: true; id?: string } | { ok: false; error: string }> {
   try {

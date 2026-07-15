@@ -8,8 +8,15 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowIcon, XIcon } from "@/components/icons";
+import { readMigratedKey } from "@/lib/browser-storage";
 
-export const GETTING_STARTED_KEY = "lodestar_getting_started_v3";
+export const GETTING_STARTED_KEY = "leadify_getting_started_v3";
+const GETTING_STARTED_LEGACY = ["lodestar_getting_started_v3"];
+
+export function isGettingStartedDone(): boolean {
+  if (typeof window === "undefined") return true;
+  return readMigratedKey(GETTING_STARTED_KEY, GETTING_STARTED_LEGACY) === "done";
+}
 
 export interface GettingStartedCaps {
   canSearchLive: boolean;

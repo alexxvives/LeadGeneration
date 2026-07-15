@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   loadSenderProfile,
   saveSenderProfile,
@@ -13,6 +13,7 @@ import { SparkIcon } from "@/components/icons";
 /**
  * Editable outreach voice fields (local to this browser). Used to prefill
  * search offer notes and the multi-line email sign-off.
+ * Saves automatically when a field loses focus.
  */
 export function SenderProfileForm() {
   const [profile, setProfile] = useState<SenderProfile | null>(null);
@@ -20,12 +21,19 @@ export function SenderProfileForm() {
   const [website, setWebsite] = useState("");
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const p = loadSenderProfile();
     if (!p.signature.trim()) p.signature = SIGNATURE_PLACEHOLDER;
     setProfile(p);
     setWebsite(p.website || "");
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+    };
   }, []);
 
   if (!profile) {
@@ -36,21 +44,30 @@ export function SenderProfileForm() {
     );
   }
 
+  const flashSaved = () => {
+    setSaved(true);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSaved(false), 2000);
+  };
+
+  const persist = (next: SenderProfile) => {
+    saveSenderProfile(next);
+    setProfile(next);
+    flashSaved();
+  };
+
   const patch = (partial: Partial<SenderProfile>) => {
     setProfile((prev) => (prev ? { ...prev, ...partial } : prev));
     setSaved(false);
   };
 
-  const onSave = (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveOnBlur = () => {
     const next = {
       ...profile,
       website: website.trim(),
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
     };
-    saveSenderProfile(next);
-    setProfile(next);
-    setSaved(true);
+    persist(next);
   };
 
   const generatePitch = async () => {
@@ -71,7 +88,13 @@ export function SenderProfileForm() {
         return;
       }
       if (data.pitch) {
-        patch({ defaultOffer: data.pitch, website: website.trim() });
+        const next = {
+          ...profile,
+          defaultOffer: data.pitch,
+          website: website.trim(),
+          signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
+        };
+        persist(next);
       }
     } catch {
       setGenError("Network error");
@@ -81,11 +104,16 @@ export function SenderProfileForm() {
   };
 
   return (
-    <form onSubmit={onSave} className="space-y-4 rounded-xl2 border border-white/10 p-5">
-      <p className="text-sm text-mist-300">
-        Pitch notes and sign-off for drafts. Your display name is set under Sending
-        identity. Stored in this browser only.
-      </p>
+    <div className="space-y-4 rounded-xl2 border border-white/10 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm text-mist-300">
+          Pitch notes and sign-off for drafts. Your display name is set under Sending
+          identity. Stored in this browser only — saves when you leave a field.
+        </p>
+        {saved && (
+          <span className="shrink-0 text-sm font-medium text-aurora-300">Saved</span>
+        )}
+      </div>
       <label className="block">
         <span className="text-xs font-medium text-mist-500">Your website (for AI pitch)</span>
         <input
@@ -94,6 +122,7 @@ export function SenderProfileForm() {
             setWebsite(e.target.value);
             setSaved(false);
           }}
+          onBlur={saveOnBlur}
           placeholder="https://yourcompany.com"
           className="mt-1.5 w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
         />
@@ -114,6 +143,7 @@ export function SenderProfileForm() {
         <textarea
           value={profile.defaultOffer}
           onChange={(e) => patch({ defaultOffer: e.target.value })}
+          onBlur={saveOnBlur}
           rows={3}
           placeholder="We help clinics turn website visitors into booked appointments…"
           className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
@@ -125,20 +155,12 @@ export function SenderProfileForm() {
         <textarea
           value={profile.signature}
           onChange={(e) => patch({ signature: e.target.value })}
+          onBlur={saveOnBlur}
           rows={4}
           placeholder={SIGNATURE_PLACEHOLDER}
           className="mt-1.5 w-full resize-y rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 font-sans text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
         />
       </label>
-      <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          className="rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.03]"
-        >
-          Save profile
-        </button>
-        {saved && <span className="text-sm text-aurora-300">Saved</span>}
-      </div>
-    </form>
+    </div>
   );
 }

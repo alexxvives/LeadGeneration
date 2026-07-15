@@ -3,7 +3,10 @@
  * Non-secret only — SMTP keys stay in .env (constitution Art. III.5).
  * Prefills search offer notes and shows in Settings.
  */
-const KEY = "lodestar_sender_profile";
+import { readMigratedKey } from "@/lib/browser-storage";
+
+const KEY = "leadify_sender_profile";
+const LEGACY_KEYS = ["lodestar_sender_profile"];
 
 export type SenderProfile = {
   displayName: string;
@@ -74,7 +77,7 @@ export function resolveSignature(p: SenderProfile): string {
 export function loadSenderProfile(): SenderProfile {
   if (typeof window === "undefined") return { ...EMPTY };
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = readMigratedKey(KEY, LEGACY_KEYS);
     if (!raw) return { ...EMPTY };
     const parsed = JSON.parse(raw) as Partial<SenderProfile>;
     return {

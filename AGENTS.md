@@ -1,4 +1,4 @@
-# AGENTS.md — Working in the Lodestar repo
+# AGENTS.md — Working in the Leadify repo
 
 This file is the **entry point / index** for any AI agent (or human) working in
 this repository. Read it first. It is intentionally short: the details live in

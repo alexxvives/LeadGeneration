@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * Events: delivered, failed, rejected, complained (opened/clicked ignored).
  *
  * Matching order:
- *   1. Tags `lodestar_ws` + `lodestar_outreach` (set on send)
+ *   1. Tags `leadify_ws` + `leadify_outreach` (set on send; also accept legacy `lodestar_*`)
  *   2. Fallback: latest sent outreach by recipient email
  *
  * Optional: MAILEROO_WEBHOOK_SECRET — if set, require `X-Maileroo-Secret`
@@ -52,8 +52,10 @@ export async function POST(req: Request) {
   }
 
   const tags = body.tags ?? {};
-  const tagWs = (tags.lodestar_ws ?? "").trim() || null;
-  const tagOutreach = (tags.lodestar_outreach ?? "").trim() || null;
+  const tagWs =
+    (tags.leadify_ws ?? tags.lodestar_ws ?? "").trim() || null;
+  const tagOutreach =
+    (tags.leadify_outreach ?? tags.lodestar_outreach ?? "").trim() || null;
 
   const binding = await getD1Binding();
   const probe = getDb(binding, LOCAL_WORKSPACE_ID);

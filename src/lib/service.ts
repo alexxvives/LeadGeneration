@@ -1,7 +1,7 @@
 import type { LeadRepository } from "@/lib/db";
 import { newId, nowIso } from "@/lib/id";
 import { runSearch, SearchUnavailableError } from "@/lib/search";
-import { generateDraft, complianceFooter, leadLooksLikeUsa, stripLegacyCompliance } from "@/lib/outreach/draft";
+import { generateDraft, stripLegacyCompliance } from "@/lib/outreach/draft";
 import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
@@ -419,21 +419,15 @@ export async function sendApprovedOutreach(
   // their own from-name, from-email etc. (configured in Settings → Sending).
   // Always load workspace (local JSON too) so Pro mailbox + BYO Resend work in demo.
   const wsForEmail = await db.getWorkspace(ctx.workspaceId);
-  const leadForLocale = await db.getLead(outreach.leadId);
   const cleanBody = stripLegacyCompliance(outreach.body);
   const result = await sendEmail(
     {
       to: outreach.toEmail,
       subject: outreach.subject,
-      body:
-        cleanBody +
-        complianceFooter({
-          physicalAddress: wsForEmail?.physicalAddress,
-          includeAddress: leadForLocale ? leadLooksLikeUsa(leadForLocale) : false,
-        }),
+      body: cleanBody,
       tags: [
-        { name: "lodestar_ws", value: ctx.workspaceId.slice(0, 256) },
-        { name: "lodestar_outreach", value: outreachId.slice(0, 256) },
+        { name: "leadify_ws", value: ctx.workspaceId.slice(0, 256) },
+        { name: "leadify_outreach", value: outreachId.slice(0, 256) },
       ],
     },
     wsForEmail
@@ -486,9 +480,9 @@ export async function sendApprovedOutreach(
     // Auto-advance CRM stage to "contacted" via email on first send.
     const lead = await db.getLead(outreach.leadId);
     const crmPatch: Partial<Lead> = { status: "sent" };
-    if (lead && lead.crmStage === "new") {
-      crmPatch.crmStage = "contacted";
-      crmPatch.contactMethod = "email";
+    if (lead) {
+      if (lead.crmStage === "new") crmPatch.crmStage = "contacted";
+      if (!lead.contactMethod) crmPatch.contactMethod = "email";
     }
     if (lead) {
       const existing = lead.followUps ?? [];
@@ -672,7 +666,40 @@ export async function updateLeadCrm(
     followUps?: FollowUp[];
   },
 ): Promise<Lead | null> {
-  return ctx.db.updateLead(leadId, patch);
+  const lead = await ctx.db.getLead(leadId);
+  if (!lead) return null;
+
+  const next: typeof patch = { ...patch };
+
+  // When the user explicitly sets how they contacted, journal a follow-up note.
+  if (
+    patch.contactMethod &&
+    patch.contactMethod !== lead.contactMethod
+  ) {
+    const note = contactMethodFollowUpNote(patch.contactMethod);
+    const today = nowIso().slice(0, 10);
+    const existing = patch.followUps ?? lead.followUps ?? [];
+    const already = existing.some(
+      (f) => f.note.trim().toLowerCase() === note.toLowerCase() && f.date === today,
+    );
+    if (!already) {
+      next.followUps = [
+        { id: newId("fu"), date: today, note, done: false },
+        ...existing,
+      ];
+    }
+    if (!patch.crmStage && lead.crmStage === "new") {
+      next.crmStage = "contacted";
+    }
+  }
+
+  return ctx.db.updateLead(leadId, next);
+}
+
+function contactMethodFollowUpNote(method: ContactMethod): string {
+  if (method === "email") return "Contacted by email";
+  if (method === "phone") return "Contacted by phone";
+  return "Contacted via contact form";
 }
 
 /** Row shape for CSV/Excel import (flexible mapping happens client-side). */
@@ -837,8 +864,8 @@ export async function importLeads(
 }
 
 /**
- * Generate a default outreach pitch from the user's company website (Workers AI).
- * Falls back to a short heuristic pitch when AI is unavailable but the page loads.
+ * Generate a default outreach pitch from the user's company website (real AI only).
+ * Workers AI → Groq → Gemini. Never invents a heuristic pitch (ADR 0013).
  */
 export async function generatePitchFromWebsite(
   _ctx: Ctx,
@@ -854,7 +881,7 @@ export async function generatePitchFromWebsite(
 
   const { fetchPublicPageText } = await import("@/lib/ai/fetch-page");
   const { generateDefaultPitch } = await import("@/lib/ai/generate");
-  const { workersAiAvailable } = await import("@/lib/ai/workers-ai");
+  const { aiAvailable } = await import("@/lib/ai/chat");
 
   let pageText: string;
   try {
@@ -867,44 +894,20 @@ export async function generatePitchFromWebsite(
     );
   }
 
-  const companyName = input.companyName?.trim() || undefined;
-
-  if (await workersAiAvailable()) {
-    const pitch = await generateDefaultPitch({
-      website: url,
-      companyName,
-      pageText,
-    });
-    if (pitch) return { pitch };
+  if (!(await aiAvailable())) {
+    throw new Error(
+      "No AI available. On Cloudflare, redeploy so the Workers AI binding is live. Locally set CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN, or GROQ_API_KEY / GEMINI_API_KEY.",
+    );
   }
 
-  const heuristic = heuristicPitchFromPage(pageText, companyName);
-  if (heuristic) return { pitch: heuristic };
+  const pitch = await generateDefaultPitch({
+    website: url,
+    companyName: input.companyName?.trim() || undefined,
+    pageText,
+  });
+  if (pitch) return { pitch };
 
   throw new Error(
-    "Could not generate a pitch from that site. Try again or write one manually.",
+    "AI could not generate a pitch from that site. Check Workers AI / Groq / Gemini credentials and try again, or write the pitch manually.",
   );
-}
-
-/** Last-resort pitch when Workers AI is down — first useful sentences from the page. */
-function heuristicPitchFromPage(pageText: string, companyName?: string): string | null {
-  const cleaned = pageText
-    .replace(/\s+/g, " ")
-    .replace(/#{1,6}\s*/g, "")
-    .trim();
-  if (cleaned.length < 60) return null;
-  const sentences = cleaned
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter(
-      (s) =>
-        s.length > 40 &&
-        s.length < 220 &&
-        !/cookie|privacy|sign in|log in|copyright|all rights/i.test(s),
-    );
-  const pick = sentences.slice(0, 2).join(" ");
-  if (!pick) return null;
-  const who = companyName ? `At ${companyName}, ` : "We ";
-  const body = pick.replace(/^(we|our company|at .+?)\s+/i, "");
-  return `${who}${body.charAt(0).toLowerCase()}${body.slice(1)}`.slice(0, 800);
 }

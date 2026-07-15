@@ -475,3 +475,15 @@ live product preview (map + pipeline) — dropped missing hero image dependency.
 - Lead blurbs polished after live search (concurrency 3). Default pitch:
   Settings → website + “Generate from website” → `/api/ai/pitch`.
 
+### 2026-07-15 — Leadify identifiers + natural emails + pitch AI
+- Runtime keys/tags renamed `lodestar_*` → `leadify_*` with one-time localStorage
+  migration; webhook receivers still accept legacy tags. D1 CF database name
+  remains `lodestar-prod` (id-bound).
+- STOP / mailing-address footers removed from send path (ADR 0012). User found
+  them scammy; constitution Art. I.3 amended.
+- Pitch: no heuristic page-sentence fallback (ADR 0013). Cascade Workers AI →
+  Groq → Gemini; otherwise clear error. Local needs CF REST or `GROQ_API_KEY` /
+  `GEMINI_API_KEY`.
+- Contacted-without-method highlighted in pipeline; setting method journals a
+  follow-up via `updateLeadCrm`.
+

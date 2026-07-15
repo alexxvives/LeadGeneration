@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, QuotaExceededError, type BoardResponse, type FirecrawlUsage } from "@/lib/client-api";
-import type { CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
+import type { ContactMethod, CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
 import { LeadTable } from "./LeadTable";
@@ -347,11 +347,19 @@ export function Studio() {
     }
   };
 
-  const onMoveStage = async (leadId: string, stage: CrmStage) => {
+  const onMoveStage = async (
+    leadId: string,
+    stage: CrmStage,
+    contactMethod?: ContactMethod | null,
+  ) => {
+    const patch: { crmStage: CrmStage; contactMethod?: ContactMethod | null } = {
+      crmStage: stage,
+    };
+    if (contactMethod !== undefined) patch.contactMethod = contactMethod;
     // Optimistic update first for instant feel.
-    patchLeadLocal(leadId, { crmStage: stage });
+    patchLeadLocal(leadId, patch);
     try {
-      const { lead } = await api.updateLead(leadId, { crmStage: stage });
+      const { lead } = await api.updateLead(leadId, patch);
       patchLeadLocal(leadId, lead);
     } catch (e) {
       // Revert on failure by refreshing.

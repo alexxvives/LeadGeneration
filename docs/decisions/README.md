@@ -50,5 +50,7 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0009 — Resend for send, Maileroo/Zeruh for verify](0009-resend-send-maileroo-verify.md) _(amended by 0011 for Easy BYO Maileroo send)_
 - [0010 — Google / Microsoft mailbox OAuth behind sendEmail()](0010-mailbox-oauth-send.md) _(accepted — Google first; multi-inbox deferred)_
 - [0011 — Easy send: Resend or Maileroo (BYO)](0011-easy-resend-or-maileroo.md)
+- [0012 — Natural email bodies — no STOP footer](0012-natural-email-bodies-no-stop-footer.md) _(amends constitution Art. I.3)_
+- [0013 — Pitch AI: no heuristic fallback](0013-pitch-ai-no-heuristic-fallback.md)
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

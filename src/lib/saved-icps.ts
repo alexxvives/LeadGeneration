@@ -1,16 +1,14 @@
-/**
- * Browser-only saved ICP templates (niche + location + offer).
- * Zero-key demo path — no server/DB required (constitution Art. I.2).
- */
 import type { SavedIcp } from "@/lib/types";
+import { readMigratedKey } from "@/lib/browser-storage";
 
-const KEY = "lodestar_saved_icps";
+const KEY = "leadify_saved_icps";
+const LEGACY_KEYS = ["lodestar_saved_icps"];
 const MAX = 12;
 
 export function loadSavedIcps(): SavedIcp[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = readMigratedKey(KEY, LEGACY_KEYS);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];

@@ -1,10 +1,10 @@
 /**
- * Workers AI client (Leadify's optional LLM).
+ * Workers AI client (Leadify's preferred LLM on Cloudflare).
  *
  * Preferred: Cloudflare Workers AI binding (`env.AI`) on the deployed Worker —
  * no API key, same account as D1. Optional REST via CLOUDFLARE_ACCOUNT_ID +
- * CLOUDFLARE_API_TOKEN for local/dev. Missing AI → callers keep heuristic /
- * template fallbacks (constitution Art. I.2).
+ * CLOUDFLARE_API_TOKEN for local/dev. Missing AI → `aiChat` may try Groq/Gemini;
+ * pitch generate never invents heuristic copy (ADR 0013).
  */
 
 import { env } from "@/lib/config";

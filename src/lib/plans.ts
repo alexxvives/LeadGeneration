@@ -91,7 +91,7 @@ export const PLANS: Record<PlanId, Plan> = {
       "10,000 enriched leads / month",
       "10,000 sends / month",
       "Multiple workspaces / seats",
-      "White-label compliance footer",
+      "Custom sending identity",
     ],
     stripePriceEnv: "STRIPE_AGENCY_PRICE_ID",
   },

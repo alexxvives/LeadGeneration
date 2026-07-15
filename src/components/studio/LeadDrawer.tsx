@@ -116,8 +116,10 @@ export function LeadDrawer(props: DrawerProps) {
     setCrmStage(lead.crmStage ?? "new");
     setContactMethod(lead.contactMethod ?? null);
     setFollowUps(lead.followUps ?? []);
-    setShowMethodPicker(false);
-    setPendingStage(null);
+    const needsMethod =
+      (lead.crmStage ?? "new") === "contacted" && !lead.contactMethod;
+    setShowMethodPicker(needsMethod);
+    setPendingStage(needsMethod ? "contacted" : null);
     setShowAddNote(false);
     setNewNoteDate(todayIsoDate());
     setNewNoteText("");
@@ -175,6 +177,12 @@ export function LeadDrawer(props: DrawerProps) {
     setShowMethodPicker(false);
     setPendingStage(null);
     await props.onUpdateCrm(lead.id, { crmStage: stage, contactMethod: method });
+  };
+
+  /** Set contact method for a lead already in Contacted (or completing the picker). */
+  const commitContactMethod = async (method: ContactMethod) => {
+    const stage = pendingStage ?? (crmStage === "new" ? "contacted" : crmStage);
+    await commitStage(stage, method);
   };
 
   // ── Dated notes (journal) ──
@@ -263,8 +271,8 @@ export function LeadDrawer(props: DrawerProps) {
               ))}
             </div>
 
-            {/* Contact method picker — shown when moving to Contacted */}
-            {showMethodPicker && (
+            {/* Contact method picker — moving to Contacted, or Contacted without a method */}
+            {(showMethodPicker || (crmStage === "contacted" && !contactMethod)) && (
               <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3">
                 <p className="mb-2 text-xs font-medium text-amber-300">How did you reach them?</p>
                 <div className="flex flex-wrap gap-2">
@@ -272,19 +280,21 @@ export function LeadDrawer(props: DrawerProps) {
                     <button
                       key={method}
                       type="button"
-                      onClick={() => commitStage(pendingStage!, method)}
+                      onClick={() => void commitContactMethod(method)}
                       className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs text-amber-200 transition-colors hover:bg-amber-400/20"
                     >
                       {label}
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() => { setShowMethodPicker(false); setPendingStage(null); }}
-                    className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 transition-colors hover:text-mist-300"
-                  >
-                    Cancel
-                  </button>
+                  {showMethodPicker && pendingStage && crmStage !== "contacted" && (
+                    <button
+                      type="button"
+                      onClick={() => { setShowMethodPicker(false); setPendingStage(null); }}
+                      className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 transition-colors hover:text-mist-300"
+                    >
+                      Cancel
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -532,10 +542,11 @@ export function LeadDrawer(props: DrawerProps) {
                           })
                         }
                         disabled={busy === "approve"}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
+                        aria-label="Approve"
+                        title="Approve"
+                        className="inline-flex items-center justify-center rounded-full bg-amber-400 p-2.5 text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
                       >
-                        {busy === "approve" ? <Spinner className="h-3.5 w-3.5" /> : <CheckIcon className="h-4 w-4" />}
-                        Approve
+                        {busy === "approve" ? <Spinner className="h-4 w-4" /> : <CheckIcon className="h-5 w-5" />}
                       </button>
                     ) : (
                       <button

@@ -1,4 +1,4 @@
-# Lodestar System Constitution
+# Leadify System Constitution
 
 These are the **non-negotiable principles** for this codebase. They exist so the
 project stays consistent, safe, and easy to change no matter who (human or agent)
@@ -17,9 +17,10 @@ it, or amend this constitution first (with reasoning recorded in
    **demo mode** with no external services. Every integration degrades
    gracefully to a local fallback (sample leads, simulated sends). Never make a
    feature hard-depend on a key.
-3. **Compliance is on by default.** Rate limiting, clear from-identity, physical
-   address, and an unsubscribe placeholder ship in every outbound email. Guards
-   are opt-out, never opt-in.
+3. **Send hygiene is on by default.** Rate limiting and clear from-identity ship
+   on every outbound email. Do **not** auto-append STOP / unsubscribe mailto /
+   placeholder mailing-address footers — bodies must read like a natural email
+   (ADR 0012). Guards are opt-out, never opt-in.
 4. **Contact-form automation stays a demo-only stub** behind an off-by-default
    flag, with legal/ToS review comments intact. Do not make it submit to real
    sites.

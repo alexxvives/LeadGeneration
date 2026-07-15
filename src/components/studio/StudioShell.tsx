@@ -9,7 +9,7 @@ import { AuthModal } from "@/components/AuthModal";
 import {
   GettingStartedWizard,
   useGettingStartedOpen,
-  GETTING_STARTED_KEY,
+  isGettingStartedDone,
   type GettingStartedCaps,
   type GettingStartedIdentity,
 } from "@/components/studio/GettingStartedWizard";
@@ -25,6 +25,25 @@ import {
 } from "@/components/icons";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
+
+const GUEST_KEY = "leadify_guest";
+const GUEST_LEGACY = "lodestar_guest";
+
+function isGuestSession(): boolean {
+  if (typeof window === "undefined") return false;
+  if (sessionStorage.getItem(GUEST_KEY) === "1") return true;
+  if (sessionStorage.getItem(GUEST_LEGACY) === "1") {
+    sessionStorage.setItem(GUEST_KEY, "1");
+    sessionStorage.removeItem(GUEST_LEGACY);
+    return true;
+  }
+  return false;
+}
+
+function markGuestSession(): void {
+  sessionStorage.setItem(GUEST_KEY, "1");
+  sessionStorage.removeItem(GUEST_LEGACY);
+}
 
 /**
  * Studio chrome: left sidebar with product navigation + account footer.
@@ -57,7 +76,7 @@ export function StudioShell({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const ok = sessionStorage.getItem("lodestar_guest") === "1";
+    const ok = isGuestSession();
     if (!ok && !authRequired && status !== "authenticated") {
       setAuthOpen(true);
     }
@@ -75,8 +94,8 @@ export function StudioShell({
     if (authOpen || typeof window === "undefined") return;
     if (searchParams.get("setup") === "1") return;
     try {
-      if (localStorage.getItem(GETTING_STARTED_KEY) !== "done") {
-        const guest = sessionStorage.getItem("lodestar_guest") === "1";
+      if (!isGettingStartedDone()) {
+        const guest = isGuestSession();
         if (guest || status === "authenticated" || authRequired) {
           setSetupOpen(true);
         }
@@ -87,7 +106,7 @@ export function StudioShell({
   }, [authOpen, status, authRequired, setSetupOpen, searchParams]);
 
   const markGuest = () => {
-    sessionStorage.setItem("lodestar_guest", "1");
+    markGuestSession();
     setAuthOpen(false);
   };
 

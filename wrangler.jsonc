@@ -1,5 +1,5 @@
 {
-  // Cloudflare Workers deploy config for Lodestar (via @opennextjs/cloudflare).
+  // Cloudflare Workers deploy config for Leadify (via @opennextjs/cloudflare).
   // Local `npm run dev` does NOT use this — it runs plain Next.js in demo mode
   // (JSON store, zero keys). Use `npm run cf:preview` to exercise D1 locally.
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -17,13 +17,14 @@
   "d1_databases": [
     {
       "binding": "DB",
+      // CF resource name (do not rename without migrating the D1 database).
       "database_name": "lodestar-prod",
       "database_id": "f990d480-83aa-4123-8979-e47d11347069",
       "migrations_dir": "migrations"
     }
   ],
   // Optional LLM for lead blurbs + default pitch (Llama 3.1 via Workers AI).
-  // Demo mode still works with zero AI — heuristics/templates only.
+  // Pitch generate never invents heuristic copy — needs AI or manual write.
   "ai": {
     "binding": "AI"
   }

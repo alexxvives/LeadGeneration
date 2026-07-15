@@ -129,7 +129,7 @@ export const env = {
   // secret). authRequired() distinguishes the two.
   authSecret: () =>
     process.env.AUTH_SECRET?.trim() ||
-    "lodestar-dev-insecure-secret-change-me-in-production",
+    "leadify-dev-insecure-secret-change-me-in-production",
   authResendKey: () => process.env.RESEND_API_KEY?.trim() || "",
   appUrl: () =>
     process.env.NEXTAUTH_URL?.trim() ||
@@ -168,6 +168,9 @@ export const env = {
    */
   cfAccountId: () => process.env.CLOUDFLARE_ACCOUNT_ID?.trim() ?? "",
   cfApiToken: () => process.env.CLOUDFLARE_API_TOKEN?.trim() ?? "",
+  /** Optional free-tier LLMs when Workers AI isn’t available (local/dev). */
+  groqApiKey: () => process.env.GROQ_API_KEY?.trim() ?? "",
+  geminiApiKey: () => process.env.GEMINI_API_KEY?.trim() ?? "",
 
   // ── Smoke test bypass ──
   // When set, requests carrying `x-smoke-key: <value>` skip auth enforcement so

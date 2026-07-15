@@ -5,15 +5,15 @@ import { CheckIcon } from "@/components/icons";
 
 export const metadata = {
   title: "Ethics — Leadify",
-  description: "Human approval, rate limits, and compliance-by-default.",
+  description: "Human approval, rate limits, and clear from-identity.",
 };
 
 const POINTS: [string, string][] = [
   ["Per-lead approval", "No message is ever auto-blasted. Every send needs an explicit approve."],
   ["Rate limited", "Outbound sends are throttled per minute to protect deliverability."],
   [
-    "Clear identity + opt-out",
-    "Outbound sends include a quiet mailing-address + opt-out line (not baked into the editable draft).",
+    "Natural copy",
+    "Emails keep your draft as written — no STOP lines or auto mailing-address footers.",
   ],
   ["Public web only", "Enrichment never touches content behind a login."],
   [

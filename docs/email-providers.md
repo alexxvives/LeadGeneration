@@ -103,8 +103,9 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 ## How this maps to code
 
 - `src/lib/email/sender.ts`: Google mailbox → workspace Resend/Maileroo →
-  platform Resend → SMTP → demo. Outbound Resend sends tag `lodestar_ws` +
-  `lodestar_outreach` for webhooks.
+  platform Resend → SMTP → demo. Outbound sends tag `leadify_ws` +
+  `leadify_outreach` for webhooks (legacy `lodestar_*` still matched).
+  Bodies are sent as drafted — no STOP / mailing-address auto-footer.
 - `src/lib/email/maileroo.ts`: Maileroo HTTP send (`smtp.maileroo.com/api/v2`).
 - `src/lib/email/domain-health.ts` + `POST /api/providers/resend/domain-health`:
   live SPF/DKIM rows from Resend Domains API (demo-safe when no key).
@@ -116,7 +117,7 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   only receives `hasResendKey` / `hasMailerooKey` flags.
 - Stay pluggable: swapping providers is config, not a rewrite.
 - **Webhooks:** `POST /api/webhooks/resend` and `POST /api/webhooks/maileroo`
-  (public) — prefer tags (`lodestar_ws` + `lodestar_outreach`), else latest sent
+  (public) — prefer tags (`leadify_ws` + `leadify_outreach`), else latest sent
   by recipient email. Bounce/complaint → `deliveryStatus=bounced`; Resend
   inbound `email.received` → `replied` (+ CRM). Set `RESEND_WEBHOOK_SECRET` /
   `MAILEROO_WEBHOOK_SECRET` in production.

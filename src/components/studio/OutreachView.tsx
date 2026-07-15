@@ -273,10 +273,11 @@ function OutreachRow({
                 type="button"
                 disabled={busy}
                 onClick={() => void onApprove()}
-                className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
+                aria-label="Approve"
+                title="Approve"
+                className="inline-flex items-center justify-center rounded-full bg-amber-400 p-1.5 text-ink-950 disabled:opacity-50"
               >
-                {busy ? <Spinner className="h-3 w-3" /> : <CheckIcon className="h-3 w-3" />}
-                Approve
+                {busy ? <Spinner className="h-3.5 w-3.5" /> : <CheckIcon className="h-3.5 w-3.5" />}
               </button>
             </div>
           )}

@@ -9,7 +9,10 @@
  * continue. Plan quotas + per-minute rate limits remain hard guards.
  */
 
-export const WARMUP_STORAGE_KEY = "lodestar_warmup_v1";
+import { readMigratedKey } from "@/lib/browser-storage";
+
+export const WARMUP_STORAGE_KEY = "leadify_warmup_v1";
+const WARMUP_LEGACY_KEYS = ["lodestar_warmup_v1"];
 
 export type MailboxAgeBand = "new" | "weeks" | "months" | "established";
 export type MailboxVolumeBand = "none" | "light" | "regular";
@@ -52,7 +55,7 @@ export function loadWarmupProfile(): WarmupProfile {
     return { startedOn: todayKey(), days: {} };
   }
   try {
-    const raw = localStorage.getItem(WARMUP_STORAGE_KEY);
+    const raw = readMigratedKey(WARMUP_STORAGE_KEY, WARMUP_LEGACY_KEYS);
     if (!raw) {
       const fresh: WarmupProfile = { startedOn: todayKey(), days: {} };
       localStorage.setItem(WARMUP_STORAGE_KEY, JSON.stringify(fresh));

@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 /*
-  Lodestar design system.
-  Brand story: a lodestar is the star you navigate by — here, your best-fit
-  customers. Palette is deep "ink" night sky + aurora teal/green + warm amber,
-  deliberately avoiding purple-on-white and cream+terracotta clichés.
+  Leadify design system.
+  Brand story: navigate to your best-fit customers. Palette is deep "ink" night
+  sky + aurora teal/green + warm amber, deliberately avoiding purple-on-white
+  and cream+terracotta clichés.
 */
 
 @theme {
@@ -197,7 +197,7 @@
   }
 
   /* Landing hero map tooltips */
-  .lodestar-hero-tooltip {
+  .leadify-hero-tooltip {
     background: rgba(6, 10, 18, 0.92) !important;
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
     color: #eaf1fb !important;
@@ -206,10 +206,10 @@
     font-size: 11px !important;
     box-shadow: none !important;
   }
-  .lodestar-hero-tooltip::before {
+  .leadify-hero-tooltip::before {
     border-top-color: rgba(6, 10, 18, 0.92) !important;
   }
-  .lodestar-hero-pin {
+  .leadify-hero-pin {
     background: transparent !important;
     border: none !important;
   }

@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 type ResendTag = { name?: string; value?: string };
 
 /**
- * Resend → Lodestar delivery webhooks.
+ * Resend → Leadify delivery webhooks.
  *
  * Configure in Resend Dashboard → Webhooks → URL:
  *   https://<your-host>/api/webhooks/resend
@@ -21,7 +21,7 @@ type ResendTag = { name?: string; value?: string };
  * payloads in local/demo so zero-key mode still works; production should set it.
  *
  * Matching order:
- *   1. Tags `lodestar_ws` + `lodestar_outreach` (set on send)
+ *   1. Tags `leadify_ws` + `leadify_outreach` (set on send; also accept legacy `lodestar_*`)
  *   2. Fallback: latest sent outreach by recipient email (cross-workspace)
  */
 export async function POST(req: Request) {
@@ -57,8 +57,9 @@ export async function POST(req: Request) {
   }
 
   const tags = body.data?.tags ?? [];
-  const tagWs = tagValue(tags, "lodestar_ws");
-  const tagOutreach = tagValue(tags, "lodestar_outreach");
+  const tagWs = tagValue(tags, "leadify_ws") || tagValue(tags, "lodestar_ws");
+  const tagOutreach =
+    tagValue(tags, "leadify_outreach") || tagValue(tags, "lodestar_outreach");
 
   const binding = await getD1Binding();
   const probe = getDb(binding, LOCAL_WORKSPACE_ID);

@@ -1,9 +1,9 @@
 /**
- * LLM helpers for blurbs + default pitch. Always optional — null/empty means
- * "use heuristic/template instead".
+ * LLM helpers for blurbs + default pitch.
+ * Always optional — null means "no AI available / failed" (no fake copy).
  */
 
-import { workersAiChat } from "@/lib/ai/workers-ai";
+import { aiChat } from "@/lib/ai/chat";
 import {
   langLabel,
   outreachLangFromLocation,
@@ -34,7 +34,7 @@ export async function generateLeadBlurb(opts: {
   if (raw.length < 40) return null;
 
   const lang = outreachLangFromLocation(opts.location);
-  const out = await workersAiChat(
+  const out = await aiChat(
     `You write one factual sentence describing a company for B2B outreach. Language: ${langLabel(lang)}. Plain and specific. No marketing fluff, no greetings, no quotes, no nav/menu words. Max 35 words.`,
     [
       `Company: ${opts.company}`,
@@ -46,7 +46,7 @@ export async function generateLeadBlurb(opts: {
       .filter(Boolean)
       .join("\n"),
   );
-  return out ? cleanOneLine(out, 240) : null;
+  return out ? cleanOneLine(out.text, 240) : null;
 }
 
 /**
@@ -63,7 +63,7 @@ export async function generateDefaultPitch(opts: {
   if (raw.length < 40) return null;
 
   const lang = opts.lang ?? "en";
-  const out = await workersAiChat(
+  const out = await aiChat(
     `You write a short cold-email pitch (2–3 sentences) in ${langLabel(lang)}. Sound like a real person, not a marketer. First person. Concrete value only. No hype words (revolutionize, seamless, leverage). No subject line, greeting, or sign-off.`,
     [
       opts.companyName ? `Our company: ${opts.companyName}` : null,
@@ -75,7 +75,7 @@ export async function generateDefaultPitch(opts: {
       .join("\n"),
   );
   if (!out) return null;
-  return out
+  return out.text
     .replace(/^["'\s]+|["'\s]+$/g, "")
     .replace(/\s+/g, " ")
     .trim()

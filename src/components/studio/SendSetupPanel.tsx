@@ -69,7 +69,7 @@ export function SendSetupPanel({
         body: JSON.stringify({ preferredSendPath: next }),
       });
     } catch {
-      // non-blocking — Save settings also persists path
+      // non-blocking — identity fields auto-save on blur too
     }
   }
 

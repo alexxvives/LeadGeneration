@@ -8,6 +8,7 @@ import type { Lead, Run } from "@/lib/types";
 // Deterministic, no-API-key outreach drafting. Language follows lead geography
 // (see locale.ts). LLM is optional for blurbs/pitch only — drafts stay template
 // so zero-key demo mode always works (constitution Art. I.2).
+// Bodies stay natural — no STOP / mailing-address footers (ADR 0012).
 
 export interface DraftResult {
   subject: string;
@@ -34,19 +35,10 @@ function shortCompany(lead: Lead): string {
   );
 }
 
-/** Rough US location check for CAN-SPAM physical-address requirement. */
-export function leadLooksLikeUsa(lead: Pick<Lead, "location">): boolean {
-  const loc = lead.location?.trim() ?? "";
-  if (!loc) return false;
-  if (/\b(USA|U\.S\.A\.?|United States|Estados Unidos)\b/i.test(loc)) return true;
-  return /,\s*(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\b/i.test(
-    loc,
-  );
-}
-
 /**
  * Strip legacy compliance blocks that were once baked into draft bodies
- * (Sent by… / unsubscribe mailto / duplicate STOP lines). Safe to run at send.
+ * (Sent by… / unsubscribe mailto / STOP lines / addresses). Safe to run at send
+ * so old drafts stay natural (ADR 0012).
  */
 export function stripLegacyCompliance(body: string): string {
   let out = body.replace(/\r\n/g, "\n");
@@ -57,7 +49,7 @@ export function stripLegacyCompliance(body: string): string {
   );
   out = out.replace(/\n*Don't want to hear from us\?[^\n]*/gi, "");
   out = out.replace(/\{\{unsubscribe_url\}\}/gi, "");
-  // Prior send-appended STOP blocks (avoid stacking on resend/retry).
+  // Prior send-appended STOP blocks.
   out = out.replace(
     /\n*—\s*\n(?:If you[’']d rather not hear from us, reply STOP\.|Si prefieres no recibir más mensajes, responde STOP\.)\s*$/i,
     "",
@@ -67,29 +59,6 @@ export function stripLegacyCompliance(body: string): string {
     "",
   );
   return out.replace(/\n{3,}/g, "\n\n").trimEnd();
-}
-
-/**
- * Quiet compliance block appended only at send time (not in the editable draft).
- * Never includes placeholder identity, "Sent by…", or unsubscribe mailto links.
- * Physical address only for US recipients when it looks real (CAN-SPAM).
- */
-export function complianceFooter(opts?: {
-  physicalAddress?: string | null;
-  includeAddress?: boolean;
-}): string {
-  const lines: string[] = [""];
-  if (opts?.includeAddress) {
-    const address = (opts.physicalAddress || env.physicalAddress()).trim();
-    if (
-      address &&
-      !/placeholder|your city|00000|your (street|address)/i.test(address)
-    ) {
-      lines.push("—", address);
-    }
-  }
-  lines.push("If you’d rather not hear from us, reply STOP.");
-  return lines.join("\n");
 }
 
 /** True when scraped "about" text is nav/chrome junk, not a real company blurb. */

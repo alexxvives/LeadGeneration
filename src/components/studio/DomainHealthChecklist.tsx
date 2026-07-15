@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckIcon, XIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import type { DomainDnsRecord, DomainHealthResult } from "@/lib/email/domain-health";
+import { readMigratedKey } from "@/lib/browser-storage";
 
-const MANUAL_KEY = "lodestar_domain_health_v1";
+const MANUAL_KEY = "leadify_domain_health_v1";
+const MANUAL_LEGACY_KEYS = ["lodestar_domain_health_v1"];
 
 type ManualChecks = {
   spf: boolean;
@@ -47,7 +49,7 @@ export function DomainHealthPanel() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(MANUAL_KEY);
+      const raw = readMigratedKey(MANUAL_KEY, MANUAL_LEGACY_KEYS);
       if (raw) setManual({ ...MANUAL_DEFAULTS, ...JSON.parse(raw) });
     } catch {
       /* ignore */

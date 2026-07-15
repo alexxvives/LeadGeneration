@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CheckIcon } from "@/components/icons";
 import { PasswordField } from "@/components/PasswordField";
@@ -74,6 +74,13 @@ export function EmailSettingsForm({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     setValues({
@@ -114,10 +121,18 @@ export function EmailSettingsForm({
   const isNewKey = (draft: string) =>
     !!draft.trim() && draft !== SAVED_KEY_MASK;
 
-  const save = async () => {
+  const save = async (opts?: {
+    providerOverride?: EasyEmailProvider;
+    clearResend?: boolean;
+    clearMaileroo?: boolean;
+  }) => {
+    if (!canEdit || saving) return;
     setSaving(true);
     setSaved(false);
     setError(null);
+    const activeProvider = opts?.providerOverride ?? provider;
+    const doClearResend = opts?.clearResend ?? clearResend;
+    const doClearMaileroo = opts?.clearMaileroo ?? clearMaileroo;
     try {
       const payload: Record<string, unknown> = isPro
         ? {
@@ -128,14 +143,14 @@ export function EmailSettingsForm({
         : {
             fromName: values.fromName,
             fromEmail: values.fromEmail,
-            easyEmailProvider: provider,
+            easyEmailProvider: activeProvider,
             preferredSendPath: "easy",
           };
 
       if (!isPro) {
-        if (clearResend) payload.clearResendApiKey = true;
+        if (doClearResend) payload.clearResendApiKey = true;
         else if (isNewKey(resendDraft)) payload.resendApiKey = resendDraft.trim();
-        if (clearMaileroo) payload.clearMailerooApiKey = true;
+        if (doClearMaileroo) payload.clearMailerooApiKey = true;
         else if (isNewKey(mailerooDraft)) payload.mailerooApiKey = mailerooDraft.trim();
       }
 
@@ -161,10 +176,10 @@ export function EmailSettingsForm({
           saveSenderProfile(next);
         }
         if (!isPro) {
-          const nextHasResend = clearResend
+          const nextHasResend = doClearResend
             ? false
             : isNewKey(resendDraft) || hasResendKey;
-          const nextHasMaileroo = clearMaileroo
+          const nextHasMaileroo = doClearMaileroo
             ? false
             : isNewKey(mailerooDraft) || hasMailerooKey;
           setHasResendKey(nextHasResend);
@@ -175,6 +190,8 @@ export function EmailSettingsForm({
           setClearMaileroo(false);
         }
         setSaved(true);
+        if (savedTimer.current) clearTimeout(savedTimer.current);
+        savedTimer.current = setTimeout(() => setSaved(false), 2000);
         router.refresh();
       }
     } catch {
@@ -182,6 +199,11 @@ export function EmailSettingsForm({
     } finally {
       setSaving(false);
     }
+  };
+
+  const setProviderAndSave = (p: EasyEmailProvider) => {
+    setProvider(p);
+    void save({ providerOverride: p });
   };
 
   const inputCls =
@@ -231,6 +253,7 @@ export function EmailSettingsForm({
           <input
             value={values.fromName ?? ""}
             onChange={(e) => setField("fromName", e.target.value)}
+            onBlur={() => void save()}
             placeholder={defaults.fromName}
             disabled={!canEdit}
             className={inputCls}
@@ -244,6 +267,9 @@ export function EmailSettingsForm({
             type="email"
             value={fromLocked ? lockedFromEmail! : (values.fromEmail ?? "")}
             onChange={(e) => setField("fromEmail", e.target.value)}
+            onBlur={() => {
+              if (!fromLocked) void save();
+            }}
             placeholder={defaults.fromEmail}
             disabled={!canEdit || fromLocked}
             className={inputCls}
@@ -262,7 +288,7 @@ export function EmailSettingsForm({
               <button
                 type="button"
                 disabled={!canEdit}
-                onClick={() => setProvider("resend")}
+                onClick={() => setProviderAndSave("resend")}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                   !isMaileroo
                     ? "bg-aurora-400 text-ink-950"
@@ -274,7 +300,7 @@ export function EmailSettingsForm({
               <button
                 type="button"
                 disabled={!canEdit}
-                onClick={() => setProvider("maileroo")}
+                onClick={() => setProviderAndSave("maileroo")}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                   isMaileroo
                     ? "bg-aurora-400 text-ink-950"
@@ -298,6 +324,7 @@ export function EmailSettingsForm({
                       setClearMaileroo(true);
                       setMailerooDraft("");
                       setSaved(false);
+                      void save({ clearMaileroo: true });
                     }}
                   >
                     Clear key
@@ -315,6 +342,7 @@ export function EmailSettingsForm({
                   onFocus={(e) => {
                     if (mailerooDraft === SAVED_KEY_MASK) e.target.select();
                   }}
+                  onBlur={() => void save()}
                   placeholder="Your Maileroo sending key"
                   disabled={!canEdit}
                   inputClassName={`${inputCls} pr-11`}
@@ -322,7 +350,7 @@ export function EmailSettingsForm({
               )}
               {clearMaileroo && (
                 <p className="mt-2 text-xs text-amber-200/90">
-                  Will clear the saved Maileroo key on Save.{" "}
+                  Key will be cleared when you leave this section.{" "}
                   <button
                     type="button"
                     className="underline"
@@ -361,6 +389,7 @@ export function EmailSettingsForm({
                       setClearResend(true);
                       setResendDraft("");
                       setSaved(false);
+                      void save({ clearResend: true });
                     }}
                   >
                     Clear key
@@ -378,6 +407,7 @@ export function EmailSettingsForm({
                   onFocus={(e) => {
                     if (resendDraft === SAVED_KEY_MASK) e.target.select();
                   }}
+                  onBlur={() => void save()}
                   placeholder="re_xxxxxxxxxxxx"
                   disabled={!canEdit}
                   inputClassName={`${inputCls} pr-11`}
@@ -385,7 +415,7 @@ export function EmailSettingsForm({
               )}
               {clearResend && (
                 <p className="mt-2 text-xs text-amber-200/90">
-                  Will clear the saved Resend key on Save.{" "}
+                  Key will be cleared when you leave this section.{" "}
                   <button
                     type="button"
                     className="underline"
@@ -415,23 +445,17 @@ export function EmailSettingsForm({
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex min-h-[1.5rem] items-center justify-end gap-3">
         {error && <p className="text-sm text-rose-300">{error}</p>}
-        {saved && (
+        {saving && (
+          <span className="flex items-center gap-1.5 text-sm text-mist-500">
+            <Spinner className="h-3.5 w-3.5" /> Saving…
+          </span>
+        )}
+        {!saving && saved && (
           <span className="flex items-center gap-1.5 text-sm text-aurora-300">
             <CheckIcon className="h-4 w-4" /> Saved
           </span>
-        )}
-        {canEdit && (
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.03] disabled:opacity-50"
-          >
-            {saving ? <Spinner className="h-4 w-4" /> : null}
-            {saving ? "Saving…" : "Save settings"}
-          </button>
         )}
       </div>
     </div>
