@@ -2,8 +2,11 @@ import type {
   Capabilities,
 } from "@/lib/config";
 import type {
+  Board,
+  BoardSummary,
   ContactMethod,
   CrmStage,
+  DashboardStats,
   FollowUp,
   Lead,
   LeadWithOutreach,
@@ -18,6 +21,8 @@ import type { LocationSuggestion } from "@/app/api/geocode/route";
 export interface BoardResponse {
   run: Run | null;
   leads: LeadWithOutreach[];
+  boards: BoardSummary[];
+  activeBoardId: string | null;
   capabilities: Capabilities;
   workspace: WorkspaceSummary;
 }
@@ -55,7 +60,33 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  board: () => jsonFetch<BoardResponse>("/api/board"),
+  board: (boardId?: string | null) => {
+    const q =
+      boardId && boardId !== "all"
+        ? `?boardId=${encodeURIComponent(boardId)}`
+        : "?boardId=all";
+    return jsonFetch<BoardResponse>(`/api/board${q}`);
+  },
+
+  listBoards: () => jsonFetch<{ boards: BoardSummary[] }>("/api/boards"),
+
+  createBoard: (name: string) =>
+    jsonFetch<{ board: Board }>("/api/boards", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  renameBoard: (id: string, name: string) =>
+    jsonFetch<{ board: Board }>(`/api/boards/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+
+  deleteBoard: (id: string) =>
+    jsonFetch<{ ok: boolean }>(`/api/boards/${id}`, { method: "DELETE" }),
+
+  dashboard: () =>
+    jsonFetch<DashboardStats & { workspace: WorkspaceSummary }>("/api/dashboard"),
 
   createRun: (input: {
     niche: string;
@@ -65,6 +96,7 @@ export const api = {
     searchStrategy?: SearchStrategy;
     maxLeads?: number;
     demo?: boolean;
+    boardId?: string | null;
   }) =>
     jsonFetch<{ run: Run }>("/api/runs", {
       method: "POST",

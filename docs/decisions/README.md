@@ -52,5 +52,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0011 — Easy send: Resend or Maileroo (BYO)](0011-easy-resend-or-maileroo.md)
 - [0012 — Natural email bodies — no STOP footer](0012-natural-email-bodies-no-stop-footer.md) _(amends constitution Art. I.3)_
 - [0013 — Pitch AI: no heuristic fallback](0013-pitch-ai-no-heuristic-fallback.md)
+- [0014 — First-class Boards for lead collections](0014-boards.md)
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

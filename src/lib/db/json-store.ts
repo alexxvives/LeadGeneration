@@ -1,11 +1,12 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { Lead, Outreach, Run, Workspace } from "@/lib/types";
-import type { LeadRepository } from "./index";
+import type { Board, Lead, Outreach, Run, Workspace } from "@/lib/types";
+import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
 interface DbShape {
   workspaces: Workspace[];
+  boards: Board[];
   runs: Run[];
   leads: Lead[];
   outreach: Outreach[];
@@ -41,10 +42,26 @@ function normalizeLead(l: Lead): Lead {
   const raw = l as unknown as Record<string, unknown>;
   return {
     ...l,
+    boardId: typeof raw.boardId === "string" ? raw.boardId : "",
     crmStage: (raw.crmStage as Lead["crmStage"] | undefined) ?? "new",
     contactMethod: (raw.contactMethod as Lead["contactMethod"] | undefined) ?? null,
     notes: (raw.notes as Lead["notes"] | undefined) ?? null,
     followUps: (raw.followUps as Lead["followUps"] | undefined) ?? [],
+  };
+}
+
+function normalizeRun(r: Run): Run {
+  const raw = r as unknown as Record<string, unknown>;
+  return {
+    ...r,
+    boardId: typeof raw.boardId === "string" ? raw.boardId : "",
+  };
+}
+
+function normalizeBoard(b: Board): Board {
+  return {
+    ...b,
+    isDefault: !!b.isDefault,
   };
 }
 
@@ -59,7 +76,13 @@ function normalizeOutreach(o: Outreach): Outreach {
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 
-const EMPTY: DbShape = { workspaces: [], runs: [], leads: [], outreach: [] };
+const EMPTY: DbShape = {
+  workspaces: [],
+  boards: [],
+  runs: [],
+  leads: [],
+  outreach: [],
+};
 
 // A single, process-wide write chain shared by ALL JsonStore instances. Stores
 // are now created per-request (one per workspace scope), so the chain can no
@@ -88,6 +111,7 @@ export class JsonStore implements LeadRepository {
       const parsed = JSON.parse(raw) as Partial<DbShape>;
       return {
         workspaces: parsed.workspaces ?? [],
+        boards: parsed.boards ?? [],
         runs: parsed.runs ?? [],
         leads: parsed.leads ?? [],
         outreach: parsed.outreach ?? [],
@@ -155,6 +179,48 @@ export class JsonStore implements LeadRepository {
     });
   }
 
+  // ---- Boards ----
+  createBoard(board: Board): Promise<Board> {
+    return this.mutate((data) => {
+      data.boards.push(board);
+      return { data, result: board };
+    });
+  }
+
+  updateBoard(id: string, patch: Partial<Board>): Promise<Board | null> {
+    return this.mutate((data) => {
+      const idx = data.boards.findIndex((b) => b.id === id && this.inScope(b));
+      if (idx === -1) return { data, result: null };
+      data.boards[idx] = { ...data.boards[idx], ...patch };
+      return { data, result: data.boards[idx] };
+    });
+  }
+
+  async getBoard(id: string): Promise<Board | null> {
+    const data = await this.read();
+    const b = data.boards.find((b) => b.id === id && this.inScope(b));
+    return b ? normalizeBoard(b) : null;
+  }
+
+  async listBoards(): Promise<Board[]> {
+    const data = await this.read();
+    return data.boards
+      .filter((b) => this.inScope(b))
+      .map(normalizeBoard)
+      .sort((a, b) => {
+        if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+  }
+
+  deleteBoard(id: string): Promise<boolean> {
+    return this.mutate((data) => {
+      const before = data.boards.length;
+      data.boards = data.boards.filter((b) => !(b.id === id && this.inScope(b)));
+      return { data, result: data.boards.length < before };
+    });
+  }
+
   // ---- Runs ----
   createRun(run: Run): Promise<Run> {
     return this.mutate((data) => {
@@ -174,12 +240,13 @@ export class JsonStore implements LeadRepository {
 
   async getRun(id: string): Promise<Run | null> {
     const data = await this.read();
-    return data.runs.find((r) => r.id === id && this.inScope(r)) ?? null;
+    const r = data.runs.find((r) => r.id === id && this.inScope(r));
+    return r ? normalizeRun(r) : null;
   }
 
   async listRuns(): Promise<Run[]> {
     const data = await this.read();
-    return data.runs.filter((r) => this.inScope(r));
+    return data.runs.filter((r) => this.inScope(r)).map(normalizeRun);
   }
 
   // ---- Leads ----
@@ -206,11 +273,14 @@ export class JsonStore implements LeadRepository {
     return normalizeLead(l);
   }
 
-  async listLeads(runId?: string): Promise<Lead[]> {
+  async listLeads(filter?: LeadListFilter): Promise<Lead[]> {
     const data = await this.read();
-    const leads = data.leads.filter(
-      (l) => this.inScope(l) && (runId ? l.runId === runId : true),
-    );
+    const leads = data.leads.filter((l) => {
+      if (!this.inScope(l)) return false;
+      if (filter?.runId && l.runId !== filter.runId) return false;
+      if (filter?.boardId && (l.boardId || "") !== filter.boardId) return false;
+      return true;
+    });
     return [...leads].map(normalizeLead).sort((a, b) => b.fitScore - a.fitScore);
   }
 
@@ -262,6 +332,7 @@ export class JsonStore implements LeadRepository {
 
   clearWorkspaceData(): Promise<void> {
     return this.mutate((data) => {
+      data.boards = data.boards.filter((b) => !this.inScope(b));
       data.runs = data.runs.filter((r) => !this.inScope(r));
       data.leads = data.leads.filter((l) => !this.inScope(l));
       data.outreach = data.outreach.filter((o) => !this.inScope(o));

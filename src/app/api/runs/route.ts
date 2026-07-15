@@ -15,6 +15,7 @@ const CreateRunSchema = z.object({
   searchStrategy: z.enum(["standard", "smart", "local"]).optional(),
   maxLeads: z.number().int().min(1).max(50).optional(),
   demo: z.boolean().optional(),
+  boardId: z.string().min(1).max(80).optional().nullable(),
 });
 
 export async function GET() {

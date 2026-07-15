@@ -1,4 +1,4 @@
-import type { Lead, Outreach, Run, Workspace } from "@/lib/types";
+import type { Board, Lead, Outreach, Run, Workspace } from "@/lib/types";
 import { JsonStore } from "./json-store";
 import { D1Store, type D1Database } from "./d1-store";
 
@@ -24,6 +24,11 @@ export const LOCAL_WORKSPACE_ID = "local";
  * D1 binding at deploy time is a one-liner in each API route — no service or
  * UI changes required.
  */
+export interface LeadListFilter {
+  runId?: string;
+  boardId?: string;
+}
+
 export interface LeadRepository {
   // Workspaces (tenant + plan + usage). NOT workspace-scoped: these operate on
   // the workspaces table directly by id/owner/customer.
@@ -32,6 +37,13 @@ export interface LeadRepository {
   getWorkspaceByStripeCustomer(customerId: string): Promise<Workspace | null>;
   createWorkspace(workspace: Workspace): Promise<Workspace>;
   updateWorkspace(id: string, patch: Partial<Workspace>): Promise<Workspace | null>;
+
+  // Boards (named lead collections — ADR 0014)
+  createBoard(board: Board): Promise<Board>;
+  updateBoard(id: string, patch: Partial<Board>): Promise<Board | null>;
+  getBoard(id: string): Promise<Board | null>;
+  listBoards(): Promise<Board[]>;
+  deleteBoard(id: string): Promise<boolean>;
 
   // Runs
   createRun(run: Run): Promise<Run>;
@@ -43,7 +55,7 @@ export interface LeadRepository {
   createLeads(leads: Lead[]): Promise<Lead[]>;
   updateLead(id: string, patch: Partial<Lead>): Promise<Lead | null>;
   getLead(id: string): Promise<Lead | null>;
-  listLeads(runId?: string): Promise<Lead[]>;
+  listLeads(filter?: LeadListFilter): Promise<Lead[]>;
 
   // Outreach
   upsertOutreach(outreach: Outreach): Promise<Outreach>;
@@ -58,7 +70,7 @@ export interface LeadRepository {
    */
   findLatestSentByEmail(email: string): Promise<Outreach | null>;
 
-  /** Wipe runs/leads/outreach for this workspace (keeps the workspace row). */
+  /** Wipe runs/leads/outreach/boards for this workspace (keeps the workspace row). */
   clearWorkspaceData(): Promise<void>;
 }
 

@@ -106,7 +106,7 @@ src/app/             Routes. Pages + thin API handlers (api/*/route.ts).
   api/{auth,billing,webhooks/stripe,turnstile}   Commercial endpoints.
 src/components/      UI. studio/* is the app; BrandMark / icons / ui are primitives.
 src/lib/
-  types.ts           Domain models (Workspace/Run/Lead/Outreach) — source of truth.
+  types.ts           Domain models (Workspace/Board/Run/Lead/Outreach) — source of truth.
   service.ts         Coordination layer + plan/quota enforcement (Ctx-based).
   request-context.ts getCtx(): D1 binding + session → workspace-scoped repo.
   config.ts          Env + capability detection (incl. authRequired).
@@ -122,7 +122,7 @@ src/lib/
   billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.
-migrations/          D1 SQL 0001–0008 (init … connected mailbox OAuth).
+migrations/          D1 SQL 0001–0011 (init … boards).
 wrangler.jsonc, open-next.config.ts   Cloudflare Workers deploy config.
 data/                Local JSON DB (git-ignored).
 ```

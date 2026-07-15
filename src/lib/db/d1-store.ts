@@ -1,5 +1,5 @@
-import type { Lead, Outreach, Run, Workspace, PlanId, CrmStage, ContactMethod, FollowUp, DeliveryStatus } from "@/lib/types";
-import type { LeadRepository } from "./index";
+import type { Board, Lead, Outreach, Run, Workspace, PlanId, CrmStage, ContactMethod, FollowUp, DeliveryStatus } from "@/lib/types";
+import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
 /**
@@ -68,9 +68,19 @@ type WorkspaceRow = {
   connected_mailbox_json: string | null;
 };
 
+type BoardRow = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  is_default: number;
+  created_at: string;
+  updated_at: string;
+};
+
 type RunRow = {
   id: string;
   workspace_id: string;
+  board_id: string | null;
   niche: string;
   location: string | null;
   offer_notes: string | null;
@@ -88,6 +98,7 @@ type LeadRow = {
   id: string;
   workspace_id: string;
   run_id: string;
+  board_id: string | null;
   company: string;
   website: string | null;
   emails: string; // JSON-encoded string[]
@@ -172,10 +183,22 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
   };
 }
 
+function rowToBoard(r: BoardRow): Board {
+  return {
+    id: r.id,
+    workspaceId: r.workspace_id,
+    name: r.name,
+    isDefault: !!r.is_default,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
 function rowToRun(r: RunRow): Run {
   return {
     id: r.id,
     workspaceId: r.workspace_id ?? LOCAL_WORKSPACE_ID,
+    boardId: r.board_id ?? "",
     niche: r.niche,
     location: r.location,
     offerNotes: r.offer_notes,
@@ -199,6 +222,7 @@ function rowToLead(r: LeadRow): Lead {
     id: r.id,
     workspaceId: r.workspace_id ?? LOCAL_WORKSPACE_ID,
     runId: r.run_id,
+    boardId: r.board_id ?? "",
     company: r.company,
     website: r.website,
     emails: arr(r.emails),
@@ -351,19 +375,81 @@ export class D1Store implements LeadRepository {
     return this.getWorkspace(id);
   }
 
+  // ---- Boards ----
+
+  async createBoard(board: Board): Promise<Board> {
+    await this.db
+      .prepare(
+        `INSERT INTO boards (id, workspace_id, name, is_default, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        board.id,
+        this.workspaceId,
+        board.name,
+        board.isDefault ? 1 : 0,
+        board.createdAt,
+        board.updatedAt,
+      )
+      .run();
+    return board;
+  }
+
+  async updateBoard(id: string, patch: Partial<Board>): Promise<Board | null> {
+    const row: Record<string, unknown> = {};
+    if ("name" in patch) row.name = patch.name;
+    if ("isDefault" in patch) row.is_default = patch.isDefault ? 1 : 0;
+    if ("updatedAt" in patch) row.updated_at = patch.updatedAt;
+    if (Object.keys(row).length === 0) return this.getBoard(id);
+    const { clause, values } = buildSet(row);
+    await this.db
+      .prepare(`UPDATE boards SET ${clause} WHERE id = ? AND workspace_id = ?`)
+      .bind(...values, id, this.workspaceId)
+      .run();
+    return this.getBoard(id);
+  }
+
+  async getBoard(id: string): Promise<Board | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM boards WHERE id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .first<BoardRow>();
+    return row ? rowToBoard(row) : null;
+  }
+
+  async listBoards(): Promise<Board[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT * FROM boards WHERE workspace_id = ?
+         ORDER BY is_default DESC, name ASC`,
+      )
+      .bind(this.workspaceId)
+      .all<BoardRow>();
+    return results.map(rowToBoard);
+  }
+
+  async deleteBoard(id: string): Promise<boolean> {
+    const result = await this.db
+      .prepare(`DELETE FROM boards WHERE id = ? AND workspace_id = ? AND is_default = 0`)
+      .bind(id, this.workspaceId)
+      .run();
+    return result.meta.changes > 0;
+  }
+
   // ---- Runs ----
 
   async createRun(run: Run): Promise<Run> {
     await this.db
       .prepare(
         `INSERT INTO runs
-         (id, workspace_id, niche, location, offer_notes, sender_name, status, mode, provider,
+         (id, workspace_id, board_id, niche, location, offer_notes, sender_name, status, mode, provider,
           lead_count, error, created_at, completed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         run.id,
         this.workspaceId,
+        run.boardId,
         run.niche,
         run.location,
         run.offerNotes,
@@ -382,6 +468,7 @@ export class D1Store implements LeadRepository {
 
   async updateRun(id: string, patch: Partial<Run>): Promise<Run | null> {
     const row: Record<string, unknown> = {};
+    if ("boardId" in patch) row.board_id = patch.boardId;
     if ("niche" in patch) row.niche = patch.niche;
     if ("location" in patch) row.location = patch.location ?? null;
     if ("offerNotes" in patch) row.offer_notes = patch.offerNotes ?? null;
@@ -427,15 +514,16 @@ export class D1Store implements LeadRepository {
       this.db
         .prepare(
           `INSERT INTO leads
-           (id, workspace_id, run_id, company, website, emails, phones, contact_name,
+           (id, workspace_id, run_id, board_id, company, website, emails, phones, contact_name,
             location, about_blurb, tags, fit_score, fit_reasons, source_url,
             status, crm_stage, contact_method, notes, follow_ups, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           l.id,
           this.workspaceId,
           l.runId,
+          l.boardId,
           l.company,
           l.website,
           str(l.emails),
@@ -462,6 +550,7 @@ export class D1Store implements LeadRepository {
   async updateLead(id: string, patch: Partial<Lead>): Promise<Lead | null> {
     const row: Record<string, unknown> = {};
     if ("runId" in patch) row.run_id = patch.runId;
+    if ("boardId" in patch) row.board_id = patch.boardId;
     if ("company" in patch) row.company = patch.company;
     if ("website" in patch) row.website = patch.website ?? null;
     if ("emails" in patch) row.emails = str(patch.emails!);
@@ -497,18 +586,39 @@ export class D1Store implements LeadRepository {
     return row ? rowToLead(row) : null;
   }
 
-  async listLeads(runId?: string): Promise<Lead[]> {
-    const { results } = runId
-      ? await this.db
-          .prepare(
-            `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? ORDER BY fit_score DESC`,
-          )
-          .bind(this.workspaceId, runId)
-          .all<LeadRow>()
-      : await this.db
-          .prepare(`SELECT * FROM leads WHERE workspace_id = ? ORDER BY fit_score DESC`)
-          .bind(this.workspaceId)
-          .all<LeadRow>();
+  async listLeads(filter?: LeadListFilter): Promise<Lead[]> {
+    if (filter?.runId && filter?.boardId) {
+      const { results } = await this.db
+        .prepare(
+          `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? AND board_id = ?
+           ORDER BY fit_score DESC`,
+        )
+        .bind(this.workspaceId, filter.runId, filter.boardId)
+        .all<LeadRow>();
+      return results.map(rowToLead);
+    }
+    if (filter?.runId) {
+      const { results } = await this.db
+        .prepare(
+          `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? ORDER BY fit_score DESC`,
+        )
+        .bind(this.workspaceId, filter.runId)
+        .all<LeadRow>();
+      return results.map(rowToLead);
+    }
+    if (filter?.boardId) {
+      const { results } = await this.db
+        .prepare(
+          `SELECT * FROM leads WHERE workspace_id = ? AND board_id = ? ORDER BY fit_score DESC`,
+        )
+        .bind(this.workspaceId, filter.boardId)
+        .all<LeadRow>();
+      return results.map(rowToLead);
+    }
+    const { results } = await this.db
+      .prepare(`SELECT * FROM leads WHERE workspace_id = ? ORDER BY fit_score DESC`)
+      .bind(this.workspaceId)
+      .all<LeadRow>();
     return results.map(rowToLead);
   }
 
@@ -629,6 +739,10 @@ export class D1Store implements LeadRepository {
       .run();
     await this.db
       .prepare(`DELETE FROM runs WHERE workspace_id = ?`)
+      .bind(this.workspaceId)
+      .run();
+    await this.db
+      .prepare(`DELETE FROM boards WHERE workspace_id = ?`)
       .bind(this.workspaceId)
       .run();
   }

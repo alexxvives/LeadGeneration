@@ -18,8 +18,8 @@ const RowSchema = z.object({
 
 const BodySchema = z.object({
   leads: z.array(RowSchema).min(1).max(500),
-  mode: z.enum(["append", "new"]).optional().default("new"),
-  appendToRunId: z.string().min(1).max(80).optional().nullable(),
+  boardId: z.string().min(1).max(80).optional().nullable(),
+  newBoardName: z.string().min(1).max(80).optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -41,8 +41,8 @@ export async function POST(req: Request) {
   try {
     const ctx = await getCtx();
     const result = await importLeads(ctx, parsed.data.leads, {
-      mode: parsed.data.mode,
-      appendToRunId: parsed.data.appendToRunId,
+      boardId: parsed.data.boardId,
+      newBoardName: parsed.data.newBoardName,
     });
     return NextResponse.json(result);
   } catch (err) {

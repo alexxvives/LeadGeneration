@@ -21,25 +21,44 @@ import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 import { loadSenderProfile, resolveSignature } from "@/lib/sender-profile";
+import { BoardAssignModal, type BoardDestination } from "./BoardAssignModal";
+import { DashboardView } from "./DashboardView";
+import { BoardsView } from "./BoardsView";
+import { loadStoredBoardFilter, storeBoardFilter } from "./BoardPicker";
+import type { BoardSummary, ImportLeadRow } from "@/lib/types";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
 type UpgradePrompt = { kind: "leads" | "sends"; planId: PlanId };
-type StudioView = "board" | "pipeline" | "leads" | "outreach" | "runs";
+type StudioView =
+  | "board"
+  | "pipeline"
+  | "leads"
+  | "outreach"
+  | "runs"
+  | "dashboard"
+  | "boards";
 
 function viewFromParams(view: string | null): StudioView {
   if (view === "pipeline") return "pipeline";
   if (view === "leads") return "leads";
   if (view === "outreach") return "outreach";
   if (view === "runs") return "runs";
+  if (view === "dashboard") return "dashboard";
+  if (view === "boards") return "boards";
   return "board";
 }
 
-function queryForView(next: StudioView): string {
-  if (next === "pipeline") return "?view=pipeline";
-  if (next === "leads") return "?view=leads";
-  if (next === "outreach") return "?view=outreach";
-  if (next === "runs") return "?view=runs";
-  return "";
+function queryForView(next: StudioView, boardId?: string | null): string {
+  const params = new URLSearchParams();
+  if (next === "pipeline") params.set("view", "pipeline");
+  else if (next === "leads") params.set("view", "leads");
+  else if (next === "outreach") params.set("view", "outreach");
+  else if (next === "runs") params.set("view", "runs");
+  else if (next === "dashboard") params.set("view", "dashboard");
+  else if (next === "boards") params.set("view", "boards");
+  if (boardId && boardId !== "all") params.set("board", boardId);
+  const q = params.toString();
+  return q ? `?${q}` : "";
 }
 
 // ─── Studio root ─────────────────────────────────────────────────────────────
@@ -48,8 +67,14 @@ export function Studio() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const view = viewFromParams(searchParams.get("view"));
+  const boardParam = searchParams.get("board");
+  const filterBoardId =
+    boardParam === "all" || !boardParam
+      ? null
+      : boardParam;
 
   const [board, setBoard] = useState<BoardResponse | null>(null);
+  const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -67,11 +92,19 @@ export function Studio() {
     todayCount: number;
     softCap: number;
   } | null>(null);
+  const [pendingSearch, setPendingSearch] = useState<SearchValues | null>(null);
+  const [pendingImport, setPendingImport] = useState<ImportLeadRow[] | null>(null);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignMode, setAssignMode] = useState<"search" | "import">("search");
   const activeRunIdRef = useRef<string | null>(null);
+  const filterBoardIdRef = useRef<string | null>(filterBoardId);
+  filterBoardIdRef.current = filterBoardId;
 
   const setView = useCallback(
     (next: StudioView) => {
-      router.replace(`/app${queryForView(next)}`, { scroll: false });
+      const stored = loadStoredBoardFilter();
+      const bid = stored === "all" ? null : stored;
+      router.replace(`/app${queryForView(next, bid)}`, { scroll: false });
     },
     [router],
   );
@@ -94,7 +127,8 @@ export function Studio() {
   );
 
   const refresh = useCallback(async () => {
-    const data = await api.board();
+    const data = await api.board(filterBoardIdRef.current);
+    setBoards(data.boards ?? []);
     const pinned = activeRunIdRef.current;
     if (pinned && pinned !== data.run?.id) {
       try {
@@ -110,6 +144,12 @@ export function Studio() {
     setBoard(data);
     return data;
   }, []);
+
+  // Re-fetch when sidebar board filter changes.
+  useEffect(() => {
+    if (boardParam) storeBoardFilter(boardParam);
+    void refresh().catch((e) => toast("err", e.message));
+  }, [filterBoardId, boardParam, refresh, toast]);
 
   const loadRunOnBoard = useCallback(
     async (runId: string) => {
@@ -140,7 +180,7 @@ export function Studio() {
     }
   }, [toast]);
 
-  const runSearch = async (v: SearchValues) => {
+  const executeSearch = async (v: SearchValues, boardId: string) => {
     setRunning(true);
     let before: FirecrawlUsage | null = null;
     try {
@@ -155,7 +195,9 @@ export function Studio() {
         searchStrategy: v.searchStrategy,
         offerNotes: v.offerNotes.trim() || undefined,
         maxLeads: v.maxLeads,
+        boardId,
       });
+      storeBoardFilter(boardId);
       const data = await refresh();
       const n = data.leads.length;
       setFcUsageKey((k) => k + 1);
@@ -171,17 +213,26 @@ export function Studio() {
     }
   };
 
+  const requestSearch = (v: SearchValues) => {
+    setPendingSearch(v);
+    setPendingImport(null);
+    setAssignMode("search");
+    setAssignOpen(true);
+  };
+
   const loadDemo = async () => {
     setRunning(true);
     activeRunIdRef.current = null;
     setActiveRunId(null);
     try {
+      const def = boards.find((b) => b.isDefault)?.id ?? boards[0]?.id;
       await api.createRun({
         niche: "boutique dental clinics",
         location: "Austin, TX",
         offerNotes:
           "We build booking sites that turn website visitors into scheduled appointments.",
         demo: true,
+        boardId: def,
       });
       await refresh();
       toast("ok", "Demo board loaded — no provider credits used.");
@@ -190,6 +241,56 @@ export function Studio() {
       handleError(e);
     } finally {
       setRunning(false);
+    }
+  };
+
+  const executeImport = async (leads: ImportLeadRow[], dest: BoardDestination) => {
+    const res = await fetch("/api/leads/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leads,
+        boardId: dest.boardId,
+        newBoardName: dest.newBoardName,
+      }),
+    });
+    const data = (await res.json()) as {
+      error?: string;
+      imported?: number;
+      merged?: number;
+      skipped?: number;
+      run?: { id: string };
+      boardId?: string;
+    };
+    if (!res.ok) throw new Error(data.error ?? "Import failed");
+    if (data.boardId) storeBoardFilter(data.boardId);
+    const parts = [
+      `Added ${data.imported ?? 0} new`,
+      data.merged ? `merged ${data.merged} existing` : null,
+      data.skipped ? `skipped ${data.skipped} unchanged` : null,
+    ].filter(Boolean);
+    toast("ok", `${parts.join(" · ")}.`);
+    if (data.run?.id) await loadRunOnBoard(data.run.id);
+    else {
+      await refresh();
+      setView("pipeline");
+    }
+  };
+
+  const onAssignConfirm = async (dest: BoardDestination) => {
+    setAssignOpen(false);
+    if (assignMode === "search" && pendingSearch) {
+      const v = pendingSearch;
+      setPendingSearch(null);
+      await executeSearch(v, dest.boardId);
+    } else if (assignMode === "import" && pendingImport) {
+      const rows = pendingImport;
+      setPendingImport(null);
+      try {
+        await executeImport(rows, dest);
+      } catch (e) {
+        handleError(e);
+      }
     }
   };
 
@@ -460,31 +561,35 @@ export function Studio() {
         }`}
       >
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-              {view === "pipeline"
-                ? "Pipeline"
-                : view === "leads"
-                  ? "Leads"
-                  : view === "outreach"
-                    ? "Outreach"
-                    : view === "runs"
-                      ? "Search runs"
-                      : "Search"}
-            </h1>
-            {view === "leads" && hasLeads ? <ExportButton /> : null}
-          </div>
-          {view === "runs" || view === "board" ? (
-            <p className="mt-1 text-mist-500">
-              {view === "runs"
-                ? "History of searches in this workspace."
-                : "Find prospects by niche and location."}
-            </p>
+          {view !== "dashboard" && view !== "boards" ? (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+                  {view === "pipeline"
+                    ? "Pipeline"
+                    : view === "leads"
+                      ? "Leads"
+                      : view === "outreach"
+                        ? "Outreach"
+                        : view === "runs"
+                          ? "Search runs"
+                          : "Search"}
+                </h1>
+                {view === "leads" && hasLeads ? <ExportButton /> : null}
+              </div>
+              {view === "runs" || view === "board" ? (
+                <p className="mt-1 text-mist-500">
+                  {view === "runs"
+                    ? "History of searches in this workspace."
+                    : "Find prospects by niche and location."}
+                </p>
+              ) : null}
+            </>
           ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {board?.workspace && (
+          {view !== "dashboard" && view !== "boards" && board?.workspace && (
             <div className="hidden min-w-[16rem] flex-col gap-1 sm:flex sm:min-w-[20rem]">
               <div className="grid grid-cols-2 gap-3">
                 <UsageBar
@@ -511,11 +616,24 @@ export function Studio() {
         </div>
       </div>
 
+      {/* Dashboard */}
+      {view === "dashboard" && <DashboardView />}
+
+      {/* Boards management */}
+      {view === "boards" && (
+        <BoardsView
+          onSelectBoard={(id) => {
+            storeBoardFilter(id);
+            router.replace(`/app?view=pipeline&board=${id}`, { scroll: false });
+          }}
+        />
+      )}
+
       {/* Search view — always show the full panel */}
       {view === "board" && (
         <div className="mb-8">
           <SearchPanel
-            onSearch={runSearch}
+            onSearch={requestSearch}
             running={running}
             compact={false}
             planId={board?.workspace?.planId ?? "free"}
@@ -535,12 +653,11 @@ export function Studio() {
           )}
           {!running && (
             <ImportLeadsPanel
-              activeRunId={activeRunId ?? board?.run?.id ?? null}
-              boardLeadCount={board?.leads.length ?? 0}
-              onImported={async (runId) => {
-                if (runId) await loadRunOnBoard(runId);
-                else await refresh();
-                setView("leads");
+              onPickFile={async (leads) => {
+                setPendingImport(leads);
+                setPendingSearch(null);
+                setAssignMode("import");
+                setAssignOpen(true);
               }}
             />
           )}
@@ -761,6 +878,25 @@ export function Studio() {
           onClose={() => setUpgrade(null)}
         />
       )}
+
+      <BoardAssignModal
+        open={assignOpen}
+        title={assignMode === "search" ? "Save leads to which board?" : "Import to which board?"}
+        subtitle={
+          assignMode === "search"
+            ? "Search results will be added to the board you pick."
+            : "Imported rows land on this board (duplicates are merged)."
+        }
+        boards={boards.length ? boards : board?.boards ?? []}
+        preferredBoardId={filterBoardId}
+        confirmLabel={assignMode === "search" ? "Find leads" : "Import"}
+        onConfirm={onAssignConfirm}
+        onClose={() => {
+          setAssignOpen(false);
+          setPendingSearch(null);
+          setPendingImport(null);
+        }}
+      />
 
       {/* Toasts */}
       <div className="pointer-events-none fixed bottom-6 right-6 z-[60] flex flex-col gap-2">

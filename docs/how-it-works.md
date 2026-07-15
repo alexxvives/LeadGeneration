@@ -51,24 +51,31 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   provider); in production, magic-link via SMTP (Nodemailer) or Resend
   (+ Turnstile bot check). Public.
 - **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar
-  nav: **Search · Pipeline · Leads · Outreach · Runs**. Settings opens from the
-  **account card** at the bottom of the sidebar (not a Workspace nav item).
-  Views use `?view=`:
+  nav: **Dashboard · Search · Pipeline · Leads · Outreach · Runs · Boards**.
+  Board filter (**All** or one board) sits above the account card. Settings
+  opens from the **account card** at the bottom of the sidebar (not a Workspace
+  nav item). Views use `?view=`:
 
-  - **Search** (default / no `?view=`) — always-expanded search form. Live search
-    when Firecrawl/Exa is configured; otherwise load demo data. After a run, the
-    app redirects to Pipeline. Integration status lives in Settings (no mode banner).
+  - **Dashboard** (`?view=dashboard`) — workspace-wide stats across all boards
+    (pipeline stages, sends, recent runs).
 
-  - **Pipeline** (`?view=pipeline`) — CRM kanban of **all** leads across four
+  - **Search** (default / no `?view=`) — always-expanded search form + CSV/Excel
+    import. Search and import open a board-picker modal; leads land on the
+    chosen board (workspace **Default** if none). Live search when Firecrawl/Exa
+    is configured; otherwise load demo data. After a run, the app redirects to
+    Pipeline. Integration status lives in Settings (no mode banner).
+
+  - **Pipeline** (`?view=pipeline`) — CRM kanban for the active board filter
+    (**All** = every board) across four
     active stages (*New · Contacted · In Conversation · Closed*) plus two
     side-by-side columns: *Not Interested* (declined) and *Discarded* (bad fit /
     incorrect lead). Drag cards between columns, or use quick-advance.
     Bulk bar: draft all / approve selected. CRM **New** = needs human review
     (there is no separate “In review” tag).
 
-  - **Leads** (`?view=leads`) — full list for the active run (table / cards /
-    map) + **Export Excel**. Table shows a short city label; the drawer keeps
-    the full scraped address when available.
+  - **Leads** (`?view=leads`) — full list for the active board filter (table /
+    cards / map) + **Export Excel**. Table shows a short city label; the drawer
+    keeps the full scraped address when available.
 
   - **Outreach** (`?view=outreach`) — send queue: needs draft → review & approve
     → ready to send → sent. Primary place to act on email; drawer still used for
@@ -78,13 +85,17 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     mode, lead count, status). **"Open on board"** loads that run's leads into
     Pipeline.
 
+  - **Boards** (`?view=boards`) — create / rename / delete named lead
+    collections. Every workspace has a non-deletable **Default** board. Also
+    linked from Settings → Boards.
+
   - **Lead detail drawer** — opens from any lead card/row/pin. Contact info
     (incl. full address), about blurb, fit-score reasons, CRM stage, dated notes
     journal, and the outreach composer (draft → edit → approve → send).
 
 - **`/app/settings`** — sender profile, **Sending** dual path (Easy Resend + DNS
-  health, or Pro Connect Google mailbox), plan/usage, Integrations status,
-  “Ready to send?” checklist. Microsoft mailbox connect is next.
+  health, or Pro Connect Google mailbox), plan/usage, Boards link, Integrations
+  status, “Ready to send?” checklist. Microsoft mailbox connect is next.
   Resources (Getting started wizard, How it works, Plans). No env-var names in
   the UI. Secrets are never shown. Reopen the guide via **Getting started**.
 
@@ -188,8 +199,9 @@ the local JSON-store path is always unmetered/demo.
 
 A `Run` has many `Lead`s; each `Lead` has at most one `Outreach`. By default everything is persisted to `data/db.json` (git-ignored — delete it
 to reset); in production on Cloudflare Workers, `getDb()` receives a D1 binding
-and uses `D1Store` instead. The board shows the most recent run by default, but
-**Runs → Open on board** loads any earlier completed run's leads instead.
+and uses `D1Store` instead. Pipeline/Leads respect the sidebar board filter
+(**All** by default). **Runs → Open on board** still loads that run's leads.
+Each workspace has a **Default** board; see ADR 0014.
 
 ## 6. Guardrails baked into the flow
 

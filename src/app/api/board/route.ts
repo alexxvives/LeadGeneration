@@ -6,9 +6,11 @@ import { getCapabilities } from "@/lib/config";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   const ctx = await getCtx();
-  const board = await getLatestBoard(ctx);
+  const url = new URL(req.url);
+  const boardParam = url.searchParams.get("boardId");
+  const board = await getLatestBoard(ctx, boardParam);
   const workspace = await getWorkspaceSummary(ctx);
   const ws = await ctx.db.getWorkspace(ctx.workspaceId);
   const caps = getCapabilities();

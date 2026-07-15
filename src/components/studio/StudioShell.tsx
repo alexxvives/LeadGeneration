@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, type ComponentType, type SVGProps } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState, type ComponentType, type SVGProps } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { BrandMark } from "@/components/BrandMark";
 import { AuthModal } from "@/components/AuthModal";
@@ -14,6 +14,13 @@ import {
   type GettingStartedIdentity,
 } from "@/components/studio/GettingStartedWizard";
 import {
+  BoardPicker,
+  loadStoredBoardFilter,
+  storeBoardFilter,
+} from "@/components/studio/BoardPicker";
+import { api } from "@/lib/client-api";
+import type { BoardSummary } from "@/lib/types";
+import {
   SearchIcon,
   SettingsIcon,
   GlobeIcon,
@@ -22,6 +29,8 @@ import {
   LogoutIcon,
   MailIcon,
   UsersIcon,
+  DashboardIcon,
+  BoardsIcon,
 } from "@/components/icons";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -67,12 +76,54 @@ export function StudioShell({
   identity: GettingStartedIdentity;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
   const { open: setupOpen, setOpen: setSetupOpen } = useGettingStartedOpen();
+  const [boards, setBoards] = useState<BoardSummary[]>([]);
+  const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
 
   const view = searchParams.get("view");
+  const boardParam = searchParams.get("board");
+
+  const refreshBoards = useCallback(() => {
+    api
+      .listBoards()
+      .then(({ boards: list }) => setBoards(list))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    refreshBoards();
+  }, [refreshBoards, pathname, view]);
+
+  // Sync board filter from URL, else localStorage (default All).
+  useEffect(() => {
+    if (boardParam === "all" || boardParam === "") {
+      setActiveBoardId(null);
+      storeBoardFilter("all");
+      return;
+    }
+    if (boardParam) {
+      setActiveBoardId(boardParam);
+      storeBoardFilter(boardParam);
+      return;
+    }
+    const stored = loadStoredBoardFilter();
+    setActiveBoardId(stored === "all" ? null : stored);
+  }, [boardParam]);
+
+  const setBoardFilter = (id: string | null) => {
+    const next = id ?? "all";
+    storeBoardFilter(next);
+    setActiveBoardId(id);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "all") params.delete("board");
+    else params.set("board", next);
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname);
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -82,14 +133,12 @@ export function StudioShell({
     }
   }, [authRequired, status]);
 
-  // Don't stack the setup wizard on top of the auth gate.
   useEffect(() => {
     if (authOpen && setupOpen && searchParams.get("setup") !== "1") {
       setSetupOpen(false);
     }
   }, [authOpen, setupOpen, setSetupOpen, searchParams]);
 
-  // After guest continue / sign-in, offer Getting Started if not done.
   useEffect(() => {
     if (authOpen || typeof window === "undefined") return;
     if (searchParams.get("setup") === "1") return;
@@ -122,6 +171,12 @@ export function StudioShell({
     active: boolean;
   }[] = [
     {
+      href: "/app?view=dashboard",
+      label: "Dashboard",
+      icon: DashboardIcon,
+      active: pathname === "/app" && view === "dashboard",
+    },
+    {
       href: "/app",
       label: "Search",
       icon: SearchIcon,
@@ -151,6 +206,12 @@ export function StudioShell({
       icon: HistoryIcon,
       active: pathname === "/app" && view === "runs",
     },
+    {
+      href: "/app?view=boards",
+      label: "Boards",
+      icon: BoardsIcon,
+      active: pathname === "/app" && view === "boards",
+    },
   ];
 
   return (
@@ -170,7 +231,7 @@ export function StudioShell({
           </span>
         </Link>
 
-        <nav className="flex flex-1 flex-col gap-1">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
           <p className="mb-1 hidden px-3 text-[10px] uppercase tracking-wider text-mist-500 sm:block">
             Workspace
           </p>
@@ -197,9 +258,14 @@ export function StudioShell({
           })}
         </nav>
 
-        {/* Account card → Settings */}
+        {/* Board filter + account card */}
         <div className="mt-auto border-t border-white/5 pt-4">
-          {/* Full sidebar (sm+) */}
+          <BoardPicker
+            boards={boards}
+            activeBoardId={activeBoardId}
+            onChange={setBoardFilter}
+          />
+
           <div className="hidden sm:block">
             <Link
               href="/app/settings"
@@ -254,7 +320,6 @@ export function StudioShell({
             </Link>
           </div>
 
-          {/* Icon-only (mobile): settings + auth */}
           <div className="flex flex-col items-center gap-1 sm:hidden">
             <Link
               href="/app/settings"

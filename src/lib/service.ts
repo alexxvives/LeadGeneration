@@ -10,11 +10,14 @@ import { FREE_MAX_LEADS_PER_RUN, getPlan } from "@/lib/plans";
 import { NotFoundError, QuotaError } from "@/lib/errors";
 import { ensureUsageWindow } from "@/lib/workspace";
 import type {
+  Board,
+  BoardSummary,
   ContactMethod,
   ConnectedMailbox,
   CrmStage,
   EasyEmailProvider,
   CreateRunInput,
+  DashboardStats,
   DeliveryStatus,
   FollowUp,
   Lead,
@@ -44,6 +47,129 @@ export interface Ctx {
   db: LeadRepository;
   workspaceId: string;
   metered: boolean;
+}
+
+/**
+ * Ensure the workspace has a Default board and back-fill any leads/runs that
+ * predate boards (empty boardId). Idempotent — safe on every board read.
+ */
+export async function ensureDefaultBoard(ctx: Ctx): Promise<Board> {
+  const { db } = ctx;
+  const boards = await db.listBoards();
+  let def = boards.find((b) => b.isDefault) ?? null;
+  if (!def) {
+    const now = nowIso();
+    def = await db.createBoard({
+      id: newId("board"),
+      workspaceId: ctx.workspaceId,
+      name: "Default",
+      isDefault: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const [leads, runs] = await Promise.all([db.listLeads(), db.listRuns()]);
+  const orphanLeads = leads.filter((l) => !l.boardId);
+  const orphanRuns = runs.filter((r) => !r.boardId);
+  await Promise.all([
+    ...orphanLeads.map((l) => db.updateLead(l.id, { boardId: def!.id })),
+    ...orphanRuns.map((r) => db.updateRun(r.id, { boardId: def!.id })),
+  ]);
+  return def;
+}
+
+export async function listBoardSummaries(ctx: Ctx): Promise<BoardSummary[]> {
+  await ensureDefaultBoard(ctx);
+  const [boards, leads] = await Promise.all([
+    ctx.db.listBoards(),
+    ctx.db.listLeads(),
+  ]);
+  return boards.map((b) => {
+    const mine = leads.filter((l) => l.boardId === b.id);
+    return {
+      ...b,
+      leadCount: mine.length,
+      contactedCount: mine.filter(
+        (l) =>
+          l.crmStage === "contacted" ||
+          l.crmStage === "in_conversation" ||
+          l.crmStage === "closed",
+      ).length,
+      sentCount: mine.filter((l) => l.status === "sent").length,
+      closedCount: mine.filter((l) => l.crmStage === "closed").length,
+    };
+  });
+}
+
+export async function createBoard(
+  ctx: Ctx,
+  name: string,
+): Promise<Board> {
+  await ensureDefaultBoard(ctx);
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Board name is required");
+  if (trimmed.length > 80) throw new Error("Board name is too long");
+  const now = nowIso();
+  return ctx.db.createBoard({
+    id: newId("board"),
+    workspaceId: ctx.workspaceId,
+    name: trimmed,
+    isDefault: false,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+export async function renameBoard(
+  ctx: Ctx,
+  id: string,
+  name: string,
+): Promise<Board> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Board name is required");
+  const existing = await ctx.db.getBoard(id);
+  if (!existing) throw new NotFoundError("Board not found");
+  const updated = await ctx.db.updateBoard(id, {
+    name: trimmed,
+    updatedAt: nowIso(),
+  });
+  if (!updated) throw new NotFoundError("Board not found");
+  return updated;
+}
+
+/**
+ * Delete a non-default board. Leads move to the Default board.
+ */
+export async function deleteBoard(ctx: Ctx, id: string): Promise<void> {
+  const existing = await ctx.db.getBoard(id);
+  if (!existing) throw new NotFoundError("Board not found");
+  if (existing.isDefault) throw new Error("Cannot delete the Default board");
+  const def = await ensureDefaultBoard(ctx);
+  const leads = await ctx.db.listLeads({ boardId: id });
+  const runs = (await ctx.db.listRuns()).filter((r) => r.boardId === id);
+  await Promise.all([
+    ...leads.map((l) => ctx.db.updateLead(l.id, { boardId: def.id })),
+    ...runs.map((r) => ctx.db.updateRun(r.id, { boardId: def.id })),
+  ]);
+  await ctx.db.deleteBoard(id);
+}
+
+/** Resolve a boardId or fall back to Default (optionally create by name). */
+export async function resolveBoardId(
+  ctx: Ctx,
+  opts?: { boardId?: string | null; newBoardName?: string | null },
+): Promise<string> {
+  if (opts?.newBoardName?.trim()) {
+    const created = await createBoard(ctx, opts.newBoardName);
+    return created.id;
+  }
+  if (opts?.boardId) {
+    const b = await ctx.db.getBoard(opts.boardId);
+    if (b) return b.id;
+  }
+  const def = await ensureDefaultBoard(ctx);
+  return def.id;
 }
 
 /**
@@ -129,11 +255,13 @@ export async function createAndRunSearch(
   // doesn't leave a stray failed run behind and can surface a clean 402.
   const maxLeads = await resolveRunLeadLimit(ctx, input.maxLeads);
   const searchInput: CreateRunInput = { ...input, maxLeads };
+  const boardId = await resolveBoardId(ctx, { boardId: input.boardId });
 
   const db = ctx.db;
   const run: Run = {
     id: newId("run"),
     workspaceId: ctx.workspaceId,
+    boardId,
     niche: input.niche.trim(),
     location: input.location?.trim() || null,
     offerNotes: input.offerNotes?.trim() || null,
@@ -173,6 +301,7 @@ export async function createAndRunSearch(
       id: newId("lead"),
       workspaceId: ctx.workspaceId,
       runId: run.id,
+      boardId,
       company: l.company,
       website: l.website,
       emails: l.emails,
@@ -254,21 +383,87 @@ export async function getRunWithLeads(
 ): Promise<{ run: Run; leads: LeadWithOutreach[] } | null> {
   const run = await ctx.db.getRun(runId);
   if (!run) return null;
-  const leads = await ctx.db.listLeads(runId);
+  const leads = await ctx.db.listLeads({ runId });
   const withOutreach = await attachOutreach(ctx.db, leads);
   return { run, leads: withOutreach };
 }
 
-export async function getLatestBoard(ctx: Ctx): Promise<{
+/**
+ * Studio board view. `boardId` null/"all" → all leads; otherwise filter.
+ * Still returns the latest completed run for search-context chrome.
+ */
+export async function getLatestBoard(
+  ctx: Ctx,
+  boardId?: string | null,
+): Promise<{
   run: Run | null;
   leads: LeadWithOutreach[];
+  boards: BoardSummary[];
+  activeBoardId: string | null;
 }> {
+  await ensureDefaultBoard(ctx);
+  const boards = await listBoardSummaries(ctx);
+  const active =
+    boardId && boardId !== "all" && boards.some((b) => b.id === boardId)
+      ? boardId
+      : null;
+
   const runs = await ctx.db.listRuns();
-  // Prefer the latest completed run so a failed search doesn't blank the board.
-  const run = runs.find((r) => r.status === "complete") ?? runs[0] ?? null;
-  if (!run) return { run: null, leads: [] };
-  const leads = await ctx.db.listLeads(run.id);
-  return { run, leads: await attachOutreach(ctx.db, leads) };
+  const run =
+    (active
+      ? runs.find((r) => r.boardId === active && r.status === "complete")
+      : null) ??
+    runs.find((r) => r.status === "complete") ??
+    runs[0] ??
+    null;
+
+  const leads = await ctx.db.listLeads(active ? { boardId: active } : undefined);
+  return {
+    run,
+    leads: await attachOutreach(ctx.db, leads),
+    boards,
+    activeBoardId: active,
+  };
+}
+
+export async function getDashboardStats(ctx: Ctx): Promise<DashboardStats> {
+  await ensureDefaultBoard(ctx);
+  const [leads, boards, runs, outreach] = await Promise.all([
+    ctx.db.listLeads(),
+    listBoardSummaries(ctx),
+    ctx.db.listRuns(),
+    ctx.db.listOutreach(),
+  ]);
+
+  const byCrmStage: Record<CrmStage, number> = {
+    new: 0,
+    contacted: 0,
+    in_conversation: 0,
+    closed: 0,
+    not_interested: 0,
+    discarded: 0,
+  };
+  const byStatus: Record<string, number> = {};
+  for (const l of leads) {
+    byCrmStage[l.crmStage] = (byCrmStage[l.crmStage] ?? 0) + 1;
+    byStatus[l.status] = (byStatus[l.status] ?? 0) + 1;
+  }
+
+  const avgFitScore =
+    leads.length === 0
+      ? 0
+      : Math.round(leads.reduce((s, l) => s + l.fitScore, 0) / leads.length);
+
+  return {
+    totalLeads: leads.length,
+    byCrmStage,
+    byStatus,
+    sentCount: outreach.filter((o) => o.status === "sent").length,
+    draftedCount: outreach.filter((o) => o.status === "draft" || o.status === "approved").length,
+    boards,
+    recentRuns: runs.slice(0, 8),
+    avgFitScore,
+  };
 }
 
 async function attachOutreach(
@@ -705,21 +900,24 @@ function contactMethodFollowUpNote(method: ContactMethod): string {
 /** Row shape for CSV/Excel import (flexible mapping happens client-side). */
 export type { ImportLeadRow };
 
-export type ImportLeadsMode = "append" | "new";
-
 /**
- * Import leads from a spreadsheet (no web search).
- * - `new` → create an import run
- * - `append` → add onto an existing board run (and pull matching duplicates onto it)
+ * Import leads from a spreadsheet onto a board (ADR 0014).
+ * Always creates an import run on the target board. Matching email/domain rows
+ * already in the workspace are pulled onto that board and gap-filled.
  */
 export async function importLeads(
   ctx: Ctx,
   rows: ImportLeadRow[],
-  opts?: { mode?: ImportLeadsMode; appendToRunId?: string | null },
-): Promise<{ imported: number; merged: number; skipped: number; run: Run }> {
+  opts?: { boardId?: string | null; newBoardName?: string | null },
+): Promise<{ imported: number; merged: number; skipped: number; run: Run; boardId: string }> {
   const { db } = ctx;
   const ws = await db.getWorkspace(ctx.workspaceId);
   if (ws) await ensureUsageWindow(db, ws);
+
+  const boardId = await resolveBoardId(ctx, {
+    boardId: opts?.boardId,
+    newBoardName: opts?.newBoardName,
+  });
 
   const { normalizeWebsiteUrl } = await import("@/lib/website");
 
@@ -738,31 +936,23 @@ export async function importLeads(
     throw new Error("No usable rows — need at least a company name or email.");
   }
 
-  const mode: ImportLeadsMode =
-    opts?.mode === "append" && opts.appendToRunId ? "append" : "new";
-  let run: Run;
-  if (mode === "append") {
-    const existing = await db.getRun(opts!.appendToRunId!);
-    if (!existing) throw new Error("Current board not found — try New list instead.");
-    run = existing;
-  } else {
-    run = {
-      id: newId("run"),
-      workspaceId: ctx.workspaceId,
-      niche: "Imported list",
-      location: null,
-      offerNotes: null,
-      senderName: null,
-      status: "running",
-      mode: "live",
-      provider: "import",
-      leadCount: 0,
-      error: null,
-      createdAt: nowIso(),
-      completedAt: null,
-    };
-    await db.createRun(run);
-  }
+  const run: Run = {
+    id: newId("run"),
+    workspaceId: ctx.workspaceId,
+    boardId,
+    niche: "Imported list",
+    location: null,
+    offerNotes: null,
+    senderName: null,
+    status: "running",
+    mode: "live",
+    provider: "import",
+    leadCount: 0,
+    error: null,
+    createdAt: nowIso(),
+    completedAt: null,
+  };
+  await db.createRun(run);
 
   try {
     const prior = await db.listLeads();
@@ -790,30 +980,26 @@ export async function importLeads(
         continue;
       }
 
-      // Duplicate: when appending, pull onto this board + fill gaps. Else skip.
-      if (mode === "append") {
-        const patch: Partial<Lead> = {};
-        if (match.runId !== run.id) patch.runId = run.id;
-        if ((!match.website || /\[object\s+Object\]/i.test(match.website)) && r.website) {
-          patch.website = r.website;
-        }
-        if (!match.location && r.location) patch.location = r.location;
-        if (r.location && match.location && r.location.length > match.location.length) {
-          patch.location = r.location;
-        }
-        if (r.phones.length && match.phones.length === 0) patch.phones = r.phones;
-        if (r.emails.length) {
-          const mergedEmails = [
-            ...new Set([...match.emails.map((e) => e.toLowerCase()), ...r.emails]),
-          ];
-          if (mergedEmails.length > match.emails.length) patch.emails = mergedEmails;
-        }
-        if (Object.keys(patch).length > 0) {
-          await db.updateLead(match.id, patch);
-          merged++;
-        } else {
-          skipped++;
-        }
+      const patch: Partial<Lead> = {};
+      if (match.runId !== run.id) patch.runId = run.id;
+      if (match.boardId !== boardId) patch.boardId = boardId;
+      if ((!match.website || /\[object\s+Object\]/i.test(match.website)) && r.website) {
+        patch.website = r.website;
+      }
+      if (!match.location && r.location) patch.location = r.location;
+      if (r.location && match.location && r.location.length > match.location.length) {
+        patch.location = r.location;
+      }
+      if (r.phones.length && match.phones.length === 0) patch.phones = r.phones;
+      if (r.emails.length) {
+        const mergedEmails = [
+          ...new Set([...match.emails.map((e) => e.toLowerCase()), ...r.emails]),
+        ];
+        if (mergedEmails.length > match.emails.length) patch.emails = mergedEmails;
+      }
+      if (Object.keys(patch).length > 0) {
+        await db.updateLead(match.id, patch);
+        merged++;
       } else {
         skipped++;
       }
@@ -850,6 +1036,7 @@ export async function importLeads(
         id: newId("lead"),
         workspaceId: ctx.workspaceId,
         runId: run.id,
+        boardId,
         company: company.replace(/^./, (c) => c.toUpperCase()),
         website,
         emails: r.emails,
@@ -894,16 +1081,10 @@ export async function importLeads(
     await Promise.all(leads.map((l) => db.updateLead(l.id, { status: "queued" })));
     if (leads.length > 0) await recordLeadUsage(ctx, leads.length);
 
-    const boardCount = (await db.listLeads(run.id)).length;
+    const boardCount = (await db.listLeads({ boardId })).length;
     const parts: string[] = [];
     if (merged > 0) parts.push(`merged ${merged} existing`);
-    if (skipped > 0) {
-      parts.push(
-        mode === "new"
-          ? `skipped ${skipped} already in workspace`
-          : `skipped ${skipped} unchanged`,
-      );
-    }
+    if (skipped > 0) parts.push(`skipped ${skipped} unchanged`);
 
     const updated = await db.updateRun(run.id, {
       status: "complete",
@@ -917,17 +1098,16 @@ export async function importLeads(
       merged,
       skipped,
       run: updated ?? run,
+      boardId,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (mode === "new") {
-      await db.updateRun(run.id, {
-        status: "failed",
-        error: message,
-        completedAt: nowIso(),
-      });
-    }
-    throw err;
+    await db.updateRun(run.id, {
+      status: "failed",
+      error: message,
+      completedAt: nowIso(),
+    });
+    throw err instanceof Error ? err : new Error(message);
   }
 }
 

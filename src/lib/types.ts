@@ -161,10 +161,47 @@ export interface Workspace {
   /** Pro path: one connected mailbox (multi-inbox deferred — ADR 0010). */
   connectedMailbox: ConnectedMailbox | null;
 }
+/**
+ * Named collection of leads within a workspace (ADR 0014).
+ * Every workspace has exactly one `isDefault` board; new leads land there
+ * unless the user picks another board at search/import time.
+ */
+export interface Board {
+  id: string;
+  workspaceId: string;
+  name: string;
+  /** Exactly one default board per workspace — catch-all for unassigned leads. */
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Client-safe board row with aggregate counts for sidebar / Boards view. */
+export interface BoardSummary extends Board {
+  leadCount: number;
+  contactedCount: number;
+  sentCount: number;
+  closedCount: number;
+}
+
+/** Aggregate workspace stats for the Dashboard view. */
+export interface DashboardStats {
+  totalLeads: number;
+  byCrmStage: Record<CrmStage, number>;
+  byStatus: Record<string, number>;
+  sentCount: number;
+  draftedCount: number;
+  boards: BoardSummary[];
+  recentRuns: Run[];
+  avgFitScore: number;
+}
+
 /** A search + enrichment job kicked off from the search hero. */
 export interface Run {
   id: string;
   workspaceId: string; // owning tenant (see Workspace)
+  /** Board that receives leads from this run. */
+  boardId: string;
   niche: string; // ICP, e.g. "dentist clinics"
   location: string | null; // optional, e.g. "Austin, TX"
   offerNotes: string | null; // optional pitch / offer context used in drafts
@@ -186,6 +223,8 @@ export interface Lead {
   id: string;
   workspaceId: string;
   runId: string;
+  /** Owning board (defaults to the workspace default board). */
+  boardId: string;
   company: string;
   website: string | null;
   emails: string[]; // contact hints discovered during enrichment
@@ -267,4 +306,6 @@ export interface CreateRunInput {
    * (constitution Art. I.2: zero-key mode still works via the Load demo button).
    */
   demo?: boolean;
+  /** Board to assign new leads to. Defaults to the workspace default board. */
+  boardId?: string | null;
 }

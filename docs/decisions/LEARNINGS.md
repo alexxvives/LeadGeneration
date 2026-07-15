@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — First-class Boards (ADR 0014)
+- `Board` entity + `Lead.boardId` / `Run.boardId`; Default board auto-created
+  per workspace; orphans back-filled via `ensureDefaultBoard`.
+- Sidebar: Dashboard (top), Boards nav, board picker above account (All =
+  default filter). Search/import open `BoardAssignModal` (no inline Current/
+  New list). Migration `0011_boards.sql`.
+
 ### 2026-07-15 — Settings save false-positive + send path bugs
 - Root cause of “Maileroo not saving”: `getCtx` could scope D1 to workspace
   `"local"` under auth → UPDATE 0 rows while API returned `{ ok: true }`. Fixed

@@ -19,6 +19,7 @@ const now = new Date().toISOString();
 const niche = "boutique dental clinics";
 const location = "Austin, TX";
 const runId = id("run");
+const boardId = id("board");
 
 const seeds = [
   ["Cedar Dental Studio", "cedar-dental.example.com", "front-desk", true, 88],
@@ -38,6 +39,7 @@ const leads = seeds.map(([company, domain, mailbox, hasEmail, fit]) => ({
   id: id("lead"),
   workspaceId: WORKSPACE_ID,
   runId,
+  boardId,
   company,
   website: `https://${domain}`,
   emails: hasEmail ? [`${mailbox}@${domain}`] : [],
@@ -92,10 +94,21 @@ const outreach = leads.map((lead) => {
 
 const db = {
   workspaces: [],
+  boards: [
+    {
+      id: boardId,
+      workspaceId: WORKSPACE_ID,
+      name: "Default",
+      isDefault: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ],
   runs: [
     {
       id: runId,
       workspaceId: WORKSPACE_ID,
+      boardId,
       niche,
       location,
       offerNotes,
