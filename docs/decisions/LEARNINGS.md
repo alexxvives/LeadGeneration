@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Studio IA + enrichment polish + competitor backlog
+- **Nav:** Leads (`?view=leads`) and Outreach (`?view=outreach`) tabs; Pipeline
+  is kanban-only. Search mode sits left of leads-to-find.
+- **Drawer:** CRM stage pill (not “In review”); dated Notes journal; full
+  address shown; Source URL removed from fit reasons.
+- **Enrichment:** privacy/consent blurbs filtered; prefer meta description;
+  intl street regex; demo leads get street addresses; table shows short city.
+- **Skills:** accessibility, adr-skill, dogfood, acquire-codebase-knowledge
+  copied into `.cursor/skills/` (SkillRepo CLI needs a key for auto-sync).
+- **Backlog:** `docs/decisions/competitor-features-2026-07.md` (Smartlead etc.).
+
 ### 2026-07-15 — CI, verify path, Resend≠Maileroo, pipeline parked flat
 - **GitHub Actions** `.github/workflows/ci.yml` — `tsc` + lint on push/PR.
 - **ADR 0009:** Resend = send; Zeruh (Maileroo Verify) = verify

@@ -9,6 +9,10 @@ const PHONE_RE = /(\+?\d{1,2}[\s.-]?)?(\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/g;
 const ADDRESS_RE =
   /\b\d{1,6}\s+[A-Za-z0-9.'\- ]{2,40}\s(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Dr|Drive|Ln|Lane|Way|Ct|Court|Pl|Place)\.?(?:\s*,\s*[A-Za-z .'­-]{2,40})?(?:\s*,\s*[A-Z]{2})?(?:\s+\d{5}(?:-\d{4})?)?\b/gi;
 
+// EU / intl-style: "Carrer de la Marina 16, 08005 Barcelona" or "12 Rue de Rivoli, 75001 Paris"
+const INTL_ADDRESS_RE =
+  /\b(?:\d{1,5}\s+)?(?:Carrer|Calle|Avenida|Avda\.?|Rue|Via|Strasse|Straße|Road|Street|Camino|Plaza|Plaça|Passeig|Paseo)\s+[A-Za-zÀ-ÿ0-9.'\- ]{2,50}(?:,?\s*\d{1,5})?(?:,?\s*\d{4,6})?(?:,?\s*[A-Za-zÀ-ÿ .'­-]{2,40})?\b/gi;
+
 // "City, ST" or "City, State"
 const CITY_STATE_RE =
   /\b([A-Z][a-zA-Z.'\-]+(?:\s+[A-Z][a-zA-Z.'\-]+){0,2}),\s*([A-Z]{2})\b(?:\s+\d{5})?/g;
@@ -117,10 +121,13 @@ export function extractPhones(text: string): string[] {
  */
 export function extractLocation(text: string): string | null {
   if (!text) return null;
-  const addresses = text.match(ADDRESS_RE) ?? [];
-  for (const raw of addresses) {
+  for (const raw of text.match(ADDRESS_RE) ?? []) {
     const cleaned = raw.replace(/\s+/g, " ").trim();
-    if (cleaned.length >= 12 && cleaned.length < 120) return cleaned;
+    if (cleaned.length >= 12 && cleaned.length < 140) return cleaned;
+  }
+  for (const raw of text.match(INTL_ADDRESS_RE) ?? []) {
+    const cleaned = raw.replace(/\s+/g, " ").trim();
+    if (cleaned.length >= 14 && cleaned.length < 140) return cleaned;
   }
   // "City, ST" — only accept when ST is a real region code, which filters out
   // false positives from prose ("Learn more, WE...", "Monday, FR").
@@ -135,6 +142,33 @@ export function extractLocation(text: string): string | null {
   return null;
 }
 
+/** Short city/region label for tables — keeps full street address for the drawer. */
+export function shortLocation(location: string | null | undefined): string | null {
+  if (!location?.trim()) return null;
+  const parts = location.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    // "123 Main St, Austin, TX 78701" → "Austin, TX"
+    const last = parts[parts.length - 1] ?? "";
+    const prev = parts[parts.length - 2] ?? "";
+    if (/^\d{4,6}/.test(last) && parts.length >= 3) {
+      // "…, 08005 Barcelona" style — use last segment only
+      return last.replace(/^\d{4,6}\s+/, "").trim() || last;
+    }
+    if (/^[A-Z]{2}(?:\s+\d{5})?$/.test(last)) return `${prev}, ${last.split(/\s+/)[0]}`;
+    return parts.slice(-2).join(", ");
+  }
+  return location.trim();
+}
+
+/** True when a sentence is cookie/privacy/consent chrome, not company about-copy. */
+function isJunkBlurbSentence(s: string): boolean {
+  return /^(skip to|cookie|accept all|we use cookies|we use online identifiers|privacy policy|all rights reserved|sign in|log in|menu|home\b|copyright|manage (your )?consent|this website uses|by (continuing|using|clicking)|personalize your experience|tailor and measure ads|based on your browsing|necessary cookies|strictly necessary)/i.test(
+    s,
+  ) || /\b(cookie (policy|preferences|settings)|gdpr|online identifiers|browsing habits|measure ads|advertising partners)\b/i.test(
+    s,
+  );
+}
+
 /** Grab a short, human-readable blurb from markdown/plain text. */
 export function extractBlurb(text: string, max = 240): string | null {
   const cleaned = text
@@ -146,15 +180,11 @@ export function extractBlurb(text: string, max = 240): string | null {
     .trim();
   if (!cleaned) return null;
 
-  // Skip cookie / nav / SEO junk that often leads page text.
-  const JUNK =
-    /^(skip to|cookie|accept all|we use cookies|privacy policy|all rights reserved|sign in|log in|menu|home\b|copyright)/i;
-
   const sentences = cleaned
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 40 && !JUNK.test(s));
-  const blurb = (sentences[0] ?? (JUNK.test(cleaned) ? null : cleaned))
+    .filter((s) => s.length > 40 && !isJunkBlurbSentence(s));
+  const blurb = (sentences[0] ?? (isJunkBlurbSentence(cleaned) ? null : cleaned))
     ?.slice(0, max)
     .trim();
   return blurb && blurb.length > 0 ? blurb : null;

@@ -15,23 +15,36 @@ import { Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
 import { PipelineView } from "./PipelineView";
+import { OutreachView } from "./OutreachView";
 import { RunsView } from "./RunsView";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
 type UpgradePrompt = { kind: "leads" | "sends"; planId: PlanId };
+type StudioView = "board" | "pipeline" | "leads" | "outreach" | "runs";
+
+function viewFromParams(view: string | null): StudioView {
+  if (view === "pipeline") return "pipeline";
+  if (view === "leads") return "leads";
+  if (view === "outreach") return "outreach";
+  if (view === "runs") return "runs";
+  return "board";
+}
+
+function queryForView(next: StudioView): string {
+  if (next === "pipeline") return "?view=pipeline";
+  if (next === "leads") return "?view=leads";
+  if (next === "outreach") return "?view=outreach";
+  if (next === "runs") return "?view=runs";
+  return "";
+}
 
 // ─── Studio root ─────────────────────────────────────────────────────────────
 
 export function Studio() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const view: "board" | "pipeline" | "runs" =
-    searchParams.get("view") === "pipeline"
-      ? "pipeline"
-      : searchParams.get("view") === "runs"
-        ? "runs"
-        : "board";
+  const view = viewFromParams(searchParams.get("view"));
 
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,13 +56,12 @@ export function Studio() {
   const [fcUsageKey, setFcUsageKey] = useState(0);
   const [fcBefore, setFcBefore] = useState<FirecrawlUsage | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
   const activeRunIdRef = useRef<string | null>(null);
 
   const setView = useCallback(
-    (next: "board" | "pipeline" | "runs") => {
-      const q =
-        next === "pipeline" ? "?view=pipeline" : next === "runs" ? "?view=runs" : "";
-      router.replace(`/app${q}`, { scroll: false });
+    (next: StudioView) => {
+      router.replace(`/app${queryForView(next)}`, { scroll: false });
     },
     [router],
   );
@@ -291,6 +303,36 @@ export function Studio() {
     }
   };
 
+  const onDraftAllOutreach = async () => {
+    if (!board) return;
+    const targets = board.leads.filter((l) => !l.outreach && l.emails.length > 0);
+    setOutreachBusy("draft-all");
+    try {
+      for (const l of targets) await onDraft(l.id);
+    } finally {
+      setOutreachBusy(null);
+    }
+  };
+
+  const onApproveAllOutreach = async () => {
+    if (!board) return;
+    const targets = board.leads.filter(
+      (l) =>
+        l.outreach &&
+        (l.outreach.status === "draft" ||
+          l.outreach.status === "rejected" ||
+          l.outreach.status === "failed"),
+    );
+    setOutreachBusy("approve-all");
+    try {
+      for (const l of targets) {
+        if (l.outreach) await onDecide(l.outreach.id, "approved");
+      }
+    } finally {
+      setOutreachBusy(null);
+    }
+  };
+
   const selected = board?.leads.find((l) => l.id === selectedId) ?? null;
 
   if (loading) {
@@ -309,16 +351,30 @@ export function Studio() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-            {view === "pipeline" ? "Pipeline" : view === "runs" ? "Search runs" : "Search"}
+            {view === "pipeline"
+              ? "Pipeline"
+              : view === "leads"
+                ? "Leads"
+                : view === "outreach"
+                  ? "Outreach"
+                  : view === "runs"
+                    ? "Search runs"
+                    : "Search"}
           </h1>
           <p className="mt-1 text-mist-500">
             {view === "pipeline"
               ? hasLeads
                 ? `${board!.leads.length} prospect${board!.leads.length === 1 ? "" : "s"}${board!.run?.niche ? ` for "${board!.run.niche}"` : ""} — drag to move between stages.`
                 : "Drag leads through your sales funnel — New → Contacted → In Conversation → Closed."
-              : view === "runs"
-                ? "History of searches in this workspace."
-                : "Find prospects by niche and location."}
+              : view === "leads"
+                ? hasLeads
+                  ? `${board!.leads.length} lead${board!.leads.length === 1 ? "" : "s"} — table, cards, or map.`
+                  : "Your full lead list will show up here after a search."
+                : view === "outreach"
+                  ? "Draft → approve → send. Approval is required before any email goes out."
+                  : view === "runs"
+                    ? "History of searches in this workspace."
+                    : "Find prospects by niche and location."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -398,60 +454,101 @@ export function Studio() {
         </div>
       )}
 
-      {/* Pipeline view — kanban + full leads table below */}
+      {/* Pipeline view — CRM kanban only */}
       {view === "pipeline" && (
         hasLeads ? (
-          <div>
-            <div data-tour="pipeline-board">
-              <PipelineView
-                leads={board!.leads}
-                onOpen={(id) => setSelectedId(id)}
-                onMoveStage={onMoveStage}
-                onDraft={onDraft}
-                onDecide={onDecide}
-              />
-            </div>
-            <div className="mt-10" data-tour="leads-table">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-widest text-mist-500">
-                  All leads
-                </p>
-                <div className="flex items-center gap-3">
-                  <ExportButton />
-                  <div className="glass inline-flex items-center rounded-full p-1 text-sm">
-                    <LayoutToggle active={layout === "table"} onClick={() => setLayout("table")}>
-                      Table
-                    </LayoutToggle>
-                    <LayoutToggle active={layout === "cards"} onClick={() => setLayout("cards")}>
-                      Cards
-                    </LayoutToggle>
-                    <LayoutToggle active={layout === "map"} onClick={() => setLayout("map")}>
-                      Map
-                    </LayoutToggle>
-                  </div>
-                </div>
-              </div>
-              {layout === "map" ? (
-                <LeadMap
-                  leads={board!.leads}
-                  locationHint={board!.run?.location ?? null}
-                  onOpen={(id) => setSelectedId(id)}
-                />
-              ) : layout === "cards" ? (
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {board!.leads.map((lead, i) => (
-                    <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => setSelectedId(lead.id)} />
-                  ))}
-                </div>
-              ) : (
-                <LeadTable leads={board!.leads} onOpen={(id) => setSelectedId(id)} />
-              )}
-            </div>
+          <div data-tour="pipeline-board">
+            <PipelineView
+              leads={board!.leads}
+              onOpen={(id) => setSelectedId(id)}
+              onMoveStage={onMoveStage}
+              onDraft={onDraft}
+              onDecide={onDecide}
+            />
           </div>
         ) : (
           <div data-tour="pipeline-board">
             <EmptyState onLoadDemo={loadDemo} running={running} />
           </div>
+        )
+      )}
+
+      {/* All leads — table / cards / map */}
+      {view === "leads" && (
+        hasLeads ? (
+          <div data-tour="leads-table">
+            <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
+              <ExportButton />
+              <div className="glass inline-flex items-center rounded-full p-1 text-sm">
+                <LayoutToggle active={layout === "table"} onClick={() => setLayout("table")}>
+                  Table
+                </LayoutToggle>
+                <LayoutToggle active={layout === "cards"} onClick={() => setLayout("cards")}>
+                  Cards
+                </LayoutToggle>
+                <LayoutToggle active={layout === "map"} onClick={() => setLayout("map")}>
+                  Map
+                </LayoutToggle>
+              </div>
+            </div>
+            {layout === "map" ? (
+              <LeadMap
+                leads={board!.leads}
+                locationHint={board!.run?.location ?? null}
+                onOpen={(id) => setSelectedId(id)}
+              />
+            ) : layout === "cards" ? (
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {board!.leads.map((lead, i) => (
+                  <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => setSelectedId(lead.id)} />
+                ))}
+              </div>
+            ) : (
+              <LeadTable leads={board!.leads} onOpen={(id) => setSelectedId(id)} />
+            )}
+          </div>
+        ) : (
+          <EmptyState onLoadDemo={loadDemo} running={running} />
+        )
+      )}
+
+      {/* Outreach queue — draft / approve / send */}
+      {view === "outreach" && (
+        hasLeads ? (
+          <OutreachView
+            leads={board!.leads}
+            canSendEmail={!!board!.capabilities.canSendEmail}
+            busyId={outreachBusy}
+            onOpen={(id) => setSelectedId(id)}
+            onDraft={async (id) => {
+              setOutreachBusy(id);
+              try {
+                await onDraft(id);
+              } finally {
+                setOutreachBusy(null);
+              }
+            }}
+            onDecide={async (outreachId, decision) => {
+              setOutreachBusy(outreachId);
+              try {
+                await onDecide(outreachId, decision);
+              } finally {
+                setOutreachBusy(null);
+              }
+            }}
+            onSend={async (outreachId) => {
+              setOutreachBusy(outreachId);
+              try {
+                await onSend(outreachId);
+              } finally {
+                setOutreachBusy(null);
+              }
+            }}
+            onDraftAll={onDraftAllOutreach}
+            onApproveAll={onApproveAllOutreach}
+          />
+        ) : (
+          <EmptyState onLoadDemo={loadDemo} running={running} />
         )
       )}
 

@@ -61,12 +61,18 @@ export function demoLeads(input: CreateRunInput, count: number): RawLead[] {
     const hasEmail = i % 4 !== 3; // ~75% have discoverable emails
     const hasPhone = i % 3 !== 2;
 
+    const streetNo = 100 + (i % 80);
+    const street = pick(
+      ["Oak St", "Main Ave", "Cedar Rd", "Harbor Blvd", "Summit Dr", "Lark Ln"],
+      i,
+    );
+    const cityPart = input.location?.trim() || "Austin, TX";
     leads.push({
       company,
       website: `https://${domain}`,
       emails: hasEmail ? [`${first.toLowerCase()}@${domain}`] : [],
       phones: hasPhone ? [`(${512 + (i % 3)}) 555-01${(10 + i).toString().slice(-2)}`] : [],
-      location: input.location?.trim() || null,
+      location: `${streetNo} ${street}, ${cityPart}`,
       aboutBlurb: pick(BLURB_TEMPLATES, i)
         .replace("{niche}", nicheWord)
         .replace("{loc}", loc),

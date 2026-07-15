@@ -16,8 +16,8 @@ export type SearchStrategy = "standard" | "smart" | "local";
 export type RunStatus = "pending" | "running" | "complete" | "failed";
 
 export type LeadStatus =
-  | "new" // freshly discovered / enriched
-  | "queued" // outreach drafted, awaiting human approval
+  | "new" // freshly discovered — CRM New = needs human review
+  | "queued" // outreach drafted (batch-approve helper); not shown as "In review"
   | "approved" // human approved the draft, ready to send
   | "sent" // email dispatched
   | "rejected" // human rejected the draft
@@ -133,18 +133,18 @@ export interface Lead {
   emails: string[]; // contact hints discovered during enrichment
   phones: string[];
   contactName: string | null;
-  location: string | null;
+  location: string | null; // full scraped address when available (street + city)
   aboutBlurb: string | null; // short summary used for personalization
   tags: string[];
   fitScore: number; // 0-100 heuristic fit score
   fitReasons: string[]; // human-readable "why this scored" notes
-  sourceUrl: string; // where we found them (audit trail)
+  sourceUrl: string; // where we found them (audit trail; not shown in fit UI)
   status: LeadStatus;
   // CRM fields — user-managed relationship tracking
   crmStage: CrmStage;
   contactMethod: ContactMethod | null; // set when first contacted
-  notes: string | null;              // freeform notes per lead
-  followUps: FollowUp[];             // scheduled follow-up reminders
+  notes: string | null; // legacy freeform; prefer dated followUps journal
+  followUps: FollowUp[]; // dated notes / follow-up journal entries
   createdAt: string;
 }
 

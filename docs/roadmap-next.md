@@ -11,6 +11,9 @@ search demo.
 
 **Prioritize product value (funnel + action) over more design-tooling.**
 
+See also [`docs/decisions/competitor-features-2026-07.md`](decisions/competitor-features-2026-07.md)
+for Smartlead/Instantly/Lemlist gaps ranked P0–P2.
+
 We already have lodestar-ui + Playwright. Extra UI MCPs (Fable / 21st / v0) are
 optional accelerators, not a prerequisite. A sharp execution prompt + Playwright
 validation beats buying another design tool.
@@ -18,7 +21,7 @@ validation beats buying another design tool.
 Order of work:
 
 1. **Unblock trust** — map, credits display, auth CTAs (done / in this pass).
-2. **Make the loop obvious** — Pipeline (funnel), Runs history, Export Excel.
+2. **Make the loop obvious** — Pipeline (funnel), Leads list, Outreach queue, Runs, Export.
 3. **Raise lead quality** — better extraction, email verification, less junk titles.
 4. **Make acting easy** — batch draft, reply tracking stubs, Excel + CRM export.
 5. **Polish UI** only where friction remains (empty states, mobile sidebar).

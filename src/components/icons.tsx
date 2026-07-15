@@ -185,3 +185,26 @@ export function EyeOffIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function UsersIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 19c.8-3.2 3.2-5 6.5-5s5.7 1.8 6.5 5" strokeLinecap="round" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M15.5 19c.4-1.8 1.6-3.2 3.5-3.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function PinIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path
+        d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}

@@ -2,7 +2,8 @@ import type { CrmStage, LeadStatus, OutreachStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
   new: { label: "New", cls: "bg-white/8 text-mist-300 ring-white/10" },
-  queued: { label: "In review", cls: "bg-amber-400/15 text-amber-300 ring-amber-400/20" },
+  // Internal queue flag — CRM "New" is what users see as "needs review".
+  queued: { label: "Draft ready", cls: "bg-amber-400/15 text-amber-300 ring-amber-400/20" },
   approved: { label: "Approved", cls: "bg-aurora-400/15 text-aurora-300 ring-aurora-400/25" },
   sent: { label: "Sent", cls: "bg-aurora-500/25 text-aurora-300 ring-aurora-400/30" },
   rejected: { label: "Rejected", cls: "bg-white/5 text-mist-500 ring-white/10" },

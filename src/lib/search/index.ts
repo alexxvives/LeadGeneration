@@ -70,7 +70,12 @@ function pageToRawLead(page: PageResult, input: CreateRunInput): RawLead {
     // Keep scraped location only — do not invent the search city onto every lead
     // (that hid geo mismatches like "Barcelona SC" in New York).
     location: scrapedLocation || null,
-    aboutBlurb: extractBlurb(page.content || page.description || "") ?? page.description ?? null,
+    // Prefer meta description, then page body — both run through junk filters so
+    // cookie/privacy consent copy never lands in About.
+    aboutBlurb:
+      extractBlurb(page.description || "") ??
+      extractBlurb(page.content || "") ??
+      null,
     tags: nicheTags(input),
   };
 }

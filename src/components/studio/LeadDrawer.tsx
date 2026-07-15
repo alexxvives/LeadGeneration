@@ -3,17 +3,43 @@
 import { useEffect, useState } from "react";
 import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
-import { FitMeter, Spinner, StatusPill } from "@/components/ui";
+import { CrmStagePill, FitMeter, Spinner, StatusPill } from "@/components/ui";
 import {
   ArrowIcon,
   CheckIcon,
   GlobeIcon,
   MailIcon,
   PhoneIcon,
+  PinIcon,
   SparkIcon,
   XIcon,
 } from "@/components/icons";
 import { newId } from "@/lib/id";
+
+function todayIsoDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** "1st March 2025" style for note journal lines. */
+function formatNoteDate(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  const day = d.getDate();
+  const ord =
+    day % 10 === 1 && day !== 11
+      ? "st"
+      : day % 10 === 2 && day !== 12
+        ? "nd"
+        : day % 10 === 3 && day !== 13
+          ? "rd"
+          : "th";
+  const month = d.toLocaleString("en-GB", { month: "long" });
+  return `${day}${ord} ${month} ${d.getFullYear()}`;
+}
 
 interface DrawerProps {
   lead: LeadWithOutreach;
@@ -72,11 +98,10 @@ export function LeadDrawer(props: DrawerProps) {
   const [contactMethod, setContactMethod] = useState<ContactMethod | null>(lead.contactMethod ?? null);
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [pendingStage, setPendingStage] = useState<CrmStage | null>(null);
-  const [notes, setNotes] = useState(lead.notes ?? "");
   const [followUps, setFollowUps] = useState<FollowUp[]>(lead.followUps ?? []);
-  const [showAddFollowUp, setShowAddFollowUp] = useState(false);
-  const [newFollowUpDate, setNewFollowUpDate] = useState("");
-  const [newFollowUpNote, setNewFollowUpNote] = useState("");
+  const [showAddNote, setShowAddNote] = useState(false);
+  const [newNoteDate, setNewNoteDate] = useState(todayIsoDate);
+  const [newNoteText, setNewNoteText] = useState("");
 
   // Reset all fields when the lead changes.
   useEffect(() => {
@@ -86,11 +111,13 @@ export function LeadDrawer(props: DrawerProps) {
     setDirty(false);
     setCrmStage(lead.crmStage ?? "new");
     setContactMethod(lead.contactMethod ?? null);
-    setNotes(lead.notes ?? "");
     setFollowUps(lead.followUps ?? []);
     setShowMethodPicker(false);
     setPendingStage(null);
-  }, [lead.id, lead.crmStage, lead.contactMethod, lead.notes, lead.followUps,
+    setShowAddNote(false);
+    setNewNoteDate(todayIsoDate());
+    setNewNoteText("");
+  }, [lead.id, lead.crmStage, lead.contactMethod, lead.followUps,
       outreach?.id, outreach?.subject, outreach?.body, outreach?.toEmail, lead.emails]);
 
   // Keyboard shortcuts — skip when focus is in an input/textarea.
@@ -141,23 +168,17 @@ export function LeadDrawer(props: DrawerProps) {
     await props.onUpdateCrm(lead.id, { crmStage: stage, contactMethod: method });
   };
 
-  // ── Notes auto-save on blur ──
-  const saveNotes = async () => {
-    const trimmed = notes.trim() || null;
-    if (trimmed === (lead.notes?.trim() || null)) return;
-    await props.onUpdateCrm(lead.id, { notes: trimmed });
-  };
-
-  // ── Follow-ups ──
-  const addFollowUp = async () => {
-    if (!newFollowUpDate) return;
-    const fu: FollowUp = { id: newId("fu"), date: newFollowUpDate, note: newFollowUpNote, done: false };
+  // ── Dated notes (journal) ──
+  const addNote = async () => {
+    const text = newNoteText.trim();
+    if (!newNoteDate || !text) return;
+    const fu: FollowUp = { id: newId("fu"), date: newNoteDate, note: text, done: false };
     const updated = [...followUps, fu];
     setFollowUps(updated);
-    setShowAddFollowUp(false);
-    setNewFollowUpDate("");
-    setNewFollowUpNote("");
-    await props.onUpdateCrm(lead.id, { followUps: updated });
+    setShowAddNote(false);
+    setNewNoteDate(todayIsoDate());
+    setNewNoteText("");
+    await props.onUpdateCrm(lead.id, { followUps: updated, notes: null });
   };
 
   const toggleFollowUpDone = async (fuId: string) => {
@@ -184,7 +205,7 @@ export function LeadDrawer(props: DrawerProps) {
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <StatusPill status={lead.status} />
+              <CrmStagePill stage={lead.crmStage ?? "new"} />
               <FitMeter score={lead.fitScore} />
             </div>
             <h2 className="mt-2 truncate font-display text-2xl font-semibold">{lead.company}</h2>
@@ -274,6 +295,9 @@ export function LeadDrawer(props: DrawerProps) {
             {lead.phones.length > 0 && (
               <InfoRow icon={<PhoneIcon className="h-4 w-4" />}>{lead.phones.join(", ")}</InfoRow>
             )}
+            {lead.location && (
+              <InfoRow icon={<PinIcon className="h-4 w-4" />}>{lead.location}</InfoRow>
+            )}
           </section>
 
           {/* About */}
@@ -284,61 +308,62 @@ export function LeadDrawer(props: DrawerProps) {
             </section>
           )}
 
-          {/* Notes */}
-          <section>
-            <SectionLabel>Notes</SectionLabel>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={saveNotes}
-              rows={3}
-              placeholder="Spoke to Sarah, she mentioned Q4 budget review…"
-              className="w-full resize-y rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2.5 font-sans text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-600 transition-colors focus:border-aurora-400/60"
-            />
-          </section>
-
-          {/* Follow-ups */}
+          {/* Notes journal (dated entries) */}
           <section>
             <div className="mb-2 flex items-center justify-between">
-              <SectionLabel>Follow-ups</SectionLabel>
+              <SectionLabel>Notes</SectionLabel>
               <button
                 type="button"
-                onClick={() => setShowAddFollowUp(true)}
+                onClick={() => {
+                  setShowAddNote(true);
+                  setNewNoteDate(todayIsoDate());
+                }}
                 className="text-[11px] text-aurora-400 hover:underline"
               >
                 + Add
               </button>
             </div>
 
-            {showAddFollowUp && (
-              <div className="mb-3 rounded-xl border border-white/10 bg-ink-850/60 p-3 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
+            {lead.notes?.trim() && followUps.length === 0 && (
+              <p className="mb-3 text-sm leading-relaxed text-mist-400">
+                <span className="font-semibold text-mist-200">Earlier note:</span>{" "}
+                {lead.notes.trim()}
+              </p>
+            )}
+
+            {showAddNote && (
+              <div className="mb-3 space-y-2 rounded-xl border border-white/10 bg-ink-850/60 p-3">
+                <div className="grid grid-cols-[auto_1fr] gap-2">
                   <input
                     type="date"
-                    value={newFollowUpDate}
-                    onChange={(e) => setNewFollowUpDate(e.target.value)}
+                    value={newNoteDate}
+                    onChange={(e) => setNewNoteDate(e.target.value)}
                     className="rounded-lg border border-white/10 bg-ink-900/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
                   />
                   <input
                     type="text"
-                    value={newFollowUpNote}
-                    onChange={(e) => setNewFollowUpNote(e.target.value)}
-                    placeholder="Note (optional)"
+                    value={newNoteText}
+                    onChange={(e) => setNewNoteText(e.target.value)}
+                    placeholder="What happened…"
                     className="rounded-lg border border-white/10 bg-ink-900/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60"
                   />
                 </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={addFollowUp}
-                    disabled={!newFollowUpDate}
+                    onClick={() => void addNote()}
+                    disabled={!newNoteDate || !newNoteText.trim()}
                     className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-ink-950 disabled:opacity-40"
                   >
                     Save
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setShowAddFollowUp(false); setNewFollowUpDate(""); setNewFollowUpNote(""); }}
+                    onClick={() => {
+                      setShowAddNote(false);
+                      setNewNoteText("");
+                      setNewNoteDate(todayIsoDate());
+                    }}
                     className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
                   >
                     Cancel
@@ -347,38 +372,49 @@ export function LeadDrawer(props: DrawerProps) {
               </div>
             )}
 
-            {followUps.length === 0 && !showAddFollowUp ? (
-              <p className="text-xs text-mist-600">No follow-ups yet.</p>
+            {followUps.length === 0 && !showAddNote ? (
+              <p className="text-xs text-mist-600">
+                No notes yet. Add a dated entry (defaults to today).
+              </p>
             ) : (
-              <ul className="space-y-1.5">
-                {[...followUps].sort((a, b) => a.date.localeCompare(b.date)).map((fu) => (
-                  <li key={fu.id} className="flex items-start gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleFollowUpDone(fu.id)}
-                      className={`mt-0.5 h-4 w-4 shrink-0 rounded border transition-colors ${
-                        fu.done
-                          ? "border-aurora-400/60 bg-aurora-400/20 text-aurora-300"
-                          : "border-white/20 bg-ink-900"
-                      } flex items-center justify-center`}
-                      aria-label={fu.done ? "Mark not done" : "Mark done"}
-                    >
-                      {fu.done && <CheckIcon className="h-2.5 w-2.5" />}
-                    </button>
-                    <div className={`min-w-0 flex-1 ${fu.done ? "opacity-50 line-through" : ""}`}>
-                      <span className="text-xs font-medium text-mist-300">{fu.date}</span>
-                      {fu.note && <span className="ml-2 text-xs text-mist-500">{fu.note}</span>}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteFollowUp(fu.id)}
-                      className="mt-0.5 text-mist-600 hover:text-rose-400"
-                      aria-label="Delete follow-up"
-                    >
-                      <XIcon className="h-3 w-3" />
-                    </button>
-                  </li>
-                ))}
+              <ul className="space-y-2">
+                {[...followUps]
+                  .sort((a, b) => a.date.localeCompare(b.date))
+                  .map((fu) => (
+                    <li key={fu.id} className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void toggleFollowUpDone(fu.id)}
+                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                          fu.done
+                            ? "border-aurora-400/60 bg-aurora-400/20 text-aurora-300"
+                            : "border-white/20 bg-ink-900"
+                        }`}
+                        aria-label={fu.done ? "Mark not done" : "Mark done"}
+                        title="Toggle follow-up done"
+                      >
+                        {fu.done && <CheckIcon className="h-2.5 w-2.5" />}
+                      </button>
+                      <p
+                        className={`min-w-0 flex-1 text-sm leading-relaxed text-mist-300 ${
+                          fu.done ? "opacity-50 line-through" : ""
+                        }`}
+                      >
+                        <span className="font-semibold text-mist-100">
+                          {formatNoteDate(fu.date)}:
+                        </span>{" "}
+                        {fu.note || "—"}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void deleteFollowUp(fu.id)}
+                        className="mt-0.5 text-mist-600 hover:text-rose-400"
+                        aria-label="Delete note"
+                      >
+                        <XIcon className="h-3 w-3" />
+                      </button>
+                    </li>
+                  ))}
               </ul>
             )}
           </section>
@@ -410,14 +446,6 @@ export function LeadDrawer(props: DrawerProps) {
                 </li>
               ))}
             </ul>
-            <a
-              href={lead.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-3 inline-flex items-center gap-1 text-xs text-mist-500 hover:text-mist-300"
-            >
-              Source: {truncate(lead.sourceUrl, 48)}
-            </a>
           </section>
 
           {/* Outreach composer */}
@@ -638,8 +666,4 @@ function FieldMini({ label, children }: { label: string; children: React.ReactNo
       {children}
     </label>
   );
-}
-
-function truncate(s: string, n: number): string {
-  return s.length <= n ? s : s.slice(0, n) + "…";
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import type { LeadWithOutreach } from "@/lib/types";
-import { FitMeter, StatusPill } from "@/components/ui";
+import { CrmStagePill, FitMeter } from "@/components/ui";
 import { GlobeIcon, MailIcon, PhoneIcon } from "@/components/icons";
 
 export function LeadCard({
@@ -32,7 +32,7 @@ export function LeadCard({
             </span>
           )}
         </div>
-        <StatusPill status={lead.status} />
+        <CrmStagePill stage={lead.crmStage ?? "new"} />
       </div>
 
       {lead.aboutBlurb && (

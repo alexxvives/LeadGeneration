@@ -9,18 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (CI + verify + UI polish)
+## ⏱️ Status — updated 2026-07-15 (Leads + Outreach IA)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**This pass:** GitHub Actions CI; Resend=send / Zeruh=verify (ADR 0009);
-hero copy trimmed; search mode ∥ leads-to-find; Not Interested ∥ Discarded
-(no nested Parked); select-ink styling; plan dropdown auto-applies beside
-Reset credits.
+**This pass:** SkillRepo skills copied locally; competitor backlog doc;
+Search mode ∥ leads-to-find swapped; new **Leads** + **Outreach** nav tabs;
+Pipeline kanban-only; dated notes journal; full address in drawer; no “In
+review” pill; About privacy-junk filter; fit Source URL removed.
 
 ### Next for you
-1. Add `MAILEROO_VERIFY_API_KEY` (Zeruh) in `.env.local` / Wrangler secrets.
-2. Hard-refresh Pipeline + Search layout.
-3. Confirm CI green on GitHub after push.
+1. Hard-refresh and click through Search → Pipeline → Leads → Outreach.
+2. Re-search a site like barcaacademy to confirm About is no longer consent copy.
+3. Optional: `npx skillrepo init` with your key if you want auto-sync of skills.
+4. Next product bets from `docs/decisions/competitor-features-2026-07.md` (P1:
+   HITL sequence stubs, reply webhooks, cross-run dedupe).
 
 ---
 

@@ -21,6 +21,7 @@ import {
   HistoryIcon,
   LogoutIcon,
   MailIcon,
+  UsersIcon,
 } from "@/components/icons";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -112,6 +113,18 @@ export function StudioShell({
       label: "Pipeline",
       icon: PipelineIcon,
       active: pathname === "/app" && view === "pipeline",
+    },
+    {
+      href: "/app?view=leads",
+      label: "Leads",
+      icon: UsersIcon,
+      active: pathname === "/app" && view === "leads",
+    },
+    {
+      href: "/app?view=outreach",
+      label: "Outreach",
+      icon: MailIcon,
+      active: pathname === "/app" && view === "outreach",
     },
     {
       href: "/app?view=runs",

@@ -26,6 +26,9 @@ ones that ask for broad file writes.
 Connect with `npx skillrepo init` if you want auto-sync; otherwise copy SKILL.md
 into `.cursor/skills/<name>/`.
 
+**Installed locally (manual copy, no SkillRepo key):**
+`.cursor/skills/accessibility`, `adr-skill`, `dogfood`, `acquire-codebase-knowledge`.
+
 ## Also useful (outside SkillRepo)
 
 - [VoltAgent/awesome-agent-skills](https://github.com/VoltAgent/awesome-agent-skills) — large index; cherry-pick frontend/Next skills only.

@@ -66,12 +66,21 @@ function buildSteps(): TourStep[] {
     },
     {
       id: "table",
-      path: "/app?view=pipeline",
+      path: "/app?view=leads",
       target: '[data-tour="leads-table"]',
       prefer: "above",
-      title: "All leads table",
-      body: "Below the funnel you’ll find the full list — sort, export, and switch between table, cards, and map. Same leads, different lens.",
+      title: "Browse all leads",
+      body: "The Leads tab holds the full list — table, cards, or map. Export when you’re ready.",
       scrollBlock: "center",
+    },
+    {
+      id: "outreach",
+      path: "/app?view=outreach",
+      target: '[data-tour="outreach-queue"]',
+      prefer: "right",
+      title: "Send from Outreach",
+      body: "Draft → approve → send lives here. Open a row to edit the email; send stays per-lead after you approve.",
+      scrollBlock: "start",
     },
     {
       id: "settings",
@@ -97,7 +106,7 @@ function buildSteps(): TourStep[] {
       path: "/app",
       target: null,
       title: "You’re ready",
-      body: "Try a search, review drafts on the pipeline, and only approve what you’d send yourself. Replay this tour anytime from Settings → Developer mode.",
+      body: "Try a search, review drafts under Outreach, and only approve what you’d send yourself. Replay this tour anytime from Settings → Developer mode.",
     },
   ];
 }
@@ -173,9 +182,13 @@ function pathMatches(
     ? "/app/settings"
     : view === "pipeline"
       ? "/app?view=pipeline"
-      : view === "runs"
-        ? "/app?view=runs"
-        : "/app";
+      : view === "leads"
+        ? "/app?view=leads"
+        : view === "outreach"
+          ? "/app?view=outreach"
+          : view === "runs"
+            ? "/app?view=runs"
+            : "/app";
   return here === want;
 }
 
