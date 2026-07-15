@@ -63,6 +63,24 @@ Also check:
 > `gmail.send` is a sensitive scope. Testing mode + test users is enough for
 > you. Public “Production” later may need Google verification.
 
+### Allow any Google account (leave Testing)
+
+From **APIs & Services → Gmail API → Credentials** you only see the OAuth
+*client* (e.g. Web client 1). Publishing is a different screen:
+
+1. Left sidebar → **OAuth consent screen**  
+   (or **Google Auth Platform → Audience** in the newer nav).
+2. Confirm **User type: External**.
+3. Under **Publishing status**, click **Publish app** (Testing → In production).
+4. Fill branding / privacy policy / support email if Google asks.
+5. Because `gmail.send` is a **sensitive** scope, Google may still show an
+   “unverified app” warning until verification completes. Users can often click
+   through “Advanced → Go to … (unsafe)” — or stay in Testing and keep adding
+   **Test users** (best while dogfooding).
+
+You do **not** need a Service Account for Connect Google. The existing
+**Web application** OAuth client is correct.
+
 ## 4. Finish creating the OAuth Client (your current screenshot)
 
 You’re on **Clients** → Create OAuth client ID. Fill:

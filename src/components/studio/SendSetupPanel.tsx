@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { CheckIcon, MailIcon } from "@/components/icons";
-import { EmailSettingsForm, type EmailSettingsDefaults, type EmailSettingsValues } from "@/components/studio/EmailSettingsForm";
+import {
+  EmailSettingsForm,
+  type EmailSettingsDefaults,
+  type EmailSettingsValues,
+} from "@/components/studio/EmailSettingsForm";
 import { DomainHealthPanel } from "@/components/studio/DomainHealthChecklist";
 import {
   loadWarmupProfile,
@@ -12,7 +16,7 @@ import {
   type MailboxAgeBand,
   type MailboxVolumeBand,
 } from "@/lib/email/warmup";
-import type { MailboxPublicStatus } from "@/lib/types";
+import type { EasyEmailProvider, MailboxPublicStatus } from "@/lib/types";
 
 type PathId = "easy" | "pro";
 
@@ -59,8 +63,8 @@ function warmthFromBands(
 }
 
 /**
- * Dual send-path framing: Easy (Resend) is the default wizard; Pro mailbox
- * connect (ADR 0010 — Google first; Microsoft coming).
+ * Dual send-path framing: Easy (Resend or Maileroo) is the default wizard;
+ * Pro mailbox connect (ADR 0010 — Google first; Microsoft coming).
  */
 export function SendSetupPanel({
   initial,
@@ -78,6 +82,9 @@ export function SendSetupPanel({
   defaultPath?: PathId;
 }) {
   const [path, setPath] = useState<PathId>(defaultPath);
+  const [easyProvider, setEasyProvider] = useState<EasyEmailProvider>(
+    initial.easyEmailProvider ?? "resend",
+  );
   const [mailbox, setMailbox] = useState(mailboxInitial);
   const [warmth, setWarmth] = useState<WarmthId>(
     warmthFromBands(mailboxInitial.ageBand, mailboxInitial.volumeBand),
@@ -90,9 +97,13 @@ export function SendSetupPanel({
     setWarmth(warmthFromBands(mailboxInitial.ageBand, mailboxInitial.volumeBand));
   }, [mailboxInitial]);
 
-  const warmthMeta = WARMTH.find((w) => w.id === warmth) ?? WARMTH[0];
+  useEffect(() => {
+    setEasyProvider(initial.easyEmailProvider ?? "resend");
+  }, [initial.easyEmailProvider]);
 
-  // Sync self-report into client warmup soft-cap when connected.
+  const warmthMeta = WARMTH.find((w) => w.id === warmth) ?? WARMTH[0];
+  const isMaileroo = easyProvider === "maileroo";
+
   useEffect(() => {
     if (!mailbox.connected) return;
     const profile = loadWarmupProfile();
@@ -126,7 +137,7 @@ export function SendSetupPanel({
         ageBand: null,
         volumeBand: null,
       });
-      setMsg("Mailbox disconnected. Easy (Resend) still works.");
+      setMsg("Mailbox disconnected. Easy (Resend / Maileroo) still works.");
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Disconnect failed");
     } finally {
@@ -150,8 +161,8 @@ export function SendSetupPanel({
             How do you want to send?
           </h2>
           <p className="text-sm text-mist-500">
-            Easy = any domain via Resend (Zoho, Hostinger, Cloudflare DNS…). Pro = send
-            through your real Google or Microsoft mailbox.
+            Easy = any domain via Resend or Maileroo. Pro = send through your real Google
+            mailbox.
           </p>
         </div>
         <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-ink-900/60 p-1">
@@ -164,7 +175,7 @@ export function SendSetupPanel({
                 : "text-mist-300 hover:text-mist-100"
             }`}
           >
-            Easy — Resend
+            Easy — API
           </button>
           <button
             type="button"
@@ -186,29 +197,27 @@ export function SendSetupPanel({
             <li className="flex gap-3">
               <span className="font-display text-lg font-semibold text-aurora-300">1</span>
               <span>
-                Create a free{" "}
-                <a
-                  href="https://resend.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-aurora-300 hover:underline"
-                >
-                  Resend
-                </a>{" "}
-                account and add your sending domain.
+                Pick <span className="text-mist-100">Resend</span> or{" "}
+                <span className="text-mist-100">Maileroo</span> below, create a free account,
+                and add your sending domain.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="font-display text-lg font-semibold text-aurora-300">2</span>
               <span>
-                Paste your From name, From email, and Resend API key below — then copy the DNS
-                rows into Cloudflare / GoDaddy / Hostinger (wherever DNS lives).
+                Paste From name, From email on <span className="text-mist-100">your domain</span>,
+                and the API key. Then add the SPF / DKIM records{" "}
+                <span className="text-mist-100">{isMaileroo ? "Maileroo" : "Resend"}</span> shows
+                in their dashboard to your DNS host (Cloudflare, GoDaddy, Hostinger…). This is
+                new auth for <em>sending</em> — separate from Zoho/Hostinger mailbox login.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="font-display text-lg font-semibold text-aurora-300">3</span>
               <span>
-                Watch domain health turn green. Approve each outreach in the studio before send
+                {isMaileroo
+                  ? "Confirm the domain shows verified in Maileroo. Approve each outreach before send"
+                  : "Watch domain health turn green. Approve each outreach before send"}
                 {canSendEmail ? "" : " (without a key, sends stay simulated — demo-safe)"}.
               </span>
             </li>
@@ -225,10 +234,31 @@ export function SendSetupPanel({
               defaults={defaults}
               canEdit={canEdit}
               variant="easy"
+              easyProvider={easyProvider}
+              onEasyProviderChange={setEasyProvider}
             />
           </div>
 
-          <DomainHealthPanel />
+          {isMaileroo ? (
+            <div className="rounded-xl2 border border-white/10 bg-ink-900/40 px-5 py-4 text-sm text-mist-300">
+              <p className="font-medium text-mist-100">Domain checklist (Maileroo)</p>
+              <p className="mt-1 text-mist-500">
+                Open your domain in the{" "}
+                <a
+                  href="https://maileroo.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-aurora-300 hover:underline"
+                >
+                  Maileroo dashboard
+                </a>
+                , copy SPF / DKIM / DMARC into your DNS host, and wait until Maileroo marks
+                the domain verified. Lodestar&apos;s live DNS panel is Resend-only for now.
+              </p>
+            </div>
+          ) : (
+            <DomainHealthPanel />
+          )}
         </div>
       ) : (
         <div className="space-y-5">
@@ -236,11 +266,11 @@ export function SendSetupPanel({
             <p className="font-display text-xl font-semibold text-mist-100">
               Connect Google or Microsoft
             </p>
-            <p className="mt-2 max-w-xl text-sm text-mist-300">
-              Pro sends through a <span className="text-mist-100">Gmail / Google Workspace</span>{" "}
-              or <span className="text-mist-100">Outlook / Microsoft 365</span> mailbox — not
-              Zoho, Hostinger mail, or generic SMTP. Those use Easy (Resend) with your domain
-              DNS instead. Same human-approve step either way.
+            <p className="mt-2 w-full text-sm text-mist-300">
+              Pro mailbox connect is for{" "}
+              <span className="text-mist-100">Gmail / Google Workspace</span> only right now
+              (Microsoft soon). If your mail is hosted elsewhere (Zoho, Hostinger, generic
+              SMTP), use Easy (Resend or Maileroo) with your domain DNS instead.
             </p>
 
             {mailbox.connected ? (
@@ -352,7 +382,7 @@ export function SendSetupPanel({
           >
             <h3 className="mb-1 text-sm font-semibold text-mist-100">Sending identity</h3>
             <p className="mb-4 text-xs text-mist-500">
-              Same compliance fields as Easy. From email comes from the connected mailbox when
+              Display name for the From line. From email comes from the connected mailbox when
               linked.
             </p>
             <EmailSettingsForm

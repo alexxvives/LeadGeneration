@@ -61,6 +61,8 @@ type WorkspaceRow = {
   reply_to: string | null;
   physical_address: string | null;
   resend_api_key: string | null;
+  maileroo_api_key: string | null;
+  easy_email_provider: string | null;
   // Connected mailbox JSON (migration 0008)
   connected_mailbox_json: string | null;
 };
@@ -159,6 +161,8 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
     replyTo: r.reply_to ?? null,
     physicalAddress: r.physical_address ?? null,
     resendApiKey: r.resend_api_key ?? null,
+    mailerooApiKey: r.maileroo_api_key ?? null,
+    easyEmailProvider: r.easy_email_provider === "maileroo" ? "maileroo" : "resend",
     connectedMailbox: parseConnectedMailbox(r.connected_mailbox_json),
   };
 }
@@ -322,6 +326,8 @@ export class D1Store implements LeadRepository {
     if ("replyTo" in patch) row.reply_to = patch.replyTo ?? null;
     if ("physicalAddress" in patch) row.physical_address = patch.physicalAddress ?? null;
     if ("resendApiKey" in patch) row.resend_api_key = patch.resendApiKey ?? null;
+    if ("mailerooApiKey" in patch) row.maileroo_api_key = patch.mailerooApiKey ?? null;
+    if ("easyEmailProvider" in patch) row.easy_email_provider = patch.easyEmailProvider ?? "resend";
     if ("connectedMailbox" in patch) {
       row.connected_mailbox_json = patch.connectedMailbox
         ? JSON.stringify(patch.connectedMailbox)

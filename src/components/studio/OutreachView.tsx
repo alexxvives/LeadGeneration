@@ -94,11 +94,6 @@ export function OutreachView({
 
   return (
     <div data-tour="outreach-queue" className="flex h-full min-h-0 flex-col gap-3">
-      <p className="shrink-0 text-xs text-mist-500">
-        Sequence stub: after a send we schedule Day +3 / Day +7 follow-up notes
-        (still require approve → send — no auto-blast).
-      </p>
-
       {actionable === 0 && groups.sent.length === 0 ? (
         <p className="rounded-xl2 border border-white/10 bg-ink-900/40 px-5 py-8 text-center text-sm text-mist-400">
           No outreach yet. Run a search, then come back here to draft and send.

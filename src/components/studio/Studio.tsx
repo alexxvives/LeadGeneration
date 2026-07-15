@@ -17,6 +17,7 @@ import { ExportButton } from "./ExportButton";
 import { PipelineView } from "./PipelineView";
 import { OutreachView } from "./OutreachView";
 import { RunsView } from "./RunsView";
+import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 
@@ -188,19 +189,6 @@ export function Studio() {
       handleError(e);
     } finally {
       setRunning(false);
-    }
-  };
-
-  const clearBoardData = async () => {
-    try {
-      activeRunIdRef.current = null;
-      setActiveRunId(null);
-      await api.clearBoard();
-      await refresh();
-      toast("ok", "Board cleared.");
-      setView("board"); // go to Search so they can start a new search
-    } catch (e) {
-      handleError(e);
     }
   };
 
@@ -463,21 +451,13 @@ export function Studio() {
                     ? "Search runs"
                     : "Search"}
           </h1>
-          <p className="mt-1 text-mist-500">
-            {view === "pipeline"
-              ? hasLeads
-                ? `${board!.leads.length} prospect${board!.leads.length === 1 ? "" : "s"}${board!.run?.niche ? ` for "${board!.run.niche}"` : ""} — drag to move between stages.`
-                : "Drag leads through your sales funnel — New → Contacted → In Conversation → Closed."
-              : view === "leads"
-                ? hasLeads
-                  ? `${board!.leads.length} lead${board!.leads.length === 1 ? "" : "s"} — table, cards, or map.`
-                  : "Your full lead list will show up here after a search."
-                : view === "outreach"
-                  ? "Draft → approve → send. Approval is required before any email goes out."
-                  : view === "runs"
-                    ? "History of searches in this workspace."
-                    : "Find prospects by niche and location."}
-          </p>
+          {view === "runs" || view === "board" ? (
+            <p className="mt-1 text-mist-500">
+              {view === "runs"
+                ? "History of searches in this workspace."
+                : "Find prospects by niche and location."}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-self-center">
@@ -549,28 +529,13 @@ export function Studio() {
               Settings.
             </p>
           )}
-          {hasLeads && !running && (
-            <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/5 bg-ink-900/40 px-4 py-3">
-              <span className="text-sm text-mist-300">
-                <span className="font-semibold text-aurora-300">{board!.leads.length}</span>{" "}
-                lead{board!.leads.length === 1 ? "" : "s"} in your pipeline
-                {board!.run?.niche ? ` for "${board!.run.niche}"` : ""}.
-              </span>
-              <button
-                type="button"
-                onClick={() => setView("pipeline")}
-                className="ml-auto text-sm text-aurora-300 underline-offset-2 hover:underline"
-              >
-                View Pipeline →
-              </button>
-              <button
-                type="button"
-                onClick={clearBoardData}
-                className="text-xs text-mist-500 transition-colors hover:text-mist-200"
-              >
-                Clear
-              </button>
-            </div>
+          {!running && (
+            <ImportLeadsPanel
+              onImported={async () => {
+                await refresh();
+                setView("pipeline");
+              }}
+            />
           )}
           {!hasLeads && !running && <div className="mt-6"><EmptyState onLoadDemo={loadDemo} running={running} /></div>}
         </div>
@@ -597,22 +562,28 @@ export function Studio() {
       {/* All leads — table / cards / map */}
       {view === "leads" && (
         hasLeads ? (
-          <div data-tour="leads-table" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            {layout === "map" ? (
-              <LeadMap
-                leads={board!.leads}
-                locationHint={board!.run?.location ?? null}
-                onOpen={openInfo}
-              />
-            ) : layout === "cards" ? (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {board!.leads.map((lead, i) => (
-                  <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => openInfo(lead.id)} />
-                ))}
-              </div>
-            ) : (
-              <LeadTable leads={board!.leads} onOpen={openInfo} />
-            )}
+          <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+            <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
+              <span className="font-semibold text-mist-200">{board!.leads.length}</span> lead
+              {board!.leads.length === 1 ? "" : "s"} · table, cards, or map
+            </p>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              {layout === "map" ? (
+                <LeadMap
+                  leads={board!.leads}
+                  locationHint={board!.run?.location ?? null}
+                  onOpen={openInfo}
+                />
+              ) : layout === "cards" ? (
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {board!.leads.map((lead, i) => (
+                    <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => openInfo(lead.id)} />
+                  ))}
+                </div>
+              ) : (
+                <LeadTable leads={board!.leads} onOpen={openInfo} />
+              )}
+            </div>
           </div>
         ) : (
           <div className="min-h-0 flex-1">

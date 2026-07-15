@@ -13,7 +13,10 @@ export async function GET() {
   const ws = await ctx.db.getWorkspace(ctx.workspaceId);
   const caps = getCapabilities();
   const canSendEmail =
-    caps.canSendEmail || !!ws?.resendApiKey?.trim() || !!ws?.connectedMailbox;
+    caps.canSendEmail ||
+    !!ws?.resendApiKey?.trim() ||
+    !!ws?.mailerooApiKey?.trim() ||
+    !!ws?.connectedMailbox;
   return NextResponse.json({
     ...board,
     capabilities: { ...caps, canSendEmail },

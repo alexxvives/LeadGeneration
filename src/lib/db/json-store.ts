@@ -21,6 +21,11 @@ function normalizeWorkspace(w: Workspace): Workspace {
     replyTo: (raw.replyTo as string | undefined) ?? null,
     physicalAddress: (raw.physicalAddress as string | undefined) ?? null,
     resendApiKey: (raw.resendApiKey as string | undefined) ?? null,
+    mailerooApiKey: (raw.mailerooApiKey as string | undefined) ?? null,
+    easyEmailProvider:
+      (raw.easyEmailProvider as Workspace["easyEmailProvider"] | undefined) === "maileroo"
+        ? "maileroo"
+        : "resend",
     connectedMailbox: (raw.connectedMailbox as Workspace["connectedMailbox"] | undefined) ?? null,
   };
 }

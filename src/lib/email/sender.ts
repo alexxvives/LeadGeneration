@@ -1,6 +1,7 @@
 import { env, getCapabilities } from "@/lib/config";
 import { sendViaGmail } from "@/lib/email/mailbox";
-import type { ConnectedMailbox } from "@/lib/types";
+import { sendViaMaileroo } from "@/lib/email/maileroo";
+import type { ConnectedMailbox, EasyEmailProvider } from "@/lib/types";
 
 export interface SendInput {
   to: string;
@@ -20,15 +21,19 @@ export interface WorkspaceEmailSettings {
   fromEmail?: string | null;
   replyTo?: string | null;
   physicalAddress?: string | null;
-  /** User's own Resend API key (custom domain). Tried before the platform key. */
+  /** User's own Resend API key (custom domain). */
   resendApiKey?: string | null;
+  /** User's own Maileroo sending key (custom domain). */
+  mailerooApiKey?: string | null;
+  /** Preferred Easy provider when both keys could exist. */
+  easyEmailProvider?: EasyEmailProvider | null;
   /** Pro path — connected Google/Microsoft mailbox (ADR 0010). */
   connectedMailbox?: ConnectedMailbox | null;
 }
 
 export interface SendResult {
   ok: boolean;
-  provider: "google" | "resend" | "smtp" | "demo";
+  provider: "google" | "resend" | "maileroo" | "smtp" | "demo";
   id?: string;
   error?: string;
   /** Updated mailbox after token refresh — caller should persist. */
@@ -40,12 +45,41 @@ function finalizeBody(body: string, replyToOrFrom: string): string {
   return body.replace(/\{\{unsubscribe_url\}\}/g, mailto);
 }
 
+async function sendWithResendKey(
+  apiKey: string,
+  opts: {
+    from: string;
+    to: string;
+    subject: string;
+    body: string;
+    replyTo?: string;
+    tags?: Array<{ name: string; value: string }>;
+  },
+): Promise<SendResult> {
+  try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send({
+      from: opts.from,
+      to: opts.to,
+      subject: opts.subject,
+      text: opts.body,
+      ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+      ...(opts.tags ? { tags: opts.tags } : {}),
+    });
+    if (error) return { ok: false, provider: "resend", error: error.message };
+    return { ok: true, provider: "resend", id: data?.id };
+  } catch (err) {
+    return { ok: false, provider: "resend", error: errMsg(err) };
+  }
+}
+
 /**
  * Send a single already-approved email.
  *
  * Priority (first available wins):
  *   1. Connected Google mailbox     → Pro path (ADR 0010)
- *   2. Workspace's own Resend key   → custom domain, user's Resend account
+ *   2. Workspace Easy key (Resend or Maileroo — ADR 0011)
  *   3. Platform Resend key          → platform's Resend sending domain
  *   4. Platform SMTP                → fallback for self-hosted setups
  *   5. Demo mode                    → logs only, nothing is delivered
@@ -88,45 +122,61 @@ export async function sendEmail(
     };
   }
 
-  // 2. Workspace's own Resend key (custom domain).
-  const wsResendKey = ws?.resendApiKey?.trim();
-  if (wsResendKey) {
-    try {
-      const { Resend } = await import("resend");
-      const resend = new Resend(wsResendKey);
-      const { data, error } = await resend.emails.send({
-        from,
-        to: input.to,
-        subject: input.subject,
-        text: body,
-        ...(replyToHeader ? { replyTo: replyToHeader } : {}),
-        ...(tags ? { tags } : {}),
-      });
-      if (error) return { ok: false, provider: "resend", error: error.message };
-      return { ok: true, provider: "resend", id: data?.id };
-    } catch (err) {
-      return { ok: false, provider: "resend", error: errMsg(err) };
-    }
+  // 2. Workspace Easy keys (Resend / Maileroo). Prefer the chosen provider.
+  const wsResendKey = ws?.resendApiKey?.trim() || "";
+  const wsMailerooKey = ws?.mailerooApiKey?.trim() || "";
+  const preferred: EasyEmailProvider =
+    ws?.easyEmailProvider === "maileroo" ? "maileroo" : "resend";
+
+  const tryMaileroo = async (): Promise<SendResult | null> => {
+    if (!wsMailerooKey) return null;
+    const result = await sendViaMaileroo({
+      apiKey: wsMailerooKey,
+      fromName,
+      fromEmail,
+      to: input.to,
+      subject: input.subject,
+      body,
+      replyTo: replyToHeader,
+    });
+    if (!result.ok) return { ok: false, provider: "maileroo", error: result.error };
+    return { ok: true, provider: "maileroo", id: result.id };
+  };
+
+  const tryResend = async (): Promise<SendResult | null> => {
+    if (!wsResendKey) return null;
+    return sendWithResendKey(wsResendKey, {
+      from,
+      to: input.to,
+      subject: input.subject,
+      body,
+      replyTo: replyToHeader,
+      tags,
+    });
+  };
+
+  if (preferred === "maileroo") {
+    const m = await tryMaileroo();
+    if (m) return m;
+    const r = await tryResend();
+    if (r) return r;
+  } else {
+    const r = await tryResend();
+    if (r) return r;
+    const m = await tryMaileroo();
+    if (m) return m;
   }
 
   // 3. Platform Resend key (primary — simple API key, no SMTP config needed).
   if (caps.resend) {
-    try {
-      const { Resend } = await import("resend");
-      const resend = new Resend(env.resendKey());
-      const { data, error } = await resend.emails.send({
-        from,
-        to: input.to,
-        subject: input.subject,
-        text: body,
-        ...(replyToHeader ? { replyTo: replyToHeader } : {}),
-        ...(tags ? { tags } : {}),
-      });
-      if (error) return { ok: false, provider: "resend", error: error.message };
-      return { ok: true, provider: "resend", id: data?.id };
-    } catch (err) {
-      return { ok: false, provider: "resend", error: errMsg(err) };
-    }
+    return sendWithResendKey(env.resendKey(), {
+      from,
+      to: input.to,
+      subject: input.subject,
+      body,
+      replyTo: replyToHeader,
+      tags,
+    });
   }
 
   // 4. Platform SMTP (self-hosted fallback — Maileroo, SES, Postfix, etc.).

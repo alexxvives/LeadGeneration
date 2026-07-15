@@ -9,22 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (Google mailbox connect)
+## ⏱️ Status — updated 2026-07-15 (Maileroo Easy + CRM)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- **Pro path live locally:** Connect Google OAuth (ADR 0010) — start/callback
-  APIs, encrypted refresh token on workspace, Gmail send behind `sendEmail()`,
-  warmup self-report on connect. Microsoft = soon.
-- Easy Resend path unchanged (DNS at any registrar incl. Hostinger/GoDaddy).
-- Migration `0008_connected_mailbox.sql` — apply on CF before prod use.
+- Easy send: Resend **or** Maileroo BYO (ADR 0011) + migration 0009.
+- Send → Contacted + dated “Email sent” note; CSV/Excel import.
+- Settings: clearer Easy DNS copy; Pro Connect Google (needs Wrangler `GMAIL_OAUTH_*`).
 
 ### Next
-1. Put `GMAIL_OAUTH_*` as Wrangler secrets + run `cf:migrate` → Connect Google in prod.
-2. Soft-cap warning popup on send when over recommend.
-3. Microsoft Graph Mail.Send (same seam).
+1. Prod: `wrangler secret put GMAIL_OAUTH_*` + `cf:migrate` (0009) + deploy.
+2. Soft-cap warning popup on send; Maileroo live DNS panel (parity with Resend).
+3. Microsoft Graph Mail.Send.
 
 ---
 

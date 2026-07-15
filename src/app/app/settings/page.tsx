@@ -1,5 +1,5 @@
 import { env, getCapabilities } from "@/lib/config";
-import { CheckIcon, XIcon, HelpIcon, SparkIcon } from "@/components/icons";
+import { HelpIcon, SparkIcon } from "@/components/icons";
 import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
 import { getPlan } from "@/lib/plans";
 import type { Workspace } from "@/lib/types";
@@ -8,11 +8,6 @@ import { BillingActions } from "@/components/studio/BillingActions";
 import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
 import { DeveloperModePanel } from "@/components/studio/DeveloperModePanel";
 import { SendSetupPanel } from "@/components/studio/SendSetupPanel";
-import {
-  isPlaceholderAddress,
-  isPlaceholderEmail,
-  isPlaceholderName,
-} from "@/lib/identity";
 import Link from "next/link";
 
 export const runtime = "nodejs";
@@ -48,31 +43,11 @@ export default async function SettingsPage({
   const { mailboxPublicStatus } = await import("@/lib/email/mailbox");
   const mailbox = mailboxPublicStatus(ws);
 
-  const fromEmail = ws?.fromEmail || env.fromEmail();
-  const fromName = ws?.fromName || env.fromName();
-  const physicalAddress = ws?.physicalAddress || env.physicalAddress();
-
   const canSendEmail =
-    caps.canSendEmail || !!ws?.resendApiKey?.trim() || !!ws?.connectedMailbox;
-
-  const providers = [
-    {
-      name: "Web search",
-      on: caps.firecrawl || caps.exa,
-      desc: caps.firecrawl || caps.exa
-        ? "Connected — searches find real companies on the web."
-        : "Not connected — searches use sample leads until search is set up.",
-    },
-    {
-      name: "Email delivery",
-      on: canSendEmail,
-      desc: canSendEmail
-        ? ws?.connectedMailbox
-          ? `Connected — sending via ${ws.connectedMailbox.provider} (${ws.connectedMailbox.email}).`
-          : "Connected — approved messages can reach real inboxes."
-        : "Not connected — approved messages stay inside the app.",
-    },
-  ];
+    caps.canSendEmail ||
+    !!ws?.resendApiKey?.trim() ||
+    !!ws?.mailerooApiKey?.trim() ||
+    !!ws?.connectedMailbox;
 
   const defaultPath = mailboxFlag === "connected" || mailbox.connected ? "pro" : "easy";
 
@@ -112,6 +87,8 @@ export default async function SettingsPage({
             replyTo: ws?.replyTo ?? null,
             physicalAddress: ws?.physicalAddress ?? null,
             resendApiKey: ws?.resendApiKey ?? null,
+            mailerooApiKey: ws?.mailerooApiKey ?? null,
+            easyEmailProvider: ws?.easyEmailProvider ?? "resend",
           }}
           defaults={{
             fromName: env.fromName(),
@@ -156,6 +133,17 @@ export default async function SettingsPage({
             </div>
             <span className="text-mist-500">→</span>
           </Link>
+          <Link
+            href="/deliverability"
+            className="flex items-center gap-4 border-t border-white/5 p-5 transition-colors hover:bg-white/[0.03]"
+          >
+            <HelpIcon className="h-5 w-5 shrink-0 text-mist-500" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">Deliverability guide</p>
+              <p className="text-sm text-mist-500">DNS, warmup, and keeping mail out of spam.</p>
+            </div>
+            <span className="text-mist-500">→</span>
+          </Link>
         </div>
       </section>
 
@@ -190,109 +178,6 @@ export default async function SettingsPage({
           )}
         </div>
       </section>
-
-      <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Ready to send?
-        </h2>
-        <div className="overflow-hidden rounded-xl2 border border-white/10">
-          {(
-            [
-              {
-                ok: !isPlaceholderEmail(fromEmail),
-                label: "From email",
-                hint: "Set under Easy path — use an address on your verified domain",
-              },
-              {
-                ok: !isPlaceholderName(fromName),
-                label: "From name",
-                hint: "Set under Easy path — how you appear in the inbox",
-              },
-              {
-                ok: !isPlaceholderAddress(physicalAddress),
-                label: "Mailing address",
-                hint: "CAN-SPAM — appended only when the lead looks US-based",
-              },
-              {
-                ok: caps.canSendEmail,
-                label: "Email delivery",
-                hint: "Resend or SMTP connected so approved messages can leave the app",
-              },
-              {
-                ok: caps.canSearchLive,
-                label: "Live search",
-                hint: "Must be connected so searches find real companies",
-              },
-            ] as const
-          ).map((item, i) => (
-            <div
-              key={item.label}
-              className={`flex items-start gap-4 p-4 ${i > 0 ? "border-t border-white/5" : ""}`}
-            >
-              <StatusDot on={item.ok} />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">{item.label}</p>
-                <p className="text-sm text-mist-500">{item.hint}</p>
-              </div>
-            </div>
-          ))}
-          <div className="border-t border-white/5 px-4 py-3">
-            <Link href="/deliverability" className="text-sm text-aurora-300 hover:underline">
-              Full deliverability guide →
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Integrations
-        </h2>
-        <div className="overflow-hidden rounded-xl2 border border-white/10">
-          {providers.map((p, i) => (
-            <div
-              key={p.name}
-              className={`flex items-center gap-4 p-5 ${i > 0 ? "border-t border-white/5" : ""}`}
-            >
-              <StatusDot on={p.on} />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">{p.name}</p>
-                <p className="text-sm text-mist-500">{p.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Advanced
-        </h2>
-        <div className="rounded-xl2 border border-white/10 p-5">
-          <div className="flex items-center gap-4">
-            <StatusDot on={env.contactFormAutomationEnabled()} />
-            <div className="flex-1">
-              <p className="font-medium">Contact-form automation</p>
-              <p className="text-sm text-mist-500">
-                Off by default. Even when on, it only simulates a form fill — never posts to a
-                real site.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
     </main>
-  );
-}
-
-function StatusDot({ on }: { on: boolean }) {
-  return (
-    <span
-      className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
-        on ? "bg-aurora-400/15 text-aurora-300" : "bg-white/5 text-mist-500"
-      }`}
-    >
-      {on ? <CheckIcon className="h-4 w-4" /> : <XIcon className="h-4 w-4" />}
-    </span>
   );
 }

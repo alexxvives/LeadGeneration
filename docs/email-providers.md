@@ -68,11 +68,11 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   transactional ESPs. Resend (like Postmark) is optimized for mail recipients
   expect; aggressive cold can violate AUP and share-pool reputation.
 - **Recommendation for Lodestar now:**
-  1. **BYO Resend key + customer domain** (current Settings field) for real
-     sends — **Resend is the send path** (ADR 0009).
+  1. **BYO Easy send:** Resend **or** Maileroo API key + customer domain
+     (Settings → Easy — ADR 0011). Resend remains the default DX.
   2. **Maileroo Verify (Zeruh API)** via `MAILEROO_VERIFY_API_KEY` — verify on
-     enrich + block undeliverable on send. Not a replacement for Resend.
-  3. Keep **SMTP path** as optional fallback (Maileroo / SES / Google SMTP).
+     enrich + block undeliverable on send. Separate from Maileroo *send*.
+  3. Keep **SMTP path** as optional platform fallback.
   4. Do **not** market a shared Lodestar From-domain for client outreach.
   5. Later (agency plans): optional Instantly/Smartlead-style multi-inbox, or
      SES dedicated IPs — behind the same `sendEmail()` interface.
@@ -102,14 +102,17 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 
 ## How this maps to code
 
-- `src/lib/email/sender.ts`: Resend (workspace key → platform key) → SMTP → demo.
-  Outbound Resend sends tag `lodestar_ws` + `lodestar_outreach` for webhooks.
+- `src/lib/email/sender.ts`: Google mailbox → workspace Resend/Maileroo →
+  platform Resend → SMTP → demo. Outbound Resend sends tag `lodestar_ws` +
+  `lodestar_outreach` for webhooks.
+- `src/lib/email/maileroo.ts`: Maileroo HTTP send (`smtp.maileroo.com/api/v2`).
 - `src/lib/email/domain-health.ts` + `POST /api/providers/resend/domain-health`:
   live SPF/DKIM rows from Resend Domains API (demo-safe when no key).
 - `src/lib/email/verify.ts`: Zeruh/Maileroo verify on enrich + before send.
 - Quotas + rate limits in `service.ts`.
-- Settings → Easy Resend wizard + Pro mailbox Connect Google (`SendSetupPanel`).
-- Stay pluggable: swapping to SES/Maileroo/Google is config, not a rewrite.
+- Settings → Easy Resend **or** Maileroo wizard + Pro mailbox Connect Google
+  (`SendSetupPanel`).
+- Stay pluggable: swapping providers is config, not a rewrite.
 - **Webhooks:** `POST /api/webhooks/resend` (public) — prefer tags, else latest
   sent by recipient email (cross-workspace). Bounce/complaint →
   `deliveryStatus=bounced`; inbound `email.received` → `replied` (+ CRM).

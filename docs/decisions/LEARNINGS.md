@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Easy Maileroo send + safe test guidance
+- ADR 0011: Easy path is Resend **or** Maileroo BYO key (`mailerooApiKey` +
+  `easyEmailProvider`). Verify (Zeruh) stays separate from Maileroo send.
+- Migration `0009_maileroo_send.sql` for D1; JSON store normalizes defaults.
+- Safe E2E testing: leave sends in **demo/simulate** (no BYO key / no Google
+  connect), or send only to addresses you own. Never blast fake lead emails
+  from personal Gmail or a production domain.
+
 ### 2026-07-15 — Google mailbox OAuth E2E (local)
 - Env: `GMAIL_OAUTH_CLIENT_ID` / `SECRET` → Connect Google enabled in Settings → Pro.
 - Flow: `/api/mailbox/google/start` → consent → callback stores AES-GCM refresh

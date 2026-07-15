@@ -1,5 +1,5 @@
 # 0009. Resend for send, Maileroo/Zeruh for verify
-- Status: accepted
+- Status: accepted _(amended by [0011](0011-easy-resend-or-maileroo.md) — Easy BYO Maileroo send is also allowed)_
 - Date: 2026-07-15
 
 ## Context

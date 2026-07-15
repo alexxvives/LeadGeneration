@@ -13,6 +13,7 @@ import type {
   ContactMethod,
   ConnectedMailbox,
   CrmStage,
+  EasyEmailProvider,
   CreateRunInput,
   DeliveryStatus,
   FollowUp,
@@ -24,6 +25,7 @@ import type {
   Outreach,
   PlanId,
   Run,
+  ImportLeadRow,
 } from "@/lib/types";
 import { mailboxPublicStatus } from "@/lib/email/mailbox";
 
@@ -437,6 +439,8 @@ export async function sendApprovedOutreach(
           replyTo: wsForEmail.replyTo,
           physicalAddress: wsForEmail.physicalAddress,
           resendApiKey: wsForEmail.resendApiKey,
+          mailerooApiKey: wsForEmail.mailerooApiKey,
+          easyEmailProvider: wsForEmail.easyEmailProvider,
           connectedMailbox: wsForEmail.connectedMailbox,
         }
       : undefined,
@@ -464,17 +468,25 @@ export async function sendApprovedOutreach(
       crmPatch.crmStage = "contacted";
       crmPatch.contactMethod = "email";
     }
-    // HITL sequence stubs — Day +3 / Day +7 reminders (still require approve→send).
     if (lead) {
       const existing = lead.followUps ?? [];
-      const hasSeq = existing.some((f) => f.note.startsWith("Sequence ·"));
-      if (!hasSeq) {
-        crmPatch.followUps = [
-          ...existing,
-          sequenceFollowUp(3, 2),
-          sequenceFollowUp(7, 3),
+      const today = nowIso().slice(0, 10);
+      const hasEmailSentNote = existing.some(
+        (f) => f.note.trim().toLowerCase() === "email sent" && f.date === today,
+      );
+      let followUps = existing;
+      if (!hasEmailSentNote) {
+        followUps = [
+          { id: newId("fu"), date: today, note: "Email sent", done: false },
+          ...followUps,
         ];
       }
+      // HITL sequence stubs — Day +3 / Day +7 reminders (still require approve→send).
+      const hasSeq = followUps.some((f) => f.note.startsWith("Sequence ·"));
+      if (!hasSeq) {
+        followUps = [...followUps, sequenceFollowUp(3, 2), sequenceFollowUp(7, 3)];
+      }
+      crmPatch.followUps = followUps;
     }
     await db.updateLead(outreach.leadId, crmPatch);
     // Track sends locally too (bars); quota enforcement stays metered-only above.
@@ -555,6 +567,8 @@ export async function updateWorkspaceEmailSettings(
     replyTo?: string | null;
     physicalAddress?: string | null;
     resendApiKey?: string | null;
+    mailerooApiKey?: string | null;
+    easyEmailProvider?: EasyEmailProvider;
   },
 ): Promise<void> {
   await ctx.db.updateWorkspace(ctx.workspaceId, { ...patch, updatedAt: nowIso() });
@@ -621,4 +635,165 @@ export async function updateLeadCrm(
   },
 ): Promise<Lead | null> {
   return ctx.db.updateLead(leadId, patch);
+}
+
+/** Row shape for CSV/Excel import (flexible mapping happens client-side). */
+export type { ImportLeadRow };
+
+/**
+ * Import leads from a spreadsheet (no web search). Creates an "import" run,
+ * dedupes against existing workspace domains/emails, optional light drafts.
+ */
+export async function importLeads(
+  ctx: Ctx,
+  rows: ImportLeadRow[],
+): Promise<{ imported: number; skipped: number; run: Run }> {
+  const { db } = ctx;
+  const ws = await db.getWorkspace(ctx.workspaceId);
+  if (ws) await ensureUsageWindow(db, ws);
+
+  const cleaned = rows
+    .map((r) => ({
+      company: (r.company ?? "").trim(),
+      website: r.website?.trim() || null,
+      emails: (r.emails ?? []).map((e) => e.trim()).filter(Boolean),
+      phones: (r.phones ?? []).map((p) => p.trim()).filter(Boolean),
+      contactName: r.contactName?.trim() || null,
+      location: r.location?.trim() || null,
+    }))
+    .filter((r) => r.company.length > 0 || r.emails.length > 0);
+
+  if (cleaned.length === 0) {
+    throw new Error("No usable rows — need at least a company name or email.");
+  }
+
+  if (ctx.metered) {
+    const fresh = ws ? await db.getWorkspace(ctx.workspaceId) : null;
+    if (fresh) {
+      const plan = getPlan(fresh.planId);
+      const remaining = Math.max(0, plan.leadCreditsPerMonth - fresh.leadsUsedThisMonth);
+      if (cleaned.length > remaining) {
+        throw new QuotaError({
+          kind: "leads",
+          planId: fresh.planId,
+          limit: plan.leadCreditsPerMonth,
+          used: fresh.leadsUsedThisMonth,
+          message: `Import would use ${cleaned.length} leads but only ${remaining} remain this month.`,
+        });
+      }
+    }
+  }
+
+  const run: Run = {
+    id: newId("run"),
+    workspaceId: ctx.workspaceId,
+    niche: "Imported list",
+    location: null,
+    offerNotes: null,
+    senderName: null,
+    status: "running",
+    mode: "live",
+    provider: "import",
+    leadCount: 0,
+    error: null,
+    createdAt: nowIso(),
+    completedAt: null,
+  };
+  await db.createRun(run);
+
+  try {
+    const prior = await db.listLeads();
+    const knownDomains = new Set(
+      prior.map((l) => domainKey(l.website)).filter((d): d is string => !!d),
+    );
+    const knownEmails = new Set(
+      prior.flatMap((l) => l.emails.map((e) => e.toLowerCase())),
+    );
+
+    const fresh = cleaned.filter((r) => {
+      const d = domainKey(r.website);
+      if (d && knownDomains.has(d)) return false;
+      if (r.emails.some((e) => knownEmails.has(e.toLowerCase()))) return false;
+      return true;
+    });
+    const skipped = cleaned.length - fresh.length;
+
+    const leads: Lead[] = fresh.map((r) => {
+      const company =
+        r.company ||
+        r.emails[0]?.split("@")[1]?.split(".")[0] ||
+        "Unknown company";
+      const website =
+        r.website ||
+        (r.emails[0]?.includes("@")
+          ? `https://${r.emails[0].split("@")[1]}`
+          : null);
+      return {
+        id: newId("lead"),
+        workspaceId: ctx.workspaceId,
+        runId: run.id,
+        company: company.replace(/^./, (c) => c.toUpperCase()),
+        website,
+        emails: r.emails,
+        phones: r.phones,
+        contactName: r.contactName,
+        location: r.location,
+        aboutBlurb: null,
+        tags: ["imported"],
+        fitScore: r.emails.length ? 55 : 40,
+        fitReasons: [
+          "Imported from your file",
+          r.emails.length ? "Has email on file" : "No email — add one before send",
+        ],
+        sourceUrl: website || "import",
+        status: "new",
+        crmStage: "new",
+        contactMethod: null,
+        notes: null,
+        followUps: [],
+        createdAt: nowIso(),
+      };
+    });
+
+    await db.createLeads(leads);
+
+    const now = nowIso();
+    const drafts: Outreach[] = leads.map((lead) => ({
+      id: newId("out"),
+      workspaceId: ctx.workspaceId,
+      leadId: lead.id,
+      runId: run.id,
+      toEmail: lead.emails[0] ?? null,
+      ...generateDraft(lead, run),
+      status: "draft",
+      deliveryStatus: "unknown",
+      sentAt: null,
+      error: null,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    await Promise.all(drafts.map((d) => db.upsertOutreach(d)));
+    await Promise.all(leads.map((l) => db.updateLead(l.id, { status: "queued" })));
+    await recordLeadUsage(ctx, leads.length);
+
+    const updated = await db.updateRun(run.id, {
+      status: "complete",
+      leadCount: leads.length,
+      error:
+        skipped > 0
+          ? `Skipped ${skipped} duplicate domain/email already in workspace`
+          : null,
+      completedAt: nowIso(),
+    });
+
+    return { imported: leads.length, skipped, run: updated ?? run };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await db.updateRun(run.id, {
+      status: "failed",
+      error: message,
+      completedAt: nowIso(),
+    });
+    throw err;
+  }
 }

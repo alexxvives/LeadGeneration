@@ -39,6 +39,8 @@ export function newWorkspace(args: {
     replyTo: null,
     physicalAddress: null,
     resendApiKey: null,
+    mailerooApiKey: null,
+    easyEmailProvider: "resend",
     connectedMailbox: null,
   };
 }

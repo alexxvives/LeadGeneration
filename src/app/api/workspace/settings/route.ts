@@ -12,6 +12,8 @@ const PatchSchema = z.object({
   replyTo: z.string().email().nullable().optional(),
   physicalAddress: z.string().max(500).nullable().optional(),
   resendApiKey: z.string().max(200).nullable().optional(),
+  mailerooApiKey: z.string().max(200).nullable().optional(),
+  easyEmailProvider: z.enum(["resend", "maileroo"]).optional(),
 });
 
 export async function PATCH(req: Request) {

@@ -88,7 +88,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="sending-identity"]',
       prefer: "right",
       title: "Set who you send as",
-      body: "Your name, from email, and (for US recipients) a mailing address. This is how you show up in the inbox.",
+      body: "Your from name and from email. This is how you show up in the inbox.",
       scrollBlock: "start",
     },
     {
@@ -98,7 +98,7 @@ function buildSteps(): TourStep[] {
       prefer: "left",
       pad: 14,
       title: "Bring your own sender (Resend)",
-      body: "For real inbox delivery, customers paste their own Resend API key and send from their verified domain — we don’t host a shared “Lodestar domain” for client outreach (that burns reputation). Platform keys are for local/dev demos only.",
+      body: "For real inbox delivery, pick Resend or Maileroo, paste your API key, and send from your verified domain — we don’t host a shared “Lodestar domain” for client outreach (that burns reputation). Platform keys are for local/dev demos only.",
       scrollBlock: "center",
     },
     {

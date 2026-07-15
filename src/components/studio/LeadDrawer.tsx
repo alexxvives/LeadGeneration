@@ -156,12 +156,22 @@ export function LeadDrawer(props: DrawerProps) {
   // ── CRM stage change ──
   const handleStageClick = (stage: CrmStage) => {
     if (stage === "contacted" && crmStage !== "contacted") {
-      // Show contact-method picker before committing.
       setPendingStage(stage);
       setShowMethodPicker(true);
-    } else {
-      commitStage(stage, contactMethod);
+      return;
     }
+    const emailed =
+      crmStage === "contacted" ||
+      lead.status === "sent" ||
+      outreach?.status === "sent" ||
+      contactMethod === "email";
+    if (stage === "new" && emailed && crmStage !== "new") {
+      const ok = window.confirm(
+        `${lead.company} already has outreach history. Move back to New anyway? (Does not unsend the email.)`,
+      );
+      if (!ok) return;
+    }
+    void commitStage(stage, contactMethod);
   };
 
   const commitStage = async (stage: CrmStage, method: ContactMethod | null) => {
@@ -185,12 +195,6 @@ export function LeadDrawer(props: DrawerProps) {
     await props.onUpdateCrm(lead.id, { followUps: updated, notes: null });
   };
 
-  const toggleFollowUpDone = async (fuId: string) => {
-    const updated = followUps.map((f) => f.id === fuId ? { ...f, done: !f.done } : f);
-    setFollowUps(updated);
-    await props.onUpdateCrm(lead.id, { followUps: updated });
-  };
-
   const deleteFollowUp = async (fuId: string) => {
     const updated = followUps.filter((f) => f.id !== fuId);
     setFollowUps(updated);
@@ -206,7 +210,7 @@ export function LeadDrawer(props: DrawerProps) {
       <aside
         className={`animate-float-up relative flex w-full flex-col overflow-y-auto border border-white/10 bg-ink-900 shadow-2xl ${
           mode === "info"
-            ? "max-h-[min(90dvh,720px)] max-w-lg rounded-xl2"
+            ? "max-h-[min(90dvh,720px)] max-w-[36.8rem] rounded-xl2"
             : "h-full max-h-[min(92dvh,900px)] max-w-xl rounded-xl2 sm:max-h-[min(90dvh,860px)]"
         }`}
       >
@@ -404,24 +408,7 @@ export function LeadDrawer(props: DrawerProps) {
                   .sort((a, b) => a.date.localeCompare(b.date))
                   .map((fu) => (
                     <li key={fu.id} className="flex items-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void toggleFollowUpDone(fu.id)}
-                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                          fu.done
-                            ? "border-aurora-400/60 bg-aurora-400/20 text-aurora-300"
-                            : "border-white/20 bg-ink-900"
-                        }`}
-                        aria-label={fu.done ? "Mark not done" : "Mark done"}
-                        title="Toggle follow-up done"
-                      >
-                        {fu.done && <CheckIcon className="h-2.5 w-2.5" />}
-                      </button>
-                      <p
-                        className={`min-w-0 flex-1 text-sm leading-relaxed text-mist-300 ${
-                          fu.done ? "opacity-50 line-through" : ""
-                        }`}
-                      >
+                      <p className="min-w-0 flex-1 text-sm leading-relaxed text-mist-300">
                         <span className="font-semibold text-mist-100">
                           {formatNoteDate(fu.date)}:
                         </span>{" "}
@@ -460,7 +447,7 @@ export function LeadDrawer(props: DrawerProps) {
                 </span>
               </div>
             </div>
-            <ul className="space-y-1.5">
+            <ul className="grid gap-1.5 sm:grid-cols-2">
               {lead.fitReasons.map((r) => (
                 <li key={r} className="flex items-start gap-2 text-sm text-mist-300">
                   <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-aurora-400" />

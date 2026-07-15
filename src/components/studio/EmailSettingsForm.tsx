@@ -5,6 +5,7 @@ import { CheckIcon } from "@/components/icons";
 import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
 import { loadSenderProfile, saveSenderProfile, buildSignature } from "@/lib/sender-profile";
+import type { EasyEmailProvider } from "@/lib/types";
 
 export interface EmailSettingsValues {
   fromName: string | null;
@@ -12,6 +13,8 @@ export interface EmailSettingsValues {
   replyTo: string | null;
   physicalAddress: string | null;
   resendApiKey: string | null;
+  mailerooApiKey: string | null;
+  easyEmailProvider: EasyEmailProvider;
 }
 
 /** Env-var defaults shown as placeholder text when the workspace has no override. */
@@ -27,20 +30,22 @@ export function EmailSettingsForm({
   defaults,
   canEdit,
   liveAppUrl,
-  /** Easy = full form + Resend key. Pro = name / reply-to / address (From from mailbox). */
+  /** Easy = name / from / provider key. Pro = name (From from mailbox when linked). */
   variant = "easy",
   /** When set (Pro connected), From email is read-only. */
   lockedFromEmail,
+  /** Controlled Easy provider (SendSetupPanel owns the picker). */
+  easyProvider,
+  onEasyProviderChange,
 }: {
   initial: EmailSettingsValues;
-  /** Shown as input hints when the workspace has no override. */
   defaults: EmailSettingsDefaults;
-  /** False on local preview (no workspace DB) — form is read-only. */
   canEdit: boolean;
-  /** Link to the live app Settings when the form can’t be edited here. */
   liveAppUrl?: string;
   variant?: "easy" | "pro";
   lockedFromEmail?: string | null;
+  easyProvider?: EasyEmailProvider;
+  onEasyProviderChange?: (p: EasyEmailProvider) => void;
 }) {
   const [values, setValues] = useState<EmailSettingsValues>(initial);
   const [saving, setSaving] = useState(false);
@@ -49,10 +54,18 @@ export function EmailSettingsForm({
 
   const isPro = variant === "pro";
   const fromLocked = isPro && !!lockedFromEmail;
+  const provider: EasyEmailProvider =
+    easyProvider ?? values.easyEmailProvider ?? "resend";
 
   const set = (key: keyof EmailSettingsValues, v: string) => {
     setSaved(false);
     setValues((prev) => ({ ...prev, [key]: v || null }));
+  };
+
+  const setProvider = (p: EasyEmailProvider) => {
+    setSaved(false);
+    setValues((prev) => ({ ...prev, easyEmailProvider: p }));
+    onEasyProviderChange?.(p);
   };
 
   const save = async () => {
@@ -63,12 +76,15 @@ export function EmailSettingsForm({
       const payload = isPro
         ? {
             fromName: values.fromName,
-            replyTo: values.replyTo,
-            physicalAddress: values.physicalAddress,
-            // Keep From aligned with mailbox when connected.
             ...(fromLocked ? { fromEmail: lockedFromEmail } : {}),
           }
-        : values;
+        : {
+            fromName: values.fromName,
+            fromEmail: values.fromEmail,
+            easyEmailProvider: provider,
+            resendApiKey: values.resendApiKey,
+            mailerooApiKey: values.mailerooApiKey,
+          };
       const res = await fetch("/api/workspace/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -78,7 +94,6 @@ export function EmailSettingsForm({
         const data = (await res.json()) as { error?: string };
         setError(data.error ?? "Save failed");
       } else {
-        // Keep draft sign-off in sync — one name field for From + drafts.
         if (values.fromName) {
           const profile = loadSenderProfile();
           const next = { ...profile, displayName: values.fromName };
@@ -103,6 +118,8 @@ export function EmailSettingsForm({
   const inputCls =
     "w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-2.5 text-sm text-mist-100 outline-none transition-colors placeholder:text-mist-600 focus:border-aurora-400/60 disabled:opacity-40";
 
+  const isMaileroo = provider === "maileroo";
+
   return (
     <div className="space-y-4">
       {!canEdit && (
@@ -120,7 +137,7 @@ export function EmailSettingsForm({
           ) : (
             <span className="font-medium text-amber-100">live app → Settings → Sending identity</span>
           )}
-          , sign in, and save your from name, from email, and mailing address there.
+          , sign in, and save your from name and from email there.
         </p>
       )}
 
@@ -136,7 +153,7 @@ export function EmailSettingsForm({
         </Field>
         <Field
           label="From email"
-          hint={fromLocked ? "From your connected mailbox" : "The sending address"}
+          hint={fromLocked ? "From your connected mailbox" : "Must match your verified domain"}
         >
           <input
             type="email"
@@ -147,70 +164,97 @@ export function EmailSettingsForm({
             className={inputCls}
           />
         </Field>
-        <Field
-          label="Reply-to"
-          hint="Where their reply lands (optional)"
-        >
-          <input
-            type="email"
-            value={values.replyTo ?? ""}
-            onChange={(e) => set("replyTo", e.target.value)}
-            placeholder={defaults.replyTo || defaults.fromEmail}
-            disabled={!canEdit}
-            className={inputCls}
-          />
-        </Field>
-        <Field
-          label="Mailing address"
-          hint="CAN-SPAM — only added on sends to US leads"
-        >
-          <input
-            value={values.physicalAddress ?? ""}
-            onChange={(e) => set("physicalAddress", e.target.value)}
-            placeholder={defaults.physicalAddress}
-            disabled={!canEdit}
-            className={inputCls}
-          />
-        </Field>
       </div>
-      <p className="text-xs text-mist-500">
-        Reply-to is for routing replies to a different inbox than the From address.
-        We don&apos;t CC teammates on cold outreach — that hurts deliverability and
-        looks spammy. Share the thread yourself after they reply.
-      </p>
 
       {!isPro && (
         <div
           data-tour="resend-key"
-          className="rounded-xl border border-aurora-400/20 bg-aurora-400/[0.04] p-4"
+          className="space-y-4 rounded-xl border border-aurora-400/20 bg-aurora-400/[0.04] p-4"
         >
-          <Field
-            label="Your Resend API key"
-            hint="BYO domain — not a shared Lodestar sender"
-          >
-            <PasswordField
-              autoComplete="off"
-              value={values.resendApiKey ?? ""}
-              onChange={(e) => set("resendApiKey", e.target.value)}
-              placeholder="re_xxxxxxxxxxxx"
-              disabled={!canEdit}
-              inputClassName={`${inputCls} pr-11`}
-            />
-            <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
-              Customers send from <span className="text-mist-300">their</span> verified domain.
-              Create a free account at{" "}
-              <a
-                href="https://resend.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-aurora-300 hover:underline"
+          <div>
+            <p className="mb-2 text-sm font-medium text-mist-100">Sending provider</p>
+            <div className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1">
+              <button
+                type="button"
+                disabled={!canEdit}
+                onClick={() => setProvider("resend")}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  !isMaileroo
+                    ? "bg-aurora-400 text-ink-950"
+                    : "text-mist-300 hover:text-mist-100"
+                }`}
               >
-                resend.com
-              </a>
-              , add DNS for your domain, then paste the API key here. Platform keys are for
-              local/dev demos only — a shared outreach domain would land in spam.
-            </p>
-          </Field>
+                Resend
+              </button>
+              <button
+                type="button"
+                disabled={!canEdit}
+                onClick={() => setProvider("maileroo")}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  isMaileroo
+                    ? "bg-aurora-400 text-ink-950"
+                    : "text-mist-300 hover:text-mist-100"
+                }`}
+              >
+                Maileroo
+              </button>
+            </div>
+          </div>
+
+          {isMaileroo ? (
+            <Field
+              label="Maileroo sending key"
+              hint="Dashboard → Domains → Sending Keys"
+            >
+              <PasswordField
+                autoComplete="off"
+                value={values.mailerooApiKey ?? ""}
+                onChange={(e) => set("mailerooApiKey", e.target.value)}
+                placeholder="Your Maileroo sending key"
+                disabled={!canEdit}
+                inputClassName={`${inputCls} pr-11`}
+              />
+              <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
+                Free account at{" "}
+                <a
+                  href="https://maileroo.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-aurora-300 hover:underline"
+                >
+                  maileroo.com
+                </a>
+                → add your domain → copy DNS → create a Sending Key → paste here.
+                Same From email must be on that verified domain.
+              </p>
+            </Field>
+          ) : (
+            <Field
+              label="Resend API key"
+              hint="BYO domain — not a shared Lodestar sender"
+            >
+              <PasswordField
+                autoComplete="off"
+                value={values.resendApiKey ?? ""}
+                onChange={(e) => set("resendApiKey", e.target.value)}
+                placeholder="re_xxxxxxxxxxxx"
+                disabled={!canEdit}
+                inputClassName={`${inputCls} pr-11`}
+              />
+              <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
+                Free account at{" "}
+                <a
+                  href="https://resend.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-aurora-300 hover:underline"
+                >
+                  resend.com
+                </a>
+                → add your domain → copy DNS → paste the API key here.
+              </p>
+            </Field>
+          )}
         </div>
       )}
 
@@ -248,7 +292,7 @@ function Field({
 }) {
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-between">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-mist-100">{label}</p>
         {hint && <p className="text-xs text-mist-500">{hint}</p>}
       </div>

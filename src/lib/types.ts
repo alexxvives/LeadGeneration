@@ -73,6 +73,19 @@ export interface SavedIcp {
 /** Billing plan identifiers. Definitions/quotas/prices live in src/lib/plans.ts. */
 export type PlanId = "free" | "starter" | "pro" | "agency";
 
+/** Easy-path transactional sender (Settings). Pro = mailbox OAuth. */
+export type EasyEmailProvider = "resend" | "maileroo";
+
+/** Spreadsheet / CSV row after client-side column mapping (import API). */
+export interface ImportLeadRow {
+  company: string;
+  website?: string | null;
+  emails?: string[];
+  phones?: string[];
+  contactName?: string | null;
+  location?: string | null;
+}
+
 /**
  * A tenant. Every Run/Lead/Outreach belongs to exactly one workspace, which is
  * how multi-tenancy + plan/quota enforcement is scoped (constitution Art. II.2).
@@ -136,10 +149,13 @@ export interface Workspace {
   // Optional per-workspace Resend API key (user's own account → custom domain).
   // Stored as plain text for now; encrypt at rest before GA.
   resendApiKey: string | null;
+  /** Optional BYO Maileroo sending key (Easy peer to Resend — ADR 0011). */
+  mailerooApiKey: string | null;
+  /** Which Easy transactional provider the workspace prefers. */
+  easyEmailProvider: EasyEmailProvider;
   /** Pro path: one connected mailbox (multi-inbox deferred — ADR 0010). */
   connectedMailbox: ConnectedMailbox | null;
 }
-
 /** A search + enrichment job kicked off from the search hero. */
 export interface Run {
   id: string;
