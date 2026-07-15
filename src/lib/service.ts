@@ -1,7 +1,7 @@
 import type { LeadRepository } from "@/lib/db";
 import { newId, nowIso } from "@/lib/id";
 import { runSearch, SearchUnavailableError } from "@/lib/search";
-import { generateDraft, complianceFooter } from "@/lib/outreach/draft";
+import { generateDraft, complianceFooter, leadLooksLikeUsa } from "@/lib/outreach/draft";
 import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
@@ -85,7 +85,9 @@ async function resolveRunLeadLimit(
 }
 
 async function recordLeadUsage(ctx: Ctx, count: number): Promise<void> {
-  if (!ctx.metered || count <= 0) return;
+  // Track locally too so usage bars move in `npm run dev` (enforcement still
+  // gated on ctx.metered in resolveRunLeadLimit).
+  if (count <= 0) return;
   const ws = await ctx.db.getWorkspace(ctx.workspaceId);
   if (!ws) return;
   await ctx.db.updateWorkspace(ctx.workspaceId, {
@@ -96,7 +98,6 @@ async function recordLeadUsage(ctx: Ctx, count: number): Promise<void> {
 
 /** TEMP developer helper — zero monthly lead/send counters for the workspace. */
 export async function resetWorkspaceUsage(ctx: Ctx): Promise<void> {
-  if (!ctx.metered) return;
   await ctx.db.updateWorkspace(ctx.workspaceId, {
     leadsUsedThisMonth: 0,
     sendsUsedThisMonth: 0,
@@ -366,6 +367,7 @@ export async function sendApprovedOutreach(
   // Pass workspace email identity overrides so each tenant's outreach uses
   // their own from-name, from-email etc. (configured in Settings → Sending).
   const wsForEmail = ctx.metered ? await db.getWorkspace(ctx.workspaceId) : null;
+  const leadForLocale = await db.getLead(outreach.leadId);
   const result = await sendEmail(
     {
       to: outreach.toEmail,
@@ -374,8 +376,7 @@ export async function sendApprovedOutreach(
         outreach.body +
         complianceFooter({
           physicalAddress: wsForEmail?.physicalAddress,
-          fromName: wsForEmail?.fromName,
-          fromEmail: wsForEmail?.fromEmail,
+          includeAddress: leadForLocale ? leadLooksLikeUsa(leadForLocale) : false,
         }),
     },
     wsForEmail
@@ -406,14 +407,13 @@ export async function sendApprovedOutreach(
       crmPatch.contactMethod = "email";
     }
     await db.updateLead(outreach.leadId, crmPatch);
-    if (ctx.metered) {
-      const ws = await db.getWorkspace(ctx.workspaceId);
-      if (ws) {
-        await db.updateWorkspace(ctx.workspaceId, {
-          sendsUsedThisMonth: ws.sendsUsedThisMonth + 1,
-          updatedAt: nowIso(),
-        });
-      }
+    // Track sends locally too (bars); quota enforcement stays metered-only above.
+    const ws = await db.getWorkspace(ctx.workspaceId);
+    if (ws) {
+      await db.updateWorkspace(ctx.workspaceId, {
+        sendsUsedThisMonth: ws.sendsUsedThisMonth + 1,
+        updatedAt: nowIso(),
+      });
     }
     return { ok: true, outreach: updated ?? undefined };
   }

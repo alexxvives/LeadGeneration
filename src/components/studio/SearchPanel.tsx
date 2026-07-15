@@ -5,7 +5,7 @@ import { SearchIcon, ArrowIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import type { PlanId, SearchStrategy } from "@/lib/types";
 import { FREE_MAX_LEADS_PER_RUN, LEAD_COUNT_OPTIONS } from "@/lib/plans";
-import { loadSenderProfile } from "@/lib/sender-profile";
+import { loadSenderProfile, resolveSignature } from "@/lib/sender-profile";
 import { deleteSavedIcp, loadSavedIcps, saveIcp } from "@/lib/saved-icps";
 import type { SavedIcp } from "@/lib/types";
 import { api } from "@/lib/client-api";
@@ -217,7 +217,7 @@ export function SearchPanel({
 
   useEffect(() => {
     const profile = loadSenderProfile();
-    setSenderName(profile.displayName);
+    setSenderName(resolveSignature(profile));
     setOfferNotes(profile.defaultOffer);
     setIcps(loadSavedIcps());
   }, []);

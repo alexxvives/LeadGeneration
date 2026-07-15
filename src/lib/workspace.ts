@@ -59,6 +59,23 @@ export async function getOrCreateWorkspaceForUser(
 }
 
 /**
+ * Ensure the local JSON workspace row exists so Settings can save sending
+ * identity during `npm run dev` (no D1 / not metered).
+ */
+export async function ensureLocalWorkspace(db: LeadRepository): Promise<Workspace> {
+  const { LOCAL_WORKSPACE_ID } = await import("@/lib/db");
+  const existing = await db.getWorkspace(LOCAL_WORKSPACE_ID);
+  if (existing) return existing;
+  return db.createWorkspace(
+    newWorkspace({
+      id: LOCAL_WORKSPACE_ID,
+      name: "Local workspace",
+      ownerUserId: "local",
+    }),
+  );
+}
+
+/**
  * Lazily reset the monthly usage window: if we've passed `resetsAt`, zero the
  * counters and roll `resetsAt` forward. Returns the (possibly updated) row.
  */

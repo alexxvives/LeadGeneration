@@ -1,18 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadSenderProfile, saveSenderProfile, type SenderProfile } from "@/lib/sender-profile";
+import {
+  TITLE_OPTIONS,
+  DEFAULT_COMPANY,
+  loadSenderProfile,
+  saveSenderProfile,
+  SIGNATURE_PLACEHOLDER,
+  type SenderProfile,
+} from "@/lib/sender-profile";
 
 /**
  * Editable outreach voice fields (local to this browser). Used to prefill
- * search offer notes. Does not store SMTP secrets.
+ * search offer notes and the multi-line email sign-off.
  */
 export function SenderProfileForm() {
   const [profile, setProfile] = useState<SenderProfile | null>(null);
   const [saved, setSaved] = useState(false);
+  const [customTitle, setCustomTitle] = useState(false);
 
   useEffect(() => {
-    setProfile(loadSenderProfile());
+    const p = loadSenderProfile();
+    if (!p.company) p.company = DEFAULT_COMPANY;
+    if (!p.signature.trim()) p.signature = SIGNATURE_PLACEHOLDER;
+    setProfile(p);
+    setCustomTitle(!!p.title && !(TITLE_OPTIONS as readonly string[]).includes(p.title));
   }, []);
 
   if (!profile) {
@@ -23,39 +35,100 @@ export function SenderProfileForm() {
     );
   }
 
-  const set =
-    (field: keyof SenderProfile) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setProfile((p) => (p ? { ...p, [field]: e.target.value } : p));
-      setSaved(false);
-    };
+  const patch = (partial: Partial<SenderProfile>) => {
+    setProfile((prev) => (prev ? { ...prev, ...partial } : prev));
+    setSaved(false);
+  };
 
   const onSave = (e: React.FormEvent) => {
     e.preventDefault();
-    saveSenderProfile(profile);
+    const next = {
+      ...profile,
+      company: profile.company.trim() || DEFAULT_COMPANY,
+      signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
+    };
+    saveSenderProfile(next);
+    setProfile(next);
     setSaved(true);
   };
+
+  const knownTitle = (TITLE_OPTIONS as readonly string[]).includes(profile.title);
 
   return (
     <form onSubmit={onSave} className="space-y-4 rounded-xl2 border border-white/10 p-5">
       <p className="text-sm text-mist-300">
-        Pitch notes and sign-off for drafts. Your display name lives under Sending
-        identity (one place). Stored in this browser only — not synced to the server.
+        Pitch notes and sign-off for drafts. Your display name is set under Sending
+        identity. Stored in this browser only.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Title" value={profile.title} onChange={set("title")} placeholder="Founder" />
-        <Field
-          label="Company"
-          value={profile.company}
-          onChange={set("company")}
-          placeholder="Northstar Studio"
-        />
+        <label className="block">
+          <span className="text-xs font-medium text-mist-500">Position (optional)</span>
+          {customTitle || (!knownTitle && profile.title) ? (
+            <input
+              value={profile.title}
+              onChange={(e) => patch({ title: e.target.value })}
+              placeholder="Co-founder & CEO"
+              className="mt-1.5 w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 pr-10 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+            />
+          ) : (
+            <div className="relative mt-1.5">
+              <select
+                value={profile.title}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setCustomTitle(true);
+                    return;
+                  }
+                  patch({ title: e.target.value });
+                }}
+                className="w-full appearance-none rounded-lg border border-white/10 bg-ink-900/60 py-3 pl-4 pr-11 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+              >
+                <option value="">Select a role…</option>
+                {TITLE_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+                <option value="__custom__">Custom…</option>
+              </select>
+              <span
+                className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-mist-500"
+                aria-hidden
+              >
+                <svg viewBox="0 0 12 12" className="h-3.5 w-3.5 fill-current">
+                  <path d="M2.5 4.5L6 8l3.5-3.5H2.5z" />
+                </svg>
+              </span>
+            </div>
+          )}
+          {customTitle && (
+            <button
+              type="button"
+              className="mt-1 text-[11px] text-aurora-300 hover:underline"
+              onClick={() => {
+                setCustomTitle(false);
+                patch({ title: "" });
+              }}
+            >
+              Use dropdown
+            </button>
+          )}
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-mist-500">Company</span>
+          <input
+            value={profile.company}
+            onChange={(e) => patch({ company: e.target.value })}
+            placeholder={DEFAULT_COMPANY}
+            className="mt-1.5 w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+          />
+        </label>
       </div>
       <label className="block">
         <span className="text-xs font-medium text-mist-500">Default offer / pitch</span>
         <textarea
           value={profile.defaultOffer}
-          onChange={set("defaultOffer")}
+          onChange={(e) => patch({ defaultOffer: e.target.value })}
           rows={3}
           placeholder="We help clinics turn website visitors into booked appointments…"
           className="mt-1.5 w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
@@ -65,11 +138,14 @@ export function SenderProfileForm() {
         <span className="text-xs font-medium text-mist-500">Email sign-off</span>
         <textarea
           value={profile.signature}
-          onChange={set("signature")}
-          rows={2}
-          placeholder="Best,&#10;Alex"
-          className="mt-1.5 w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+          onChange={(e) => patch({ signature: e.target.value })}
+          rows={4}
+          placeholder={SIGNATURE_PLACEHOLDER}
+          className="mt-1.5 w-full resize-y rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 font-sans text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
         />
+        <p className="mt-1.5 text-[11px] text-mist-500">
+          Ends every draft — name, role | company, and site.
+        </p>
       </label>
       <div className="flex items-center gap-3">
         <button
@@ -81,31 +157,5 @@ export function SenderProfileForm() {
         {saved && <span className="text-sm text-aurora-300">Saved</span>}
       </div>
     </form>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  className = "",
-}: {
-  label: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  placeholder?: string;
-  className?: string;
-}) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="text-xs font-medium text-mist-500">{label}</span>
-      <input
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className="mt-1.5 w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
-      />
-    </label>
   );
 }

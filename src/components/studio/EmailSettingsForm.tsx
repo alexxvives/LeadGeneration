@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CheckIcon } from "@/components/icons";
 import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
-import { loadSenderProfile, saveSenderProfile } from "@/lib/sender-profile";
+import { loadSenderProfile, saveSenderProfile, buildSignature } from "@/lib/sender-profile";
 
 export interface EmailSettingsValues {
   fromName: string | null;
@@ -63,7 +63,15 @@ export function EmailSettingsForm({
         // Keep draft sign-off in sync — one name field for From + drafts.
         if (values.fromName) {
           const profile = loadSenderProfile();
-          saveSenderProfile({ ...profile, displayName: values.fromName });
+          const next = { ...profile, displayName: values.fromName };
+          const lines = profile.signature.split("\n");
+          if (!profile.signature.trim()) {
+            next.signature = buildSignature(next);
+          } else if (!profile.displayName || lines[0] === profile.displayName) {
+            lines[0] = values.fromName;
+            next.signature = lines.join("\n");
+          }
+          saveSenderProfile(next);
         }
         setSaved(true);
       }
@@ -133,7 +141,7 @@ export function EmailSettingsForm({
         </Field>
         <Field
           label="Mailing address"
-          hint="CAN-SPAM — required for real commercial sends"
+          hint="CAN-SPAM — only added on sends to US leads"
         >
           <input
             value={values.physicalAddress ?? ""}
@@ -150,33 +158,38 @@ export function EmailSettingsForm({
         looks spammy. Share the thread yourself after they reply.
       </p>
 
-      <Field
-        label="Resend API key"
-        hint="Your own Resend account → sends from your verified domain"
+      <div
+        data-tour="resend-key"
+        className="rounded-xl border border-aurora-400/20 bg-aurora-400/[0.04] p-4"
       >
-        <PasswordField
-          autoComplete="off"
-          value={values.resendApiKey ?? ""}
-          onChange={(e) => set("resendApiKey", e.target.value)}
-          placeholder="re_xxxxxxxxxxxx"
-          disabled={!canEdit}
-          inputClassName={`${inputCls} pr-11`}
-        />
-        <p className="mt-1 text-[11px] text-mist-500">
-          Go to{" "}
-          <a
-            href="https://resend.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-aurora-300 hover:underline"
-          >
-            resend.com
-          </a>
-          , create a free account, add your sending domain (DNS wizard takes ~5 min),
-          and paste the API key here. Emails will arrive from your own domain instead
-          of the platform&apos;s shared sender.
-        </p>
-      </Field>
+        <Field
+          label="Your Resend API key"
+          hint="BYO domain — not a shared Lodestar sender"
+        >
+          <PasswordField
+            autoComplete="off"
+            value={values.resendApiKey ?? ""}
+            onChange={(e) => set("resendApiKey", e.target.value)}
+            placeholder="re_xxxxxxxxxxxx"
+            disabled={!canEdit}
+            inputClassName={`${inputCls} pr-11`}
+          />
+          <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
+            Customers send from <span className="text-mist-300">their</span> verified domain.
+            Create a free account at{" "}
+            <a
+              href="https://resend.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-aurora-300 hover:underline"
+            >
+              resend.com
+            </a>
+            , add DNS for your domain, then paste the API key here. Platform keys are for
+            local/dev demos only — a shared outreach domain would land in spam.
+          </p>
+        </Field>
+      </div>
 
       <div className="flex items-center justify-end gap-3">
         {error && <p className="text-sm text-rose-300">{error}</p>}

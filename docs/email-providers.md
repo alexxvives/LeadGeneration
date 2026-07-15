@@ -1,81 +1,96 @@
-# Email Provider Choice — Research & Recommendation
+# Email sending & deliverability — research notes (2026)
 
-**Question:** Is Resend the best tool here? What about Maileroo? Lowest cost
-without sacrificing too much quality.
+**Question:** What’s the best way to send Lodestar outreach efficiently and avoid
+spam? Is Resend the right tool?
 
-**Short answer:** For Lodestar's profile (cold-ish outreach, low volume per user,
-cost-sensitive, early stage), **start on Maileroo via the existing SMTP path** —
-it has the most generous permanent free tier, the lowest paid entry, and a
-built-in **email-verification API** that directly improves lead quality. Keep
-**Resend** as the "best developer experience" option, and plan to move
-high-volume sending to **Amazon SES** later. The app is already provider-agnostic,
-so this is a config choice, not a rewrite.
+**Short answer:** Resend is excellent for **transactional** / product email and
+a fine **BYO API** for low-volume human-approved sends — but it is **not** the
+best long-term cold-outreach infrastructure. For spam avoidance, the stack that
+wins in 2026 is: **customer’s own domain + warmed inboxes (Google/Microsoft) +
+SPF/DKIM/DMARC + low volume + human approval**. Lodestar should stay
+provider-agnostic and push **bring-your-own-sender**, not a shared Lodestar
+sending domain.
 
-_Pricing checked mid-2026; verify current numbers before committing._
+_Research refreshed 2026-07-15 (Mailpool / Smartlead industry guides + prior
+provider comparison)._
 
 ---
 
-## Comparison
+## What actually keeps mail out of spam
 
-| Provider | Free tier | Cheapest paid | ~Cost @ 50k/mo | ~Cost @ 1M/mo | DX | Deliverability | Notes for us |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| **Maileroo** | **3,000/mo, forever, no card** | ~$10–25/mo | ~$25–45 | custom | Good (SMTP + REST, SDKs) | Good | **Includes email-verification API.** SMTP works with our code today. Lowest cost entry. |
-| **Resend** | 3,000/mo forever (100/day cap) | $20/mo (50k) | $20 | ~$650 (Scale) | **Best** (React Email, clean API) | Good (building reputation) | Transactional-focused; cold outreach is against the spirit of ToS. |
-| **Amazon SES** | 3,000/mo, first 12 months only | pay-as-you-go | **$5** | **$100** | Poor (AWS, sandbox, IAM) | Good (you manage reputation) | **Cheapest at scale by far.** High setup cost (hours), you handle bounces/reputation. |
-| **Postmark** | 100/mo | $15/mo | $50 | $475 | Excellent | **Best (99%+ published)** | **Transactional ONLY — will suspend cold email.** Not for outreach. |
-| **SendGrid** | 100/day | ~$20/mo | ~$20 | $400+ | Good | Varies by IP pool | All-in-one (also marketing). Heavier. |
+Provider brand matters less than these (in order):
 
-### The math that matters
-- **At the volumes a single user of Lodestar sends** (dozens–hundreds of
-  approved emails/month), **every provider is effectively free.** Cost only
-  becomes a real factor if we send on behalf of many users at scale — then **SES
-  wins decisively** (5–20× cheaper than the others).
-- So "lowest cost without sacrificing quality" resolves to: **free tier + good
-  deliverability + useful extras now**, with a **cheap-at-scale escape hatch**.
+1. **Domain reputation** — send from a domain the user controls; never the
+   primary company domain for high-volume cold; use a secondary (e.g.
+   `getakademo.com`) with proper DNS.
+2. **Authentication** — SPF + DKIM + DMARC aligned. Without these, Gmail/Yahoo
+   bulk-sender rules (2024+) punish hard.
+3. **Warm-up** — new inboxes ramp slowly (often ~20–50/day early, then higher).
+4. **List quality** — verify emails; bounce rate >2–3% destroys reputation.
+5. **Content + cadence** — personal, short, no spammy footers; Lodestar’s
+   per-lead approval + rate limits help here.
+6. **Infrastructure isolation** — don’t mix transactional product mail and cold
+   outreach on the same domain/IP pool.
 
-## Recommendation for Lodestar
+Lodestar already helps on (5). Product work should bias toward (1)–(4).
 
-1. **Default / recommended: Maileroo (SMTP).**
-   - 3,000 emails/mo free, no credit card → covers early real usage at $0.
-   - Lowest paid tiers if you grow ($10–25/mo).
-   - **Email verification API** is a direct quality win for scraped leads (see
-     `search-and-enrichment.md`, Tier 1) — cleaning dead emails matters more than
-     the sender brand for outreach results.
-   - Works with our current Nodemailer/SMTP path **with zero code changes**
-     (`SMTP_HOST=smtp.maileroo.com`).
-2. **Best DX / if you prefer an API: Resend.** Cleanest integration, already
-   wired (`RESEND_API_KEY`). Great if you stay transactional-adjacent.
-3. **Scale: Amazon SES (SMTP).** Move here when monthly volume crosses ~tens of
-   thousands; it's ~$0.10/1k. Also works via our SMTP path.
-4. **Avoid for outreach: Postmark** (transactional-only; bans cold email despite
-   great deliverability).
+---
 
-## ⚠️ The real constraint: cold email ≠ transactional email
+## Provider landscape (for Lodestar)
 
-This is more important than provider price. Transactional ESPs (Resend,
-Postmark, and to a degree SES/SendGrid shared pools) are designed for mail the
-recipient expects (receipts, resets). **Unsolicited cold outreach can violate
-their acceptable-use policies and will hurt shared-IP reputation.** For serious
-outreach volume you typically want:
-- Your **own sending domain** (with SPF/DKIM/DMARC) and a warmed-up reputation,
-- Possibly **dedicated IPs** (SES $15–25/mo, Resend/others on higher plans),
-- And to keep volume/quality in check — which Lodestar already enforces via
-  **per-lead approval + rate limiting + verified emails**.
+| Approach | Tools | Fit for Lodestar | Spam risk |
+| --- | --- | --- | --- |
+| **Transactional ESP** | Resend, Postmark, Maileroo (API), SES | Great DX for “send this approved email now” | Shared pools + ToS often discourage **unsolicited** cold; fine at low human-approved volume on **user’s domain** |
+| **SMTP / mailbox sending** | Google Workspace, Microsoft 365 via SMTP/OAuth | Best inbox placement for cold-ish B2B | Per-inbox caps (~20–100/day); needs multi-inbox at scale |
+| **Cold infra platforms** | Instantly, Smartlead, Lemlist + domain providers (Mailpool, etc.) | Built for sequences, warmup, multi-inbox | Overkill for MVP; partner later if agencies need volume |
+| **Shared platform domain** | “send via lodestar.app” | Tempting for onboarding | **Avoid for outreach** — one bad user tanks everyone |
 
-Purpose-built cold-email infra (Instantly, Smartlead, etc.) exists for high
-volume, but that's out of scope for the MVP and adds cost/complexity. The
-provider-agnostic SMTP design keeps all these doors open.
+### Is Resend the best tool?
 
-## How this maps to the code
+- **For product/dev experience:** yes — clean API, already wired, good for magic
+  links + low-volume approved sends when the user verifies **their** domain.
+- **For cold outreach at scale:** no — industry practice in 2026 routes cold
+  through **warmed Google/Microsoft inboxes** (or dedicated cold infra), not
+  transactional ESPs. Resend (like Postmark) is optimized for mail recipients
+  expect; aggressive cold can violate AUP and share-pool reputation.
+- **Recommendation for Lodestar now:**
+  1. **BYO Resend key + customer domain** (current Settings field) for real
+     sends.
+  2. Keep **SMTP path** for Maileroo / SES / Google SMTP.
+  3. Do **not** market a shared Lodestar From-domain for client outreach.
+  4. Later (agency plans): optional Instantly/Smartlead-style multi-inbox, or
+     SES dedicated IPs — behind the same `sendEmail()` interface.
 
-- `src/lib/email/sender.ts` already tries **Resend → SMTP → demo**. Maileroo and
-  SES are just SMTP config (`.env.local`). No new code needed to adopt the
-  recommendation.
-- Adding **email verification** is a search/enrichment task, not a sender task —
-  see `search-and-enrichment.md`.
-- If we later want React-Email templates, add them behind `sendEmail()` without
-  changing the approval flow.
+---
 
-**Bottom line:** stay provider-agnostic (already done). Point `.env.local` at
-**Maileroo** for the cheapest quality baseline today; keep **SES** as the
-scale plan. Spend optimization energy on **email verification**, not on the ESP.
+## Product implication (what we tell users)
+
+- Tour / Settings: “Paste **your** Resend key and send from **your** domain.”
+- Platform `RESEND_API_KEY` = local/dev and transactional product mail only.
+- Physical address on US recipients (CAN-SPAM); quiet opt-out at send time.
+- Human approval is a deliverability feature, not just ethics.
+
+---
+
+## Comparison snapshot (cost / DX)
+
+| Provider | Free tier | Notes for us |
+| --- | --- | --- |
+| **Resend** | ~3k/mo (daily caps apply) | Best DX; BYO domain; not cold-infra |
+| **Maileroo** | Generous SMTP free | Cheap + verification API; SMTP path works today |
+| **Amazon SES** | Cheap at scale | Best $/email later; more ops |
+| **Instantly / Smartlead** | Paid | Cold sequences + warmup; future integration |
+| **Postmark** | Low | Transactional-only — avoid for cold |
+
+---
+
+## How this maps to code
+
+- `src/lib/email/sender.ts`: Resend (workspace key → platform key) → SMTP → demo.
+- Quotas + rate limits in `service.ts`.
+- Identity + BYO key in Settings → workspace row.
+- Stay pluggable: swapping to SES/Maileroo/Google is config, not a rewrite.
+
+**Bottom line:** Resend is the right **API shape** for v1 BYO sending; it is
+**not** a silver bullet against spam. Deliverability comes from the customer’s
+domain, DNS, warm-up, list hygiene, and Lodestar’s human-in-the-loop limits.

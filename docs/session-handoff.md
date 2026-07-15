@@ -9,19 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-14 (lead count, drafts, settings dev tools)
+## ⏱️ Status — updated 2026-07-15 (tour v2, local settings, email research)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Local this pass (not redeployed):** search `maxLeads` (Free ≤10/run), Settings
-Developer mode (tour + reset credits), single name field, quieter send-time
-compliance, Spanish `Propuesta para…` drafts, Firecrawl badge without /mo plan,
-usage bars side-by-side, fit % in drawer, Approve all flush right of New.
+**Local this pass:** tour (pipeline + table steps, no center-flash, BYO Resend
+copy, side confetti); AKADEMO sign-off defaults; local Sending identity editable
++ usage bars; `docs/email-providers.md` refreshed (Resend ≠ cold infra);
+**AGENTS.md** rule: commit + push after each meaningful change.
 
 ### Next for you
-1. Try Search lead-count + Regenerate on a lead; Settings → Developer mode.
-2. Deploy when ready: `npm run cf:build` then
-   `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
-3. Product: platform Firecrawl credits on Free vs BYO; Resend connect UX.
+1. Hard-refresh localhost; Settings → Developer mode → Replay tour.
+2. Confirm Sending identity saves locally and usage bars appear.
+3. Deploy when ready.
 
 ---
 

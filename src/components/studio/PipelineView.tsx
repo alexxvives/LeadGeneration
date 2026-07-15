@@ -174,7 +174,7 @@ export function PipelineView({
         {queuedLeads.length > 0 && (
           <span className="normal-case tracking-normal text-mist-600">
             {" "}
-            · tick cards to approve selected
+            · click a New card to select · double-click to open
           </span>
         )}
       </p>
@@ -382,112 +382,81 @@ function DraggablePipelineCard({
   return (
     <div
       ref={setNodeRef}
-      className={`group rounded-xl border border-white/5 bg-ink-900/60 transition-opacity ${
+      className={`group flex overflow-hidden rounded-xl border transition-all ${
         isDragging ? "opacity-30" : ""
-      } ${selected ? "ring-1 ring-aurora-400/40" : ""}`}
+      } ${
+        selected
+          ? "border-aurora-400/50 bg-aurora-400/10 ring-1 ring-aurora-400/40"
+          : "border-white/5 bg-ink-900/60"
+      }`}
       {...attributes}
     >
-      <div className="flex items-start gap-0.5">
-        {selectable && onToggleSelect ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleSelect(lead.id);
-            }}
-            aria-pressed={selected}
-            aria-label={selected ? "Deselect for approve" : "Select for approve"}
-            className="px-1.5 py-3 text-mist-500 hover:text-aurora-300"
-          >
-            <span
-              className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
-                selected
-                  ? "border-aurora-400 bg-aurora-400 text-ink-950"
-                  : "border-white/25 bg-transparent"
-              }`}
-            >
-              {selected && <CheckIcon className="h-2.5 w-2.5" />}
-            </span>
-          </button>
-        ) : (
-          <button
-            {...listeners}
-            className="cursor-grab touch-none px-1.5 py-3 text-mist-500 hover:text-mist-300 active:cursor-grabbing"
-            aria-label="Drag to move"
-            tabIndex={-1}
-          >
-            <svg viewBox="0 0 6 12" className="h-3 w-3 fill-current" aria-hidden>
-              <circle cx="1.5" cy="1.5" r="1" /><circle cx="4.5" cy="1.5" r="1" />
-              <circle cx="1.5" cy="4.5" r="1" /><circle cx="4.5" cy="4.5" r="1" />
-              <circle cx="1.5" cy="7.5" r="1" /><circle cx="4.5" cy="7.5" r="1" />
-              <circle cx="1.5" cy="10.5" r="1" /><circle cx="4.5" cy="10.5" r="1" />
-            </svg>
-          </button>
-        )}
+      <button
+        type="button"
+        {...listeners}
+        className="flex shrink-0 cursor-grab touch-none items-center self-stretch px-1.5 text-mist-600 hover:bg-white/5 hover:text-mist-300 active:cursor-grabbing"
+        aria-label="Drag to move"
+        tabIndex={-1}
+      >
+        <svg viewBox="0 0 6 12" className="h-3 w-3 fill-current" aria-hidden>
+          <circle cx="1.5" cy="1.5" r="1" /><circle cx="4.5" cy="1.5" r="1" />
+          <circle cx="1.5" cy="4.5" r="1" /><circle cx="4.5" cy="4.5" r="1" />
+          <circle cx="1.5" cy="7.5" r="1" /><circle cx="4.5" cy="7.5" r="1" />
+          <circle cx="1.5" cy="10.5" r="1" /><circle cx="4.5" cy="10.5" r="1" />
+        </svg>
+      </button>
 
-        {selectable && (
-          <button
-            {...listeners}
-            className="cursor-grab touch-none px-0.5 py-3 text-mist-600 hover:text-mist-300 active:cursor-grabbing"
-            aria-label="Drag to move"
-            tabIndex={-1}
-          >
-            <svg viewBox="0 0 6 12" className="h-3 w-3 fill-current" aria-hidden>
-              <circle cx="1.5" cy="1.5" r="1" /><circle cx="4.5" cy="1.5" r="1" />
-              <circle cx="1.5" cy="4.5" r="1" /><circle cx="4.5" cy="4.5" r="1" />
-              <circle cx="1.5" cy="7.5" r="1" /><circle cx="4.5" cy="7.5" r="1" />
-              <circle cx="1.5" cy="10.5" r="1" /><circle cx="4.5" cy="10.5" r="1" />
-            </svg>
-          </button>
+      <button
+        type="button"
+        onClick={() => {
+          if (selectable && onToggleSelect) onToggleSelect(lead.id);
+          else onOpen(lead.id);
+        }}
+        onDoubleClick={() => onOpen(lead.id)}
+        aria-pressed={selectable ? selected : undefined}
+        className="min-w-0 flex-1 py-3 pr-1 text-left transition-colors hover:bg-white/[0.03]"
+      >
+        <p className="truncate text-sm font-medium text-mist-100">{lead.company}</p>
+        {subtitle && (
+          <p className="mt-0.5 truncate text-xs text-mist-500">{subtitle}</p>
         )}
+        {showMeta && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {pendingFollowUps > 0 && (
+              <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
+              </span>
+            )}
+            {lead.contactMethod && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] text-mist-500"
+                title={
+                  lead.contactMethod === "email"
+                    ? "Contacted by email"
+                    : lead.contactMethod === "phone"
+                      ? "Contacted by phone"
+                      : "Contacted via form"
+                }
+              >
+                {lead.contactMethod === "email" && <MailIcon className="h-2.5 w-2.5" />}
+                {lead.contactMethod === "phone" && <PhoneIcon className="h-2.5 w-2.5" />}
+                {lead.contactMethod === "contact_form" && <FormIcon className="h-2.5 w-2.5" />}
+              </span>
+            )}
+          </div>
+        )}
+      </button>
 
+      {nextStage && (
         <button
           type="button"
-          onClick={() => onOpen(lead.id)}
-          className="min-w-0 flex-1 rounded-r-xl py-3 text-left transition-colors hover:bg-white/5"
+          onClick={(e) => { e.stopPropagation(); onMoveStage(lead.id, nextStage); }}
+          title={`Move to ${ALL_COLUMNS.find((c) => c.stage === nextStage)?.title ?? nextStage}`}
+          className="mr-2 self-center rounded-md p-1 text-mist-600 opacity-0 transition-all hover:bg-white/10 hover:text-aurora-300 group-hover:opacity-100"
         >
-          <p className="truncate text-sm font-medium text-mist-100">{lead.company}</p>
-          {subtitle && (
-            <p className="mt-0.5 truncate text-xs text-mist-500">{subtitle}</p>
-          )}
-          {showMeta && (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {pendingFollowUps > 0 && (
-                <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-                  {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
-                </span>
-              )}
-              {lead.contactMethod && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] text-mist-500"
-                  title={
-                    lead.contactMethod === "email"
-                      ? "Contacted by email"
-                      : lead.contactMethod === "phone"
-                        ? "Contacted by phone"
-                        : "Contacted via form"
-                  }
-                >
-                  {lead.contactMethod === "email" && <MailIcon className="h-2.5 w-2.5" />}
-                  {lead.contactMethod === "phone" && <PhoneIcon className="h-2.5 w-2.5" />}
-                  {lead.contactMethod === "contact_form" && <FormIcon className="h-2.5 w-2.5" />}
-                </span>
-              )}
-            </div>
-          )}
+          <ArrowIcon className="h-3.5 w-3.5" />
         </button>
-
-        {nextStage && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onMoveStage(lead.id, nextStage); }}
-            title={`Move to ${ALL_COLUMNS.find((c) => c.stage === nextStage)?.title ?? nextStage}`}
-            className="mr-2 self-center rounded-md p-1 text-mist-600 opacity-0 transition-all hover:bg-white/10 hover:text-aurora-300 group-hover:opacity-100"
-          >
-            <ArrowIcon className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
+      )}
     </div>
   );
 }

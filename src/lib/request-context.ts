@@ -3,7 +3,7 @@ import { getDb, LOCAL_WORKSPACE_ID } from "@/lib/db";
 import { authRequired } from "@/lib/config";
 import { auth } from "@/auth";
 import { getPlan } from "@/lib/plans";
-import { ensureUsageWindow, getOrCreateWorkspaceForUser } from "@/lib/workspace";
+import { ensureUsageWindow, getOrCreateWorkspaceForUser, ensureLocalWorkspace } from "@/lib/workspace";
 import type { Ctx } from "@/lib/service";
 import type { WorkspaceSummary } from "@/lib/types";
 
@@ -45,35 +45,26 @@ export async function getCtx(): Promise<Ctx> {
   }
 
   const db = getDb(binding, workspaceId);
+  if (!binding) {
+    await ensureLocalWorkspace(db);
+  }
   return { db, workspaceId, metered: !!binding };
 }
 
 /**
  * Plan + usage snapshot for the current workspace, for the client UI. In demo/
- * local mode returns an unmetered Free summary without touching the DB.
+ * local mode still reads the JSON workspace so usage bars can move during
+ * local testing (quotas are not enforced when metered=false).
  */
 export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
-  if (!ctx.metered) {
-    const free = getPlan("free");
-    return {
-      workspaceId: ctx.workspaceId,
-      planId: "free",
-      metered: false,
-      leadsUsed: 0,
-      leadsLimit: free.leadCreditsPerMonth,
-      sendsUsed: 0,
-      sendsLimit: free.sendsPerMonth,
-      resetsAt: null,
-    };
-  }
+  const free = getPlan("free");
   try {
     const ws = await ctx.db.getWorkspace(ctx.workspaceId);
     if (!ws) {
-      const free = getPlan("free");
       return {
         workspaceId: ctx.workspaceId,
         planId: "free",
-        metered: true,
+        metered: ctx.metered,
         leadsUsed: 0,
         leadsLimit: free.leadCreditsPerMonth,
         sendsUsed: 0,
@@ -86,7 +77,7 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
     return {
       workspaceId: fresh.id,
       planId: fresh.planId,
-      metered: true,
+      metered: ctx.metered,
       leadsUsed: fresh.leadsUsedThisMonth,
       leadsLimit: plan.leadCreditsPerMonth,
       sendsUsed: fresh.sendsUsedThisMonth,
@@ -95,11 +86,10 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
     };
   } catch (err) {
     console.error("[getWorkspaceSummary] failed", err);
-    const free = getPlan("free");
     return {
       workspaceId: ctx.workspaceId,
       planId: "free",
-      metered: true,
+      metered: ctx.metered,
       leadsUsed: 0,
       leadsLimit: free.leadCreditsPerMonth,
       sendsUsed: 0,

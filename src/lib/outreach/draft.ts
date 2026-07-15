@@ -18,26 +18,39 @@ function firstName(lead: Lead): string {
 
 function shortCompany(lead: Lead): string {
   return (
-    lead.company.replace(/\b(LLC|Inc|Co|Group|Studio|Partners|Collective|Labs|Academy|Academia)\b\.?/gi, "").trim() ||
     lead.company
+      .replace(/\b(LLC|Inc|Co|Group|Studio|Partners|Collective|Labs|Academy|Academia)\b\.?/gi, "")
+      .trim() || lead.company
+  );
+}
+
+/** Rough US location check for CAN-SPAM physical-address requirement. */
+export function leadLooksLikeUsa(lead: Pick<Lead, "location">): boolean {
+  const loc = lead.location?.trim() ?? "";
+  if (!loc) return false;
+  if (/\b(USA|U\.S\.A\.?|United States|Estados Unidos)\b/i.test(loc)) return true;
+  // City, ST pattern with US state codes
+  return /,\s*(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\b/i.test(
+    loc,
   );
 }
 
 /**
  * Quiet compliance block appended only at send time (not in the editable draft).
- * Keeps CAN-SPAM essentials without the scammy "Sent by… Reply STOP" chrome.
+ * Physical address only for US recipients (CAN-SPAM).
  */
 export function complianceFooter(opts?: {
   physicalAddress?: string | null;
-  fromName?: string | null;
-  fromEmail?: string | null;
+  includeAddress?: boolean;
 }): string {
-  const address = (opts?.physicalAddress || env.physicalAddress()).trim();
   const lines = ["", "—"];
-  if (address && !/placeholder|your city|00000/i.test(address)) {
-    lines.push(address);
+  if (opts?.includeAddress) {
+    const address = (opts.physicalAddress || env.physicalAddress()).trim();
+    if (address && !/placeholder|your city|00000/i.test(address)) {
+      lines.push(address);
+    }
   }
-  lines.push("Si prefieres no recibir más mensajes, responde STOP.");
+  lines.push("If you’d rather not hear from us, reply STOP.");
   return lines.join("\n");
 }
 
@@ -46,13 +59,12 @@ export function generateDraft(lead: Lead, run: Run): DraftResult {
   const company = shortCompany(lead);
   const offer = run.offerNotes?.trim();
   const nicheHint = run.niche.trim();
-  const signOff = run.senderName?.trim() || env.fromName();
+  // senderName may be a multi-line signature block from the browser profile.
+  const signOff = (run.senderName?.trim() || env.fromName()).replace(/\r\n/g, "\n");
 
   const subject = `Propuesta para ${company}`;
-
   const greeting = name ? `Hola ${name},` : `Hola,`;
 
-  // Prefer a concrete hook over quoting privacy-policy blurbs (common scrape noise).
   const blurb = lead.aboutBlurb?.trim() ?? "";
   const blurbLooksLikePolicy =
     /cookie|privacy|identif|gdpr|personalize your experience|terms of/i.test(blurb);
@@ -79,7 +91,6 @@ export function generateDraft(lead: Lead, run: Run): DraftResult {
     "",
     "¿Tendrían 10 minutos la semana que viene para ver si encaja? Si no es el momento, no hay problema — con un “no” me alcanza.",
     "",
-    "Un saludo,",
     signOff,
   ].join("\n");
 

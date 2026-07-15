@@ -69,6 +69,11 @@ Also see [`README.md`](README.md) for setup/run instructions.
      why. Constitution changes need explicit justification.
    Stale documentation is treated as a bug, not a nice-to-have (constitution
    Article V.3).
+8. **Commit and push after every meaningful change (for now).** While we are
+   iterating quickly, end each completed batch of work with a git commit **and**
+   `git push` to the current branch (unless the user says not to). Follow the
+   repo’s commit-message style; never force-push `main`/`master`. Update
+   `docs/session-handoff.md` in the same commit when state changed.
 
 ## Commands
 

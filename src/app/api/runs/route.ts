@@ -11,7 +11,7 @@ const CreateRunSchema = z.object({
   niche: z.string().min(2, "Describe who you want to reach").max(200),
   location: z.string().max(120).optional().nullable(),
   offerNotes: z.string().max(1000).optional().nullable(),
-  senderName: z.string().max(120).optional().nullable(),
+  senderName: z.string().max(500).optional().nullable(),
   searchStrategy: z.enum(["standard", "smart", "local"]).optional(),
   maxLeads: z.number().int().min(1).max(50).optional(),
   demo: z.boolean().optional(),

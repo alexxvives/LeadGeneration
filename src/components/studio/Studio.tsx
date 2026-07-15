@@ -322,18 +322,25 @@ export function Studio() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {board?.workspace?.metered && (
-            <div className="hidden min-w-[16rem] grid-cols-2 gap-3 sm:grid sm:min-w-[20rem]">
-              <UsageBar
-                label="Leads"
-                used={board.workspace.leadsUsed}
-                limit={board.workspace.leadsLimit}
-              />
-              <UsageBar
-                label="Sends"
-                used={board.workspace.sendsUsed}
-                limit={board.workspace.sendsLimit}
-              />
+          {board?.workspace && (
+            <div className="hidden min-w-[16rem] flex-col gap-1 sm:flex sm:min-w-[20rem]">
+              <div className="grid grid-cols-2 gap-3">
+                <UsageBar
+                  label="Leads"
+                  used={board.workspace.leadsUsed}
+                  limit={board.workspace.leadsLimit}
+                />
+                <UsageBar
+                  label="Sends"
+                  used={board.workspace.sendsUsed}
+                  limit={board.workspace.sendsLimit}
+                />
+              </div>
+              {!board.workspace.metered && (
+                <p className="text-[10px] text-mist-500">
+                  Local preview — quotas enforced on the live app
+                </p>
+              )}
             </div>
           )}
           {view === "board" && board?.capabilities.firecrawl && (
@@ -394,15 +401,17 @@ export function Studio() {
       {/* Pipeline view — kanban + full leads table below */}
       {view === "pipeline" && (
         hasLeads ? (
-          <div data-tour="pipeline">
-            <PipelineView
-              leads={board!.leads}
-              onOpen={(id) => setSelectedId(id)}
-              onMoveStage={onMoveStage}
-              onDraft={onDraft}
-              onDecide={onDecide}
-            />
-            <div className="mt-10">
+          <div>
+            <div data-tour="pipeline-board">
+              <PipelineView
+                leads={board!.leads}
+                onOpen={(id) => setSelectedId(id)}
+                onMoveStage={onMoveStage}
+                onDraft={onDraft}
+                onDecide={onDecide}
+              />
+            </div>
+            <div className="mt-10" data-tour="leads-table">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs font-semibold uppercase tracking-widest text-mist-500">
                   All leads
@@ -440,7 +449,7 @@ export function Studio() {
             </div>
           </div>
         ) : (
-          <div data-tour="pipeline">
+          <div data-tour="pipeline-board">
             <EmptyState onLoadDemo={loadDemo} running={running} />
           </div>
         )

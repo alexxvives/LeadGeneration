@@ -4,6 +4,28 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Tour v2, local settings, deliverability research
+- **Tour:** separate pipeline-board + leads-table steps; tip waits until
+  anchored (no center flash); Resend step = BYO domain, tip prefers left;
+  confetti bursts from sides.
+- **Localhost:** `ensureLocalWorkspace` so Sending identity is editable on
+  JSON store; usage bars shown (tracked, not hard-capped) — explains why they
+  were missing (`metered === false` hid them).
+- **Do not** give clients a shared Lodestar send domain — burns reputation;
+  Resend BYO is correct for v1; cold scale later = warmed Google/MS inboxes
+  or Instantly/Smartlead (see `docs/email-providers.md`).
+- **AGENTS.md #8:** commit and push after every meaningful change (for now).
+
+### 2026-07-15 — Tour polish, LUMIA sign-off, click-select pipeline
+- **Stale `.next` chunks** → 404 on `app-pages-internals.js` after heavy HMR;
+  fix is delete `.next` + restart `npm run dev` (hard refresh).
+- **Tour:** smarter tip placement (above/below/side), scroll-into-view,
+  progress dots, Resend step, confetti on finish.
+- **Sign-off:** profile builds `Name / Role | Company / site`; drafts use that
+  block; mailing address appended at send only when lead location looks US.
+- **Pipeline:** no checkboxes — click highlights for Approve all; drag handle
+  spans full card height; double-click opens drawer.
+
 ### 2026-07-14 — Search lead-count, quieter compliance, Spanish drafts
 - **`maxLeads` on CreateRunInput** — UI offers 5/10/15/25; Free capped at
   `FREE_MAX_LEADS_PER_RUN` (10) + monthly credits; paid uses `MAX_LEADS_PER_RUN`

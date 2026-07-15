@@ -10,7 +10,7 @@ import { api } from "@/lib/client-api";
  * TEMP developer tools — tour replay + credit reset.
  * Remove this section before GA.
  */
-export function DeveloperModePanel({ metered }: { metered: boolean }) {
+export function DeveloperModePanel({ metered = true }: { metered?: boolean }) {
   const [resetting, setResetting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -48,9 +48,9 @@ export function DeveloperModePanel({ metered }: { metered: boolean }) {
         <button
           type="button"
           onClick={() => void resetCredits()}
-          disabled={!metered || resetting}
-          title={metered ? "Zero lead and send usage for this month" : "Only works on the live metered app"}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-mist-200 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={resetting}
+          title="Zero lead and send usage counters"
+          className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-mist-200 transition-colors hover:bg-white/5 disabled:opacity-40"
         >
           {resetting ? <Spinner className="h-3.5 w-3.5" /> : null}
           Reset credits
@@ -60,7 +60,7 @@ export function DeveloperModePanel({ metered }: { metered: boolean }) {
       {err && <p className="mt-3 text-sm text-rose-300">{err}</p>}
       {!metered && (
         <p className="mt-3 text-xs text-mist-500">
-          Reset credits needs the live app (usage isn&apos;t metered in local preview).
+          Local preview tracks usage for the bars; hard plan caps apply on the live app.
         </p>
       )}
     </div>

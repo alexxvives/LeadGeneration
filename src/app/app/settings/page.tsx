@@ -93,8 +93,7 @@ export default async function SettingsPage() {
               replyTo: env.replyTo(),
               physicalAddress: env.physicalAddress(),
             }}
-            canEdit={ctx.metered}
-            liveAppUrl="https://leadgeneration.alexxvives.workers.dev/app/settings#sending-identity"
+            canEdit={true}
           />
         </div>
       </section>
@@ -103,7 +102,7 @@ export default async function SettingsPage() {
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Developer mode
         </h2>
-        <DeveloperModePanel metered={usage.metered} />
+        <DeveloperModePanel metered />
       </section>
 
       <section className="mt-8">
@@ -152,10 +151,17 @@ export default async function SettingsPage() {
             </div>
             {usage.metered && <BillingActions paid={usage.planId !== "free"} />}
           </div>
-          {usage.metered && (
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <UsageBar label="Lead credits" used={usage.leadsUsed} limit={usage.leadsLimit} />
-              <UsageBar label="Sends" used={usage.sendsUsed} limit={usage.sendsLimit} />
+          {usage && (
+            <div className="mt-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <UsageBar label="Lead credits" used={usage.leadsUsed} limit={usage.leadsLimit} />
+                <UsageBar label="Sends" used={usage.sendsUsed} limit={usage.sendsLimit} />
+              </div>
+              {!usage.metered && (
+                <p className="mt-2 text-xs text-mist-500">
+                  Local preview tracks usage for UX; hard caps apply on the live app.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -220,7 +226,7 @@ export default async function SettingsPage() {
               {
                 ok: !isPlaceholderAddress(physicalAddress),
                 label: "Mailing address",
-                hint: "Set under Sending identity — required on every commercial email",
+                hint: "Set under Sending identity — appended only when the lead looks US-based (CAN-SPAM)",
               },
               {
                 ok: caps.canSendEmail,
