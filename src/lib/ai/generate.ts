@@ -7,6 +7,7 @@ import { aiChat } from "@/lib/ai/chat";
 import {
   langLabel,
   outreachLangFromLocation,
+  outreachLangFromText,
   type OutreachLang,
 } from "@/lib/outreach/locale";
 
@@ -49,6 +50,19 @@ export async function generateLeadBlurb(opts: {
   return out ? cleanOneLine(out.text, 240) : null;
 }
 
+const PITCH_SYSTEM = (lang: OutreachLang) =>
+  [
+    `You write the "offer / pitch" paragraph for a cold B2B email, in ${langLabel(lang)} only.`,
+    `Voice: first person plural ("we" / local equivalent). Sound like a real founder, not a marketer.`,
+    `Content: 2–3 short sentences that say (1) who we help, (2) the concrete problem we solve, (3) the outcome — grounded ONLY in the website content.`,
+    `Hard rules:`,
+    `- Stay 100% in ${langLabel(lang)}. Never mix languages or leave brand slogans in another language.`,
+    `- Do NOT paste or lightly rewrite homepage taglines, slogans, or "about us" marketing copy.`,
+    `- Do NOT invent features, customers, or claims that are not supported by the source.`,
+    `- No subject line, greeting, sign-off, quotes, or hype words (revolutionize, seamless, leverage, cerebro tecnológico, etc.).`,
+    `- Output the pitch paragraph only — nothing else.`,
+  ].join(" ");
+
 /**
  * Default offer / pitch from the user's own company website (Settings).
  */
@@ -56,19 +70,19 @@ export async function generateDefaultPitch(opts: {
   companyName?: string;
   website: string;
   pageText: string;
-  /** Pitch language — usually the user's market; default English. */
+  /** Pitch language — usually the user's market; else inferred from page text. */
   lang?: OutreachLang;
 }): Promise<string | null> {
   const raw = opts.pageText.replace(/\s+/g, " ").trim().slice(0, 3500);
   if (raw.length < 40) return null;
 
-  const lang = opts.lang ?? "en";
+  const lang = opts.lang ?? outreachLangFromText(raw);
   const out = await aiChat(
-    `You write a short cold-email pitch (2–3 sentences) in ${langLabel(lang)}. Sound like a real person, not a marketer. First person. Concrete value only. No hype words (revolutionize, seamless, leverage). No subject line, greeting, or sign-off.`,
+    PITCH_SYSTEM(lang),
     [
       opts.companyName ? `Our company: ${opts.companyName}` : null,
       `Our website: ${opts.website}`,
-      `Website content:`,
+      `Website content (facts only — rewrite into a cold-email pitch, do not quote slogans):`,
       raw,
     ]
       .filter(Boolean)

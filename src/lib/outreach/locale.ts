@@ -116,3 +116,34 @@ export function langLabel(lang: OutreachLang): string {
       return "English";
   }
 }
+
+/**
+ * Cheap language guess from page text (for pitch generation when no market
+ * location is set). Counts common function words; defaults to English.
+ */
+export function outreachLangFromText(text: string | null | undefined): OutreachLang {
+  const sample = (text ?? "").toLowerCase().slice(0, 4000);
+  if (sample.length < 40) return "en";
+
+  const score = (words: string[]) =>
+    words.reduce((n, w) => n + (sample.match(new RegExp(`\\b${w}\\b`, "g"))?.length ?? 0), 0);
+
+  const scores: Record<OutreachLang, number> = {
+    es: score(["el", "la", "los", "las", "una", "para", "con", "por", "como", "más", "que", "gestiona"]),
+    pt: score(["uma", "para", "com", "não", "você", "pelo", "pela", "está", "são"]),
+    fr: score(["les", "des", "une", "pour", "avec", "dans", "est", "vous", "nous", "être"]),
+    it: score(["che", "una", "per", "con", "del", "sono", "della", "degli", "nel"]),
+    de: score(["der", "die", "das", "und", "den", "mit", "für", "von", "ist", "ein", "eine"]),
+    en: score(["the", "and", "for", "with", "your", "you", "our", "that", "this", "from", "are", "we"]),
+  };
+
+  let best: OutreachLang = "en";
+  let bestScore = -1;
+  for (const lang of Object.keys(scores) as OutreachLang[]) {
+    if (scores[lang] > bestScore) {
+      best = lang;
+      bestScore = scores[lang];
+    }
+  }
+  return bestScore >= 3 ? best : "en";
+}

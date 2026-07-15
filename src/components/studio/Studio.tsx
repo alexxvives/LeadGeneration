@@ -455,22 +455,25 @@ export function Studio() {
       }
     >
       <div
-        className={`grid grid-cols-1 items-end gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] ${
+        className={`flex flex-wrap items-end justify-between gap-4 ${
           lockViewport ? "mb-3 shrink-0" : "mb-6"
         }`}
       >
         <div className="min-w-0">
-          <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-            {view === "pipeline"
-              ? "Pipeline"
-              : view === "leads"
-                ? "Leads"
-                : view === "outreach"
-                  ? "Outreach"
-                  : view === "runs"
-                    ? "Search runs"
-                    : "Search"}
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              {view === "pipeline"
+                ? "Pipeline"
+                : view === "leads"
+                  ? "Leads"
+                  : view === "outreach"
+                    ? "Outreach"
+                    : view === "runs"
+                      ? "Search runs"
+                      : "Search"}
+            </h1>
+            {view === "leads" && hasLeads ? <ExportButton /> : null}
+          </div>
           {view === "runs" || view === "board" ? (
             <p className="mt-1 text-mist-500">
               {view === "runs"
@@ -480,26 +483,7 @@ export function Studio() {
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-self-center">
-          {view === "leads" && hasLeads ? (
-            <>
-              <ExportButton />
-              <div className="glass inline-flex items-center rounded-full p-1 text-sm">
-                <LayoutToggle active={layout === "table"} onClick={() => setLayout("table")}>
-                  Table
-                </LayoutToggle>
-                <LayoutToggle active={layout === "cards"} onClick={() => setLayout("cards")}>
-                  Cards
-                </LayoutToggle>
-                <LayoutToggle active={layout === "map"} onClick={() => setLayout("map")}>
-                  Map
-                </LayoutToggle>
-              </div>
-            </>
-          ) : null}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 lg:justify-self-end">
+        <div className="flex flex-wrap items-center gap-3">
           {board?.workspace && (
             <div className="hidden min-w-[16rem] flex-col gap-1 sm:flex sm:min-w-[20rem]">
               <div className="grid grid-cols-2 gap-3">
@@ -583,11 +567,28 @@ export function Studio() {
       {view === "leads" && (
         hasLeads ? (
           <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-            <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
-              <span className="font-semibold text-mist-200">{board!.leads.length}</span> lead
-              {board!.leads.length === 1 ? "" : "s"} · table, cards, or map
-            </p>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+              <p className="text-xs uppercase tracking-widest text-mist-500">
+                <span className="font-semibold text-mist-200">{board!.leads.length}</span> lead
+                {board!.leads.length === 1 ? "" : "s"} · table, cards, or map
+              </p>
+              <div className="glass inline-flex items-center rounded-full p-1 text-sm">
+                <LayoutToggle active={layout === "table"} onClick={() => setLayout("table")}>
+                  Table
+                </LayoutToggle>
+                <LayoutToggle active={layout === "cards"} onClick={() => setLayout("cards")}>
+                  Cards
+                </LayoutToggle>
+                <LayoutToggle active={layout === "map"} onClick={() => setLayout("map")}>
+                  Map
+                </LayoutToggle>
+              </div>
+            </div>
+            <div
+              className={`min-h-0 flex-1 ${
+                layout === "map" ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
+              }`}
+            >
               {layout === "map" ? (
                 <LeadMap
                   leads={board!.leads}

@@ -9,25 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (Leadify polish pass)
+## ⏱️ Status — updated 2026-07-15 (leads/map/outreach polish + pitch prompt)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Renamed runtime identifiers `lodestar_*` → `leadify_*` (storage keys migrate;
-  webhook tags accept both; D1 CF name stays `lodestar-prod`).
-- Removed STOP / mailing-address auto-footer from sends (ADR 0012 + constitution
-  Art. I.3). Still strips legacy footers from old drafts.
-- Pitch generate: real AI only (Workers AI → Groq → Gemini); no heuristic fake
-  pitch (ADR 0013).
-- Profile + sending settings auto-save on blur with green “Saved”.
-- Outreach approve control is checkmark-only.
-- Contacted leads without email/phone/form method are highlighted; picker
-  creates a follow-up note when set.
+- Leads: Export Excel next to title; table/cards/map toggle on the count row;
+  map fills viewport height; discarded off the map; New pins mist-gray again.
+- Outreach: Sent is a full-height column beside Ready to send (4 columns).
+- Pitch “Generate from website”: stronger prompt + page-language detection
+  (fixes bilingual tagline regurgitation like akademo-edu.com).
 
 ### Next
-1. Redeploy Workers (AI binding + webhook tag rename live).
+1. Commit + deploy so live Workers picks up UI + pitch prompt.
 2. Point Maileroo Dashboard webhook at `/api/webhooks/maileroo`.
 3. Confirm Wrangler `NEXTAUTH_URL` = live Workers URL (Connect Google).
 4. Soft-cap warning popup on send; Maileroo live DNS panel.

@@ -19,9 +19,9 @@ import { Spinner } from "@/components/ui";
 type Coords = { lat: number; lng: number };
 type Pin = { id: string; company: string; coords: Coords; crmStage: CrmStage };
 
-/** Hex colors aligned with Pipeline column dots. */
+/** Hex colors aligned with Pipeline column dots (mist-500 / amber / sky / aurora / rose). */
 const STAGE_PIN: Record<CrmStage, { fill: string; glow: string; label: string }> = {
-  new: { fill: "#0a0a0a", glow: "rgba(10,10,10,0.45)", label: "New" },
+  new: { fill: "#7f92b3", glow: "rgba(127,146,179,0.4)", label: "New" },
   contacted: { fill: "#f7b955", glow: "rgba(247,185,85,0.4)", label: "Contacted" },
   in_conversation: { fill: "#38bdf8", glow: "rgba(56,189,248,0.4)", label: "In Conversation" },
   closed: { fill: "#7ff2c8", glow: "rgba(127,242,200,0.45)", label: "Closed" },
@@ -29,13 +29,13 @@ const STAGE_PIN: Record<CrmStage, { fill: string; glow: string; label: string }>
   discarded: { fill: "#5c6b82", glow: "rgba(92,107,130,0.35)", label: "Discarded" },
 };
 
+/** Discarded leads are parked off the map (same idea as collapsed pipeline columns). */
 const LEGEND_ORDER: CrmStage[] = [
   "new",
   "contacted",
   "in_conversation",
   "closed",
   "not_interested",
-  "discarded",
 ];
 
 const geocodeCache = new Map<string, Coords | null>();
@@ -109,14 +109,22 @@ export function LeadMap({
   const [loadingPins, setLoadingPins] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
 
+  const mapLeads = useMemo(
+    () => leads.filter((l) => (l.crmStage ?? "new") !== "discarded"),
+    [leads],
+  );
+
   const hint = useMemo(
-    () => locationHint?.trim() || leads.find((l) => l.location)?.location || "",
-    [locationHint, leads],
+    () =>
+      locationHint?.trim() ||
+      mapLeads.find((l) => l.location)?.location ||
+      "",
+    [locationHint, mapLeads],
   );
 
   const leadKey = useMemo(
-    () => leads.map((l) => `${l.id}:${l.location ?? ""}:${l.crmStage ?? "new"}`).join("|"),
-    [leads],
+    () => mapLeads.map((l) => `${l.id}:${l.location ?? ""}:${l.crmStage ?? "new"}`).join("|"),
+    [mapLeads],
   );
 
   useEffect(() => {
@@ -127,7 +135,7 @@ export function LeadMap({
       if (cancelled) return;
 
       const uniqueLocs = new Set<string>();
-      for (const l of leads) {
+      for (const l of mapLeads) {
         const loc = (l.location?.trim() || hint).trim();
         if (loc) uniqueLocs.add(loc);
       }
@@ -140,7 +148,7 @@ export function LeadMap({
       if (cancelled) return;
 
       const next: Pin[] = [];
-      for (const l of leads) {
+      for (const l of mapLeads) {
         const loc = (l.location?.trim() || hint).trim();
         let coords = loc ? resolved.get(loc) ?? null : null;
         if (!coords && base) {
@@ -297,16 +305,15 @@ export function LeadMap({
   }, [pins, ready]);
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <div
         ref={wrapRef}
-        className="relative overflow-hidden rounded-xl2 border border-white/10 bg-ink-900"
+        className="relative min-h-0 flex-1 overflow-hidden rounded-xl2 border border-white/10 bg-ink-900"
         data-testid="lead-map"
       >
         <div
           ref={mapElRef}
-          className="h-[min(70vh,560px)] w-full [&_.leaflet-tile-pane]:brightness-[0.72] [&_.leaflet-tile-pane]:contrast-[1.05] [&_.leaflet-tile-pane]:saturate-[0.85]"
-          style={{ minHeight: 360 }}
+          className="h-full w-full min-h-[240px] [&_.leaflet-tile-pane]:brightness-[0.72] [&_.leaflet-tile-pane]:contrast-[1.05] [&_.leaflet-tile-pane]:saturate-[0.85]"
         />
         {(!ready || loadingPins) && !initError && (
           <div className="absolute inset-0 z-[500] grid place-items-center bg-ink-900/70">
@@ -330,7 +337,7 @@ export function LeadMap({
       </div>
 
       {pins.length > 0 && (
-        <ul className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[11px] text-mist-500">
+        <ul className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[11px] text-mist-500">
           {LEGEND_ORDER.map((stage) => {
             const c = STAGE_PIN[stage];
             return (

@@ -50,8 +50,8 @@ const BUCKET_META: Record<
 };
 
 /**
- * Compact 3-column send queue so Needs draft → Review → Ready stay visible
- * together. Edit opens draft-only; info icon opens the lead profile.
+ * Compact 4-column send queue: Needs draft → Review → Ready → Sent.
+ * Edit opens draft-only; info icon opens the lead profile.
  */
 export function OutreachView({
   leads,
@@ -87,19 +87,22 @@ export function OutreachView({
     if (b) groups[b].push(lead);
   }
 
-  const actionable =
-    groups.needs_draft.length + groups.review.length + groups.ready.length;
+  const total =
+    groups.needs_draft.length +
+    groups.review.length +
+    groups.ready.length +
+    groups.sent.length;
 
-  const columns: OutreachBucket[] = ["needs_draft", "review", "ready"];
+  const columns: OutreachBucket[] = ["needs_draft", "review", "ready", "sent"];
 
   return (
     <div data-tour="outreach-queue" className="flex h-full min-h-0 flex-col gap-3">
-      {actionable === 0 && groups.sent.length === 0 ? (
+      {total === 0 ? (
         <p className="rounded-xl2 border border-white/10 bg-ink-900/40 px-5 py-8 text-center text-sm text-mist-400">
           No outreach yet. Run a search, then come back here to draft and send.
         </p>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
+        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-4 lg:items-stretch">
           {columns.map((key) => {
             const meta = BUCKET_META[key];
             const rows = groups[key];
@@ -181,33 +184,6 @@ export function OutreachView({
           })}
         </div>
       )}
-
-      {groups.sent.length > 0 ? (
-        <section className="shrink-0 rounded-xl2 border border-white/10 bg-ink-950/30">
-          <div className="border-b border-white/5 px-3 py-2">
-            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-mist-500">
-              Sent
-              <span className="ml-1.5 tabular-nums text-mist-400">{groups.sent.length}</span>
-            </h3>
-          </div>
-          <ul className="max-h-28 divide-y divide-white/5 overflow-y-auto">
-            {groups.sent.map((lead) => (
-              <OutreachRow
-                key={lead.id}
-                lead={lead}
-                bucket="sent"
-                busy={false}
-                canSendEmail={canSendEmail}
-                onOpenInfo={() => onOpenInfo(lead.id)}
-                onOpenDraft={() => onOpenDraft(lead.id)}
-                onDraft={() => Promise.resolve()}
-                onApprove={() => Promise.resolve()}
-                onSend={() => Promise.resolve()}
-              />
-            ))}
-          </ul>
-        </section>
-      ) : null}
     </div>
   );
 }

@@ -487,3 +487,15 @@ live product preview (map + pipeline) — dropped missing hero image dependency.
 - Contacted-without-method highlighted in pipeline; setting method journals a
   follow-up via `updateLeadCrm`.
 
+### 2026-07-15 — Leads layout + pitch prompt + AI billing notes
+- Leads: Export Excel sits next to the title; table/cards/map toggle shares the
+  count row. Map fills remaining viewport height; discarded pins hidden; New pin
+  color back to mist gray (`#7f92b3`). Outreach Sent is a 4th vertical column.
+- Pitch generate for akademo-edu.com regurgitated bilingual homepage slogans
+  because the system prompt defaulted to English and didn’t forbid tagline
+  paste. Tightened prompt + `outreachLangFromText()` so language follows the
+  page and output must be a cold-email offer rewrite.
+- Billing: Workers AI = 10k Neurons/day free then ~$0.011/1k on Paid Workers;
+  Groq/Gemini only if keys are set (their free tiers apply). Local `.env` has
+  neither Groq nor Gemini — prod uses the `AI` binding.
+
