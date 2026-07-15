@@ -833,3 +833,39 @@ export async function importLeads(
     throw err;
   }
 }
+
+/**
+ * Generate a default outreach pitch from the user's company website (Workers AI).
+ * Falls back with a clear error when AI or page fetch is unavailable.
+ */
+export async function generatePitchFromWebsite(
+  _ctx: Ctx,
+  input: { website: string; companyName?: string },
+): Promise<{ pitch: string }> {
+  const { workersAiAvailable } = await import("@/lib/ai/workers-ai");
+  if (!(await workersAiAvailable())) {
+    throw new Error(
+      "Workers AI is not available. Deploy with the AI binding, or set CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN locally.",
+    );
+  }
+  let url = input.website.trim();
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  try {
+    new URL(url);
+  } catch {
+    throw new Error("Enter a valid website URL.");
+  }
+
+  const { fetchPublicPageText } = await import("@/lib/ai/fetch-page");
+  const { generateDefaultPitch } = await import("@/lib/ai/generate");
+  const pageText = await fetchPublicPageText(url);
+  const pitch = await generateDefaultPitch({
+    website: url,
+    companyName: input.companyName?.trim() || undefined,
+    pageText,
+  });
+  if (!pitch) {
+    throw new Error("AI could not generate a pitch from that site. Try again or write one manually.");
+  }
+  return { pitch };
+}

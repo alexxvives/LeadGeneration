@@ -113,9 +113,10 @@ src/lib/
   workspace.ts       Workspace provisioning + monthly usage window.
   errors.ts          QuotaError (→ API 402).
   cf.ts              Cloudflare D1 binding resolver (prod only).
+  ai/                Optional Workers AI (blurbs + default pitch); demo-safe null.
   db/                Repository (LeadRepository) + JsonStore (dev) & D1Store (prod), workspace-scoped.
   search/            Providers (firecrawl/exa), enrichment, demo fallback.
-  outreach/          Draft generation + compliance footer.
+  outreach/          Locale-aware draft templates + compliance footer.
   email/             Rate-limited sender (resend/smtp/google mailbox/demo).
   billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).

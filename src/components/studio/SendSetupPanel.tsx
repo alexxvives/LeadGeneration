@@ -10,57 +10,12 @@ import {
 import { DomainHealthPanel } from "@/components/studio/DomainHealthChecklist";
 import {
   loadWarmupProfile,
-  saveWarmupProfile,
   recommendedDailySoftCap,
   todayKey,
-  type MailboxAgeBand,
-  type MailboxVolumeBand,
 } from "@/lib/email/warmup";
 import type { EasyEmailProvider, MailboxPublicStatus } from "@/lib/types";
 
 type PathId = "easy" | "pro";
-
-/** Single warmth choice → age/volume bands for soft daily recommend. */
-type WarmthId = "new" | "warming" | "active";
-
-const WARMTH: {
-  id: WarmthId;
-  label: string;
-  hint: string;
-  ageBand: MailboxAgeBand;
-  volumeBand: MailboxVolumeBand;
-}[] = [
-  {
-    id: "new",
-    label: "New / cold",
-    hint: "~15/day",
-    ageBand: "new",
-    volumeBand: "none",
-  },
-  {
-    id: "warming",
-    label: "A few months old",
-    hint: "~40/day",
-    ageBand: "months",
-    volumeBand: "light",
-  },
-  {
-    id: "active",
-    label: "Established & active",
-    hint: "~80/day",
-    ageBand: "established",
-    volumeBand: "regular",
-  },
-];
-
-function warmthFromBands(
-  age: MailboxAgeBand | null | undefined,
-  volume: MailboxVolumeBand | null | undefined,
-): WarmthId {
-  if (age === "established" || volume === "regular") return "active";
-  if (age === "months" || age === "weeks" || volume === "light") return "warming";
-  return "new";
-}
 
 /**
  * Dual send-path framing: Easy (Resend or Maileroo) is the default wizard;
@@ -89,15 +44,11 @@ export function SendSetupPanel({
     initial.easyEmailProvider ?? "resend",
   );
   const [mailbox, setMailbox] = useState(mailboxInitial);
-  const [warmth, setWarmth] = useState<WarmthId>(
-    warmthFromBands(mailboxInitial.ageBand, mailboxInitial.volumeBand),
-  );
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setMailbox(mailboxInitial);
-    setWarmth(warmthFromBands(mailboxInitial.ageBand, mailboxInitial.volumeBand));
   }, [mailboxInitial]);
 
   useEffect(() => {
@@ -122,26 +73,12 @@ export function SendSetupPanel({
     }
   }
 
-  const warmthMeta = WARMTH.find((w) => w.id === warmth) ?? WARMTH[0];
   const isMaileroo = easyProvider === "maileroo";
-
-  useEffect(() => {
-    if (!mailbox.connected) return;
-    const profile = loadWarmupProfile();
-    saveWarmupProfile({
-      ...profile,
-      ageBand: warmthMeta.ageBand,
-      volumeBand: warmthMeta.volumeBand,
-      startedOn: profile.startedOn || todayKey(),
-    });
-  }, [mailbox.connected, warmthMeta.ageBand, warmthMeta.volumeBand]);
-
-  const softCap = recommendedDailySoftCap({
-    startedOn: todayKey(),
-    ageBand: warmthMeta.ageBand,
-    volumeBand: warmthMeta.volumeBand,
-    days: {},
-  });
+  const softCap = recommendedDailySoftCap(
+    mailbox.connected
+      ? loadWarmupProfile()
+      : { startedOn: todayKey(), days: {} },
+  );
 
   async function disconnect() {
     setBusy(true);
@@ -167,11 +104,7 @@ export function SendSetupPanel({
   }
 
   function connectGoogle() {
-    const params = new URLSearchParams({
-      ageBand: warmthMeta.ageBand,
-      volumeBand: warmthMeta.volumeBand,
-    });
-    window.location.href = `/api/mailbox/google/start?${params.toString()}`;
+    window.location.href = "/api/mailbox/google/start";
   }
 
   return (
@@ -329,39 +262,6 @@ export function SendSetupPanel({
               </div>
             ) : (
               <div className="mt-5 space-y-5">
-                <div>
-                  <p className="mb-2 text-sm font-medium text-mist-100">
-                    How warm is this inbox?
-                  </p>
-                  <p className="mb-3 text-xs text-mist-500">
-                    Sets a soft daily suggest (you can still send more). No paid warmup network.
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    {WARMTH.map((w) => {
-                      const on = warmth === w.id;
-                      return (
-                        <button
-                          key={w.id}
-                          type="button"
-                          onClick={() => setWarmth(w.id)}
-                          className={`rounded-xl border px-4 py-3 text-left transition-colors ${
-                            on
-                              ? "border-aurora-400/50 bg-aurora-400/10 text-mist-100"
-                              : "border-white/10 bg-ink-950/40 text-mist-300 hover:border-white/20 hover:text-mist-100"
-                          }`}
-                        >
-                          <span className="block text-sm font-medium">{w.label}</span>
-                          <span
-                            className={`mt-0.5 block text-xs ${on ? "text-aurora-300" : "text-mist-500"}`}
-                          >
-                            Suggest {w.hint}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
                 <div className="flex flex-wrap gap-3">
                   <button
                     type="button"

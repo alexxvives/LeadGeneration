@@ -1,7 +1,7 @@
 "use client";
 
 import type { LeadWithOutreach } from "@/lib/types";
-import { FitMeter, Spinner, StatusPill } from "@/components/ui";
+import { FitMeter, Spinner } from "@/components/ui";
 import {
   ArrowIcon,
   CheckIcon,
@@ -258,73 +258,74 @@ function OutreachRow({
             <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
           ) : null}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
           <FitMeter score={lead.fitScore} />
-          {lead.outreach && <StatusPill status={lead.outreach.status} />}
+          {bucket === "review" && (
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              <button
+                type="button"
+                onClick={onOpenDraft}
+                className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-300 hover:bg-white/5"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onApprove()}
+                className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
+              >
+                {busy ? <Spinner className="h-3 w-3" /> : <CheckIcon className="h-3 w-3" />}
+                Approve
+              </button>
+            </div>
+          )}
+          {bucket === "ready" && (
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              <button
+                type="button"
+                onClick={onOpenDraft}
+                className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-300 hover:bg-white/5"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                disabled={busy || !email}
+                onClick={() => void onSend()}
+                className="inline-flex items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
+              >
+                {busy ? <Spinner className="h-3 w-3" /> : <ArrowIcon className="h-3 w-3" />}
+                {canSendEmail ? "Send" : "Send (simulate)"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {bucket === "needs_draft" && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void onDraft()}
-            className="inline-flex items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
-          >
-            {busy ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3 w-3" />}
-            Draft
-          </button>
-        )}
-        {bucket === "review" && (
-          <>
-            <button
-              type="button"
-              onClick={onOpenDraft}
-              className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-300 hover:bg-white/5"
-            >
-              Edit
-            </button>
+      {(bucket === "needs_draft" || bucket === "sent") && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {bucket === "needs_draft" && (
             <button
               type="button"
               disabled={busy}
-              onClick={() => void onApprove()}
-              className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
+              onClick={() => void onDraft()}
+              className="inline-flex items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
             >
-              {busy ? <Spinner className="h-3 w-3" /> : <CheckIcon className="h-3 w-3" />}
-              Approve
+              {busy ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3 w-3" />}
+              Draft
             </button>
-          </>
-        )}
-        {bucket === "ready" && (
-          <>
+          )}
+          {bucket === "sent" && (
             <button
               type="button"
               onClick={onOpenDraft}
-              className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-300 hover:bg-white/5"
+              className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-400 hover:bg-white/5"
             >
-              Edit
+              View draft
             </button>
-            <button
-              type="button"
-              disabled={busy || !email}
-              onClick={() => void onSend()}
-              className="inline-flex items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
-            >
-              {busy ? <Spinner className="h-3 w-3" /> : <ArrowIcon className="h-3 w-3" />}
-              {canSendEmail ? "Send" : "Send (simulate)"}
-            </button>
-          </>
-        )}
-        {bucket === "sent" && (
-          <button
-            type="button"
-            onClick={onOpenDraft}
-            className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-400 hover:bg-white/5"
-          >
-            View draft
-          </button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </li>
   );
 }

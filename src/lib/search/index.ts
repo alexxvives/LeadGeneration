@@ -1,4 +1,6 @@
 import { env, getCapabilities } from "@/lib/config";
+import { generateLeadBlurb, mapPool } from "@/lib/ai/generate";
+import { workersAiAvailable } from "@/lib/ai/workers-ai";
 import { scoreLead, type RawLead } from "@/lib/fit-score";
 import type { CreateRunInput } from "@/lib/types";
 import { demoLeads } from "./demo";
@@ -71,7 +73,8 @@ function pageToRawLead(page: PageResult, input: CreateRunInput): RawLead {
     // (that hid geo mismatches like "Barcelona SC" in New York).
     location: scrapedLocation || null,
     // Prefer meta description, then page body — both run through junk filters so
-    // cookie/privacy consent copy never lands in About.
+    // cookie/privacy consent copy never lands in About. Optional Workers AI
+    // polish happens after ranking (see runSearch).
     aboutBlurb:
       extractBlurb(page.description || "") ??
       extractBlurb(page.content || "") ??
@@ -168,6 +171,8 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
     };
   }
 
+  const pageByUrl = new Map(pages.map((p) => [urlKey(p.url), p]));
+
   const seen = new Set<string>();
   const candidates = pages
     .map((p) => finalize(pageToRawLead(p, input), p.url, input))
@@ -179,12 +184,24 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
     });
   const ranked = candidates.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit);
 
-  // Verify emails when a Maileroo/Zeruh key is present (no-op heuristics otherwise).
-  const leads: ScoredLead[] = [];
-  for (const lead of ranked) {
+  const useAi = await workersAiAvailable();
+
+  const leads: ScoredLead[] = await mapPool(ranked, 3, async (lead) => {
     const emails = await filterVerifiableEmails(lead.emails);
-    leads.push({ ...lead, emails });
-  }
+    let aboutBlurb = lead.aboutBlurb;
+    if (useAi) {
+      const page = pageByUrl.get(urlKey(lead.sourceUrl));
+      const rawText = `${page?.description ?? ""}\n${page?.content ?? ""}\n${lead.aboutBlurb ?? ""}`;
+      const polished = await generateLeadBlurb({
+        company: lead.company,
+        website: lead.website,
+        location: lead.location,
+        rawText,
+      });
+      if (polished) aboutBlurb = polished;
+    }
+    return { ...lead, emails, aboutBlurb };
+  });
 
   return { provider: provider.name, mode: "live", leads };
 }

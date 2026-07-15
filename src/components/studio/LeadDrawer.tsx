@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
-import { CrmStagePill, FitMeter, Spinner, StatusPill } from "@/components/ui";
+import { CrmStagePill, FitMeter, Spinner } from "@/components/ui";
 import {
   ArrowIcon,
   CheckIcon,
@@ -51,6 +51,7 @@ interface DrawerProps {
   onSaveDraft: (
     outreachId: string,
     patch: { subject: string; body: string; toEmail: string | null },
+    opts?: { silent?: boolean },
   ) => Promise<void>;
   onDecide: (outreachId: string, decision: "approved" | "rejected") => Promise<void>;
   onSend: (outreachId: string) => Promise<void>;
@@ -123,30 +124,24 @@ export function LeadDrawer(props: DrawerProps) {
   }, [lead.id, lead.crmStage, lead.contactMethod, lead.followUps,
       outreach?.id, outreach?.subject, outreach?.body, outreach?.toEmail, lead.emails]);
 
-  // Keyboard shortcuts — draft mode only; skip when focus is in an input.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { onClose(); return; }
-      if (mode !== "draft") return;
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (e.key === "a" || e.key === "A") {
-        if (outreach && outreach.status !== "approved" && outreach.status !== "sent") {
-          void run("approve", () => props.onDecide(outreach.id, "approved"));
-        }
-      }
-      if (e.key === "r" || e.key === "R") {
-        if (outreach && outreach.status !== "sent") {
-          void run("reject", () => props.onDecide(outreach.id, "rejected"));
-        }
-      }
-      if (e.key === "g" || e.key === "G") {
-        void run("draft", () => props.onDraft(lead.id));
-      }
+      if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, outreach, lead.id, props, mode]);
+  }, [onClose]);
+
+  /** Persist composer fields before approve/send so edits aren't lost. */
+  const persistIfDirty = async () => {
+    if (!outreach || !dirty) return;
+    await props.onSaveDraft(
+      outreach.id,
+      { subject, body, toEmail: toEmail || null },
+      { silent: true },
+    );
+    setDirty(false);
+  };
 
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key);
@@ -211,24 +206,24 @@ export function LeadDrawer(props: DrawerProps) {
         className={`animate-float-up relative flex w-full flex-col overflow-y-auto border border-white/10 bg-ink-900 shadow-2xl ${
           mode === "info"
             ? "max-h-[min(90dvh,720px)] max-w-[36.8rem] rounded-xl2"
-            : "h-full max-h-[min(92dvh,900px)] max-w-xl rounded-xl2 sm:max-h-[min(90dvh,860px)]"
+            : "h-full max-h-[min(92dvh,900px)] max-w-[43rem] rounded-xl2 sm:max-h-[min(90dvh,860px)]"
         }`}
       >
 
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              {mode === "info" ? (
+            {mode === "info" ? (
+              <div className="flex items-center gap-2">
                 <CrmStagePill stage={lead.crmStage ?? "new"} />
-              ) : outreach ? (
-                <StatusPill status={outreach.status} />
-              ) : (
-                <CrmStagePill stage={lead.crmStage ?? "new"} />
-              )}
-              <FitMeter score={lead.fitScore} />
-            </div>
-            <h2 className="mt-2 truncate font-display text-2xl font-semibold">
+                <FitMeter score={lead.fitScore} />
+              </div>
+            ) : null}
+            <h2
+              className={`truncate font-display text-2xl font-semibold ${
+                mode === "info" ? "mt-2" : ""
+              }`}
+            >
               {mode === "draft" ? "Draft" : lead.company}
             </h2>
             {mode === "draft" ? (
@@ -459,24 +454,21 @@ export function LeadDrawer(props: DrawerProps) {
             </>
           ) : (
             <>
-          {/* Draft-only composer */}
-          <section className="rounded-xl2 border border-white/10 bg-ink-850/60 p-5">
+          {/* Draft-only composer — flat; popup shell already provides the surface */}
+          <section>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-display text-lg font-semibold">Email</h3>
-              <div className="flex items-center gap-2">
-                {outreach && !sent && (
-                  <button
-                    onClick={() => run("draft", () => props.onDraft(lead.id))}
-                    disabled={busy === "draft"}
-                    title="Rewrite this draft (G)"
-                    className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-xs text-mist-300 transition-colors hover:bg-white/5 disabled:opacity-40"
-                  >
-                    {busy === "draft" ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3.5 w-3.5" />}
-                    Regenerate
-                  </button>
-                )}
-                {outreach && <StatusPill status={outreach.status} />}
-              </div>
+              {outreach && !sent ? (
+                <button
+                  onClick={() => run("draft", () => props.onDraft(lead.id))}
+                  disabled={busy === "draft"}
+                  title="Rewrite this draft"
+                  className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-xs text-mist-300 transition-colors hover:bg-white/5 disabled:opacity-40"
+                >
+                  {busy === "draft" ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3.5 w-3.5" />}
+                  Regenerate
+                </button>
+              ) : null}
             </div>
 
             {!outreach ? (
@@ -487,7 +479,6 @@ export function LeadDrawer(props: DrawerProps) {
                 <button
                   onClick={() => run("draft", () => props.onDraft(lead.id))}
                   disabled={busy === "draft"}
-                  title="G"
                   className="mt-4 inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
                 >
                   {busy === "draft" ? <Spinner className="h-4 w-4" /> : <SparkIcon className="h-4 w-4" />}
@@ -531,42 +522,29 @@ export function LeadDrawer(props: DrawerProps) {
                 )}
 
                 {!sent && (
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <button
-                      onClick={() =>
-                        run("save", () =>
-                          props.onSaveDraft(outreach.id, { subject, body, toEmail: toEmail || null }),
-                        ).then(() => setDirty(false))
-                      }
-                      disabled={!dirty || busy === "save"}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-mist-100 transition-colors hover:bg-white/5 disabled:opacity-40"
-                    >
-                      {busy === "save" ? <Spinner className="h-3.5 w-3.5" /> : null}
-                      Save edits
-                    </button>
-
-                    <button
-                      onClick={() => run("reject", () => props.onDecide(outreach.id, "rejected"))}
-                      disabled={busy === "reject"}
-                      title="R"
-                      className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-mist-300 transition-colors hover:bg-white/5 disabled:opacity-40"
-                    >
-                      <XIcon className="h-4 w-4" /> Reject
-                    </button>
-
+                  <div className="flex justify-center pt-1">
                     {outreach.status !== "approved" ? (
                       <button
-                        onClick={() => run("approve", () => props.onDecide(outreach.id, "approved"))}
+                        onClick={() =>
+                          run("approve", async () => {
+                            await persistIfDirty();
+                            await props.onDecide(outreach.id, "approved");
+                          })
+                        }
                         disabled={busy === "approve"}
-                        title="A"
-                        className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-4 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
                       >
                         {busy === "approve" ? <Spinner className="h-3.5 w-3.5" /> : <CheckIcon className="h-4 w-4" />}
                         Approve
                       </button>
                     ) : (
                       <button
-                        onClick={() => run("send", () => props.onSend(outreach.id))}
+                        onClick={() =>
+                          run("send", async () => {
+                            await persistIfDirty();
+                            await props.onSend(outreach.id);
+                          })
+                        }
                         disabled={!canSend || busy === "send"}
                         title={!toEmail ? "Add a recipient email first" : undefined}
                         className="inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
@@ -639,13 +617,6 @@ export function LeadDrawer(props: DrawerProps) {
               </div>
             )}
           </section>
-
-          <p className="text-center text-[11px] text-mist-600">
-            Shortcuts: <kbd className="rounded bg-white/5 px-1">G</kbd> generate ·{" "}
-            <kbd className="rounded bg-white/5 px-1">A</kbd> approve ·{" "}
-            <kbd className="rounded bg-white/5 px-1">R</kbd> reject ·{" "}
-            <kbd className="rounded bg-white/5 px-1">Esc</kbd> close
-          </p>
             </>
           )}
         </div>

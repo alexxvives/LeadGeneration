@@ -21,5 +21,10 @@
       "database_id": "f990d480-83aa-4123-8979-e47d11347069",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  // Optional LLM for lead blurbs + default pitch (Llama 3.1 via Workers AI).
+  // Demo mode still works with zero AI — heuristics/templates only.
+  "ai": {
+    "binding": "AI"
+  }
 }

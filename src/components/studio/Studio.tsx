@@ -214,14 +214,16 @@ export function Studio() {
   const onSaveDraft = async (
     outreachId: string,
     patch: { subject: string; body: string; toEmail: string | null },
+    opts?: { silent?: boolean },
   ) => {
     try {
       const { outreach } = await api.updateOutreach(outreachId, patch);
       const lead = findLeadByOutreach(outreachId);
       if (lead) patchLeadLocal(lead.id, { outreach });
-      toast("ok", "Edits saved.");
+      if (!opts?.silent) toast("ok", "Edits saved.");
     } catch (e) {
       toast("err", (e as Error).message);
+      throw e;
     }
   };
 

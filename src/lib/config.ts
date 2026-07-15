@@ -26,6 +26,11 @@ export interface Capabilities {
   turnstile: boolean; // Turnstile configured (signup bot check)
   /** Zeruh / Maileroo email verification API key present. */
   emailVerify: boolean;
+  /**
+   * Workers AI available for blurbs/pitch (binding on CF, or REST token locally).
+   * Sync approximation — UI may still show generate when REST creds exist.
+   */
+  workersAi: boolean;
 }
 
 function has(v: string | undefined | null): boolean {
@@ -49,6 +54,10 @@ export function getCapabilities(): Capabilities {
     billing: has(process.env.STRIPE_SECRET_KEY),
     turnstile: has(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) && has(process.env.TURNSTILE_SECRET_KEY),
     emailVerify: has(process.env.MAILEROO_VERIFY_API_KEY) || has(process.env.ZERUH_API_KEY),
+    // REST creds OR production (binding may exist at request time — UI enables generate in prod).
+    workersAi:
+      (has(process.env.CLOUDFLARE_ACCOUNT_ID) && has(process.env.CLOUDFLARE_API_TOKEN)) ||
+      process.env.NODE_ENV === "production",
   };
 }
 
@@ -152,6 +161,13 @@ export const env = {
   // ── Turnstile (Cloudflare bot check, production signup only) ──
   turnstileSiteKey: () => process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "",
   turnstileSecretKey: () => process.env.TURNSTILE_SECRET_KEY?.trim() ?? "",
+
+  /**
+   * Optional Workers AI REST (local/dev). Production uses the `AI` binding in
+   * wrangler.jsonc — no token needed on the Worker.
+   */
+  cfAccountId: () => process.env.CLOUDFLARE_ACCOUNT_ID?.trim() ?? "",
+  cfApiToken: () => process.env.CLOUDFLARE_API_TOKEN?.trim() ?? "",
 
   // ── Smoke test bypass ──
   // When set, requests carrying `x-smoke-key: <value>` skip auth enforcement so

@@ -456,3 +456,12 @@ live product preview (map + pipeline) — dropped missing hero image dependency.
 - **Sender profile:** position/company fields were redundant with the editable
   sign-off textarea — removed from Settings UI (localStorage fields kept).
 
+### 2026-07-15 — Locale drafts + Workers AI for blurbs/pitch
+- **Draft language** follows lead `location` (ES/EN/FR/IT/DE/PT) via
+  `src/lib/outreach/locale.ts` + multi-copy templates in `draft.ts`. Default EN.
+- **Chose Workers AI** over Groq/Gemini: same Cloudflare deploy as D1, no extra
+  vendor key in prod (`ai.binding` in wrangler). Local optional
+  `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` REST. Demo stays template/heuristic.
+- Lead blurbs polished after live search (concurrency 3). Default pitch:
+  Settings → website + “Generate from website” → `/api/ai/pitch`.
+

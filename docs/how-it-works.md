@@ -146,7 +146,8 @@ the local JSON-store path is always unmetered/demo.
 - **`src/lib/search/`** — `runSearch()` picks a provider (Firecrawl → Exa),
   scrapes/enriches to leads, and **falls back to demo data** on missing key or
   error. `enrich.ts` extracts emails/phones/blurb; `fit-score.ts` scores.
-- **`src/lib/outreach/draft.ts`** — template-based personalization + the
+- **`src/lib/outreach/draft.ts`** — locale-aware template personalization (language
+  from lead location) + the
   CAN-SPAM-style compliance footer. Swap in an LLM here without touching the
   approve/send flow.
 - **`src/lib/email/`** — `sendEmail()` (Google mailbox → Resend → SMTP → demo),

@@ -82,10 +82,10 @@ Ordered by impact-to-effort. Each step is isolated to `src/lib/search/` so it
 won't disturb the approval/send flow.
 
 ### Tier 1 — high impact, low effort
-1. **Structured extraction instead of regex.** Use Firecrawl's **`/extract`**
-   (schema-based) or an LLM pass over the scraped markdown to return a typed
-   object: `{ company, emails[], phones[], contactName, services[], summary }`.
-   Far more accurate than regexes, and gives real personalization material.
+1. **Structured extraction instead of regex.** ✅ _Partial_ — Workers AI (optional)
+   rewrites lead `aboutBlurb` from scraped text after live search. Still to do:
+   Firecrawl `/extract` for typed `{ company, emails[], phones[], contactName, services[] }`.
+   Heuristic extract remains the zero-key fallback.
 2. **Email verification.** Run discovered emails through a verification API
    (Maileroo includes one; also NeverBounce/ZeroBounce) and store a
    `deliverable` flag. Down-rank or hide undeliverable addresses. **This alone
