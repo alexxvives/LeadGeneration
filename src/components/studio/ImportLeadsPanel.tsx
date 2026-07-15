@@ -1,10 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import type { ImportLeadRow } from "@/lib/types";
-import { shortLocation } from "@/lib/search/enrich";
+import { normalizeWebsiteUrl } from "@/lib/website";
 
 /** Normalize header cells for fuzzy column matching. */
 function normHeader(h: string): string {
@@ -90,7 +89,6 @@ function cellStr(v: unknown): string {
 
 function cleanCellText(raw: string): string {
   let s = raw.trim();
-  // Formula-as-text phones: "=+34 933 18 05 72"
   if (s.startsWith("=")) s = s.replace(/^=+/, "").trim();
   return s;
 }
@@ -102,24 +100,9 @@ function splitList(raw: string): string[] {
     .filter(Boolean);
 }
 
-function normalizeWebsite(raw: string | null): string | null {
-  if (!raw) return null;
-  let u = raw.trim();
-  if (!u || u === "[object Object]") return null;
-  if (!/^https?:\/\//i.test(u) && /\./.test(u)) u = `https://${u}`;
-  try {
-    const parsed = new URL(u);
-    if (!parsed.hostname.includes(".")) return null;
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
-
 function normalizePhone(raw: string): string {
   let p = raw.trim();
   if (p.startsWith("=")) p = p.replace(/^=+/, "").trim();
-  // Keep leading + and digits/spaces/dashes/parens
   return p.replace(/[^\d+\s().-]/g, "").replace(/\s+/g, " ").trim();
 }
 
@@ -145,7 +128,6 @@ function rowsFromMatrix(matrix: string[][]): ImportLeadRow[] {
     const company = companyI >= 0 ? cellStr(row[companyI]) : "";
     const emails = emailI >= 0 ? splitList(cellStr(row[emailI])) : [];
     if (!company && emails.length === 0) continue;
-    const fullLocation = locationI >= 0 ? cellStr(row[locationI]) || null : null;
     const phones =
       phoneI >= 0
         ? splitList(cellStr(row[phoneI]))
@@ -155,9 +137,10 @@ function rowsFromMatrix(matrix: string[][]): ImportLeadRow[] {
     out.push({
       company,
       emails,
-      website: websiteI >= 0 ? normalizeWebsite(cellStr(row[websiteI]) || null) : null,
+      website: websiteI >= 0 ? normalizeWebsiteUrl(cellStr(row[websiteI]) || null) : null,
       phones,
-      location: shortLocation(fullLocation) ?? fullLocation,
+      // Keep full street addresses from the file (better for outreach than city-only).
+      location: locationI >= 0 ? cellStr(row[locationI]) || null : null,
       contactName: contactI >= 0 ? cellStr(row[contactI]) || null : null,
     });
   }
@@ -208,7 +191,6 @@ async function parseFile(file: File): Promise<ImportLeadRow[]> {
     sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       const vals: string[] = [];
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        // Prefer ExcelJS text / hyperlink-aware value over raw formula objects.
         const raw =
           cell.value != null
             ? cell.value
@@ -227,19 +209,31 @@ async function parseFile(file: File): Promise<ImportLeadRow[]> {
   throw new Error("Use a .csv or .xlsx file.");
 }
 
+type ImportDest = "append" | "new";
+
 /**
  * Drop-zone / file picker to feed an existing lead list into the pipeline.
  * Flexible headers — we map Company/Email/Website/etc. by aliases.
  */
 export function ImportLeadsPanel({
+  activeRunId,
+  boardLeadCount = 0,
   onImported,
 }: {
-  onImported: () => Promise<void> | void;
+  /** When set and board has leads, user can append onto that board. */
+  activeRunId?: string | null;
+  boardLeadCount?: number;
+  onImported: (runId: string) => Promise<void> | void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const canAppend = !!activeRunId && boardLeadCount > 0;
+  const [dest, setDest] = useState<ImportDest>(canAppend ? "append" : "new");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  // If board becomes available mid-session, prefer append.
+  const effectiveDest: ImportDest = canAppend ? dest : "new";
 
   async function handleFile(file: File | null) {
     if (!file) return;
@@ -254,20 +248,32 @@ export function ImportLeadsPanel({
       const res = await fetch("/api/leads/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leads }),
+        body: JSON.stringify({
+          leads,
+          mode: effectiveDest,
+          appendToRunId: effectiveDest === "append" ? activeRunId : undefined,
+        }),
       });
       const data = (await res.json()) as {
         error?: string;
         imported?: number;
+        merged?: number;
         skipped?: number;
+        run?: { id: string };
       };
       if (!res.ok) throw new Error(data.error ?? "Import failed");
-      setMsg(
-        `Imported ${data.imported ?? 0} lead${(data.imported ?? 0) === 1 ? "" : "s"}` +
-          (data.skipped ? ` · skipped ${data.skipped} duplicates` : "") +
-          ".",
-      );
-      await onImported();
+      const parts = [
+        `Added ${data.imported ?? 0} new`,
+        data.merged ? `merged ${data.merged} existing` : null,
+        data.skipped
+          ? effectiveDest === "new"
+            ? `skipped ${data.skipped} already in workspace`
+            : `skipped ${data.skipped} unchanged`
+          : null,
+      ].filter(Boolean);
+      setMsg(`${parts.join(" · ")}.`);
+      if (data.run?.id) await onImported(data.run.id);
+      else await onImported(activeRunId ?? "");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Import failed");
     } finally {
@@ -282,9 +288,45 @@ export function ImportLeadsPanel({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-mist-100">Already have a list?</p>
           <p className="mt-1 text-xs leading-relaxed text-mist-500">
-            Drop a CSV or Excel file. We auto-detect columns like Opportunity/Company, Email,
-            Website, Phone, Address.
+            Drop a CSV or Excel file. We auto-detect Opportunity/Company, Email, Website,
+            Phone, Address.
           </p>
+          {canAppend ? (
+            <div className="mt-3">
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-widest text-mist-500">
+                Where should they go?
+              </p>
+              <div className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1">
+                <button
+                  type="button"
+                  onClick={() => setDest("append")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    effectiveDest === "append"
+                      ? "bg-aurora-400 text-ink-950"
+                      : "text-mist-300 hover:text-mist-100"
+                  }`}
+                >
+                  Current board
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDest("new")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    effectiveDest === "new"
+                      ? "bg-aurora-400 text-ink-950"
+                      : "text-mist-300 hover:text-mist-100"
+                  }`}
+                >
+                  New list
+                </button>
+              </div>
+              <p className="mt-1.5 text-[11px] text-mist-600">
+                {effectiveDest === "append"
+                  ? `Adds onto your open board (${boardLeadCount} lead${boardLeadCount === 1 ? "" : "s"}). Matches by email/website update gaps instead of duplicating.`
+                  : "Starts a fresh board. Rows already in the workspace are skipped."}
+              </p>
+            </div>
+          ) : null}
         </div>
         <button
           type="button"
@@ -292,7 +334,7 @@ export function ImportLeadsPanel({
           onClick={() => inputRef.current?.click()}
           className="inline-flex shrink-0 items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.02] disabled:opacity-50"
         >
-          {busy ? <Spinner className="h-4 w-4" /> : <ArrowIcon className="h-4 w-4" />}
+          {busy ? <Spinner className="h-4 w-4" /> : null}
           {busy ? "Importing…" : "Import CSV / Excel"}
         </button>
         <input

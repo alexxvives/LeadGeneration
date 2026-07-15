@@ -535,8 +535,11 @@ export function Studio() {
           )}
           {!running && (
             <ImportLeadsPanel
-              onImported={async () => {
-                await refresh();
+              activeRunId={activeRunId ?? board?.run?.id ?? null}
+              boardLeadCount={board?.leads.length ?? 0}
+              onImported={async (runId) => {
+                if (runId) await loadRunOnBoard(runId);
+                else await refresh();
                 setView("leads");
               }}
             />

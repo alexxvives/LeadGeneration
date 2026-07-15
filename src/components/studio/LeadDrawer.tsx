@@ -15,6 +15,7 @@ import {
   XIcon,
 } from "@/components/icons";
 import { newId } from "@/lib/id";
+import { displayWebsite, isUsableWebsite } from "@/lib/website";
 
 function todayIsoDate(): string {
   const d = new Date();
@@ -316,10 +317,10 @@ export function LeadDrawer(props: DrawerProps) {
 
           {/* Contact info */}
           <section className="grid gap-3">
-            {lead.website && (
+            {isUsableWebsite(lead.website) && (
               <InfoRow icon={<GlobeIcon className="h-4 w-4" />}>
-                <a href={lead.website} target="_blank" rel="noreferrer" className="text-aurora-300 hover:underline">
-                  {lead.website.replace(/^https?:\/\//, "")}
+                <a href={lead.website!} target="_blank" rel="noreferrer" className="text-aurora-300 hover:underline">
+                  {displayWebsite(lead.website)}
                 </a>
               </InfoRow>
             )}

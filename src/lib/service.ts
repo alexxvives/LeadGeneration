@@ -532,7 +532,7 @@ export async function sendApprovedOutreach(
 }
 
 function domainKey(website: string | null | undefined): string | null {
-  if (!website) return null;
+  if (!website || /\[object\s+Object\]/i.test(website)) return null;
   try {
     const host = new URL(
       website.startsWith("http") ? website : `https://${website}`,
@@ -705,23 +705,29 @@ function contactMethodFollowUpNote(method: ContactMethod): string {
 /** Row shape for CSV/Excel import (flexible mapping happens client-side). */
 export type { ImportLeadRow };
 
+export type ImportLeadsMode = "append" | "new";
+
 /**
- * Import leads from a spreadsheet (no web search). Creates an "import" run,
- * dedupes against existing workspace domains/emails, optional light drafts.
+ * Import leads from a spreadsheet (no web search).
+ * - `new` → create an import run
+ * - `append` → add onto an existing board run (and pull matching duplicates onto it)
  */
 export async function importLeads(
   ctx: Ctx,
   rows: ImportLeadRow[],
-): Promise<{ imported: number; skipped: number; run: Run }> {
+  opts?: { mode?: ImportLeadsMode; appendToRunId?: string | null },
+): Promise<{ imported: number; merged: number; skipped: number; run: Run }> {
   const { db } = ctx;
   const ws = await db.getWorkspace(ctx.workspaceId);
   if (ws) await ensureUsageWindow(db, ws);
 
+  const { normalizeWebsiteUrl } = await import("@/lib/website");
+
   const cleaned = rows
     .map((r) => ({
       company: (r.company ?? "").trim(),
-      website: r.website?.trim() || null,
-      emails: (r.emails ?? []).map((e) => e.trim()).filter(Boolean),
+      website: normalizeWebsiteUrl(r.website) ?? null,
+      emails: (r.emails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean),
       phones: (r.phones ?? []).map((p) => p.trim()).filter(Boolean),
       contactName: r.contactName?.trim() || null,
       location: r.location?.trim() || null,
@@ -732,58 +738,105 @@ export async function importLeads(
     throw new Error("No usable rows — need at least a company name or email.");
   }
 
-  if (ctx.metered) {
-    const fresh = ws ? await db.getWorkspace(ctx.workspaceId) : null;
-    if (fresh) {
-      const plan = getPlan(fresh.planId);
-      const remaining = Math.max(0, plan.leadCreditsPerMonth - fresh.leadsUsedThisMonth);
-      if (cleaned.length > remaining) {
-        throw new QuotaError({
-          kind: "leads",
-          planId: fresh.planId,
-          limit: plan.leadCreditsPerMonth,
-          used: fresh.leadsUsedThisMonth,
-          message: `Import would use ${cleaned.length} leads but only ${remaining} remain this month.`,
-        });
-      }
-    }
+  const mode: ImportLeadsMode =
+    opts?.mode === "append" && opts.appendToRunId ? "append" : "new";
+  let run: Run;
+  if (mode === "append") {
+    const existing = await db.getRun(opts!.appendToRunId!);
+    if (!existing) throw new Error("Current board not found — try New list instead.");
+    run = existing;
+  } else {
+    run = {
+      id: newId("run"),
+      workspaceId: ctx.workspaceId,
+      niche: "Imported list",
+      location: null,
+      offerNotes: null,
+      senderName: null,
+      status: "running",
+      mode: "live",
+      provider: "import",
+      leadCount: 0,
+      error: null,
+      createdAt: nowIso(),
+      completedAt: null,
+    };
+    await db.createRun(run);
   }
-
-  const run: Run = {
-    id: newId("run"),
-    workspaceId: ctx.workspaceId,
-    niche: "Imported list",
-    location: null,
-    offerNotes: null,
-    senderName: null,
-    status: "running",
-    mode: "live",
-    provider: "import",
-    leadCount: 0,
-    error: null,
-    createdAt: nowIso(),
-    completedAt: null,
-  };
-  await db.createRun(run);
 
   try {
     const prior = await db.listLeads();
-    const knownDomains = new Set(
-      prior.map((l) => domainKey(l.website)).filter((d): d is string => !!d),
-    );
-    const knownEmails = new Set(
-      prior.flatMap((l) => l.emails.map((e) => e.toLowerCase())),
-    );
+    const byEmail = new Map<string, Lead>();
+    const byDomain = new Map<string, Lead>();
+    for (const l of prior) {
+      for (const e of l.emails) byEmail.set(e.toLowerCase(), l);
+      const d = domainKey(l.website);
+      if (d) byDomain.set(d, l);
+    }
 
-    const fresh = cleaned.filter((r) => {
+    const freshRows: typeof cleaned = [];
+    let merged = 0;
+    let skipped = 0;
+
+    for (const r of cleaned) {
       const d = domainKey(r.website);
-      if (d && knownDomains.has(d)) return false;
-      if (r.emails.some((e) => knownEmails.has(e.toLowerCase()))) return false;
-      return true;
-    });
-    const skipped = cleaned.length - fresh.length;
+      const match =
+        r.emails.map((e) => byEmail.get(e)).find(Boolean) ??
+        (d ? byDomain.get(d) : undefined) ??
+        null;
 
-    const leads: Lead[] = fresh.map((r) => {
+      if (!match) {
+        freshRows.push(r);
+        continue;
+      }
+
+      // Duplicate: when appending, pull onto this board + fill gaps. Else skip.
+      if (mode === "append") {
+        const patch: Partial<Lead> = {};
+        if (match.runId !== run.id) patch.runId = run.id;
+        if ((!match.website || /\[object\s+Object\]/i.test(match.website)) && r.website) {
+          patch.website = r.website;
+        }
+        if (!match.location && r.location) patch.location = r.location;
+        if (r.location && match.location && r.location.length > match.location.length) {
+          patch.location = r.location;
+        }
+        if (r.phones.length && match.phones.length === 0) patch.phones = r.phones;
+        if (r.emails.length) {
+          const mergedEmails = [
+            ...new Set([...match.emails.map((e) => e.toLowerCase()), ...r.emails]),
+          ];
+          if (mergedEmails.length > match.emails.length) patch.emails = mergedEmails;
+        }
+        if (Object.keys(patch).length > 0) {
+          await db.updateLead(match.id, patch);
+          merged++;
+        } else {
+          skipped++;
+        }
+      } else {
+        skipped++;
+      }
+    }
+
+    if (ctx.metered && freshRows.length > 0) {
+      const freshWs = ws ? await db.getWorkspace(ctx.workspaceId) : null;
+      if (freshWs) {
+        const plan = getPlan(freshWs.planId);
+        const remaining = Math.max(0, plan.leadCreditsPerMonth - freshWs.leadsUsedThisMonth);
+        if (freshRows.length > remaining) {
+          throw new QuotaError({
+            kind: "leads",
+            planId: freshWs.planId,
+            limit: plan.leadCreditsPerMonth,
+            used: freshWs.leadsUsedThisMonth,
+            message: `Import would use ${freshRows.length} leads but only ${remaining} remain this month.`,
+          });
+        }
+      }
+    }
+
+    const leads: Lead[] = freshRows.map((r) => {
       const company =
         r.company ||
         r.emails[0]?.split("@")[1]?.split(".")[0] ||
@@ -820,7 +873,7 @@ export async function importLeads(
       };
     });
 
-    await db.createLeads(leads);
+    if (leads.length > 0) await db.createLeads(leads);
 
     const now = nowIso();
     const drafts: Outreach[] = leads.map((lead) => ({
@@ -839,26 +892,41 @@ export async function importLeads(
     }));
     await Promise.all(drafts.map((d) => db.upsertOutreach(d)));
     await Promise.all(leads.map((l) => db.updateLead(l.id, { status: "queued" })));
-    await recordLeadUsage(ctx, leads.length);
+    if (leads.length > 0) await recordLeadUsage(ctx, leads.length);
+
+    const boardCount = (await db.listLeads(run.id)).length;
+    const parts: string[] = [];
+    if (merged > 0) parts.push(`merged ${merged} existing`);
+    if (skipped > 0) {
+      parts.push(
+        mode === "new"
+          ? `skipped ${skipped} already in workspace`
+          : `skipped ${skipped} unchanged`,
+      );
+    }
 
     const updated = await db.updateRun(run.id, {
       status: "complete",
-      leadCount: leads.length,
-      error:
-        skipped > 0
-          ? `Skipped ${skipped} duplicate domain/email already in workspace`
-          : null,
+      leadCount: boardCount,
+      error: parts.length ? parts.join(" · ") : null,
       completedAt: nowIso(),
     });
 
-    return { imported: leads.length, skipped, run: updated ?? run };
+    return {
+      imported: leads.length,
+      merged,
+      skipped,
+      run: updated ?? run,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await db.updateRun(run.id, {
-      status: "failed",
-      error: message,
-      completedAt: nowIso(),
-    });
+    if (mode === "new") {
+      await db.updateRun(run.id, {
+        status: "failed",
+        error: message,
+        completedAt: nowIso(),
+      });
+    }
     throw err;
   }
 }

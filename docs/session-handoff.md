@@ -9,27 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (leads UX + import + secrets)
+## ⏱️ Status — updated 2026-07-15 (import board modes + polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Pitch generate shows which AI wrote it (Workers AI / Groq / Gemini).
-- Leads UX: centered table/cards/map; map pin count top-right + legend bottom;
-  info drawer ~wider with Notes column on the right; Export stays by title.
-- Outreach: dropped Needs draft (search/import auto-draft); Sent column kept;
-  equal-height Edit/✓/→ actions; draft popup has Save draft + Approve label.
-- Pipeline: unknown contact method highlights the ⓘ icon only.
-- Excel import: Opportunity column, hyperlink websites, formula phones, short
-  locations; navigates to Leads after import.
-- **Cloudflare secrets gap:** `wrangler secret list` currently only has
-  AUTH_SECRET, NEXTAUTH_URL, RESEND_API_KEY, FIRECRAWL_API_KEY. Gmail / Groq /
-  Gemini are missing — restore via `docs/cloudflare-secrets.md` (deploy does
-  not wipe secrets; something else deleted them).
+- Import UX: **Current board** vs **New list**; append merges email/domain
+  matches onto the open run (fills address/website/phone gaps).
+- Keep full street addresses on import; hide junk `[object Object]` websites;
+  pipeline column padding even (no scrollbar-gutter asymmetry).
+- **Cloudflare secrets gap** still open — see `docs/cloudflare-secrets.md`.
 
 ### Next
-1. User: re-`wrangler secret put` for GMAIL_* + GROQ + GEMINI; then commit/deploy.
+1. Commit/deploy; user re-puts GMAIL_* + GROQ + GEMINI secrets if still missing.
 2. Point Maileroo Dashboard webhook at `/api/webhooks/maileroo`.
 3. Soft-cap warning popup on send; Maileroo live DNS panel.
 4. Microsoft Graph Mail.Send.

@@ -15,6 +15,7 @@ import {
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import { SparkIcon, MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
+import { displayWebsite } from "@/lib/website";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ function cardSubtitle(lead: LeadWithOutreach): string | null {
   return (
     lead.emails[0] ??
     lead.location ??
-    lead.website?.replace(/^https?:\/\//, "").replace(/\/$/, "") ??
+    displayWebsite(lead.website) ??
     null
   );
 }
@@ -384,7 +385,7 @@ function PipelineColumn({
         </span>
       </div>
       {/* min-h-0 is required so flex children can scroll instead of clipping */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3 [scrollbar-gutter:stable]">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3">
         {leads.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
             {col.empty}

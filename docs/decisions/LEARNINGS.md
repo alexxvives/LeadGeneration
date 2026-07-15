@@ -503,10 +503,16 @@ live product preview (map + pipeline) — dropped missing hero image dependency.
 - `LEADS_example.xlsx` used **Opportunity** (not Name) plus Excel hyperlink
   objects and `=+34…` formula phones. Old parser mapped Name→empty company so
   only email rows imported, and websites rendered as `[object Object]`. Prefer
-  Opportunity > Company > Name; unwrap hyperlink/formula cells; shorten
-  addresses; route import → Leads.
+  Opportunity > Company > Name; unwrap hyperlink/formula cells; route import → Leads.
+- Re-import skipped the two email rows as workspace duplicates from the first
+  broken import; locations were over-shortened. Keep full Address; import mode
+  **Current board** merges matches (email/domain) onto the open run and fills
+  gaps; **New list** still skips workspace dupes. `displayWebsite` hides junk
+  `[object Object]` URLs in UI.
 - `wrangler secret list` on Worker `leadgeneration` was missing Gmail/Groq/
   Gemini — deploy does not clear secrets; document checklist in
   `docs/cloudflare-secrets.md`.
 - Outreach “Needs draft” removed: search + import already auto-create drafts.
+- Pipeline card list: drop `scrollbar-gutter:stable` (it reserved only the
+  right edge and looked like uneven padding).
 

@@ -3,6 +3,7 @@
 import type { LeadWithOutreach } from "@/lib/types";
 import { CrmStagePill, FitMeter } from "@/components/ui";
 import { GlobeIcon, MailIcon, PhoneIcon } from "@/components/icons";
+import { displayWebsite } from "@/lib/website";
 
 export function LeadCard({
   lead,
@@ -13,7 +14,7 @@ export function LeadCard({
   index: number;
   onOpen: () => void;
 }) {
-  const domain = lead.website?.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const domain = displayWebsite(lead.website);
   return (
     <button
       onClick={onOpen}
@@ -25,12 +26,12 @@ export function LeadCard({
           <h3 className="truncate font-display text-lg font-semibold leading-tight">
             {lead.company}
           </h3>
-          {domain && (
+          {domain ? (
             <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-mist-500">
               <GlobeIcon className="h-3.5 w-3.5 shrink-0" />
               {domain}
             </span>
-          )}
+          ) : null}
         </div>
         <CrmStagePill stage={lead.crmStage ?? "new"} />
       </div>

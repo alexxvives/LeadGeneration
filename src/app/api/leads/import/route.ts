@@ -13,11 +13,13 @@ const RowSchema = z.object({
   emails: z.array(z.string().min(3).max(200)).max(10).optional(),
   phones: z.array(z.string().max(40)).max(5).optional(),
   contactName: z.string().max(120).nullable().optional(),
-  location: z.string().max(200).nullable().optional(),
+  location: z.string().max(400).nullable().optional(),
 });
 
 const BodySchema = z.object({
   leads: z.array(RowSchema).min(1).max(500),
+  mode: z.enum(["append", "new"]).optional().default("new"),
+  appendToRunId: z.string().min(1).max(80).optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -38,7 +40,10 @@ export async function POST(req: Request) {
 
   try {
     const ctx = await getCtx();
-    const result = await importLeads(ctx, parsed.data.leads);
+    const result = await importLeads(ctx, parsed.data.leads, {
+      mode: parsed.data.mode,
+      appendToRunId: parsed.data.appendToRunId,
+    });
     return NextResponse.json(result);
   } catch (err) {
     if (isQuotaError(err)) {

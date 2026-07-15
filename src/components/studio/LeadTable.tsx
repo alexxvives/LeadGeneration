@@ -3,7 +3,7 @@
 import type { LeadWithOutreach } from "@/lib/types";
 import { CrmStagePill, FitMeter } from "@/components/ui";
 import { MailIcon, PhoneIcon } from "@/components/icons";
-import { shortLocation } from "@/lib/search/enrich";
+import { displayWebsite } from "@/lib/website";
 
 export function LeadTable({
   leads,
@@ -27,7 +27,7 @@ export function LeadTable({
           </thead>
           <tbody>
             {leads.map((l) => {
-              const domain = l.website?.replace(/^https?:\/\//, "").replace(/\/$/, "");
+              const domain = displayWebsite(l.website);
               return (
                 <tr
                   key={l.id}
@@ -38,8 +38,10 @@ export function LeadTable({
                     <p className="font-medium text-mist-100">{l.company}</p>
                     {domain && <p className="text-xs text-mist-500">{domain}</p>}
                   </td>
-                  <td className="px-5 py-3.5 text-mist-300">
-                    {shortLocation(l.location) ?? "—"}
+                  <td className="max-w-[16rem] px-5 py-3.5 text-mist-300">
+                    <span className="line-clamp-2" title={l.location ?? undefined}>
+                      {l.location ?? "—"}
+                    </span>
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex flex-col gap-1 text-xs">
