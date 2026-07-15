@@ -23,7 +23,7 @@ type Pin = { id: string; company: string; coords: Coords; crmStage: CrmStage };
 const STAGE_PIN: Record<CrmStage, { fill: string; glow: string; label: string }> = {
   new: { fill: "#7f92b3", glow: "rgba(127,146,179,0.35)", label: "New" },
   contacted: { fill: "#f7b955", glow: "rgba(247,185,85,0.4)", label: "Contacted" },
-  in_conversation: { fill: "#43e0a8", glow: "rgba(67,224,168,0.4)", label: "In Conversation" },
+  in_conversation: { fill: "#38bdf8", glow: "rgba(56,189,248,0.4)", label: "In Conversation" },
   closed: { fill: "#7ff2c8", glow: "rgba(127,242,200,0.45)", label: "Closed" },
   not_interested: { fill: "#fb7185", glow: "rgba(251,113,133,0.4)", label: "Not Interested" },
 };

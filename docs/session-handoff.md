@@ -5,44 +5,44 @@ without re-deriving context. `AGENTS.md` points every agent here. **Read this
 first, and update the top block at the end of any session that changes state.**
 
 > Keep it short. This is a pointer to truth (code + `docs/`), not a second copy
-> of it. Durable decisions still go in `docs/decisions/` (ADRs + LEARNINGS).
+> of it. Durable decisions still live in `docs/decisions/` (ADRs + LEARNINGS).
 
 ---
 
-## ⏱️ Status — updated 2026-07-14 (Pipeline UX polish + DevTools MCP + lockfile regen)
+## ⏱️ Status — updated 2026-07-14 (CF deploy validated)
 
-**Stage:** CRM Pipeline polished (column actions, collapsible lost, table/map).
-`chrome-devtools-mcp` wired in Cursor. Lockfile regenerated for CF `npm ci`.
+**Stage:** Phase A/B complete. Live Worker on Cloudflare is healthy.
 
 **Works today (local, zero keys):** Search → Enrich → Draft → Approve → Send.
-Sidebar: **Search, Pipeline, Runs, Settings.**
-Auth/metering OFF until `AUTH_SECRET` is set.
+Sidebar Workspace: **Search, Pipeline, Runs.** Account card → Settings.
+Auth/metering OFF until `AUTH_SECRET` is set. Real signup/accounts need
+Cloudflare D1 + `AUTH_SECRET` (local “Sign in” is demo credentials only).
+
+**Live:** https://leadgeneration.alexxvives.workers.dev (HTTP 200). Last good
+Workers Build: `fc53588` (success). Failed builds were manual redeploys of
+stale `cba0ef9` (lockfile out of sync with `@dnd-kit/*` / `leaflet`).
 
 **Live keys** (`.env.local`): Firecrawl, Resend. SMTP/Stripe/Turnstile/D1 not yet.
 
 ### Recently done (this session)
-- **chrome-devtools-mcp** added to `~/.cursor/mcp.json` — reload MCP in Cursor.
-- **Pipeline UX:** Draft/Approve all in New header; Send all in Contacted;
-  Not Interested collapsed by default (4-column main grid); droppable when closed.
-- **Lead table:** phone under email; StatusPill nowrap (“In review”); Subject
-  column removed.
-- **Map pins** colored by `crmStage` + legend.
-- **`package-lock.json` regenerated** (dnd-kit + leaflet present) — retrigger CF
-  build on this commit if prior log was from before `0bbcef9`.
+- Validated CF Builds via MCP: latest `master` deploys; do not redeploy `cba0ef9`.
+- Local `npm ci` OK with current lockfile (incl. uncommitted `exceljs`).
+- Pipeline declutter + sky In Conversation; CRM Status / Excel / Settings (prior).
 
 ### In flight / next
-- **Deploy:** clear CF dependency cache if `npm ci` still fails after this push;
-  then `cf:migrate` + `cf:deploy`.
-- Phase C / more UX via standing audit prompt in `docs/roadmap-next.md`.
+- Commit + push local uncommitted work (`exceljs` + UI) **with** `package-lock.json`.
+- Phase C: bulk draft/approve (per-lead send only), reply stubs, saved ICPs.
 
 ### Known issues / gotchas
+- CF “Retry deploy” on an old commit re-triggers the lockfile `npm ci` failure.
 - **`npm run smoke` crashes on Windows** — prefer Playwright / chrome-devtools.
 - PowerShell: use `;` not `&&`.
-- After MCP config change: Cursor → Settings → MCP → refresh/reload servers.
+- Local Sign in accepts any email/password but does **not** persist a real user
+  account without D1.
 
 ### Next likely steps
-1. Confirm Cloudflare build on this commit succeeds.
-2. Deploy + live-verify, or paste the UX audit prompt for another polish round.
+1. Commit/push local changes (keep package.json + lockfile together), then rebuild.
+2. Phase C bulk actions (still Art. I.1 — no approve-all-and-send skip).
 
 ---
 

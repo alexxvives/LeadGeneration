@@ -42,7 +42,7 @@ interface DrawerProps {
 const CRM_STAGES: { stage: CrmStage; label: string; color: string }[] = [
   { stage: "new",             label: "New",             color: "bg-mist-500/20 text-mist-300 ring-mist-500/20" },
   { stage: "contacted",       label: "Contacted",       color: "bg-amber-400/15 text-amber-300 ring-amber-400/20" },
-  { stage: "in_conversation", label: "In Conversation", color: "bg-aurora-400/15 text-aurora-300 ring-aurora-400/25" },
+  { stage: "in_conversation", label: "In Conversation", color: "bg-sky-400/15 text-sky-300 ring-sky-400/25" },
   { stage: "closed",          label: "Closed",          color: "bg-aurora-300/20 text-aurora-200 ring-aurora-300/25" },
   { stage: "not_interested",  label: "Not Interested",  color: "bg-rose-500/10 text-rose-300 ring-rose-500/20" },
 ];

@@ -1,7 +1,7 @@
 "use client";
 
 import type { LeadWithOutreach } from "@/lib/types";
-import { FitMeter, StatusPill } from "@/components/ui";
+import { CrmStagePill, FitMeter } from "@/components/ui";
 import { MailIcon, PhoneIcon } from "@/components/icons";
 
 export function LeadTable({
@@ -62,7 +62,7 @@ export function LeadTable({
                     <FitMeter score={l.fitScore} />
                   </td>
                   <td className="px-5 py-3.5 whitespace-nowrap">
-                    <StatusPill status={l.status} />
+                    <CrmStagePill stage={l.crmStage ?? "new"} />
                   </td>
                 </tr>
               );

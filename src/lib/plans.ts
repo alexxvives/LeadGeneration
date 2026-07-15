@@ -55,7 +55,7 @@ export const PLANS: Record<PlanId, Plan> = {
       "500 enriched leads / month",
       "500 sends / month",
       "Email verification, table + board views",
-      "CSV export",
+      "Excel export",
     ],
     stripePriceEnv: "STRIPE_STARTER_PRICE_ID",
   },

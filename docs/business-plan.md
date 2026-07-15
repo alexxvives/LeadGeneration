@@ -75,7 +75,7 @@ undercut Apollo's per-seat model.
 | Plan | Price | Lead credits/mo | Sends/mo | Key features |
 | --- | --- | --- | --- | --- |
 | **Free** | $0 | 50 enriched leads | 25 (bring-your-own sender) | Demo + live search, drafting, approval, 1 workspace. |
-| **Starter** | **$29/mo** | 500 | 500 | Email verification, table+board, CSV export. |
+| **Starter** | **$29/mo** | 500 | 500 | Email verification, table+board, Excel export. |
 | **Pro** | **$79/mo** | 2,500 | 2,500 | LLM personalization, Places/local source, priority. |
 | **Agency** | **$199/mo** | 10,000 | 10,000 | Multiple workspaces/seats, white-label footer. |
 

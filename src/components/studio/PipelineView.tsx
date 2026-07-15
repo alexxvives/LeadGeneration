@@ -21,35 +21,30 @@ import { ArrowIcon, CheckIcon, SparkIcon, MailIcon, PhoneIcon, FormIcon } from "
 const MAIN_COLUMNS: {
   stage: CrmStage;
   title: string;
-  hint: string;
   empty: string;
   color: string;
 }[] = [
   {
     stage: "new",
     title: "New",
-    hint: "Just found",
     empty: "No untouched leads — run a search to add more.",
     color: "bg-mist-500",
   },
   {
     stage: "contacted",
     title: "Contacted",
-    hint: "First outreach sent",
     empty: "Send an approved email or drag a card here.",
     color: "bg-amber-400",
   },
   {
     stage: "in_conversation",
     title: "In Conversation",
-    hint: "Active dialogue",
     empty: "Move here when they reply.",
-    color: "bg-aurora-400",
+    color: "bg-sky-400",
   },
   {
     stage: "closed",
     title: "Closed",
-    hint: "Won — became a client",
     empty: "Move here when you close the deal.",
     color: "bg-aurora-300",
   },
@@ -58,19 +53,11 @@ const MAIN_COLUMNS: {
 const NOT_INTERESTED_COL = {
   stage: "not_interested" as const,
   title: "Not Interested",
-  hint: "Lost",
   empty: "Move here when they decline.",
   color: "bg-rose-400",
 };
 
 const ALL_COLUMNS = [...MAIN_COLUMNS, NOT_INTERESTED_COL];
-
-const EMAIL_STATUS_BADGE: Record<string, { label: string; cls: string } | undefined> = {
-  queued:   { label: "Draft ready", cls: "bg-amber-400/15 text-amber-300" },
-  approved: { label: "Approved",    cls: "bg-aurora-400/15 text-aurora-300" },
-  sent:     { label: "Sent",        cls: "bg-aurora-500/20 text-aurora-300" },
-  failed:   { label: "Failed",      cls: "bg-rose-500/15 text-rose-300" },
-};
 
 const NEXT_CRM_STAGE: Partial<Record<CrmStage, CrmStage>> = {
   new: "contacted",
@@ -281,7 +268,6 @@ function PipelineColumn({
           </div>
           <span className="font-display text-lg tabular-nums text-aurora-300">{leads.length}</span>
         </div>
-        <p className="mt-0.5 text-[11px] text-mist-500">{col.hint}</p>
         {headerActions && (
           <div className="mt-2 flex flex-wrap items-center gap-1">{headerActions}</div>
         )}
@@ -387,10 +373,11 @@ function DraggablePipelineCard({
   isDragging: boolean;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
-  const emailBadge = lead.outreach ? EMAIL_STATUS_BADGE[lead.outreach.status] : undefined;
   const pendingFollowUps = lead.followUps?.filter((f) => !f.done).length ?? 0;
   const nextStage = lead.crmStage ? NEXT_CRM_STAGE[lead.crmStage] : undefined;
   const subtitle = lead.tags[0] ?? lead.emails[0] ?? lead.website ?? null;
+  const showMeta =
+    pendingFollowUps > 0 || !!lead.contactMethod;
 
   return (
     <div
@@ -424,34 +411,31 @@ function DraggablePipelineCard({
           {subtitle && (
             <p className="mt-0.5 truncate text-xs text-mist-500">{subtitle}</p>
           )}
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {emailBadge && (
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${emailBadge.cls}`}>
-                {emailBadge.label}
-              </span>
-            )}
-            {pendingFollowUps > 0 && (
-              <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-                {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
-              </span>
-            )}
-            {lead.contactMethod && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] text-mist-500"
-                title={
-                  lead.contactMethod === "email"
-                    ? "Contacted by email"
-                    : lead.contactMethod === "phone"
-                      ? "Contacted by phone"
-                      : "Contacted via form"
-                }
-              >
-                {lead.contactMethod === "email" && <MailIcon className="h-2.5 w-2.5" />}
-                {lead.contactMethod === "phone" && <PhoneIcon className="h-2.5 w-2.5" />}
-                {lead.contactMethod === "contact_form" && <FormIcon className="h-2.5 w-2.5" />}
-              </span>
-            )}
-          </div>
+          {showMeta && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {pendingFollowUps > 0 && (
+                <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                  {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
+                </span>
+              )}
+              {lead.contactMethod && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] text-mist-500"
+                  title={
+                    lead.contactMethod === "email"
+                      ? "Contacted by email"
+                      : lead.contactMethod === "phone"
+                        ? "Contacted by phone"
+                        : "Contacted via form"
+                  }
+                >
+                  {lead.contactMethod === "email" && <MailIcon className="h-2.5 w-2.5" />}
+                  {lead.contactMethod === "phone" && <PhoneIcon className="h-2.5 w-2.5" />}
+                  {lead.contactMethod === "contact_form" && <FormIcon className="h-2.5 w-2.5" />}
+                </span>
+              )}
+            </div>
+          )}
         </button>
 
         {nextStage && (

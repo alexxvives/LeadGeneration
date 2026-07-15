@@ -20,6 +20,7 @@ type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 /**
  * Studio chrome: left sidebar with product navigation + account footer.
+ * Settings opens from the account card (not a Workspace nav item).
  */
 export function StudioShell({
   children,
@@ -57,6 +58,7 @@ export function StudioShell({
   const signedIn = status === "authenticated" && !!session?.user;
   const displayName = (session?.user?.name as string | undefined) ?? null;
   const userEmail = (session?.user?.email as string | undefined) ?? null;
+  const settingsActive = pathname.startsWith("/app/settings");
 
   const nav: {
     href: string;
@@ -81,12 +83,6 @@ export function StudioShell({
       label: "Runs",
       icon: HistoryIcon,
       active: pathname === "/app" && view === "runs",
-    },
-    {
-      href: "/app/settings",
-      label: "Settings",
-      icon: SettingsIcon,
-      active: pathname.startsWith("/app/settings"),
     },
   ];
 
@@ -132,33 +128,43 @@ export function StudioShell({
               </Link>
             );
           })}
-
         </nav>
 
-        {/* Account card */}
+        {/* Account card → Settings */}
         <div className="mt-auto border-t border-white/5 pt-4">
           {/* Full sidebar (sm+) */}
           <div className="hidden sm:block">
-            <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
+            <Link
+              href="/app/settings"
+              className={`block rounded-xl border p-3 transition-colors ${
+                settingsActive
+                  ? "border-aurora-400/30 bg-aurora-400/10"
+                  : "border-white/8 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.05]"
+              }`}
+              title="Open settings"
+            >
               <div className="flex items-center gap-2.5">
-                {/* Avatar initial */}
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-aurora-400/15 text-sm font-semibold text-aurora-300">
                   {signedIn ? (displayName?.[0] ?? userEmail?.[0] ?? "U").toUpperCase() : "G"}
                 </div>
-                {/* Name + email */}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-mist-100">
                     {signedIn ? (displayName ?? userEmail ?? "Account") : "Guest"}
                   </p>
                   <p className="truncate text-xs text-mist-500">
-                    {signedIn && userEmail && displayName ? userEmail : signedIn ? "" : "Browsing as guest"}
+                    {signedIn && userEmail && displayName
+                      ? userEmail
+                      : "Settings"}
                   </p>
                 </div>
-                {/* Action */}
                 {signedIn ? (
                   <button
                     type="button"
-                    onClick={() => signOut({ callbackUrl: "/" })}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void signOut({ callbackUrl: "/" });
+                    }}
                     title="Sign out"
                     className="rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200"
                   >
@@ -167,18 +173,33 @@ export function StudioShell({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setAuthOpen(true)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setAuthOpen(true);
+                    }}
                     className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-aurora-300 transition-colors hover:bg-aurora-400/10"
                   >
                     Sign in
                   </button>
                 )}
               </div>
-            </div>
+            </Link>
           </div>
 
-          {/* Icon-only (mobile) */}
-          <div className="flex justify-center sm:hidden">
+          {/* Icon-only (mobile): settings + auth */}
+          <div className="flex flex-col items-center gap-1 sm:hidden">
+            <Link
+              href="/app/settings"
+              title="Settings"
+              className={`rounded-xl p-2.5 transition-colors ${
+                settingsActive
+                  ? "bg-aurora-400/10 text-aurora-300"
+                  : "text-mist-500 hover:bg-white/5 hover:text-aurora-300"
+              }`}
+            >
+              <SettingsIcon className="h-5 w-5" />
+            </Link>
             {signedIn ? (
               <button
                 type="button"

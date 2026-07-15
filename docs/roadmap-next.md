@@ -18,9 +18,9 @@ validation beats buying another design tool.
 Order of work:
 
 1. **Unblock trust** — map, credits display, auth CTAs (done / in this pass).
-2. **Make the loop obvious** — Pipeline (funnel), Runs history, Export CSV.
+2. **Make the loop obvious** — Pipeline (funnel), Runs history, Export Excel.
 3. **Raise lead quality** — better extraction, email verification, less junk titles.
-4. **Make acting easy** — batch draft, reply tracking stubs, CSV + CRM export.
+4. **Make acting easy** — batch draft, reply tracking stubs, Excel + CRM export.
 5. **Polish UI** only where friction remains (empty states, mobile sidebar).
 
 ---
@@ -30,12 +30,14 @@ Order of work:
 ### Phase A — Close the action loop ✅ shipped
 - [x] Pipeline view (`?view=pipeline`) — CRM: New → Contacted → In Conversation → Closed → Not Interested
 - [x] Runs history (`?view=runs`)
-- [x] Export CSV (Pipeline header + Settings resources elsewhere)
+- [x] Export Excel (Pipeline header — styled `.xlsx` with stage coloring)
 - [x] How it works + Plans linked from Settings → Resources
 - [x] Wire outreach profile `displayName` into `generateDraft` (via `Run.senderName`,
       API-safe — server never reads localStorage)
 - [x] “Open run on board” loads that run’s leads into Pipeline
 - [x] Search view (sidebar) separate from Pipeline; post-search redirects to Pipeline
+- [x] Settings via sidebar **account card** (not a Workspace nav item)
+- [x] Leads table Status = CRM funnel stage (matches Pipeline columns)
 
 ### Phase B — Lead quality ✅ shipped (highest ROI for users)
 - [x] Structured extraction (company name ≠ page title “Contact Us”; prettified domain)

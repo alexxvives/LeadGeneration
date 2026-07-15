@@ -1,4 +1,4 @@
-import type { LeadStatus, OutreachStatus } from "@/lib/types";
+import type { CrmStage, LeadStatus, OutreachStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
   new: { label: "New", cls: "bg-white/8 text-mist-300 ring-white/10" },
@@ -10,6 +10,21 @@ const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
   draft: { label: "Draft", cls: "bg-white/8 text-mist-300 ring-white/10" },
 };
 
+/** Pipeline-funnel labels — keep in sync with PipelineView column titles. */
+const CRM_STAGE_STYLES: Record<CrmStage, { label: string; cls: string }> = {
+  new: { label: "New", cls: "bg-white/8 text-mist-300 ring-white/10" },
+  contacted: { label: "Contacted", cls: "bg-amber-400/15 text-amber-300 ring-amber-400/20" },
+  in_conversation: {
+    label: "In Conversation",
+    cls: "bg-sky-400/15 text-sky-300 ring-sky-400/25",
+  },
+  closed: { label: "Closed", cls: "bg-aurora-500/25 text-aurora-300 ring-aurora-400/30" },
+  not_interested: {
+    label: "Not Interested",
+    cls: "bg-rose-500/15 text-rose-300 ring-rose-400/25",
+  },
+};
+
 export function StatusPill({ status }: { status: LeadStatus | OutreachStatus }) {
   const s = STATUS_STYLES[status] ?? STATUS_STYLES.new;
   return (
@@ -19,6 +34,22 @@ export function StatusPill({ status }: { status: LeadStatus | OutreachStatus }) 
       {s.label}
     </span>
   );
+}
+
+/** CRM funnel stage for table / list views (matches Pipeline columns). */
+export function CrmStagePill({ stage }: { stage: CrmStage }) {
+  const s = CRM_STAGE_STYLES[stage] ?? CRM_STAGE_STYLES.new;
+  return (
+    <span
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${s.cls}`}
+    >
+      {s.label}
+    </span>
+  );
+}
+
+export function crmStageLabel(stage: CrmStage): string {
+  return CRM_STAGE_STYLES[stage]?.label ?? stage;
 }
 
 export function FitMeter({ score }: { score: number }) {

@@ -50,7 +50,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   provider); in production, magic-link via SMTP (Nodemailer) or Resend
   (+ Turnstile bot check). Public.
 - **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar
-  nav: **Search · Pipeline · Runs · Settings**. Views use `?view=`:
+  nav: **Search · Pipeline · Runs**. Settings opens from the **account card**
+  at the bottom of the sidebar (not a Workspace nav item). Views use `?view=`:
 
   - **Search** (default / no `?view=`) — always-expanded search form. Live search
     when Firecrawl/Exa is configured; otherwise load demo data. After a run, the
@@ -60,7 +61,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     stages: *New · Contacted · In Conversation · Closed · Not Interested*.
     Drag cards between columns, or use quick-advance. Bulk bar: draft all /
     approve all drafts / send all approved. Below the kanban: full leads list
-    (table / cards / map) + **Export CSV**.
+    (table / cards / map) + **Export Excel** (styled `.xlsx`).
+    Table Status column shows **CRM stage** (same funnel as Pipeline columns).
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). **"Open on board"** loads that run's leads into

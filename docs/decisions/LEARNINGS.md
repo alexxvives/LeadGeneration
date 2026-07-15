@@ -4,6 +4,19 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-14 — Table Status = CRM stage; Excel export; Settings on account card
+- **Two status models confuse users in the table.** `LeadStatus` (“In review”)
+  is email-workflow; Pipeline columns use `crmStage`. Table Status must show
+  `CrmStagePill` so it matches the funnel position the user just dragged to.
+- **Excel over CSV for export:** `exceljs` (dynamic `import()` on click) gives
+  aurora-styled headers, stage fill colors, frozen header, auto-filter — better
+  than plain CSV for agency handoff without a server route.
+- **Settings belongs on the account card**, not Workspace nav — Search /
+  Pipeline / Runs are work surfaces; settings is account chrome. Keep Sign
+  in/out as nested buttons with `stopPropagation` so the card can be a Link.
+- **Pipeline email badge key was wrong:** `OutreachStatus` uses `"draft"`, not
+  `"queued"` — badge map must use `draft` or “Draft ready” never shows.
+
 ### 2026-07-14 — Pipeline UX polish + chrome-devtools MCP
 - **chrome-devtools-mcp** wired in `~/.cursor/mcp.json` (`npx -y chrome-devtools-mcp@latest`).
   Use it for live DOM/layout/network/memory debugging; keep Playwright for
@@ -14,6 +27,7 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   (more card width). Droppable target still accepts drags when collapsed.
 - **Map pins colored by `crmStage`** (mist/amber/aurora/aurora-light/rose) with
   a small legend — same palette as Pipeline column dots.
+
 
 ### 2026-07-14 — Auth edge split, lockfile, Studio modularize, docs hygiene
 - **Email providers must not live in `auth.config.ts`.** Auth.js asserts an
