@@ -4,6 +4,31 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Dual send plan + agent scrape tooling
+- **Push policy:** user wants commit+push every meaningful change.
+- **Plan:** `docs/roadmap-send-paths.md` — Easy=Resend+DNS guide; Pro=Google/
+  Microsoft mailbox (ADR first). OSS backlog ranked P0–P2.
+- **gstack `/scrape`:** Claude Code browser extract skill — useful for agent QA,
+  not Lodestar production search (we use Firecrawl/Exa).
+- **Root `SKILL.md` data-scraper-agent:** wrong stack (Python/Actions); don’t
+  adopt for product scraping.
+- **Leads UX:** centered Export/layout toggles; table viewport-capped scroll.
+
+### 2026-07-15 — Cold email infra reality + OSS notes
+- **CI:** `.github/workflows/ci.yml` is live; push `e8b4512` → Actions success.
+- **Smartlead ≠ Resend:** competitors send through **warmed Google Workspace /
+  Microsoft 365 inboxes** (OAuth/SMTP). User still configures DNS (SPF/DKIM/
+  DMARC) on their domain; tools guide + check, they don’t silently own the
+  registrar. Claimed “automatic DNS” usually means: buy domains via partner,
+  show copy-paste records, poll until verified, plus mailbox warmup.
+- **OSS inspiration:** [Wu-Wei-Mail](https://github.com/LuiHedlund02/Wu-Wei-Mail)
+  (multi-inbox SMTP + IMAP replies; warmup still hard); OutreachStud-io
+  (planned DNS checks / rotation — code early); PaulleDemon Email-automation
+  (templates/follow-ups, BYO SMTP). Lodestar should stay HITL + BYO sender;
+  mailbox-connect is a later product bet, not a Resend feature toggle.
+- **UI:** Outreach + Pipeline columns use `100dvh` height; Pipeline cards are
+  whole-card drag with circled-i info (no grip / advance arrow).
+
 ### 2026-07-15 — Outreach UX + send 400/409 + P1 bets
 - **Send 400 then 409:** Resend/provider failure returned 400 and used to set
   outreach `failed`; retry then 409 (not approved). Now keep `approved` + store

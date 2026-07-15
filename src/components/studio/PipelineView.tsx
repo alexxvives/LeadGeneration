@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core";
 import type { CrmStage, LeadWithOutreach } from "@/lib/types";
 import { Spinner } from "@/components/ui";
-import { ArrowIcon, CheckIcon, SparkIcon, MailIcon, PhoneIcon, FormIcon } from "@/components/icons";
+import { CheckIcon, SparkIcon, MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
 
@@ -69,14 +69,6 @@ const PARKED_COLUMNS: {
     color: "bg-mist-600",
   },
 ];
-
-const ALL_COLUMNS = [...MAIN_COLUMNS, ...PARKED_COLUMNS];
-
-const NEXT_CRM_STAGE: Partial<Record<CrmStage, CrmStage>> = {
-  new: "contacted",
-  contacted: "in_conversation",
-  in_conversation: "closed",
-};
 
 /** Card subtitle: contact/location — not the niche tag (that looked like a wrong "category"). */
 function cardSubtitle(lead: LeadWithOutreach): string | null {
@@ -194,14 +186,14 @@ export function PipelineView({
         {queuedLeads.length > 0 && (
           <span className="normal-case tracking-normal text-mist-600">
             {" "}
-            · click a New card to select · double-click to open
+        · click a New card to select · ⓘ for details
           </span>
         )}
       </p>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div
-          className="grid gap-3"
+          className="grid min-h-[calc(100dvh-12rem)] gap-3"
           style={{ gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(0, 1fr))` }}
         >
           {MAIN_COLUMNS.map((col) => {
@@ -212,7 +204,6 @@ export function PipelineView({
                 col={col}
                 leads={colLeads}
                 onOpen={onOpen}
-                onMoveStage={onMoveStage}
                 activeId={activeId}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
@@ -231,7 +222,6 @@ export function PipelineView({
                 col={col}
                 leads={colLeads}
                 onOpen={onOpen}
-                onMoveStage={onMoveStage}
                 activeId={activeId}
                 compact
               />
@@ -258,7 +248,6 @@ function PipelineColumn({
   col,
   leads,
   onOpen,
-  onMoveStage,
   activeId,
   headerActions,
   selectedIds,
@@ -268,7 +257,6 @@ function PipelineColumn({
   col: (typeof MAIN_COLUMNS)[number] | (typeof PARKED_COLUMNS)[number];
   leads: LeadWithOutreach[];
   onOpen: (id: string) => void;
-  onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
   headerActions?: React.ReactNode;
   selectedIds?: Set<string>;
@@ -280,7 +268,7 @@ function PipelineColumn({
     <div
       ref={setNodeRef}
       className={`flex min-h-0 min-w-0 flex-col rounded-xl2 border transition-colors ${
-        compact ? "max-h-[min(40vh,360px)]" : "max-h-[min(60vh,520px)]"
+        compact ? "max-h-[min(40vh,360px)]" : "h-[calc(100dvh-12rem)]"
       } ${
         isOver ? "border-aurora-400/40 bg-aurora-400/5" : "border-white/10 bg-ink-950/40"
       }`}
@@ -307,7 +295,6 @@ function PipelineColumn({
               key={l.id}
               lead={l}
               onOpen={onOpen}
-              onMoveStage={onMoveStage}
               isDragging={l.id === activeId}
               selectable={l.status === "queued" && !!l.outreach}
               selected={selectedIds?.has(l.id) ?? false}
@@ -323,7 +310,6 @@ function PipelineColumn({
 function DraggablePipelineCard({
   lead,
   onOpen,
-  onMoveStage,
   isDragging,
   selectable,
   selected,
@@ -331,7 +317,6 @@ function DraggablePipelineCard({
 }: {
   lead: LeadWithOutreach;
   onOpen: (id: string) => void;
-  onMoveStage: (leadId: string, stage: CrmStage) => void;
   isDragging: boolean;
   selectable?: boolean;
   selected?: boolean;
@@ -339,47 +324,34 @@ function DraggablePipelineCard({
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
   const pendingFollowUps = lead.followUps?.filter((f) => !f.done).length ?? 0;
-  const nextStage = lead.crmStage ? NEXT_CRM_STAGE[lead.crmStage] : undefined;
   const subtitle = cardSubtitle(lead);
   const showMeta = pendingFollowUps > 0 || !!lead.contactMethod;
 
   return (
     <div
       ref={setNodeRef}
-      className={`group flex min-h-[3.25rem] items-center overflow-hidden rounded-xl border transition-all ${
+      {...attributes}
+      {...listeners}
+      role="button"
+      tabIndex={0}
+      onClick={() => {
+        if (selectable && onToggleSelect) onToggleSelect(lead.id);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          if (selectable && onToggleSelect) onToggleSelect(lead.id);
+        }
+      }}
+      className={`group flex min-h-[3.25rem] cursor-grab touch-none items-center gap-1 overflow-hidden rounded-xl border px-3 py-2.5 transition-all active:cursor-grabbing ${
         isDragging ? "opacity-30" : ""
       } ${
         selected
           ? "border-aurora-400/50 bg-aurora-400/10 ring-1 ring-aurora-400/40"
-          : "border-white/5 bg-ink-900/60"
+          : "border-white/5 bg-ink-900/60 hover:bg-white/[0.03]"
       }`}
-      {...attributes}
     >
-      <button
-        type="button"
-        {...listeners}
-        className="flex shrink-0 cursor-grab touch-none items-center self-stretch px-1.5 text-mist-600 hover:bg-white/5 hover:text-mist-300 active:cursor-grabbing"
-        aria-label="Drag to move"
-        tabIndex={-1}
-      >
-        <svg viewBox="0 0 6 12" className="h-3 w-3 fill-current" aria-hidden>
-          <circle cx="1.5" cy="1.5" r="1" /><circle cx="4.5" cy="1.5" r="1" />
-          <circle cx="1.5" cy="4.5" r="1" /><circle cx="4.5" cy="4.5" r="1" />
-          <circle cx="1.5" cy="7.5" r="1" /><circle cx="4.5" cy="7.5" r="1" />
-          <circle cx="1.5" cy="10.5" r="1" /><circle cx="4.5" cy="10.5" r="1" />
-        </svg>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => {
-          if (selectable && onToggleSelect) onToggleSelect(lead.id);
-          else onOpen(lead.id);
-        }}
-        onDoubleClick={() => onOpen(lead.id)}
-        aria-pressed={selectable ? selected : undefined}
-        className="flex min-w-0 flex-1 flex-col justify-center py-2.5 pr-1 text-left transition-colors hover:bg-white/[0.03]"
-      >
+      <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium leading-snug text-mist-100">{lead.company}</p>
         {subtitle && (
           <p className="mt-0.5 truncate text-xs leading-snug text-mist-500">{subtitle}</p>
@@ -409,18 +381,21 @@ function DraggablePipelineCard({
             )}
           </div>
         )}
-      </button>
+      </div>
 
-      {nextStage && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onMoveStage(lead.id, nextStage); }}
-          title={`Move to ${ALL_COLUMNS.find((c) => c.stage === nextStage)?.title ?? nextStage}`}
-          className="mr-2 shrink-0 rounded-md p-1 text-mist-600 opacity-0 transition-all hover:bg-white/10 hover:text-aurora-300 group-hover:opacity-100"
-        >
-          <ArrowIcon className="h-3.5 w-3.5" />
-        </button>
-      )}
+      <button
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen(lead.id);
+        }}
+        aria-label={`Lead info for ${lead.company}`}
+        title="Lead info"
+        className="shrink-0 rounded-md p-1 text-mist-600 transition-colors hover:bg-white/10 hover:text-mist-200"
+      >
+        <InfoIcon className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

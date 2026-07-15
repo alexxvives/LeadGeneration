@@ -385,8 +385,8 @@ export function Studio() {
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-8">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="mb-6 grid grid-cols-1 items-end gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+        <div className="min-w-0">
           <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
             {view === "pipeline"
               ? "Pipeline"
@@ -414,7 +414,27 @@ export function Studio() {
                     : "Find prospects by niche and location."}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+
+        <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-self-center">
+          {view === "leads" && hasLeads ? (
+            <>
+              <ExportButton />
+              <div className="glass inline-flex items-center rounded-full p-1 text-sm">
+                <LayoutToggle active={layout === "table"} onClick={() => setLayout("table")}>
+                  Table
+                </LayoutToggle>
+                <LayoutToggle active={layout === "cards"} onClick={() => setLayout("cards")}>
+                  Cards
+                </LayoutToggle>
+                <LayoutToggle active={layout === "map"} onClick={() => setLayout("map")}>
+                  Map
+                </LayoutToggle>
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 lg:justify-self-end">
           {board?.workspace && (
             <div className="hidden min-w-[16rem] flex-col gap-1 sm:flex sm:min-w-[20rem]">
               <div className="grid grid-cols-2 gap-3">
@@ -514,20 +534,6 @@ export function Studio() {
       {view === "leads" && (
         hasLeads ? (
           <div data-tour="leads-table">
-            <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
-              <ExportButton />
-              <div className="glass inline-flex items-center rounded-full p-1 text-sm">
-                <LayoutToggle active={layout === "table"} onClick={() => setLayout("table")}>
-                  Table
-                </LayoutToggle>
-                <LayoutToggle active={layout === "cards"} onClick={() => setLayout("cards")}>
-                  Cards
-                </LayoutToggle>
-                <LayoutToggle active={layout === "map"} onClick={() => setLayout("map")}>
-                  Map
-                </LayoutToggle>
-              </div>
-            </div>
             {layout === "map" ? (
               <LeadMap
                 leads={board!.leads}

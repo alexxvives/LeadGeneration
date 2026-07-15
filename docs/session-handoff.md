@@ -9,27 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (Outreach UX + P1 bets)
+## ⏱️ Status — updated 2026-07-15 (push + Leads UX + send roadmap)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**This pass:** Outreach 3-column queue (Generate all / Approve all beside
-headers); Edit = draft-only drawer; info icon = profile; info drawer has no
-Outreach block; send failures stay approved + clearer toasts; HITL Day+3/+7
-sequence notes; Resend webhooks; cross-run domain/email dedupe; Settings domain
-health checklist.
+**Policy:** commit + `git push` after every meaningful batch (user request).
 
-### Send setup (400 / 409 explained)
-- **400:** usually Resend rejected the From domain / key, or verify blocked the
-  address. Fix: Settings → Sending identity on a **verified** domain + Resend
-  key (workspace or `RESEND_API_KEY`).
-- **409 was “must be approved”** after a failed send flipped status to failed —
-  now we keep `approved` so retry works once DNS/key is fixed.
+### This pass
+- Leads header: true center grid — title | Export+Table/Cards/Map | usage bars.
+- Lead table: `max-h-[calc(100dvh-11rem)]` + sticky header; page doesn’t scroll,
+  table body does.
+- Prior: Outreach/Pipeline full-height columns; Pipeline whole-card drag + ⓘ.
+- Plan: [`docs/roadmap-send-paths.md`](roadmap-send-paths.md) — Easy Resend vs
+  Pro Google/Microsoft; OSS backlog; gstack/SKILL.md notes.
 
-### Next for you
-1. Hard-refresh Outreach — confirm three columns fit one viewport.
-2. Configure Resend domain + key; optional `RESEND_WEBHOOK_SECRET` + webhook URL
-   `/api/webhooks/resend`.
-3. Tick SPF/DKIM/DMARC in Settings → Domain health after DNS verifies.
+### Next
+1. Deploy CF so production Leads matches local.
+2. P0 from send roadmap: Easy-path Settings wizard + DNS poll hero.
+3. ADR before building mailbox OAuth.
 
 ---
 

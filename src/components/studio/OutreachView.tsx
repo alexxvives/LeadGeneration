@@ -5,7 +5,7 @@ import { FitMeter, Spinner, StatusPill } from "@/components/ui";
 import {
   ArrowIcon,
   CheckIcon,
-  HelpIcon,
+  InfoIcon,
   MailIcon,
   SparkIcon,
 } from "@/components/icons";
@@ -114,16 +114,16 @@ export function OutreachView({
           No outreach yet. Run a search, then come back here to draft and send.
         </p>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-3 lg:items-start">
+        <div className="grid min-h-[calc(100dvh-11rem)] gap-3 lg:grid-cols-3 lg:items-stretch">
           {columns.map((key) => {
             const meta = BUCKET_META[key];
             const rows = groups[key];
             return (
               <section
                 key={key}
-                className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
+                className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-950/40 lg:h-[calc(100dvh-11rem)]"
               >
-                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
+                <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
                   <div className="min-w-0">
                     <h3 className="text-[11px] font-semibold uppercase tracking-widest text-mist-500">
                       {meta.title}
@@ -163,7 +163,7 @@ export function OutreachView({
                   ) : null}
                 </div>
 
-                <ul className="max-h-[min(42vh,22rem)] divide-y divide-white/5 overflow-y-auto">
+                <ul className="min-h-0 flex-1 divide-y divide-white/5 overflow-y-auto overscroll-contain">
                   {rows.length === 0 ? (
                     <li className="px-3 py-6 text-center text-[11px] text-mist-600">
                       {meta.empty}
@@ -262,7 +262,7 @@ function OutreachRow({
               aria-label={`Lead info for ${lead.company}`}
               title="Lead info"
             >
-              <HelpIcon className="h-3.5 w-3.5" />
+              <InfoIcon className="h-3.5 w-3.5" />
             </button>
           </div>
           <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-mist-500">

@@ -28,6 +28,7 @@ repository interface, provider-agnostic search (Firecrawl/Exa) and email
 | --- | --- |
 | [`docs/session-handoff.md`](docs/session-handoff.md) | **At session start.** Current state, what's in flight, next steps. |
 | [`docs/roadmap-next.md`](docs/roadmap-next.md) | Next value plan + copy-paste execution prompt for agents. |
+| [`docs/roadmap-send-paths.md`](docs/roadmap-send-paths.md) | Easy Resend vs Pro mailbox send plan + OSS backlog. |
 | [`docs/constitution.md`](docs/constitution.md) | **Always first (before coding).** Principles + rules all code must follow. |
 | [`docs/how-it-works.md`](docs/how-it-works.md) | Understand the product, the user flow, and the architecture. |
 | [`docs/search-and-enrichment.md`](docs/search-and-enrichment.md) | Touch search, scraping, enrichment, or fit scoring. |

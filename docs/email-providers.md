@@ -14,6 +14,20 @@ sending domain.
 _Research refreshed 2026-07-15 (Mailpool / Smartlead industry guides + prior
 provider comparison)._
 
+### How Smartlead-class tools actually send
+
+They do **not** use Resend. They connect the user’s **Google Workspace /
+Microsoft 365 mailboxes** (OAuth or SMTP/IMAP), rotate across many inboxes,
+and run **warmup**. Domain auth is still on the user: buy a sending domain →
+paste SPF/DKIM/DMARC at the registrar → tool polls until green. “Ready to send
+right away” marketing usually means *guided setup + optional domain reseller*,
+not Lodestar silently writing DNS for domains we don’t control.
+
+**Lodestar implication:** keep BYO Resend for v1 HITL sends; the friendly
+path that matches competitors is later **Connect Gmail/Outlook** + a DNS
+checklist (and optional partner for domain purchase) — not a shared Lodestar
+sending domain.
+
 ---
 
 ## What actually keeps mail out of spam

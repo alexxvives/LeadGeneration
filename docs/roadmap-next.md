@@ -12,7 +12,9 @@ search demo.
 **Prioritize product value (funnel + action) over more design-tooling.**
 
 See also [`docs/decisions/competitor-features-2026-07.md`](decisions/competitor-features-2026-07.md)
-for Smartlead/Instantly/Lemlist gaps ranked P0–P2.
+for Smartlead/Instantly/Lemlist gaps ranked P0–P2, and
+[`docs/roadmap-send-paths.md`](roadmap-send-paths.md) for the **Easy Resend vs
+Pro Google/Microsoft** send plan + OSS-inspired backlog.
 
 We already have lodestar-ui + Playwright. Extra UI MCPs (Fable / 21st / v0) are
 optional accelerators, not a prerequisite. A sharp execution prompt + Playwright

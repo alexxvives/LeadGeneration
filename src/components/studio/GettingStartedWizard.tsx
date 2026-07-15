@@ -61,7 +61,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="pipeline-board"]',
       prefer: "right",
       title: "Work the pipeline",
-      body: "New leads land in these columns. Click a card to select it for Approve all, drag to move stages, double-click to open details.",
+      body: "New leads land in these columns. Drag a card anywhere to move stages, click ⓘ for details, click a queued card to select it for Approve all.",
       scrollBlock: "start",
     },
     {

@@ -13,10 +13,10 @@ export function LeadTable({
   onOpen: (id: string) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl2 border border-white/10">
-      <div className="overflow-x-auto">
+    <div className="flex max-h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-xl2 border border-white/10">
+      <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-[640px] text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-ink-950/95 backdrop-blur-sm">
             <tr className="border-b border-white/10 text-left text-xs uppercase tracking-widest text-mist-500">
               <th className="px-5 py-3 font-medium">Company</th>
               <th className="px-5 py-3 font-medium">Location</th>
