@@ -870,7 +870,7 @@ export async function importLeads(
 export async function generatePitchFromWebsite(
   _ctx: Ctx,
   input: { website: string; companyName?: string },
-): Promise<{ pitch: string }> {
+): Promise<{ pitch: string; provider: string }> {
   let url = input.website.trim();
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
   try {
@@ -900,12 +900,12 @@ export async function generatePitchFromWebsite(
     );
   }
 
-  const pitch = await generateDefaultPitch({
+  const result = await generateDefaultPitch({
     website: url,
     companyName: input.companyName?.trim() || undefined,
     pageText,
   });
-  if (pitch) return { pitch };
+  if (result) return { pitch: result.pitch, provider: result.provider };
 
   throw new Error(
     "AI could not generate a pitch from that site. Check Workers AI / Groq / Gemini credentials and try again, or write the pitch manually.",

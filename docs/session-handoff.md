@@ -9,24 +9,30 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (leads/map/outreach polish + pitch prompt)
+## ⏱️ Status — updated 2026-07-15 (leads UX + import + secrets)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Leads: Export Excel next to title; table/cards/map toggle on the count row;
-  map fills viewport height; discarded off the map; New pins mist-gray again.
-- Outreach: Sent is a full-height column beside Ready to send (4 columns).
-- Pitch “Generate from website”: stronger prompt + page-language detection
-  (fixes bilingual tagline regurgitation like akademo-edu.com).
+- Pitch generate shows which AI wrote it (Workers AI / Groq / Gemini).
+- Leads UX: centered table/cards/map; map pin count top-right + legend bottom;
+  info drawer ~wider with Notes column on the right; Export stays by title.
+- Outreach: dropped Needs draft (search/import auto-draft); Sent column kept;
+  equal-height Edit/✓/→ actions; draft popup has Save draft + Approve label.
+- Pipeline: unknown contact method highlights the ⓘ icon only.
+- Excel import: Opportunity column, hyperlink websites, formula phones, short
+  locations; navigates to Leads after import.
+- **Cloudflare secrets gap:** `wrangler secret list` currently only has
+  AUTH_SECRET, NEXTAUTH_URL, RESEND_API_KEY, FIRECRAWL_API_KEY. Gmail / Groq /
+  Gemini are missing — restore via `docs/cloudflare-secrets.md` (deploy does
+  not wipe secrets; something else deleted them).
 
 ### Next
-1. Commit + deploy so live Workers picks up UI + pitch prompt.
+1. User: re-`wrangler secret put` for GMAIL_* + GROQ + GEMINI; then commit/deploy.
 2. Point Maileroo Dashboard webhook at `/api/webhooks/maileroo`.
-3. Confirm Wrangler `NEXTAUTH_URL` = live Workers URL (Connect Google).
-4. Soft-cap warning popup on send; Maileroo live DNS panel.
-5. Microsoft Graph Mail.Send.
+3. Soft-cap warning popup on send; Maileroo live DNS panel.
+4. Microsoft Graph Mail.Send.
 
 ---
 

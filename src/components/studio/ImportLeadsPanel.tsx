@@ -4,25 +4,28 @@ import { useRef, useState } from "react";
 import { ArrowIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import type { ImportLeadRow } from "@/lib/types";
+import { shortLocation } from "@/lib/search/enrich";
 
 /** Normalize header cells for fuzzy column matching. */
 function normHeader(h: string): string {
   return h.trim().toLowerCase().replace(/[\s_-]+/g, "");
 }
 
-const COMPANY_KEYS = new Set([
+/** Prefer earlier keys when multiple header aliases exist (e.g. Opportunity > Name). */
+const COMPANY_PREFER = [
+  "opportunity",
   "company",
   "companyname",
   "business",
   "businessname",
   "organization",
   "org",
-  "name",
-  "account",
   "accountname",
-]);
-const EMAIL_KEYS = new Set(["email", "emails", "emailaddress", "mail", "workemail"]);
-const WEBSITE_KEYS = new Set([
+  "account",
+  "name",
+];
+const EMAIL_PREFER = ["email", "emails", "emailaddress", "mail", "workemail"];
+const WEBSITE_PREFER = [
   "website",
   "url",
   "domain",
@@ -30,36 +33,66 @@ const WEBSITE_KEYS = new Set([
   "webpage",
   "web",
   "homepage",
-]);
-const PHONE_KEYS = new Set(["phone", "phones", "telephone", "mobile", "cell"]);
-const LOCATION_KEYS = new Set([
+];
+const PHONE_PREFER = ["phone", "phones", "telephone", "mobile", "cell", "tel"];
+const LOCATION_PREFER = [
   "location",
   "city",
   "address",
   "region",
   "state",
   "country",
-]);
-const CONTACT_KEYS = new Set([
+];
+const CONTACT_PREFER = [
   "contact",
   "contactname",
   "fullname",
   "fullname",
   "owner",
   "lead",
-]);
+];
 
-function pickCol(headers: string[], keys: Set<string>): number {
+function pickColPreferred(headers: string[], preferred: string[]): number {
   const norms = headers.map(normHeader);
-  const i = norms.findIndex((h) => keys.has(h));
-  return i;
+  for (const key of preferred) {
+    const i = norms.indexOf(key);
+    if (i >= 0) return i;
+  }
+  return -1;
 }
 
+/** ExcelJS cell values may be hyperlinks, formulas, or rich text — never `[object Object]`. */
 function cellStr(v: unknown): string {
   if (v == null) return "";
-  if (typeof v === "string") return v.trim();
-  if (typeof v === "number") return String(v);
-  return String(v).trim();
+  if (typeof v === "string") return cleanCellText(v);
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    if (typeof o.hyperlink === "string") {
+      return cleanCellText(String(o.text ?? o.hyperlink));
+    }
+    if ("result" in o && o.result != null) return cellStr(o.result);
+    if (typeof o.formula === "string") {
+      return cleanCellText(o.formula.replace(/^=+/, ""));
+    }
+    if (typeof o.sharedFormula === "string" && o.result != null) return cellStr(o.result);
+    if (Array.isArray(o.richText)) {
+      return cleanCellText(
+        (o.richText as { text?: string }[]).map((t) => t.text ?? "").join(""),
+      );
+    }
+    if (typeof o.text === "string") return cleanCellText(o.text);
+  }
+  const s = String(v);
+  return s === "[object Object]" ? "" : cleanCellText(s);
+}
+
+function cleanCellText(raw: string): string {
+  let s = raw.trim();
+  // Formula-as-text phones: "=+34 933 18 05 72"
+  if (s.startsWith("=")) s = s.replace(/^=+/, "").trim();
+  return s;
 }
 
 function splitList(raw: string): string[] {
@@ -69,19 +102,40 @@ function splitList(raw: string): string[] {
     .filter(Boolean);
 }
 
+function normalizeWebsite(raw: string | null): string | null {
+  if (!raw) return null;
+  let u = raw.trim();
+  if (!u || u === "[object Object]") return null;
+  if (!/^https?:\/\//i.test(u) && /\./.test(u)) u = `https://${u}`;
+  try {
+    const parsed = new URL(u);
+    if (!parsed.hostname.includes(".")) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizePhone(raw: string): string {
+  let p = raw.trim();
+  if (p.startsWith("=")) p = p.replace(/^=+/, "").trim();
+  // Keep leading + and digits/spaces/dashes/parens
+  return p.replace(/[^\d+\s().-]/g, "").replace(/\s+/g, " ").trim();
+}
+
 function rowsFromMatrix(matrix: string[][]): ImportLeadRow[] {
   if (matrix.length < 2) return [];
   const headers = matrix[0].map((h) => cellStr(h));
-  const companyI = pickCol(headers, COMPANY_KEYS);
-  const emailI = pickCol(headers, EMAIL_KEYS);
-  const websiteI = pickCol(headers, WEBSITE_KEYS);
-  const phoneI = pickCol(headers, PHONE_KEYS);
-  const locationI = pickCol(headers, LOCATION_KEYS);
-  const contactI = pickCol(headers, CONTACT_KEYS);
+  const companyI = pickColPreferred(headers, COMPANY_PREFER);
+  const emailI = pickColPreferred(headers, EMAIL_PREFER);
+  const websiteI = pickColPreferred(headers, WEBSITE_PREFER);
+  const phoneI = pickColPreferred(headers, PHONE_PREFER);
+  const locationI = pickColPreferred(headers, LOCATION_PREFER);
+  const contactI = pickColPreferred(headers, CONTACT_PREFER);
 
   if (companyI < 0 && emailI < 0) {
     throw new Error(
-      "Couldn't find a Company or Email column. Rename a header to Company / Email (or Business, Website, etc.) and try again.",
+      "Couldn't find a Company or Email column. Rename a header to Company / Email (or Opportunity, Business, Website, etc.) and try again.",
     );
   }
 
@@ -91,12 +145,19 @@ function rowsFromMatrix(matrix: string[][]): ImportLeadRow[] {
     const company = companyI >= 0 ? cellStr(row[companyI]) : "";
     const emails = emailI >= 0 ? splitList(cellStr(row[emailI])) : [];
     if (!company && emails.length === 0) continue;
+    const fullLocation = locationI >= 0 ? cellStr(row[locationI]) || null : null;
+    const phones =
+      phoneI >= 0
+        ? splitList(cellStr(row[phoneI]))
+            .map(normalizePhone)
+            .filter((p) => p.replace(/\D/g, "").length >= 6)
+        : [];
     out.push({
       company,
       emails,
-      website: websiteI >= 0 ? cellStr(row[websiteI]) || null : null,
-      phones: phoneI >= 0 ? splitList(cellStr(row[phoneI])) : [],
-      location: locationI >= 0 ? cellStr(row[locationI]) || null : null,
+      website: websiteI >= 0 ? normalizeWebsite(cellStr(row[websiteI]) || null) : null,
+      phones,
+      location: shortLocation(fullLocation) ?? fullLocation,
       contactName: contactI >= 0 ? cellStr(row[contactI]) || null : null,
     });
   }
@@ -110,7 +171,6 @@ async function parseFile(file: File): Promise<ImportLeadRow[]> {
     const delim = name.endsWith(".tsv") || text.indexOf("\t") > text.indexOf(",") ? "\t" : ",";
     const lines = text.split(/\r?\n/).filter((l) => l.trim());
     const matrix = lines.map((line) => {
-      // Simple CSV split — good enough for typical lead exports.
       const cells: string[] = [];
       let cur = "";
       let inQ = false;
@@ -145,12 +205,18 @@ async function parseFile(file: File): Promise<ImportLeadRow[]> {
     const sheet = wb.worksheets[0];
     if (!sheet) throw new Error("Spreadsheet has no sheets.");
     const matrix: string[][] = [];
-    sheet.eachRow((row, rowNumber) => {
+    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       const vals: string[] = [];
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        vals[colNumber - 1] = cellStr(cell.value);
+        // Prefer ExcelJS text / hyperlink-aware value over raw formula objects.
+        const raw =
+          cell.value != null
+            ? cell.value
+            : typeof cell.text === "string"
+              ? cell.text
+              : "";
+        vals[colNumber - 1] = cellStr(raw);
       });
-      // Pad to dense array
       const max = Math.max(vals.length, ...(matrix[0] ? [matrix[0].length] : [0]));
       for (let i = 0; i < max; i++) vals[i] = vals[i] ?? "";
       matrix[rowNumber - 1] = vals;
@@ -216,8 +282,8 @@ export function ImportLeadsPanel({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-mist-100">Already have a list?</p>
           <p className="mt-1 text-xs leading-relaxed text-mist-500">
-            Drop a CSV or Excel file. We auto-detect columns like Company, Email, Website,
-            Phone, Location.
+            Drop a CSV or Excel file. We auto-detect columns like Opportunity/Company, Email,
+            Website, Phone, Address.
           </p>
         </div>
         <button

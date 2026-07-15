@@ -21,6 +21,7 @@ export function SenderProfileForm() {
   const [website, setWebsite] = useState("");
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [genProvider, setGenProvider] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -70,9 +71,17 @@ export function SenderProfileForm() {
     persist(next);
   };
 
+  const providerLabel = (p: string) => {
+    if (p === "workers-ai") return "Workers AI";
+    if (p === "groq") return "Groq";
+    if (p === "gemini") return "Gemini";
+    return p;
+  };
+
   const generatePitch = async () => {
     setGenerating(true);
     setGenError(null);
+    setGenProvider(null);
     try {
       const res = await fetch("/api/ai/pitch", {
         method: "POST",
@@ -82,12 +91,17 @@ export function SenderProfileForm() {
           companyName: profile.company || undefined,
         }),
       });
-      const data = (await res.json()) as { pitch?: string; error?: string };
+      const data = (await res.json()) as {
+        pitch?: string;
+        provider?: string;
+        error?: string;
+      };
       if (!res.ok) {
         setGenError(data.error ?? "Could not generate pitch");
         return;
       }
       if (data.pitch) {
+        if (data.provider) setGenProvider(data.provider);
         const next = {
           ...profile,
           defaultOffer: data.pitch,
@@ -148,6 +162,12 @@ export function SenderProfileForm() {
           placeholder="We help clinics turn website visitors into booked appointments…"
           className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
         />
+        {genProvider && !genError && (
+          <p className="mt-1.5 text-xs text-mist-500">
+            Generated with{" "}
+            <span className="text-mist-300">{providerLabel(genProvider)}</span>
+          </p>
+        )}
         {genError && <p className="mt-1.5 text-xs text-rose-300">{genError}</p>}
       </label>
       <label className="block">

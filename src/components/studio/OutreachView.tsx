@@ -7,19 +7,18 @@ import {
   CheckIcon,
   InfoIcon,
   MailIcon,
-  SparkIcon,
 } from "@/components/icons";
 
-type OutreachBucket = "needs_draft" | "review" | "ready" | "sent";
+type OutreachBucket = "review" | "ready" | "sent";
 
 function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   const o = lead.outreach;
   if (o?.status === "sent") return "sent";
   if (o?.status === "approved") return "ready";
+  // Search + import auto-draft; anything with a draftable status lands in Review.
   if (o && (o.status === "draft" || o.status === "rejected" || o.status === "failed")) {
     return "review";
   }
-  if (!o && lead.emails.length > 0) return "needs_draft";
   return null;
 }
 
@@ -27,11 +26,6 @@ const BUCKET_META: Record<
   OutreachBucket,
   { title: string; hint: string; empty: string }
 > = {
-  needs_draft: {
-    title: "Needs draft",
-    hint: "Generate a first touch",
-    empty: "All contactable leads have drafts.",
-  },
   review: {
     title: "Review & approve",
     hint: "Edit, then approve to unlock send",
@@ -50,8 +44,8 @@ const BUCKET_META: Record<
 };
 
 /**
- * Compact 4-column send queue: Needs draft → Review → Ready → Sent.
- * Edit opens draft-only; info icon opens the lead profile.
+ * Compact 3-column send queue: Review → Ready → Sent.
+ * Drafts are created automatically on search/import (no "Needs draft" column).
  */
 export function OutreachView({
   leads,
@@ -59,10 +53,8 @@ export function OutreachView({
   busyId,
   onOpenInfo,
   onOpenDraft,
-  onDraft,
   onDecide,
   onSend,
-  onDraftAll,
   onApproveAll,
 }: {
   leads: LeadWithOutreach[];
@@ -77,7 +69,6 @@ export function OutreachView({
   onApproveAll: () => Promise<void>;
 }) {
   const groups: Record<OutreachBucket, LeadWithOutreach[]> = {
-    needs_draft: [],
     review: [],
     ready: [],
     sent: [],
@@ -87,22 +78,17 @@ export function OutreachView({
     if (b) groups[b].push(lead);
   }
 
-  const total =
-    groups.needs_draft.length +
-    groups.review.length +
-    groups.ready.length +
-    groups.sent.length;
-
-  const columns: OutreachBucket[] = ["needs_draft", "review", "ready", "sent"];
+  const total = groups.review.length + groups.ready.length + groups.sent.length;
+  const columns: OutreachBucket[] = ["review", "ready", "sent"];
 
   return (
     <div data-tour="outreach-queue" className="flex h-full min-h-0 flex-col gap-3">
       {total === 0 ? (
         <p className="rounded-xl2 border border-white/10 bg-ink-900/40 px-5 py-8 text-center text-sm text-mist-400">
-          No outreach yet. Run a search, then come back here to draft and send.
+          No outreach yet. Run a search or import a list — drafts appear here to review.
         </p>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-4 lg:items-stretch">
+        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
           {columns.map((key) => {
             const meta = BUCKET_META[key];
             const rows = groups[key];
@@ -119,21 +105,6 @@ export function OutreachView({
                     </h3>
                     <p className="mt-0.5 text-[11px] text-mist-600">{meta.hint}</p>
                   </div>
-                  {key === "needs_draft" && rows.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => void onDraftAll()}
-                      disabled={busyId === "draft-all"}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-medium text-mist-100 hover:bg-white/5 disabled:opacity-40"
-                    >
-                      {busyId === "draft-all" ? (
-                        <Spinner className="h-3 w-3" />
-                      ) : (
-                        <SparkIcon className="h-3 w-3" />
-                      )}
-                      Generate all
-                    </button>
-                  ) : null}
                   {key === "review" && rows.length > 0 ? (
                     <button
                       type="button"
@@ -166,7 +137,6 @@ export function OutreachView({
                         canSendEmail={canSendEmail}
                         onOpenInfo={() => onOpenInfo(lead.id)}
                         onOpenDraft={() => onOpenDraft(lead.id)}
-                        onDraft={() => onDraft(lead.id)}
                         onApprove={() =>
                           lead.outreach
                             ? onDecide(lead.outreach.id, "approved")
@@ -188,6 +158,9 @@ export function OutreachView({
   );
 }
 
+const ACTION_BTN =
+  "inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-full px-2.5 text-[11px]";
+
 function OutreachRow({
   lead,
   bucket,
@@ -195,7 +168,6 @@ function OutreachRow({
   canSendEmail,
   onOpenInfo,
   onOpenDraft,
-  onDraft,
   onApprove,
   onSend,
 }: {
@@ -205,104 +177,87 @@ function OutreachRow({
   canSendEmail: boolean;
   onOpenInfo: () => void;
   onOpenDraft: () => void;
-  onDraft: () => Promise<void>;
   onApprove: () => Promise<void>;
   onSend: () => Promise<void>;
 }) {
   const email = lead.outreach?.toEmail ?? lead.emails[0] ?? null;
   return (
-    <li className="flex flex-col gap-2 px-3 py-2.5 transition-colors hover:bg-white/[0.03]">
-      <div className="flex min-w-0 items-start gap-1.5">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <span className="truncate text-sm font-medium text-mist-100">{lead.company}</span>
-            <button
-              type="button"
-              onClick={onOpenInfo}
-              className="shrink-0 rounded p-0.5 text-mist-600 transition-colors hover:bg-white/5 hover:text-mist-300"
-              aria-label={`Lead info for ${lead.company}`}
-              title="Lead info"
-            >
-              <InfoIcon className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-mist-500">
-            <MailIcon className="h-3 w-3 shrink-0" />
-            <span className="truncate">{email ?? "No email"}</span>
-          </p>
-          {lead.outreach?.status === "failed" && lead.outreach.error ? (
-            <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
-          ) : null}
+    <li className="flex items-center gap-2 px-3 py-2.5 transition-colors hover:bg-white/[0.03]">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1">
+          <span className="truncate text-sm font-medium text-mist-100">{lead.company}</span>
+          <button
+            type="button"
+            onClick={onOpenInfo}
+            className="shrink-0 rounded p-0.5 text-mist-600 transition-colors hover:bg-white/5 hover:text-mist-300"
+            aria-label={`Lead info for ${lead.company}`}
+            title="Lead info"
+          >
+            <InfoIcon className="h-3.5 w-3.5" />
+          </button>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <FitMeter score={lead.fitScore} />
-          {bucket === "review" && (
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
-              <button
-                type="button"
-                onClick={onOpenDraft}
-                className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-300 hover:bg-white/5"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void onApprove()}
-                aria-label="Approve"
-                title="Approve"
-                className="inline-flex items-center justify-center rounded-full bg-amber-400 p-1.5 text-ink-950 disabled:opacity-50"
-              >
-                {busy ? <Spinner className="h-3.5 w-3.5" /> : <CheckIcon className="h-3.5 w-3.5" />}
-              </button>
-            </div>
-          )}
-          {bucket === "ready" && (
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
-              <button
-                type="button"
-                onClick={onOpenDraft}
-                className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-300 hover:bg-white/5"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                disabled={busy || !email}
-                onClick={() => void onSend()}
-                className="inline-flex items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
-              >
-                {busy ? <Spinner className="h-3 w-3" /> : <ArrowIcon className="h-3 w-3" />}
-                {canSendEmail ? "Send" : "Send (simulate)"}
-              </button>
-            </div>
-          )}
-        </div>
+        <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-mist-500">
+          <MailIcon className="h-3 w-3 shrink-0" />
+          <span className="truncate">{email ?? "No email"}</span>
+        </p>
+        {lead.outreach?.status === "failed" && lead.outreach.error ? (
+          <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
+        ) : null}
       </div>
-      {(bucket === "needs_draft" || bucket === "sent") && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {bucket === "needs_draft" && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void onDraft()}
-              className="inline-flex items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
-            >
-              {busy ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3 w-3" />}
-              Draft
-            </button>
-          )}
-          {bucket === "sent" && (
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <FitMeter score={lead.fitScore} />
+        {bucket === "review" && (
+          <div className="flex items-center justify-end gap-1.5">
             <button
               type="button"
               onClick={onOpenDraft}
-              className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-mist-400 hover:bg-white/5"
+              className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
             >
-              View draft
+              Edit
             </button>
-          )}
-        </div>
-      )}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void onApprove()}
+              aria-label="Approve"
+              title="Approve"
+              className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
+            >
+              {busy ? <Spinner className="h-3.5 w-3.5" /> : <CheckIcon className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        )}
+        {bucket === "ready" && (
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={onOpenDraft}
+              className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              disabled={busy || !email}
+              onClick={() => void onSend()}
+              aria-label={canSendEmail ? "Send" : "Send (simulate)"}
+              title={canSendEmail ? "Send" : "Send (simulate)"}
+              className={`${ACTION_BTN} bg-aurora-400 text-ink-950 disabled:opacity-50`}
+            >
+              {busy ? <Spinner className="h-3.5 w-3.5" /> : <ArrowIcon className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        )}
+        {bucket === "sent" && (
+          <button
+            type="button"
+            onClick={onOpenDraft}
+            className={`${ACTION_BTN} border border-white/15 text-mist-400 hover:bg-white/5`}
+          >
+            View draft
+          </button>
+        )}
+      </div>
     </li>
   );
 }

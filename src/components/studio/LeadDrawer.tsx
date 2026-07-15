@@ -211,15 +211,15 @@ export function LeadDrawer(props: DrawerProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" onClick={onClose} />
       <aside
-        className={`animate-float-up relative flex w-full flex-col overflow-y-auto border border-white/10 bg-ink-900 shadow-2xl ${
+        className={`animate-float-up relative flex w-full flex-col overflow-hidden border border-white/10 bg-ink-900 shadow-2xl ${
           mode === "info"
-            ? "max-h-[min(90dvh,720px)] max-w-[36.8rem] rounded-xl2"
+            ? "max-h-[min(90dvh,720px)] max-w-[51rem] rounded-xl2"
             : "h-full max-h-[min(92dvh,900px)] max-w-[43rem] rounded-xl2 sm:max-h-[min(90dvh,860px)]"
         }`}
       >
 
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
+        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-4 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
           <div className="min-w-0">
             {mode === "info" ? (
               <div className="flex items-center gap-2">
@@ -248,9 +248,16 @@ export function LeadDrawer(props: DrawerProps) {
           </button>
         </div>
 
-        <div className="space-y-6 p-6">
+        <div
+          className={
+            mode === "info"
+              ? "grid min-h-0 flex-1 gap-0 overflow-hidden sm:grid-cols-[minmax(0,1.15fr)_minmax(14rem,0.85fr)]"
+              : "min-h-0 flex-1 space-y-6 overflow-y-auto p-6"
+          }
+        >
           {mode === "info" ? (
             <>
+          <div className="min-h-0 space-y-6 overflow-y-auto p-6">
           {/* CRM Stage picker */}
           <section>
             <SectionLabel>Sales stage</SectionLabel>
@@ -339,100 +346,6 @@ export function LeadDrawer(props: DrawerProps) {
             </section>
           )}
 
-          {/* Notes journal (dated entries) */}
-          <section>
-            <div className="mb-2 flex items-center justify-between">
-              <SectionLabel>Notes</SectionLabel>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddNote(true);
-                  setNewNoteDate(todayIsoDate());
-                }}
-                className="text-[11px] text-aurora-400 hover:underline"
-              >
-                + Add
-              </button>
-            </div>
-
-            {lead.notes?.trim() && followUps.length === 0 && (
-              <p className="mb-3 text-sm leading-relaxed text-mist-400">
-                <span className="font-semibold text-mist-200">Earlier note:</span>{" "}
-                {lead.notes.trim()}
-              </p>
-            )}
-
-            {showAddNote && (
-              <div className="mb-3 space-y-2 rounded-xl border border-white/10 bg-ink-850/60 p-3">
-                <div className="grid grid-cols-[auto_1fr] gap-2">
-                  <input
-                    type="date"
-                    value={newNoteDate}
-                    onChange={(e) => setNewNoteDate(e.target.value)}
-                    className="rounded-lg border border-white/10 bg-ink-900/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
-                  />
-                  <input
-                    type="text"
-                    value={newNoteText}
-                    onChange={(e) => setNewNoteText(e.target.value)}
-                    placeholder="What happened…"
-                    className="rounded-lg border border-white/10 bg-ink-900/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void addNote()}
-                    disabled={!newNoteDate || !newNoteText.trim()}
-                    className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-ink-950 disabled:opacity-40"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddNote(false);
-                      setNewNoteText("");
-                      setNewNoteDate(todayIsoDate());
-                    }}
-                    className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {followUps.length === 0 && !showAddNote ? (
-              <p className="text-xs text-mist-600">
-                No notes yet. Add a dated entry (defaults to today).
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {[...followUps]
-                  .sort((a, b) => a.date.localeCompare(b.date))
-                  .map((fu) => (
-                    <li key={fu.id} className="flex items-start gap-2">
-                      <p className="min-w-0 flex-1 text-sm leading-relaxed text-mist-300">
-                        <span className="font-semibold text-mist-100">
-                          {formatNoteDate(fu.date)}:
-                        </span>{" "}
-                        {fu.note || "—"}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void deleteFollowUp(fu.id)}
-                        className="mt-0.5 text-mist-600 hover:text-rose-400"
-                        aria-label="Delete note"
-                      >
-                        <XIcon className="h-3 w-3" />
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            )}
-          </section>
-
           {/* Fit score reasoning */}
           <section>
             <div className="mb-2 flex items-center justify-between gap-3">
@@ -452,7 +365,7 @@ export function LeadDrawer(props: DrawerProps) {
                 </span>
               </div>
             </div>
-            <ul className="grid gap-1.5 sm:grid-cols-2">
+            <ul className="grid gap-1.5">
               {lead.fitReasons.map((r) => (
                 <li key={r} className="flex items-start gap-2 text-sm text-mist-300">
                   <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-aurora-400" />
@@ -461,6 +374,100 @@ export function LeadDrawer(props: DrawerProps) {
               ))}
             </ul>
           </section>
+          </div>
+
+          {/* Notes column — grows independently so the left profile stays readable */}
+          <aside className="flex min-h-0 flex-col border-t border-white/5 bg-ink-950/40 sm:border-l sm:border-t-0">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/5 px-4 py-3">
+              <SectionLabel>Notes</SectionLabel>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddNote(true);
+                  setNewNoteDate(todayIsoDate());
+                }}
+                className="text-[11px] text-aurora-400 hover:underline"
+              >
+                + Add
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+              {lead.notes?.trim() && followUps.length === 0 && (
+                <p className="text-sm leading-relaxed text-mist-400">
+                  <span className="font-semibold text-mist-200">Earlier note:</span>{" "}
+                  {lead.notes.trim()}
+                </p>
+              )}
+
+              {showAddNote && (
+                <div className="space-y-2 rounded-xl border border-white/10 bg-ink-900/60 p-3">
+                  <input
+                    type="date"
+                    value={newNoteDate}
+                    onChange={(e) => setNewNoteDate(e.target.value)}
+                    className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+                  />
+                  <textarea
+                    value={newNoteText}
+                    onChange={(e) => setNewNoteText(e.target.value)}
+                    rows={3}
+                    placeholder="What happened…"
+                    className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void addNote()}
+                      disabled={!newNoteDate || !newNoteText.trim()}
+                      className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-ink-950 disabled:opacity-40"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddNote(false);
+                        setNewNoteText("");
+                        setNewNoteDate(todayIsoDate());
+                      }}
+                      className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {followUps.length === 0 && !showAddNote ? (
+                <p className="text-xs text-mist-600">
+                  No notes yet. Add a dated entry (defaults to today).
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {[...followUps]
+                    .sort((a, b) => a.date.localeCompare(b.date))
+                    .map((fu) => (
+                      <li key={fu.id} className="flex items-start gap-2">
+                        <p className="min-w-0 flex-1 text-sm leading-relaxed text-mist-300">
+                          <span className="font-semibold text-mist-100">
+                            {formatNoteDate(fu.date)}:
+                          </span>{" "}
+                          {fu.note || "—"}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => void deleteFollowUp(fu.id)}
+                          className="mt-0.5 text-mist-600 hover:text-rose-400"
+                          aria-label="Delete note"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </div>
+          </aside>
             </>
           ) : (
             <>
@@ -532,7 +539,25 @@ export function LeadDrawer(props: DrawerProps) {
                 )}
 
                 {!sent && (
-                  <div className="flex justify-center pt-1">
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        run("save", async () => {
+                          await props.onSaveDraft(outreach.id, {
+                            subject,
+                            body,
+                            toEmail: toEmail || null,
+                          });
+                          setDirty(false);
+                        })
+                      }
+                      disabled={!dirty || busy === "save"}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-mist-200 transition-colors hover:bg-white/5 disabled:opacity-40"
+                    >
+                      {busy === "save" ? <Spinner className="h-3.5 w-3.5" /> : null}
+                      Save draft
+                    </button>
                     {outreach.status !== "approved" ? (
                       <button
                         onClick={() =>
@@ -542,11 +567,14 @@ export function LeadDrawer(props: DrawerProps) {
                           })
                         }
                         disabled={busy === "approve"}
-                        aria-label="Approve"
-                        title="Approve"
-                        className="inline-flex items-center justify-center rounded-full bg-amber-400 p-2.5 text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
                       >
-                        {busy === "approve" ? <Spinner className="h-4 w-4" /> : <CheckIcon className="h-5 w-5" />}
+                        {busy === "approve" ? (
+                          <Spinner className="h-3.5 w-3.5" />
+                        ) : (
+                          <CheckIcon className="h-4 w-4" />
+                        )}
+                        Approve
                       </button>
                     ) : (
                       <button

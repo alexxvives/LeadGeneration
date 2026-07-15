@@ -425,24 +425,17 @@ function DraggablePipelineCard({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`group flex min-h-[3.25rem] cursor-grab touch-none items-center gap-1 overflow-hidden rounded-xl border px-3 py-2.5 transition-all active:cursor-grabbing ${
-        needsMethod
-          ? "border-amber-400/40 bg-amber-400/10 ring-1 ring-amber-400/25 hover:bg-amber-400/15"
-          : "border-white/5 bg-ink-900/60 hover:bg-white/[0.03]"
-      } ${isDragging ? "opacity-30" : ""}`}
+      className={`group flex min-h-[3.25rem] cursor-grab touch-none items-center gap-1 overflow-hidden rounded-xl border border-white/5 bg-ink-900/60 px-3 py-2.5 transition-all hover:bg-white/[0.03] active:cursor-grabbing ${
+        isDragging ? "opacity-30" : ""
+      }`}
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium leading-snug text-mist-100">{lead.company}</p>
         {subtitle && (
           <p className="mt-0.5 truncate text-xs leading-snug text-mist-500">{subtitle}</p>
         )}
-        {showMeta && (
+        {showMeta && !needsMethod && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {needsMethod && (
-              <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
-                How contacted?
-              </span>
-            )}
             {pendingFollowUps > 0 && (
               <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
                 {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
@@ -475,9 +468,17 @@ function DraggablePipelineCard({
           e.stopPropagation();
           onOpen(lead.id);
         }}
-        aria-label={`Lead info for ${lead.company}`}
-        title="Lead info"
-        className="shrink-0 rounded-md p-1 text-mist-600 transition-colors hover:bg-white/10 hover:text-mist-200"
+        aria-label={
+          needsMethod
+            ? `Set how you contacted ${lead.company}`
+            : `Lead info for ${lead.company}`
+        }
+        title={needsMethod ? "How contacted? Open to set method" : "Lead info"}
+        className={`shrink-0 rounded-md p-1 transition-colors ${
+          needsMethod
+            ? "bg-amber-400/20 text-amber-200 ring-1 ring-amber-400/40 hover:bg-amber-400/30"
+            : "text-mist-600 hover:bg-white/10 hover:text-mist-200"
+        }`}
       >
         <InfoIcon className="h-3.5 w-3.5" />
       </button>

@@ -537,7 +537,7 @@ export function Studio() {
             <ImportLeadsPanel
               onImported={async () => {
                 await refresh();
-                setView("pipeline");
+                setView("leads");
               }}
             />
           )}
@@ -567,12 +567,12 @@ export function Studio() {
       {view === "leads" && (
         hasLeads ? (
           <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+            <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
               <p className="text-xs uppercase tracking-widest text-mist-500">
                 <span className="font-semibold text-mist-200">{board!.leads.length}</span> lead
                 {board!.leads.length === 1 ? "" : "s"} · table, cards, or map
               </p>
-              <div className="glass inline-flex items-center rounded-full p-1 text-sm">
+              <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
                 <LayoutToggle active={layout === "table"} onClick={() => setLayout("table")}>
                   Table
                 </LayoutToggle>
@@ -583,6 +583,7 @@ export function Studio() {
                   Map
                 </LayoutToggle>
               </div>
+              <div className="hidden sm:block" aria-hidden />
             </div>
             <div
               className={`min-h-0 flex-1 ${

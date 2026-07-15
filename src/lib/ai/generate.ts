@@ -3,7 +3,7 @@
  * Always optional — null means "no AI available / failed" (no fake copy).
  */
 
-import { aiChat } from "@/lib/ai/chat";
+import { aiChat, type AiProvider } from "@/lib/ai/chat";
 import {
   langLabel,
   outreachLangFromLocation,
@@ -72,7 +72,7 @@ export async function generateDefaultPitch(opts: {
   pageText: string;
   /** Pitch language — usually the user's market; else inferred from page text. */
   lang?: OutreachLang;
-}): Promise<string | null> {
+}): Promise<{ pitch: string; provider: AiProvider } | null> {
   const raw = opts.pageText.replace(/\s+/g, " ").trim().slice(0, 3500);
   if (raw.length < 40) return null;
 
@@ -89,11 +89,13 @@ export async function generateDefaultPitch(opts: {
       .join("\n"),
   );
   if (!out) return null;
-  return out.text
+  const pitch = out.text
     .replace(/^["'\s]+|["'\s]+$/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 800);
+  if (!pitch) return null;
+  return { pitch, provider: out.provider };
 }
 
 /** Map over items with a concurrency cap (keeps Workers AI from stampeding). */

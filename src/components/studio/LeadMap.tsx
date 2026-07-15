@@ -327,31 +327,30 @@ export function LeadMap({
         )}
         {ready && !error && !initError && pins.length > 0 && (
           <div
-            className="pointer-events-none absolute left-4 top-4 z-[500] rounded-full border border-white/10 bg-ink-950/80 px-3 py-1.5 text-xs text-mist-300 backdrop-blur"
+            className="pointer-events-none absolute right-4 top-4 z-[500] rounded-full border border-white/10 bg-ink-950/80 px-3 py-1.5 text-xs text-mist-300 backdrop-blur"
             data-testid="map-pin-count"
           >
             {pins.length} pin{pins.length === 1 ? "" : "s"}
             {hint ? ` · ${hint}` : ""}
           </div>
         )}
+        {pins.length > 0 && (
+          <ul className="pointer-events-none absolute bottom-3 left-1/2 z-[500] flex -translate-x-1/2 flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-full border border-white/10 bg-ink-950/80 px-3 py-1.5 text-[11px] text-mist-400 backdrop-blur">
+            {LEGEND_ORDER.map((stage) => {
+              const c = STAGE_PIN[stage];
+              return (
+                <li key={stage} className="inline-flex items-center gap-1.5">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full ring-2 ring-ink-950"
+                    style={{ backgroundColor: c.fill, boxShadow: `0 0 0 3px ${c.glow}` }}
+                  />
+                  {c.label}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
-
-      {pins.length > 0 && (
-        <ul className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[11px] text-mist-500">
-          {LEGEND_ORDER.map((stage) => {
-            const c = STAGE_PIN[stage];
-            return (
-              <li key={stage} className="inline-flex items-center gap-1.5">
-                <span
-                  className="h-2.5 w-2.5 rounded-full ring-2 ring-ink-950"
-                  style={{ backgroundColor: c.fill, boxShadow: `0 0 0 3px ${c.glow}` }}
-                />
-                {c.label}
-              </li>
-            );
-          })}
-        </ul>
-      )}
     </div>
   );
 }

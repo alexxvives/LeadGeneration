@@ -499,3 +499,14 @@ live product preview (map + pipeline) — dropped missing hero image dependency.
   Groq/Gemini only if keys are set (their free tiers apply). Local `.env` has
   neither Groq nor Gemini — prod uses the `AI` binding.
 
+### 2026-07-15 — Excel import + CF secrets checklist
+- `LEADS_example.xlsx` used **Opportunity** (not Name) plus Excel hyperlink
+  objects and `=+34…` formula phones. Old parser mapped Name→empty company so
+  only email rows imported, and websites rendered as `[object Object]`. Prefer
+  Opportunity > Company > Name; unwrap hyperlink/formula cells; shorten
+  addresses; route import → Leads.
+- `wrangler secret list` on Worker `leadgeneration` was missing Gmail/Groq/
+  Gemini — deploy does not clear secrets; document checklist in
+  `docs/cloudflare-secrets.md`.
+- Outreach “Needs draft” removed: search + import already auto-create drafts.
+
