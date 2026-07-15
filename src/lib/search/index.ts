@@ -185,10 +185,12 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
   const ranked = candidates.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit);
 
   const useAi = await workersAiAvailable();
+  const { blurbLooksLikeJunk } = await import("@/lib/outreach/draft");
 
   const leads: ScoredLead[] = await mapPool(ranked, 3, async (lead) => {
     const emails = await filterVerifiableEmails(lead.emails);
     let aboutBlurb = lead.aboutBlurb;
+    if (aboutBlurb && blurbLooksLikeJunk(aboutBlurb)) aboutBlurb = null;
     if (useAi) {
       const page = pageByUrl.get(urlKey(lead.sourceUrl));
       const rawText = `${page?.description ?? ""}\n${page?.content ?? ""}\n${lead.aboutBlurb ?? ""}`;
@@ -198,7 +200,7 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
         location: lead.location,
         rawText,
       });
-      if (polished) aboutBlurb = polished;
+      if (polished && !blurbLooksLikeJunk(polished)) aboutBlurb = polished;
     }
     return { ...lead, emails, aboutBlurb };
   });

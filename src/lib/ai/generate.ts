@@ -35,7 +35,7 @@ export async function generateLeadBlurb(opts: {
 
   const lang = outreachLangFromLocation(opts.location);
   const out = await workersAiChat(
-    `You write one factual sentence describing a company for B2B outreach personalization. Language: ${langLabel(lang)}. No marketing fluff, no greetings, no quotes around the whole sentence. Max 40 words.`,
+    `You write one factual sentence describing a company for B2B outreach. Language: ${langLabel(lang)}. Plain and specific. No marketing fluff, no greetings, no quotes, no nav/menu words. Max 35 words.`,
     [
       `Company: ${opts.company}`,
       opts.website ? `Website: ${opts.website}` : null,
@@ -64,7 +64,7 @@ export async function generateDefaultPitch(opts: {
 
   const lang = opts.lang ?? "en";
   const out = await workersAiChat(
-    `You write a short cold-email pitch paragraph (2–4 sentences) in ${langLabel(lang)}. First person ("we"/"I"). Concrete value, no hype, no subject line, no greeting, no sign-off.`,
+    `You write a short cold-email pitch (2–3 sentences) in ${langLabel(lang)}. Sound like a real person, not a marketer. First person. Concrete value only. No hype words (revolutionize, seamless, leverage). No subject line, greeting, or sign-off.`,
     [
       opts.companyName ? `Our company: ${opts.companyName}` : null,
       `Our website: ${opts.website}`,

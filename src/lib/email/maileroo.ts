@@ -10,6 +10,8 @@ export async function sendViaMaileroo(opts: {
   subject: string;
   body: string;
   replyTo?: string;
+  /** Custom tags echoed on webhooks (lodestar_ws / lodestar_outreach). */
+  tags?: Record<string, string>;
 }): Promise<{ ok: true; id?: string } | { ok: false; error: string }> {
   try {
     const payload: Record<string, unknown> = {
@@ -20,6 +22,9 @@ export async function sendViaMaileroo(opts: {
     };
     if (opts.replyTo) {
       payload.reply_to = { address: opts.replyTo };
+    }
+    if (opts.tags && Object.keys(opts.tags).length > 0) {
+      payload.tags = opts.tags;
     }
 
     const res = await fetch("https://smtp.maileroo.com/api/v2/emails", {

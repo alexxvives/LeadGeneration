@@ -16,6 +16,7 @@ const PUBLIC_PREFIXES = [
   "/api/auth",
   "/api/webhooks/stripe",
   "/api/webhooks/resend",
+  "/api/webhooks/maileroo",
   "/api/turnstile",
 ];
 

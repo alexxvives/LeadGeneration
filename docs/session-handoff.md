@@ -9,22 +9,26 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (outreach UI polish)
+## ⏱️ Status — updated 2026-07-15 (send hygiene + Maileroo webhooks)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Outreach queue: removed Draft/Approved status pills; Edit + Approve/Send sit top-right on review/ready rows.
-- Draft popup: removed Save edits / Reject / shortcut hint; Approve or Send centered; dirty edits auto-save on those actions.
-- Map: `new` stage pins are black (was mist gray).
-- Pro mailbox setup: removed inbox “warmth” picker (soft-cap still uses default warmup ramp).
+- Delivery UI: dropped Resend-only webhook hint.
+- **Maileroo webhooks:** `POST /api/webhooks/maileroo` + tags on send; optional
+  `MAILEROO_WEBHOOK_SECRET`.
+- Send strips legacy “Sent by / unsubscribe mailto / placeholder” footers baked
+  into old drafts; new footer is STOP (+ real US address only).
+- Drafts: Settings sign-off + offer passed on regenerate; less template-y copy;
+  junk nav blurbs rejected.
+- Pitch generate: heuristic fallback when Workers AI fails; clearer fetch errors.
 
 ### Next
-1. Confirm Wrangler `NEXTAUTH_URL` = live Workers URL (Connect Google).
-2. Soft-cap warning popup on send; Maileroo live DNS panel.
-3. Redeploy so `AI` binding is live on Workers.
-4. Perf follow-up: board `listOutreach` N+1, import full-lead scan (deferred).
+1. Redeploy Workers (AI binding + webhook route live).
+2. Point Maileroo Dashboard webhook at `/api/webhooks/maileroo`.
+3. Confirm Wrangler `NEXTAUTH_URL` = live Workers URL (Connect Google).
+4. Soft-cap warning popup on send; Maileroo live DNS panel.
 5. Microsoft Graph Mail.Send.
 
 ---

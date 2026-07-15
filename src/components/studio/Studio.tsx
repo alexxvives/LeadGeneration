@@ -20,6 +20,7 @@ import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
+import { loadSenderProfile, resolveSignature } from "@/lib/sender-profile";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
 type UpgradePrompt = { kind: "leads" | "sends"; planId: PlanId };
@@ -200,7 +201,11 @@ export function Studio() {
 
   const onDraft = async (leadId: string) => {
     try {
-      const { outreach } = await api.draft(leadId);
+      const profile = loadSenderProfile();
+      const { outreach } = await api.draft(leadId, {
+        signOff: resolveSignature(profile),
+        offerNotes: profile.defaultOffer.trim() || undefined,
+      });
       patchLeadLocal(leadId, { outreach, status: "queued" });
       toast("ok", "Draft written. Review before approving.");
     } catch (e) {

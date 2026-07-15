@@ -1,7 +1,7 @@
 import type { LeadRepository } from "@/lib/db";
 import { newId, nowIso } from "@/lib/id";
 import { runSearch, SearchUnavailableError } from "@/lib/search";
-import { generateDraft, complianceFooter, leadLooksLikeUsa } from "@/lib/outreach/draft";
+import { generateDraft, complianceFooter, leadLooksLikeUsa, stripLegacyCompliance } from "@/lib/outreach/draft";
 import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
@@ -284,6 +284,7 @@ async function attachOutreach(
 export async function draftOutreach(
   ctx: Ctx,
   leadId: string,
+  overrides?: { signOff?: string | null; offerNotes?: string | null },
 ): Promise<Outreach | null> {
   const db = ctx.db;
   const lead = await db.getLead(leadId);
@@ -291,7 +292,7 @@ export async function draftOutreach(
   const run = await db.getRun(lead.runId);
   if (!run) return null;
 
-  const { subject, body } = generateDraft(lead, run);
+  const { subject, body } = generateDraft(lead, run, overrides);
   const existing = await db.getOutreachByLead(leadId);
   const now = nowIso();
 
@@ -419,12 +420,13 @@ export async function sendApprovedOutreach(
   // Always load workspace (local JSON too) so Pro mailbox + BYO Resend work in demo.
   const wsForEmail = await db.getWorkspace(ctx.workspaceId);
   const leadForLocale = await db.getLead(outreach.leadId);
+  const cleanBody = stripLegacyCompliance(outreach.body);
   const result = await sendEmail(
     {
       to: outreach.toEmail,
       subject: outreach.subject,
       body:
-        outreach.body +
+        cleanBody +
         complianceFooter({
           physicalAddress: wsForEmail?.physicalAddress,
           includeAddress: leadForLocale ? leadLooksLikeUsa(leadForLocale) : false,
@@ -836,18 +838,12 @@ export async function importLeads(
 
 /**
  * Generate a default outreach pitch from the user's company website (Workers AI).
- * Falls back with a clear error when AI or page fetch is unavailable.
+ * Falls back to a short heuristic pitch when AI is unavailable but the page loads.
  */
 export async function generatePitchFromWebsite(
   _ctx: Ctx,
   input: { website: string; companyName?: string },
 ): Promise<{ pitch: string }> {
-  const { workersAiAvailable } = await import("@/lib/ai/workers-ai");
-  if (!(await workersAiAvailable())) {
-    throw new Error(
-      "Workers AI is not available. Deploy with the AI binding, or set CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN locally.",
-    );
-  }
   let url = input.website.trim();
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
   try {
@@ -858,14 +854,57 @@ export async function generatePitchFromWebsite(
 
   const { fetchPublicPageText } = await import("@/lib/ai/fetch-page");
   const { generateDefaultPitch } = await import("@/lib/ai/generate");
-  const pageText = await fetchPublicPageText(url);
-  const pitch = await generateDefaultPitch({
-    website: url,
-    companyName: input.companyName?.trim() || undefined,
-    pageText,
-  });
-  if (!pitch) {
-    throw new Error("AI could not generate a pitch from that site. Try again or write one manually.");
+  const { workersAiAvailable } = await import("@/lib/ai/workers-ai");
+
+  let pageText: string;
+  try {
+    pageText = await fetchPublicPageText(url);
+  } catch (err) {
+    throw new Error(
+      err instanceof Error
+        ? err.message
+        : "Could not fetch that website. Check the URL and try again.",
+    );
   }
-  return { pitch };
+
+  const companyName = input.companyName?.trim() || undefined;
+
+  if (await workersAiAvailable()) {
+    const pitch = await generateDefaultPitch({
+      website: url,
+      companyName,
+      pageText,
+    });
+    if (pitch) return { pitch };
+  }
+
+  const heuristic = heuristicPitchFromPage(pageText, companyName);
+  if (heuristic) return { pitch: heuristic };
+
+  throw new Error(
+    "Could not generate a pitch from that site. Try again or write one manually.",
+  );
+}
+
+/** Last-resort pitch when Workers AI is down — first useful sentences from the page. */
+function heuristicPitchFromPage(pageText: string, companyName?: string): string | null {
+  const cleaned = pageText
+    .replace(/\s+/g, " ")
+    .replace(/#{1,6}\s*/g, "")
+    .trim();
+  if (cleaned.length < 60) return null;
+  const sentences = cleaned
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(
+      (s) =>
+        s.length > 40 &&
+        s.length < 220 &&
+        !/cookie|privacy|sign in|log in|copyright|all rights/i.test(s),
+    );
+  const pick = sentences.slice(0, 2).join(" ");
+  if (!pick) return null;
+  const who = companyName ? `At ${companyName}, ` : "We ";
+  const body = pick.replace(/^(we|our company|at .+?)\s+/i, "");
+  return `${who}${body.charAt(0).toLowerCase()}${body.slice(1)}`.slice(0, 800);
 }

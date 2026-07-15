@@ -6,7 +6,11 @@ import { draftOutreach } from "@/lib/service";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DraftSchema = z.object({ leadId: z.string().min(1) });
+const DraftSchema = z.object({
+  leadId: z.string().min(1),
+  signOff: z.string().max(2000).optional(),
+  offerNotes: z.string().max(4000).optional(),
+});
 
 export async function POST(req: Request) {
   let body: unknown;
@@ -22,7 +26,10 @@ export async function POST(req: Request) {
   }
 
   const ctx = await getCtx();
-  const outreach = await draftOutreach(ctx, parsed.data.leadId);
+  const outreach = await draftOutreach(ctx, parsed.data.leadId, {
+    signOff: parsed.data.signOff,
+    offerNotes: parsed.data.offerNotes,
+  });
   if (!outreach) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   return NextResponse.json({ outreach }, { status: 201 });
 }

@@ -37,8 +37,7 @@ function extractText(result: unknown): string | null {
 }
 
 async function getAiBinding(): Promise<AiBinding | null> {
-  // Binding only exists in the Workers / OpenNext production runtime.
-  if (process.env.NODE_ENV !== "production") return null;
+  // Binding exists on the Workers / OpenNext runtime (prod or `cf:preview`).
   try {
     const { getCloudflareContext } = await import("@opennextjs/cloudflare");
     const { env: cfEnv } = await getCloudflareContext({ async: true });

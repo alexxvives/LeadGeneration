@@ -142,6 +142,10 @@ export async function sendEmail(
 
   const tryMaileroo = async (): Promise<SendResult | null> => {
     if (!wsMailerooKey) return null;
+    const tagMap: Record<string, string> = {};
+    for (const t of tags ?? []) {
+      if (t.name && t.value) tagMap[t.name] = t.value;
+    }
     const result = await sendViaMaileroo({
       apiKey: wsMailerooKey,
       fromName,
@@ -150,6 +154,7 @@ export async function sendEmail(
       subject: input.subject,
       body,
       replyTo: replyToHeader,
+      tags: Object.keys(tagMap).length ? tagMap : undefined,
     });
     if (!result.ok) return { ok: false, provider: "maileroo", error: result.error };
     return { ok: true, provider: "maileroo", id: result.id };

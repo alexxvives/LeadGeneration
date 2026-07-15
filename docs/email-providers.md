@@ -115,10 +115,11 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   time (Google does not hijack Easy). API keys are stored server-side; Settings
   only receives `hasResendKey` / `hasMailerooKey` flags.
 - Stay pluggable: swapping providers is config, not a rewrite.
-- **Webhooks:** `POST /api/webhooks/resend` (public) — prefer tags, else latest
-  sent by recipient email (cross-workspace). Bounce/complaint →
-  `deliveryStatus=bounced`; inbound `email.received` → `replied` (+ CRM).
-  Set `RESEND_WEBHOOK_SECRET` in production.
+- **Webhooks:** `POST /api/webhooks/resend` and `POST /api/webhooks/maileroo`
+  (public) — prefer tags (`lodestar_ws` + `lodestar_outreach`), else latest sent
+  by recipient email. Bounce/complaint → `deliveryStatus=bounced`; Resend
+  inbound `email.received` → `replied` (+ CRM). Set `RESEND_WEBHOOK_SECRET` /
+  `MAILEROO_WEBHOOK_SECRET` in production.
 - **Pro path:** [`0010-mailbox-oauth-send.md`](decisions/0010-mailbox-oauth-send.md)
   (accepted) — Google OAuth behind `sendEmail()` when connected; Microsoft next.
   Warmup: free DIY slow ramp; paid partner optional — no free automated network.

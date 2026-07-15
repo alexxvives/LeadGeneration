@@ -601,8 +601,8 @@ export function LeadDrawer(props: DrawerProps) {
                         })}
                       </div>
                       <p className="mt-2 text-[11px] text-mist-600">
-                        Resend webhooks update this automatically when configured
-                        (`RESEND_WEBHOOK_SECRET`). You can still correct it manually.
+                        Delivery status updates from provider webhooks when configured.
+                        You can still correct it manually.
                       </p>
                     </div>
                   </div>

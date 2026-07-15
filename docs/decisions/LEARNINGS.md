@@ -456,6 +456,16 @@ live product preview (map + pipeline) — dropped missing hero image dependency.
 - **Sender profile:** position/company fields were redundant with the editable
   sign-off textarea — removed from Settings UI (localStorage fields kept).
 
+### 2026-07-15 — Spammy footers were old drafts + placeholder identity
+- Emails that still showed `Sent by Your Name <you@yourdomain.com>` + placeholder
+  address + `unsubscribe: mailto:…maileroo.org` were **legacy draft bodies** from
+  the initial-commit template (footer used to be baked into the draft). Current
+  send also appended a second STOP line → double footer.
+- Fix: `stripLegacyCompliance()` at send; never emit Sent-by / mailto / placeholder
+  address; Maileroo send now tags for `/api/webhooks/maileroo` (peer to Resend).
+- Draft regenerate now sends Settings `signature` + `defaultOffer` so sign-off
+  matches the profile; templates toned down; nav-junk blurbs skipped.
+
 ### 2026-07-15 — Locale drafts + Workers AI for blurbs/pitch
 - **Draft language** follows lead `location` (ES/EN/FR/IT/DE/PT) via
   `src/lib/outreach/locale.ts` + multi-copy templates in `draft.ts`. Default EN.

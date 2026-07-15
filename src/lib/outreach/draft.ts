@@ -14,6 +14,13 @@ export interface DraftResult {
   body: string;
 }
 
+export interface DraftOverrides {
+  /** Current Settings sign-off (multi-line). Prefer over run.senderName. */
+  signOff?: string | null;
+  /** Current Settings default offer / pitch notes. Prefer over run.offerNotes. */
+  offerNotes?: string | null;
+}
+
 function firstName(lead: Lead): string {
   if (lead.contactName) return lead.contactName.split(/\s+/)[0]!;
   return "";
@@ -38,22 +45,75 @@ export function leadLooksLikeUsa(lead: Pick<Lead, "location">): boolean {
 }
 
 /**
+ * Strip legacy compliance blocks that were once baked into draft bodies
+ * (Sent by… / unsubscribe mailto / duplicate STOP lines). Safe to run at send.
+ */
+export function stripLegacyCompliance(body: string): string {
+  let out = body.replace(/\r\n/g, "\n");
+  // Old initial-commit footer (often still sitting in saved drafts).
+  out = out.replace(
+    /\n*—\s*\nSent by[^\n]*(?:\n(?!—)[^\n]*)*\n?Don't want to hear from us\?[^\n]*/gi,
+    "",
+  );
+  out = out.replace(/\n*Don't want to hear from us\?[^\n]*/gi, "");
+  out = out.replace(/\{\{unsubscribe_url\}\}/gi, "");
+  // Prior send-appended STOP blocks (avoid stacking on resend/retry).
+  out = out.replace(
+    /\n*—\s*\n(?:If you[’']d rather not hear from us, reply STOP\.|Si prefieres no recibir más mensajes, responde STOP\.)\s*$/i,
+    "",
+  );
+  out = out.replace(
+    /\n+(?:If you[’']d rather not hear from us, reply STOP\.|Si prefieres no recibir más mensajes, responde STOP\.)\s*$/i,
+    "",
+  );
+  return out.replace(/\n{3,}/g, "\n\n").trimEnd();
+}
+
+/**
  * Quiet compliance block appended only at send time (not in the editable draft).
- * Physical address only for US recipients (CAN-SPAM).
+ * Never includes placeholder identity, "Sent by…", or unsubscribe mailto links.
+ * Physical address only for US recipients when it looks real (CAN-SPAM).
  */
 export function complianceFooter(opts?: {
   physicalAddress?: string | null;
   includeAddress?: boolean;
 }): string {
-  const lines = ["", "—"];
+  const lines: string[] = [""];
   if (opts?.includeAddress) {
     const address = (opts.physicalAddress || env.physicalAddress()).trim();
-    if (address && !/placeholder|your city|00000/i.test(address)) {
-      lines.push(address);
+    if (
+      address &&
+      !/placeholder|your city|00000|your (street|address)/i.test(address)
+    ) {
+      lines.push("—", address);
     }
   }
   lines.push("If you’d rather not hear from us, reply STOP.");
   return lines.join("\n");
+}
+
+/** True when scraped "about" text is nav/chrome junk, not a real company blurb. */
+export function blurbLooksLikeJunk(blurb: string): boolean {
+  const t = blurb.trim();
+  if (!t || t.length < 20) return true;
+  if (
+    /cookie|privacy|identif|gdpr|personalize your experience|terms of|skip to content/i.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  // Collapsed nav: "Login View Plans closeClose Menu Contact…"
+  if (
+    /\b(login|sign in|view plans|close menu|schedules?|premium\s*member|culers)\b/i.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  // Too many jammed TitleCase tokens without spaces between (scrape collapse).
+  if (/[a-z][A-Z][a-z]+[A-Z]/.test(t) && t.split(/\s+/).length < 8) return true;
+  return false;
 }
 
 type Copy = {
@@ -68,98 +128,107 @@ type Copy = {
 
 const COPY: Record<OutreachLang, Copy> = {
   en: {
-    subject: (c) => `Idea for ${c}`,
+    subject: (c) => `Quick note for ${c}`,
     greeting: (n) => (n ? `Hi ${n},` : `Hi,`),
     openerBlurb: (c, b) =>
-      `I came across ${c} and liked what you're doing — especially: "${b}".`,
+      `Saw ${c} while looking into the space — ${b}`,
     openerSite: (c, h) =>
-      `I was looking at ${c} (${h}) and thought it was a good time to reach out.`,
-    openerPlain: (c) => `I've been looking at ${c} and wanted to get in touch directly.`,
+      `Spent a few minutes on ${h} and wanted to write ${c} directly.`,
+    openerPlain: (c) => `Wanted to get in touch with ${c} directly.`,
     defaultPitch: (niche) =>
-      `I work with ${niche || "teams like yours"} to turn website visits into real conversations — without adding more day-to-day ops load.`,
-    cta: `Would you have 10 minutes next week to see if it's a fit? If not the right time, a simple “no” is plenty.`,
+      `I work with ${niche || "teams like yours"} on turning inbound interest into booked conversations — quietly, without a big process change.`,
+    cta: `Open to a short call next week, or should I leave it?`,
   },
   es: {
-    subject: (c) => `Propuesta para ${c}`,
+    subject: (c) => `Nota para ${c}`,
     greeting: (n) => (n ? `Hola ${n},` : `Hola,`),
     openerBlurb: (c, b) =>
-      `Vi ${c} y me llamó la atención lo que hacen — especialmente: "${b}".`,
+      `Vi ${c} investigando el sector — ${b}`,
     openerSite: (c, h) =>
-      `Estuve mirando ${c} (${h}) y me pareció un buen momento para escribirles.`,
-    openerPlain: (c) => `Estuve revisando ${c} y quise contactarlos directamente.`,
+      `Pasé unos minutos por ${h} y quise escribir a ${c} directamente.`,
+    openerPlain: (c) => `Quería contactar a ${c} directamente.`,
     defaultPitch: (niche) =>
-      `Trabajo con ${niche || "equipos como el suyo"} para convertir visitas web en conversaciones reales — sin sumar más carga operativa al día a día.`,
-    cta: `¿Tendrían 10 minutos la semana que viene para ver si encaja? Si no es el momento, no hay problema — con un “no” me alcanza.`,
+      `Trabajo con ${niche || "equipos como el suyo"} para convertir el interés entrante en conversaciones concretas — sin montar un proceso complicado.`,
+    cta: `¿Les viene bien una llamada corta la semana que viene, o lo dejamos?`,
   },
   fr: {
-    subject: (c) => `Proposition pour ${c}`,
+    subject: (c) => `Petit message pour ${c}`,
     greeting: (n) => (n ? `Bonjour ${n},` : `Bonjour,`),
     openerBlurb: (c, b) =>
-      `J’ai découvert ${c} et ce que vous faites m’a parlé — notamment : « ${b} ».`,
+      `J’ai vu ${c} en regardant le secteur — ${b}`,
     openerSite: (c, h) =>
-      `J’ai regardé ${c} (${h}) et j’ai pensé que c’était le bon moment pour vous écrire.`,
-    openerPlain: (c) => `J’ai passé du temps sur ${c} et souhaitais vous contacter directement.`,
+      `J’ai passé quelques minutes sur ${h} et voulais écrire à ${c} directement.`,
+    openerPlain: (c) => `Je voulais contacter ${c} directement.`,
     defaultPitch: (niche) =>
-      `J’aide ${niche || "des équipes comme la vôtre"} à transformer les visites web en vraies conversations — sans alourdir le quotidien.`,
-    cta: `Auriez-vous 10 minutes la semaine prochaine pour voir si ça peut matcher ? Sinon, un simple « non » suffit.`,
+      `J’aide ${niche || "des équipes comme la vôtre"} à transformer l’intérêt entrant en vraies conversations — sans changer tout le process.`,
+    cta: `Ouverts à un court appel la semaine prochaine, ou je laisse tomber ?`,
   },
   it: {
-    subject: (c) => `Proposta per ${c}`,
+    subject: (c) => `Nota per ${c}`,
     greeting: (n) => (n ? `Ciao ${n},` : `Ciao,`),
     openerBlurb: (c, b) =>
-      `Ho visto ${c} e mi ha colpito quello che fate — in particolare: "${b}".`,
+      `Ho visto ${c} mentre guardavo il settore — ${b}`,
     openerSite: (c, h) =>
-      `Stavo guardando ${c} (${h}) e mi è sembrato un buon momento per scrivervi.`,
-    openerPlain: (c) => `Ho dato un’occhiata a ${c} e volevo contattarvi direttamente.`,
+      `Ho passato qualche minuto su ${h} e volevo scrivere a ${c} direttamente.`,
+    openerPlain: (c) => `Volevo contattare ${c} direttamente.`,
     defaultPitch: (niche) =>
-      `Lavoro con ${niche || "team come il vostro"} per trasformare le visite al sito in conversazioni vere — senza aggiungere carico operativo.`,
-    cta: `Avreste 10 minuti la prossima settimana per capire se ha senso? Se non è il momento, basta un “no”.`,
+      `Lavoro con ${niche || "team come il vostro"} per trasformare l’interesse in conversazioni concrete — senza stravolgere il processo.`,
+    cta: `Vi va una breve call la prossima settimana, o lascio stare?`,
   },
   de: {
-    subject: (c) => `Vorschlag für ${c}`,
+    subject: (c) => `Kurze Notiz für ${c}`,
     greeting: (n) => (n ? `Hallo ${n},` : `Hallo,`),
     openerBlurb: (c, b) =>
-      `Ich bin auf ${c} gestoßen und fand spannend, was ihr macht — besonders: „${b}“.`,
+      `Bin bei der Recherche auf ${c} gestoßen — ${b}`,
     openerSite: (c, h) =>
-      `Ich habe mir ${c} (${h}) angeschaut und dachte, es ist ein guter Zeitpunkt für eine kurze Nachricht.`,
-    openerPlain: (c) => `Ich habe mir ${c} angesehen und wollte euch direkt ansprechen.`,
+      `Habe mir ${h} kurz angeschaut und wollte ${c} direkt schreiben.`,
+    openerPlain: (c) => `Wollte ${c} direkt ansprechen.`,
     defaultPitch: (niche) =>
-      `Ich helfe ${niche || "Teams wie eurem"}, Website-Besuche in echte Gespräche zu verwandeln — ohne mehr Tagesgeschäft.`,
-    cta: `Hättet ihr nächste Woche 10 Minuten, um zu prüfen, ob es passt? Falls nicht der richtige Zeitpunkt: ein „nein“ reicht völlig.`,
+      `Ich helfe ${niche || "Teams wie eurem"}, eingehendes Interesse in echte Gespräche zu verwandeln — ohne großen Prozesswechsel.`,
+    cta: `Passt ein kurzer Call nächste Woche, oder soll ich es lassen?`,
   },
   pt: {
-    subject: (c) => `Proposta para ${c}`,
+    subject: (c) => `Nota para ${c}`,
     greeting: (n) => (n ? `Olá ${n},` : `Olá,`),
     openerBlurb: (c, b) =>
-      `Vi a ${c} e gostei do que fazem — especialmente: "${b}".`,
+      `Vi a ${c} enquanto explorava o setor — ${b}`,
     openerSite: (c, h) =>
-      `Estive a ver a ${c} (${h}) e pareceu-me um bom momento para escrever.`,
-    openerPlain: (c) => `Estive a rever a ${c} e quis contactá-los diretamente.`,
+      `Passei uns minutos em ${h} e quis escrever à ${c} diretamente.`,
+    openerPlain: (c) => `Quis contactar a ${c} diretamente.`,
     defaultPitch: (niche) =>
-      `Trabalho com ${niche || "equipas como a vossa"} para transformar visitas no site em conversas reais — sem acrescentar carga operacional.`,
-    cta: `Teriam 10 minutos na próxima semana para ver se faz sentido? Se não for o momento, um “não” chega.`,
+      `Trabalho com ${niche || "equipas como a vossa"} para transformar interesse em conversas concretas — sem mudar o processo todo.`,
+    cta: `Faz sentido uma call curta na próxima semana, ou deixo estar?`,
   },
 };
 
-export function generateDraft(lead: Lead, run: Run): DraftResult {
+export function generateDraft(
+  lead: Lead,
+  run: Run,
+  overrides?: DraftOverrides,
+): DraftResult {
   const lang = outreachLangFromLocation(lead.location);
   const copy = COPY[lang];
   const name = firstName(lead);
   const company = shortCompany(lead);
-  const offer = run.offerNotes?.trim();
+  const offer =
+    overrides?.offerNotes?.trim() || run.offerNotes?.trim() || "";
   const nicheHint = run.niche.trim();
-  const signOff = (run.senderName?.trim() || env.fromName()).replace(/\r\n/g, "\n");
+  const signOff = (
+    overrides?.signOff?.trim() ||
+    run.senderName?.trim() ||
+    env.fromName()
+  ).replace(/\r\n/g, "\n");
 
   const subject = copy.subject(company);
   const greeting = copy.greeting(name);
 
   const blurb = lead.aboutBlurb?.trim() ?? "";
-  const blurbLooksLikePolicy =
-    /cookie|privacy|identif|gdpr|personalize your experience|terms of/i.test(blurb);
 
   let opener: string;
-  if (blurb && !blurbLooksLikePolicy) {
-    opener = copy.openerBlurb(company, truncate(blurb, 90));
+  if (blurb && !blurbLooksLikeJunk(blurb)) {
+    // Period if the blurb doesn't already end with punctuation.
+    const hook = /[.!?…]$/.test(blurb) ? blurb : `${blurb}.`;
+    opener = copy.openerBlurb(company, truncate(hook, 110));
   } else if (lead.website) {
     const host = lead.website.replace(/^https?:\/\//, "").replace(/\/$/, "");
     opener = copy.openerSite(company, host);
@@ -169,7 +238,9 @@ export function generateDraft(lead: Lead, run: Run): DraftResult {
 
   const pitch = offer || copy.defaultPitch(nicheHint);
 
-  const body = [greeting, "", opener, "", pitch, "", copy.cta, "", signOff].join("\n");
+  const body = [greeting, "", opener, "", pitch, "", copy.cta, "", signOff].join(
+    "\n",
+  );
 
   return { subject, body };
 }

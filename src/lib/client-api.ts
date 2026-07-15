@@ -93,10 +93,14 @@ export const api = {
   runWithLeads: (id: string) =>
     jsonFetch<{ run: Run; leads: LeadWithOutreach[] }>(`/api/runs/${id}`),
 
-  draft: (leadId: string) =>
+  draft: (leadId: string, opts?: { signOff?: string; offerNotes?: string }) =>
     jsonFetch<{ outreach: Outreach }>("/api/outreach", {
       method: "POST",
-      body: JSON.stringify({ leadId }),
+      body: JSON.stringify({
+        leadId,
+        ...(opts?.signOff ? { signOff: opts.signOff } : {}),
+        ...(opts?.offerNotes ? { offerNotes: opts.offerNotes } : {}),
+      }),
     }),
 
   updateOutreach: (

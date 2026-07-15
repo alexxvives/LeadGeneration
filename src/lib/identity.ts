@@ -16,7 +16,7 @@ export function isPlaceholderEmail(email: string | null | undefined): boolean {
 
 export function isPlaceholderAddress(address: string | null | undefined): boolean {
   if (!address || !address.trim()) return true;
-  return /placeholder/i.test(address);
+  return /placeholder|your city|00000|your (street|address)/i.test(address);
 }
 
 export function isPlaceholderName(name: string | null | undefined): boolean {
