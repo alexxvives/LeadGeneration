@@ -46,6 +46,18 @@ function pickProvider(): SearchProvider | null {
   return null;
 }
 
+function nicheTags(input: CreateRunInput): string[] {
+  // Prefer a short niche phrase (not just the first word — that looked like a
+  // wrong "category" on cards). Cap length so chips stay scannable.
+  const niche = input.niche.trim().toLowerCase();
+  const words = niche.split(/\s+/).filter(Boolean).slice(0, 3);
+  const tags: string[] = [];
+  if (words.length) tags.push(words.join(" "));
+  const city = input.location?.trim().split(",")[0]?.trim().toLowerCase();
+  if (city && city.length >= 2) tags.push(city);
+  return tags.length ? tags : ["lead"];
+}
+
 function pageToRawLead(page: PageResult, input: CreateRunInput): RawLead {
   const haystack = `${page.title ?? ""}\n${page.description ?? ""}\n${page.content}`;
   const scrapedLocation = extractLocation(haystack);
@@ -58,7 +70,7 @@ function pageToRawLead(page: PageResult, input: CreateRunInput): RawLead {
     // (that hid geo mismatches like "Barcelona SC" in New York).
     location: scrapedLocation || null,
     aboutBlurb: extractBlurb(page.content || page.description || "") ?? page.description ?? null,
-    tags: [input.niche.split(/\s+/)[0]?.toLowerCase() ?? "lead"],
+    tags: nicheTags(input),
   };
 }
 

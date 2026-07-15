@@ -24,6 +24,7 @@ const STAGE_FILL: Record<CrmStage, string> = {
   in_conversation: SKY,
   closed: "FF7FF2C8",
   not_interested: ROSE,
+  discarded: "FF5C6B82",
 };
 
 const STAGE_FONT: Record<CrmStage, string> = {
@@ -32,6 +33,7 @@ const STAGE_FONT: Record<CrmStage, string> = {
   in_conversation: INK,
   closed: INK,
   not_interested: WHITE,
+  discarded: WHITE,
 };
 
 export function ExportButton() {

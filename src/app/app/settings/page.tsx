@@ -102,7 +102,7 @@ export default async function SettingsPage() {
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Developer mode
         </h2>
-        <DeveloperModePanel metered />
+        <DeveloperModePanel metered currentPlanId={usage.planId} />
       </section>
 
       <section className="mt-8">

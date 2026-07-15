@@ -50,20 +50,46 @@ const MAIN_COLUMNS: {
   },
 ];
 
-const NOT_INTERESTED_COL = {
-  stage: "not_interested" as const,
-  title: "Not Interested",
-  empty: "Move here when they decline.",
-  color: "bg-rose-400",
-};
+const PARKED_COLUMNS: {
+  stage: CrmStage;
+  title: string;
+  empty: string;
+  color: string;
+  hint: string;
+}[] = [
+  {
+    stage: "not_interested",
+    title: "Not Interested",
+    empty: "Move here when they decline.",
+    color: "bg-rose-400",
+    hint: "Prospect declined",
+  },
+  {
+    stage: "discarded",
+    title: "Discarded",
+    empty: "Move bad-fit or incorrect leads here.",
+    color: "bg-mist-600",
+    hint: "Wrong lead / bad fit",
+  },
+];
 
-const ALL_COLUMNS = [...MAIN_COLUMNS, NOT_INTERESTED_COL];
+const ALL_COLUMNS = [...MAIN_COLUMNS, ...PARKED_COLUMNS];
 
 const NEXT_CRM_STAGE: Partial<Record<CrmStage, CrmStage>> = {
   new: "contacted",
   contacted: "in_conversation",
   in_conversation: "closed",
 };
+
+/** Card subtitle: contact/location — not the niche tag (that looked like a wrong "category"). */
+function cardSubtitle(lead: LeadWithOutreach): string | null {
+  return (
+    lead.emails[0] ??
+    lead.location ??
+    lead.website?.replace(/^https?:\/\//, "").replace(/\/$/, "") ??
+    null
+  );
+}
 
 // ─── Pipeline (CRM kanban with drag-and-drop) ─────────────────────────────────
 
@@ -83,12 +109,11 @@ export function PipelineView({
   const [draftingAll, setDraftingAll] = useState(false);
   const [approvingSelected, setApprovingSelected] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [lostOpen, setLostOpen] = useState(false);
+  const [parkedOpen, setParkedOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const queuedLeads = leads.filter((l) => l.status === "queued" && l.outreach);
   const undraftedLeads = leads.filter((l) => l.status === "new" && !l.outreach && l.emails.length > 0);
-  const lostLeads = leads.filter((l) => l.crmStage === "not_interested");
   const selectedQueued = queuedLeads.filter((l) => selectedIds.has(l.id));
 
   const sensors = useSensors(
@@ -109,7 +134,12 @@ export function PipelineView({
     const newStage = over.id as CrmStage;
     if (!lead || lead.crmStage === newStage) return;
     onMoveStage(String(active.id), newStage);
-    if (newStage === "not_interested" && !lostOpen) setLostOpen(true);
+    if (
+      (newStage === "not_interested" || newStage === "discarded") &&
+      !parkedOpen
+    ) {
+      setParkedOpen(true);
+    }
   }
 
   const toggleSelect = (leadId: string) => {
@@ -166,6 +196,10 @@ export function PipelineView({
     </>
   );
 
+  const parkedCount = leads.filter(
+    (l) => l.crmStage === "not_interested" || l.crmStage === "discarded",
+  ).length;
+
   return (
     <div className="space-y-4">
       <p className="text-xs uppercase tracking-widest text-mist-500">
@@ -202,10 +236,11 @@ export function PipelineView({
           })}
         </div>
 
-        <NotInterestedSection
-          open={lostOpen}
-          onToggle={() => setLostOpen((o) => !o)}
-          leads={lostLeads}
+        <ParkedSection
+          open={parkedOpen}
+          onToggle={() => setParkedOpen((o) => !o)}
+          totalCount={parkedCount}
+          leads={leads}
           onOpen={onOpen}
           onMoveStage={onMoveStage}
           activeId={activeId}
@@ -216,7 +251,7 @@ export function PipelineView({
             <div className="w-60 rotate-2 cursor-grabbing rounded-xl border border-aurora-400/40 bg-ink-800 px-3 py-3 shadow-2xl">
               <p className="truncate text-sm font-medium text-mist-100">{activeLead.company}</p>
               <p className="mt-1 truncate text-xs text-mist-500">
-                {activeLead.emails[0] ?? activeLead.website ?? "No contact yet"}
+                {cardSubtitle(activeLead) ?? "No contact yet"}
               </p>
             </div>
           ) : null}
@@ -235,8 +270,9 @@ function PipelineColumn({
   headerActions,
   selectedIds,
   onToggleSelect,
+  compact,
 }: {
-  col: (typeof MAIN_COLUMNS)[number] | typeof NOT_INTERESTED_COL;
+  col: (typeof MAIN_COLUMNS)[number] | (typeof PARKED_COLUMNS)[number];
   leads: LeadWithOutreach[];
   onOpen: (id: string) => void;
   onMoveStage: (leadId: string, stage: CrmStage) => void;
@@ -244,16 +280,19 @@ function PipelineColumn({
   headerActions?: React.ReactNode;
   selectedIds?: Set<string>;
   onToggleSelect?: (leadId: string) => void;
+  compact?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.stage });
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-w-0 flex-col rounded-xl2 border transition-colors ${
+      className={`flex min-h-0 min-w-0 flex-col rounded-xl2 border transition-colors ${
+        compact ? "max-h-[min(40vh,360px)]" : "max-h-[min(60vh,520px)]"
+      } ${
         isOver ? "border-aurora-400/40 bg-aurora-400/5" : "border-white/10 bg-ink-950/40"
       }`}
     >
-      <div className="flex min-h-[2.75rem] items-center gap-2 border-b border-white/5 px-3 py-2.5 sm:px-4">
+      <div className="flex min-h-[2.75rem] shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2.5 sm:px-4">
         <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
         <h3 className="truncate text-sm font-semibold leading-none text-mist-100">{col.title}</h3>
         {headerActions && (
@@ -263,7 +302,8 @@ function PipelineColumn({
           {leads.length}
         </span>
       </div>
-      <div className="flex max-h-[min(60vh,520px)] flex-col gap-2 overflow-y-auto p-3">
+      {/* min-h-0 is required so flex children can scroll instead of clipping */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3 [scrollbar-gutter:stable]">
         {leads.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
             {col.empty}
@@ -287,9 +327,10 @@ function PipelineColumn({
   );
 }
 
-function NotInterestedSection({
+function ParkedSection({
   open,
   onToggle,
+  totalCount,
   leads,
   onOpen,
   onMoveStage,
@@ -297,31 +338,25 @@ function NotInterestedSection({
 }: {
   open: boolean;
   onToggle: () => void;
+  totalCount: number;
   leads: LeadWithOutreach[];
   onOpen: (id: string) => void;
   onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: "not_interested" });
-
   return (
-    <div
-      ref={setNodeRef}
-      className={`rounded-xl2 border transition-colors ${
-        isOver ? "border-rose-400/40 bg-rose-400/5" : "border-white/10 bg-ink-950/30"
-      }`}
-    >
+    <div className="rounded-xl2 border border-white/10 bg-ink-950/30">
       <button
         type="button"
         onClick={onToggle}
         className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/5"
         aria-expanded={open}
       >
-        <span className={`h-2 w-2 rounded-full ${NOT_INTERESTED_COL.color}`} />
-        <span className="text-sm font-semibold text-mist-100">{NOT_INTERESTED_COL.title}</span>
-        <span className="font-display text-base tabular-nums text-mist-400">{leads.length}</span>
+        <span className="h-2 w-2 rounded-full bg-mist-500" />
+        <span className="text-sm font-semibold text-mist-100">Parked</span>
+        <span className="font-display text-base tabular-nums text-mist-400">{totalCount}</span>
         <span className="ml-auto text-xs text-mist-500">
-          {open ? "Hide" : "Show"} · drop here to park
+          {open ? "Hide" : "Show"} · Not Interested + Discarded
         </span>
         <svg
           viewBox="0 0 12 12"
@@ -333,22 +368,21 @@ function NotInterestedSection({
       </button>
 
       {open && (
-        <div className="border-t border-white/5 p-3">
-          {leads.length === 0 ? (
-            <p className="px-2 py-4 text-center text-xs text-mist-500">{NOT_INTERESTED_COL.empty}</p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {leads.map((l) => (
-                <DraggablePipelineCard
-                  key={l.id}
-                  lead={l}
-                  onOpen={onOpen}
-                  onMoveStage={onMoveStage}
-                  isDragging={l.id === activeId}
-                />
-              ))}
-            </div>
-          )}
+        <div className="grid gap-3 border-t border-white/5 p-3 sm:grid-cols-2">
+          {PARKED_COLUMNS.map((col) => {
+            const colLeads = leads.filter((l) => l.crmStage === col.stage);
+            return (
+              <PipelineColumn
+                key={col.stage}
+                col={col}
+                leads={colLeads}
+                onOpen={onOpen}
+                onMoveStage={onMoveStage}
+                activeId={activeId}
+                compact
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -375,14 +409,13 @@ function DraggablePipelineCard({
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
   const pendingFollowUps = lead.followUps?.filter((f) => !f.done).length ?? 0;
   const nextStage = lead.crmStage ? NEXT_CRM_STAGE[lead.crmStage] : undefined;
-  const subtitle = lead.tags[0] ?? lead.emails[0] ?? lead.website ?? null;
-  const showMeta =
-    pendingFollowUps > 0 || !!lead.contactMethod;
+  const subtitle = cardSubtitle(lead);
+  const showMeta = pendingFollowUps > 0 || !!lead.contactMethod;
 
   return (
     <div
       ref={setNodeRef}
-      className={`group flex overflow-hidden rounded-xl border transition-all ${
+      className={`group flex min-h-[3.25rem] items-center overflow-hidden rounded-xl border transition-all ${
         isDragging ? "opacity-30" : ""
       } ${
         selected
@@ -414,14 +447,14 @@ function DraggablePipelineCard({
         }}
         onDoubleClick={() => onOpen(lead.id)}
         aria-pressed={selectable ? selected : undefined}
-        className="min-w-0 flex-1 py-3 pr-1 text-left transition-colors hover:bg-white/[0.03]"
+        className="flex min-w-0 flex-1 flex-col justify-center py-2.5 pr-1 text-left transition-colors hover:bg-white/[0.03]"
       >
-        <p className="truncate text-sm font-medium text-mist-100">{lead.company}</p>
+        <p className="truncate text-sm font-medium leading-snug text-mist-100">{lead.company}</p>
         {subtitle && (
-          <p className="mt-0.5 truncate text-xs text-mist-500">{subtitle}</p>
+          <p className="mt-0.5 truncate text-xs leading-snug text-mist-500">{subtitle}</p>
         )}
         {showMeta && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {pendingFollowUps > 0 && (
               <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
                 {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
@@ -452,7 +485,7 @@ function DraggablePipelineCard({
           type="button"
           onClick={(e) => { e.stopPropagation(); onMoveStage(lead.id, nextStage); }}
           title={`Move to ${ALL_COLUMNS.find((c) => c.stage === nextStage)?.title ?? nextStage}`}
-          className="mr-2 self-center rounded-md p-1 text-mist-600 opacity-0 transition-all hover:bg-white/10 hover:text-aurora-300 group-hover:opacity-100"
+          className="mr-2 shrink-0 rounded-md p-1 text-mist-600 opacity-0 transition-all hover:bg-white/10 hover:text-aurora-300 group-hover:opacity-100"
         >
           <ArrowIcon className="h-3.5 w-3.5" />
         </button>

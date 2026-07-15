@@ -26,6 +26,7 @@ const STAGE_PIN: Record<CrmStage, { fill: string; glow: string; label: string }>
   in_conversation: { fill: "#38bdf8", glow: "rgba(56,189,248,0.4)", label: "In Conversation" },
   closed: { fill: "#7ff2c8", glow: "rgba(127,242,200,0.45)", label: "Closed" },
   not_interested: { fill: "#fb7185", glow: "rgba(251,113,133,0.4)", label: "Not Interested" },
+  discarded: { fill: "#5c6b82", glow: "rgba(92,107,130,0.35)", label: "Discarded" },
 };
 
 const LEGEND_ORDER: CrmStage[] = [
@@ -34,6 +35,7 @@ const LEGEND_ORDER: CrmStage[] = [
   "in_conversation",
   "closed",
   "not_interested",
+  "discarded",
 ];
 
 const geocodeCache = new Map<string, Coords | null>();

@@ -8,7 +8,14 @@ export const dynamic = "force-dynamic";
 
 const PatchSchema = z.object({
   crmStage: z
-    .enum(["new", "contacted", "in_conversation", "closed", "not_interested"])
+    .enum([
+      "new",
+      "contacted",
+      "in_conversation",
+      "closed",
+      "not_interested",
+      "discarded",
+    ])
     .optional(),
   contactMethod: z.enum(["email", "phone", "contact_form"]).nullable().optional(),
   notes: z.string().nullable().optional(),

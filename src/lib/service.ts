@@ -105,6 +105,14 @@ export async function resetWorkspaceUsage(ctx: Ctx): Promise<void> {
   });
 }
 
+/** TEMP developer helper — force a plan without Stripe (local / testing only). */
+export async function setWorkspacePlanDev(ctx: Ctx, planId: PlanId): Promise<void> {
+  await ctx.db.updateWorkspace(ctx.workspaceId, {
+    planId,
+    updatedAt: nowIso(),
+  });
+}
+
 export async function createAndRunSearch(
   ctx: Ctx,
   input: CreateRunInput,

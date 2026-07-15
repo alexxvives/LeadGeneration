@@ -74,6 +74,12 @@ export const api = {
   resetUsage: () =>
     jsonFetch<{ ok: boolean }>("/api/workspace/reset-usage", { method: "POST" }),
 
+  setPlanDev: (planId: PlanId) =>
+    jsonFetch<{ ok: boolean; planId: PlanId }>("/api/workspace/set-plan", {
+      method: "POST",
+      body: JSON.stringify({ planId }),
+    }),
+
   clearBoard: () =>
     jsonFetch<{ ok: boolean }>("/api/board", { method: "DELETE" }),
 

@@ -28,7 +28,7 @@ Order of work:
 ## Phased plan
 
 ### Phase A — Close the action loop ✅ shipped
-- [x] Pipeline view (`?view=pipeline`) — CRM: New → Contacted → In Conversation → Closed → Not Interested
+- [x] Pipeline view (`?view=pipeline`) — CRM: New → Contacted → In Conversation → Closed; Parked: Not Interested + Discarded
 - [x] Runs history (`?view=runs`)
 - [x] Export Excel (Pipeline header — styled `.xlsx` with stage coloring)
 - [x] How it works + Plans linked from Settings → Resources

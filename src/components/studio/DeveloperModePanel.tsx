@@ -5,13 +5,23 @@ import Link from "next/link";
 import { StarIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import { api } from "@/lib/client-api";
+import { PLAN_ORDER, PLANS } from "@/lib/plans";
+import type { PlanId } from "@/lib/types";
 
 /**
- * TEMP developer tools — tour replay + credit reset.
+ * TEMP developer tools — tour replay, credit reset, plan override.
  * Remove this section before GA.
  */
-export function DeveloperModePanel({ metered = true }: { metered?: boolean }) {
+export function DeveloperModePanel({
+  metered = true,
+  currentPlanId = "free",
+}: {
+  metered?: boolean;
+  currentPlanId?: PlanId;
+}) {
   const [resetting, setResetting] = useState(false);
+  const [settingPlan, setSettingPlan] = useState(false);
+  const [planId, setPlanId] = useState<PlanId>(currentPlanId);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -26,6 +36,22 @@ export function DeveloperModePanel({ metered = true }: { metered?: boolean }) {
       setErr(e instanceof Error ? e.message : "Reset failed");
     } finally {
       setResetting(false);
+    }
+  };
+
+  const applyPlan = async () => {
+    setSettingPlan(true);
+    setMsg(null);
+    setErr(null);
+    try {
+      await api.setPlanDev(planId);
+      setMsg(
+        `Plan set to ${PLANS[planId].name}. Refresh the page to see updated quotas.`,
+      );
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Plan change failed");
+    } finally {
+      setSettingPlan(false);
     }
   };
 
@@ -56,6 +82,36 @@ export function DeveloperModePanel({ metered = true }: { metered?: boolean }) {
           Reset credits
         </button>
       </div>
+
+      <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-white/5 pt-4">
+        <label className="flex min-w-[10rem] flex-col gap-1.5">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-mist-500">
+            Override plan
+          </span>
+          <select
+            value={planId}
+            onChange={(e) => setPlanId(e.target.value as PlanId)}
+            className="rounded-lg border border-white/10 bg-ink-950 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/40"
+          >
+            {PLAN_ORDER.map((id) => (
+              <option key={id} value={id}>
+                {PLANS[id].name}
+                {id === currentPlanId ? " (current)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={() => void applyPlan()}
+          disabled={settingPlan || planId === currentPlanId}
+          className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-400/15 disabled:opacity-40"
+        >
+          {settingPlan ? <Spinner className="h-3.5 w-3.5" /> : null}
+          Apply plan
+        </button>
+      </div>
+
       {msg && <p className="mt-3 text-sm text-aurora-300">{msg}</p>}
       {err && <p className="mt-3 text-sm text-rose-300">{err}</p>}
       {!metered && (

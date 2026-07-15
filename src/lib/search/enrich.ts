@@ -145,9 +145,19 @@ export function extractBlurb(text: string, max = 240): string | null {
     .replace(/\s+/g, " ")
     .trim();
   if (!cleaned) return null;
-  const sentences = cleaned.split(/(?<=[.!?])\s+/).filter((s) => s.length > 30);
-  const blurb = (sentences[0] ?? cleaned).slice(0, max).trim();
-  return blurb.length > 0 ? blurb : null;
+
+  // Skip cookie / nav / SEO junk that often leads page text.
+  const JUNK =
+    /^(skip to|cookie|accept all|we use cookies|privacy policy|all rights reserved|sign in|log in|menu|home\b|copyright)/i;
+
+  const sentences = cleaned
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 40 && !JUNK.test(s));
+  const blurb = (sentences[0] ?? (JUNK.test(cleaned) ? null : cleaned))
+    ?.slice(0, max)
+    .trim();
+  return blurb && blurb.length > 0 ? blurb : null;
 }
 
 export function domainFromUrl(url: string | null): string | null {

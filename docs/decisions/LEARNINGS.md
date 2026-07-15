@@ -4,6 +4,18 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Pipeline polish, Discarded, dev plan override
+- **Pipeline cards:** vertical centering via `items-center` + content
+  `justify-center`; column scroll needs outer `max-h` + body `min-h-0
+  overflow-y-auto` (flex children otherwise grow and clip).
+- **Card subtitle** was `tags[0]` = first niche word — looked like a wrong
+  category. Now email → location → website. Tags still niche phrase + city.
+- **aboutBlurb** = first usable sentence from scraped page content / meta
+  description (`extractBlurb`); often SEO junk — filter cookie/nav openers.
+- **Discarded** CRM stage sits beside Not Interested under Parked (bad-fit
+  leads vs prospect declined). No DB migration — `crm_stage` is free TEXT.
+- **Dev mode** can force plan via `POST /api/workspace/set-plan` (no Stripe).
+
 ### 2026-07-15 — Tour v2, local settings, deliverability research
 - **Tour:** separate pipeline-board + leads-table steps; tip waits until
   anchored (no center flash); Resend step = BYO domain, tip prefers left;

@@ -33,7 +33,8 @@ export type CrmStage =
   | "contacted"      // first outreach sent
   | "in_conversation" // they replied / active dialogue
   | "closed"         // won — became a client
-  | "not_interested"; // lost — explicitly declined
+  | "not_interested" // lost — prospect declined
+  | "discarded";     // bad fit / incorrect lead — parked without outreach
 
 /** How a prospect was first reached. Set when crmStage → "contacted". */
 export type ContactMethod = "email" | "phone" | "contact_form";

@@ -23,6 +23,10 @@ const CRM_STAGE_STYLES: Record<CrmStage, { label: string; cls: string }> = {
     label: "Not Interested",
     cls: "bg-rose-500/15 text-rose-300 ring-rose-400/25",
   },
+  discarded: {
+    label: "Discarded",
+    cls: "bg-white/5 text-mist-500 ring-white/10",
+  },
 };
 
 export function StatusPill({ status }: { status: LeadStatus | OutreachStatus }) {
