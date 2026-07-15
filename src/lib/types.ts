@@ -153,6 +153,11 @@ export interface Workspace {
   mailerooApiKey: string | null;
   /** Which Easy transactional provider the workspace prefers. */
   easyEmailProvider: EasyEmailProvider;
+  /**
+   * Which send path Settings last chose. When unset: Pro if a mailbox is
+   * connected, otherwise Easy. Google send only runs when this is `"pro"`.
+   */
+  preferredSendPath: "easy" | "pro" | null;
   /** Pro path: one connected mailbox (multi-inbox deferred — ADR 0010). */
   connectedMailbox: ConnectedMailbox | null;
 }

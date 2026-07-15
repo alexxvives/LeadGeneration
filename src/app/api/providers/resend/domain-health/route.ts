@@ -30,7 +30,8 @@ export async function POST(req: Request) {
 
   try {
     const ctx = await getCtx();
-    const ws = ctx.metered ? await ctx.db.getWorkspace(ctx.workspaceId) : null;
+    // Always load workspace so local BYO Resend keys work (not only when metered).
+    const ws = await ctx.db.getWorkspace(ctx.workspaceId);
     const apiKey = ws?.resendApiKey?.trim() || env.resendKey() || null;
     const email = fromEmail || ws?.fromEmail || env.fromEmail();
 

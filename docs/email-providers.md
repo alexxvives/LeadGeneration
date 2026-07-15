@@ -111,7 +111,9 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - `src/lib/email/verify.ts`: Zeruh/Maileroo verify on enrich + before send.
 - Quotas + rate limits in `service.ts`.
 - Settings → Easy Resend **or** Maileroo wizard + Pro mailbox Connect Google
-  (`SendSetupPanel`).
+  (`SendSetupPanel`). Workspace `preferredSendPath` chooses Easy vs Pro at send
+  time (Google does not hijack Easy). API keys are stored server-side; Settings
+  only receives `hasResendKey` / `hasMailerooKey` flags.
 - Stay pluggable: swapping providers is config, not a rewrite.
 - **Webhooks:** `POST /api/webhooks/resend` (public) — prefer tags, else latest
   sent by recipient email (cross-workspace). Bounce/complaint →

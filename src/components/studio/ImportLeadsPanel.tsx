@@ -133,7 +133,11 @@ async function parseFile(file: File): Promise<ImportLeadRow[]> {
     return rowsFromMatrix(matrix);
   }
 
-  if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+  if (name.endsWith(".xls") && !name.endsWith(".xlsx")) {
+    throw new Error("Legacy .xls is not supported — save as .xlsx or export CSV.");
+  }
+
+  if (name.endsWith(".xlsx")) {
     const ExcelJS = (await import("exceljs")).default;
     const wb = new ExcelJS.Workbook();
     const buf = await file.arrayBuffer();
@@ -229,7 +233,7 @@ export function ImportLeadsPanel({
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,.tsv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept=".csv,.tsv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className="hidden"
           onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
         />

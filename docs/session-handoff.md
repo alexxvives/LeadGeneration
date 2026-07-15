@@ -9,20 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (Maileroo Easy + CRM)
+## ⏱️ Status — updated 2026-07-15 (Settings save fix pass)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Easy send: Resend **or** Maileroo BYO (ADR 0011) + migration 0009.
-- Send → Contacted + dated “Email sent” note; CSV/Excel import.
-- Settings: clearer Easy DNS copy; Pro Connect Google (needs Wrangler `GMAIL_OAUTH_*`).
+- Fixed Settings “Saved but gone”: fail-closed `getCtx`, no silent null updates,
+  dirty-only key PATCH, keys never SSR’d (`hasResendKey` / `hasMailerooKey`).
+- `preferredSendPath` (Easy vs Pro) + migration 0010; demo send no longer advances
+  CRM when metered; magic-link only claims success on real `signIn`.
+- NEXTAUTH_URL localhost guard in Pro Settings.
 
 ### Next
-1. Prod: `wrangler secret put GMAIL_OAUTH_*` + `cf:migrate` (0009) + deploy.
-2. Soft-cap warning popup on send; Maileroo live DNS panel (parity with Resend).
-3. Microsoft Graph Mail.Send.
+1. Confirm Wrangler `NEXTAUTH_URL` = live Workers URL (Connect Google).
+2. Soft-cap warning popup on send; Maileroo live DNS panel.
+3. Perf follow-up: board `listOutreach` N+1, import full-lead scan (deferred).
+4. Microsoft Graph Mail.Send.
 
 ---
 

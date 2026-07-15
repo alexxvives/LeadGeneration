@@ -141,14 +141,21 @@ export function AuthModal({
           redirect: false,
           redirectTo: callbackUrl,
         });
-        if (viaSmtp?.error) {
-          await signIn("resend", {
+        let ok = !viaSmtp?.error;
+        if (!ok) {
+          const viaResend = await signIn("resend", {
             email: trimmed,
             redirect: false,
             redirectTo: callbackUrl,
           });
+          ok = !viaResend?.error;
         }
-        setSent(true);
+        if (ok) setSent(true);
+        else {
+          setError(
+            "Could not send a sign-in link. Check SMTP/Maileroo or RESEND_API_KEY, then try again.",
+          );
+        }
       } else {
         setError("No sign-in provider configured. Set SMTP (Maileroo) or AUTH_RESEND_KEY.");
       }

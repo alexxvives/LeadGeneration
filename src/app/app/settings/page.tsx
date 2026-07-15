@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Settings: editable outreach profile + capability status.
-// Secrets are never rendered in the UI.
+// API keys are never rendered — only has* flags reach the client.
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -30,14 +30,19 @@ export default async function SettingsPage({
   try {
     ctx = await getCtx();
     usage = await getWorkspaceSummary(ctx);
-    // Local JSON + prod D1 — always load so Easy settings + Pro mailbox persist in demo.
     ws = await ctx.db.getWorkspace(ctx.workspaceId);
   } catch (err) {
+    const { isAuthError } = await import("@/lib/errors");
+    if (isAuthError(err)) throw err;
     console.error("[settings] getCtx failed", err);
     const { getDb, LOCAL_WORKSPACE_ID } = await import("@/lib/db");
-    ctx = { db: getDb(undefined, LOCAL_WORKSPACE_ID), workspaceId: LOCAL_WORKSPACE_ID, metered: false };
+    ctx = {
+      db: getDb(undefined, LOCAL_WORKSPACE_ID),
+      workspaceId: LOCAL_WORKSPACE_ID,
+      metered: false,
+    };
     usage = await getWorkspaceSummary(ctx);
-    ws = null;
+    ws = await ctx.db.getWorkspace(ctx.workspaceId);
   }
   const plan = getPlan(usage.planId);
   const { mailboxPublicStatus } = await import("@/lib/email/mailbox");
@@ -49,7 +54,22 @@ export default async function SettingsPage({
     !!ws?.mailerooApiKey?.trim() ||
     !!ws?.connectedMailbox;
 
-  const defaultPath = mailboxFlag === "connected" || mailbox.connected ? "pro" : "easy";
+  // Prefer Easy when Maileroo is the Easy provider or user last chose Easy.
+  const defaultPath: "easy" | "pro" =
+    mailboxFlag === "connected"
+      ? "pro"
+      : ws?.preferredSendPath === "easy" ||
+          ws?.preferredSendPath === "pro"
+        ? ws.preferredSendPath
+        : ws?.easyEmailProvider === "maileroo"
+          ? "easy"
+          : mailbox.connected
+            ? "pro"
+            : "easy";
+
+  const appUrl = env.appUrl();
+  const appUrlLooksLocal =
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(appUrl);
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-8">
@@ -81,14 +101,16 @@ export default async function SettingsPage({
           canEdit={true}
           mailbox={mailbox}
           defaultPath={defaultPath}
+          appUrlLooksLocal={caps.gmailOAuth && appUrlLooksLocal}
           initial={{
             fromName: ws?.fromName ?? null,
             fromEmail: ws?.fromEmail ?? null,
             replyTo: ws?.replyTo ?? null,
             physicalAddress: ws?.physicalAddress ?? null,
-            resendApiKey: ws?.resendApiKey ?? null,
-            mailerooApiKey: ws?.mailerooApiKey ?? null,
             easyEmailProvider: ws?.easyEmailProvider ?? "resend",
+            preferredSendPath: ws?.preferredSendPath ?? null,
+            hasResendKey: !!ws?.resendApiKey?.trim(),
+            hasMailerooKey: !!ws?.mailerooApiKey?.trim(),
           }}
           defaults={{
             fromName: env.fromName(),
@@ -103,7 +125,7 @@ export default async function SettingsPage({
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Developer mode
         </h2>
-        <DeveloperModePanel metered currentPlanId={usage.planId} />
+        <DeveloperModePanel metered={usage.metered} currentPlanId={usage.planId} />
       </section>
 
       <section className="mt-8">

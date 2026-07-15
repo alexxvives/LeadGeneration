@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Settings save false-positive + send path bugs
+- Root cause of “Maileroo not saving”: `getCtx` could scope D1 to workspace
+  `"local"` under auth → UPDATE 0 rows while API returned `{ ok: true }`. Fixed
+  with fail-closed `AuthError` + `NotFoundError` when `updateWorkspace` is null.
+- Empty inactive key fields wiped the other provider on PATCH — now dirty-only
+  (+ explicit clear flags). Secrets never SSR’d; form uses `has*Key` flags.
+- `preferredSendPath` (migration 0010): Google only when path is Pro. Metered
+  demo sends no longer mark Contacted. Magic link requires successful `signIn`.
+
 ### 2026-07-15 — Easy Maileroo send + safe test guidance
 - ADR 0011: Easy path is Resend **or** Maileroo BYO key (`mailerooApiKey` +
   `easyEmailProvider`). Verify (Zeruh) stays separate from Maileroo send.

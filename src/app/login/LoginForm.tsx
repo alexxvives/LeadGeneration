@@ -106,25 +106,27 @@ export function LoginForm({
         }
       } else {
         const provider = preferSmtp ? "nodemailer" : "resend";
+        const fallback = preferSmtp ? "resend" : "nodemailer";
         const primary = await signIn(provider, {
           email: trimmed,
           redirect: false,
           redirectTo: callbackUrl,
         });
-        if (primary?.error && preferSmtp) {
-          await signIn("resend", {
+        let ok = !primary?.error;
+        if (!ok) {
+          const secondary = await signIn(fallback, {
             email: trimmed,
             redirect: false,
             redirectTo: callbackUrl,
           });
-        } else if (primary?.error && !preferSmtp) {
-          await signIn("nodemailer", {
-            email: trimmed,
-            redirect: false,
-            redirectTo: callbackUrl,
-          });
+          ok = !secondary?.error;
         }
-        setSent(true);
+        if (ok) setSent(true);
+        else {
+          setError(
+            "Could not send a sign-in link. Check SMTP/Maileroo or RESEND_API_KEY, then try again.",
+          );
+        }
       }
     } catch {
       setError("Something went wrong. Please try again.");

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckIcon } from "@/components/icons";
 import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
@@ -12,9 +13,13 @@ export interface EmailSettingsValues {
   fromEmail: string | null;
   replyTo: string | null;
   physicalAddress: string | null;
-  resendApiKey: string | null;
-  mailerooApiKey: string | null;
+  /** Never SSR the raw key — use has* flags instead. */
+  resendApiKey?: string | null;
+  mailerooApiKey?: string | null;
   easyEmailProvider: EasyEmailProvider;
+  preferredSendPath?: "easy" | "pro" | null;
+  hasResendKey?: boolean;
+  hasMailerooKey?: boolean;
 }
 
 /** Env-var defaults shown as placeholder text when the workspace has no override. */
@@ -47,17 +52,48 @@ export function EmailSettingsForm({
   easyProvider?: EasyEmailProvider;
   onEasyProviderChange?: (p: EasyEmailProvider) => void;
 }) {
-  const [values, setValues] = useState<EmailSettingsValues>(initial);
+  const router = useRouter();
+  const [values, setValues] = useState({
+    fromName: initial.fromName,
+    fromEmail: initial.fromEmail,
+    easyEmailProvider: initial.easyEmailProvider ?? "resend",
+  });
+  const [resendDraft, setResendDraft] = useState("");
+  const [mailerooDraft, setMailerooDraft] = useState("");
+  const [hasResendKey, setHasResendKey] = useState(!!initial.hasResendKey);
+  const [hasMailerooKey, setHasMailerooKey] = useState(!!initial.hasMailerooKey);
+  const [clearResend, setClearResend] = useState(false);
+  const [clearMaileroo, setClearMaileroo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setValues({
+      fromName: initial.fromName,
+      fromEmail: initial.fromEmail,
+      easyEmailProvider: initial.easyEmailProvider ?? "resend",
+    });
+    setHasResendKey(!!initial.hasResendKey);
+    setHasMailerooKey(!!initial.hasMailerooKey);
+    setResendDraft("");
+    setMailerooDraft("");
+    setClearResend(false);
+    setClearMaileroo(false);
+  }, [
+    initial.fromName,
+    initial.fromEmail,
+    initial.easyEmailProvider,
+    initial.hasResendKey,
+    initial.hasMailerooKey,
+  ]);
 
   const isPro = variant === "pro";
   const fromLocked = isPro && !!lockedFromEmail;
   const provider: EasyEmailProvider =
     easyProvider ?? values.easyEmailProvider ?? "resend";
 
-  const set = (key: keyof EmailSettingsValues, v: string) => {
+  const setField = (key: "fromName" | "fromEmail", v: string) => {
     setSaved(false);
     setValues((prev) => ({ ...prev, [key]: v || null }));
   };
@@ -73,18 +109,26 @@ export function EmailSettingsForm({
     setSaved(false);
     setError(null);
     try {
-      const payload = isPro
+      const payload: Record<string, unknown> = isPro
         ? {
             fromName: values.fromName,
+            preferredSendPath: "pro",
             ...(fromLocked ? { fromEmail: lockedFromEmail } : {}),
           }
         : {
             fromName: values.fromName,
             fromEmail: values.fromEmail,
             easyEmailProvider: provider,
-            resendApiKey: values.resendApiKey,
-            mailerooApiKey: values.mailerooApiKey,
+            preferredSendPath: "easy",
           };
+
+      if (!isPro) {
+        if (clearResend) payload.clearResendApiKey = true;
+        else if (resendDraft.trim()) payload.resendApiKey = resendDraft.trim();
+        if (clearMaileroo) payload.clearMailerooApiKey = true;
+        else if (mailerooDraft.trim()) payload.mailerooApiKey = mailerooDraft.trim();
+      }
+
       const res = await fetch("/api/workspace/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -106,7 +150,18 @@ export function EmailSettingsForm({
           }
           saveSenderProfile(next);
         }
+        if (!isPro) {
+          if (clearResend) setHasResendKey(false);
+          else if (resendDraft.trim()) setHasResendKey(true);
+          if (clearMaileroo) setHasMailerooKey(false);
+          else if (mailerooDraft.trim()) setHasMailerooKey(true);
+          setResendDraft("");
+          setMailerooDraft("");
+          setClearResend(false);
+          setClearMaileroo(false);
+        }
         setSaved(true);
+        router.refresh();
       }
     } catch {
       setError("Network error");
@@ -145,7 +200,7 @@ export function EmailSettingsForm({
         <Field label="Your name" hint="Inbox From + draft sign-off">
           <input
             value={values.fromName ?? ""}
-            onChange={(e) => set("fromName", e.target.value)}
+            onChange={(e) => setField("fromName", e.target.value)}
             placeholder={defaults.fromName}
             disabled={!canEdit}
             className={inputCls}
@@ -158,7 +213,7 @@ export function EmailSettingsForm({
           <input
             type="email"
             value={fromLocked ? lockedFromEmail! : (values.fromEmail ?? "")}
-            onChange={(e) => set("fromEmail", e.target.value)}
+            onChange={(e) => setField("fromEmail", e.target.value)}
             placeholder={defaults.fromEmail}
             disabled={!canEdit || fromLocked}
             className={inputCls}
@@ -206,14 +261,51 @@ export function EmailSettingsForm({
               label="Maileroo sending key"
               hint="Dashboard → Domains → Sending Keys"
             >
-              <PasswordField
-                autoComplete="off"
-                value={values.mailerooApiKey ?? ""}
-                onChange={(e) => set("mailerooApiKey", e.target.value)}
-                placeholder="Your Maileroo sending key"
-                disabled={!canEdit}
-                inputClassName={`${inputCls} pr-11`}
-              />
+              {hasMailerooKey && !clearMaileroo && (
+                <p className="mb-2 text-xs text-aurora-300/90">
+                  Key saved — paste a new value to replace, or{" "}
+                  <button
+                    type="button"
+                    className="underline hover:text-aurora-200"
+                    onClick={() => {
+                      setClearMaileroo(true);
+                      setMailerooDraft("");
+                      setSaved(false);
+                    }}
+                    disabled={!canEdit}
+                  >
+                    clear
+                  </button>
+                  .
+                </p>
+              )}
+              {!clearMaileroo && (
+                <PasswordField
+                  autoComplete="off"
+                  value={mailerooDraft}
+                  onChange={(e) => {
+                    setMailerooDraft(e.target.value);
+                    setSaved(false);
+                  }}
+                  placeholder={
+                    hasMailerooKey ? "Paste new key to replace" : "Your Maileroo sending key"
+                  }
+                  disabled={!canEdit}
+                  inputClassName={`${inputCls} pr-11`}
+                />
+              )}
+              {clearMaileroo && (
+                <p className="mt-2 text-xs text-amber-200/90">
+                  Will clear the saved Maileroo key on Save.{" "}
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => setClearMaileroo(false)}
+                  >
+                    Undo
+                  </button>
+                </p>
+              )}
               <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
                 Free account at{" "}
                 <a
@@ -233,14 +325,49 @@ export function EmailSettingsForm({
               label="Resend API key"
               hint="BYO domain — not a shared Lodestar sender"
             >
-              <PasswordField
-                autoComplete="off"
-                value={values.resendApiKey ?? ""}
-                onChange={(e) => set("resendApiKey", e.target.value)}
-                placeholder="re_xxxxxxxxxxxx"
-                disabled={!canEdit}
-                inputClassName={`${inputCls} pr-11`}
-              />
+              {hasResendKey && !clearResend && (
+                <p className="mb-2 text-xs text-aurora-300/90">
+                  Key saved — paste a new value to replace, or{" "}
+                  <button
+                    type="button"
+                    className="underline hover:text-aurora-200"
+                    onClick={() => {
+                      setClearResend(true);
+                      setResendDraft("");
+                      setSaved(false);
+                    }}
+                    disabled={!canEdit}
+                  >
+                    clear
+                  </button>
+                  .
+                </p>
+              )}
+              {!clearResend && (
+                <PasswordField
+                  autoComplete="off"
+                  value={resendDraft}
+                  onChange={(e) => {
+                    setResendDraft(e.target.value);
+                    setSaved(false);
+                  }}
+                  placeholder={hasResendKey ? "Paste new key to replace" : "re_xxxxxxxxxxxx"}
+                  disabled={!canEdit}
+                  inputClassName={`${inputCls} pr-11`}
+                />
+              )}
+              {clearResend && (
+                <p className="mt-2 text-xs text-amber-200/90">
+                  Will clear the saved Resend key on Save.{" "}
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => setClearResend(false)}
+                  >
+                    Undo
+                  </button>
+                </p>
+              )}
               <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
                 Free account at{" "}
                 <a

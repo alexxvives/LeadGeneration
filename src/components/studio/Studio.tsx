@@ -250,10 +250,15 @@ export function Studio() {
 
   const onSend = async (outreachId: string) => {
     try {
-      await api.send(outreachId);
+      const result = await api.send(outreachId);
       recordWarmupSend();
       await refresh();
-      toast("ok", board?.capabilities.canSendEmail ? "Email sent." : "Sent (simulated — not delivered).");
+      toast(
+        "ok",
+        result.provider === "demo"
+          ? "Sent (simulated — not delivered)."
+          : "Email sent.",
+      );
     } catch (e) {
       await refresh();
       const msg = (e as Error).message;

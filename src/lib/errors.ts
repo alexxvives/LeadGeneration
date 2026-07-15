@@ -35,3 +35,30 @@ export class QuotaError extends Error {
 export function isQuotaError(err: unknown): err is QuotaError {
   return err instanceof QuotaError;
 }
+
+/**
+ * Thrown when auth is enforced but the request has no resolvable workspace
+ * (missing session, provision failure). Routes map this to 401.
+ */
+export class AuthError extends Error {
+  constructor(message = "Sign in required.") {
+    super(message);
+    this.name = "AuthError";
+  }
+}
+
+export function isAuthError(err: unknown): err is AuthError {
+  return err instanceof AuthError;
+}
+
+/** Thrown when a workspace row is missing for an update that must persist. */
+export class NotFoundError extends Error {
+  constructor(message = "Not found.") {
+    super(message);
+    this.name = "NotFoundError";
+  }
+}
+
+export function isNotFoundError(err: unknown): err is NotFoundError {
+  return err instanceof NotFoundError;
+}

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { sendApprovedOutreach } from "@/lib/service";
-import { isQuotaError } from "@/lib/errors";
+import { isAuthError, isQuotaError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +35,9 @@ export async function POST(req: Request) {
     }
     return NextResponse.json(result);
   } catch (err) {
+    if (isAuthError(err)) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: 401 });
+    }
     if (isQuotaError(err)) {
       return NextResponse.json(
         {

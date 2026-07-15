@@ -73,6 +73,7 @@ export function SendSetupPanel({
   canSendEmail,
   mailbox: mailboxInitial,
   defaultPath = "easy",
+  appUrlLooksLocal = false,
 }: {
   initial: EmailSettingsValues;
   defaults: EmailSettingsDefaults;
@@ -80,6 +81,8 @@ export function SendSetupPanel({
   canSendEmail: boolean;
   mailbox: MailboxPublicStatus;
   defaultPath?: PathId;
+  /** True when Gmail OAuth is configured but NEXTAUTH_URL still points at localhost. */
+  appUrlLooksLocal?: boolean;
 }) {
   const [path, setPath] = useState<PathId>(defaultPath);
   const [easyProvider, setEasyProvider] = useState<EasyEmailProvider>(
@@ -100,6 +103,24 @@ export function SendSetupPanel({
   useEffect(() => {
     setEasyProvider(initial.easyEmailProvider ?? "resend");
   }, [initial.easyEmailProvider]);
+
+  useEffect(() => {
+    setPath(defaultPath);
+  }, [defaultPath]);
+
+  async function selectPath(next: PathId) {
+    setPath(next);
+    if (!canEdit) return;
+    try {
+      await fetch("/api/workspace/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferredSendPath: next }),
+      });
+    } catch {
+      // non-blocking — Save settings also persists path
+    }
+  }
 
   const warmthMeta = WARMTH.find((w) => w.id === warmth) ?? WARMTH[0];
   const isMaileroo = easyProvider === "maileroo";
@@ -168,7 +189,7 @@ export function SendSetupPanel({
         <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-ink-900/60 p-1">
           <button
             type="button"
-            onClick={() => setPath("easy")}
+            onClick={() => void selectPath("easy")}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               path === "easy"
                 ? "bg-aurora-400 text-ink-950"
@@ -179,7 +200,7 @@ export function SendSetupPanel({
           </button>
           <button
             type="button"
-            onClick={() => setPath("pro")}
+            onClick={() => void selectPath("pro")}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               path === "pro"
                 ? "bg-aurora-400 text-ink-950"
@@ -369,10 +390,26 @@ export function SendSetupPanel({
                     restart.
                   </p>
                 )}
+                {mailbox.googleReady && appUrlLooksLocal && (
+                  <p className="rounded-lg border border-amber-400/20 bg-amber-400/5 px-4 py-2 text-xs text-amber-200/90">
+                    <code className="text-mist-300">NEXTAUTH_URL</code> still looks like
+                    localhost. Set the Wrangler secret to your live Workers URL (e.g.{" "}
+                    <code className="text-mist-300">
+                      https://leadgeneration.alexxvives.workers.dev
+                    </code>
+                    ) or Connect Google will fail with redirect_uri_mismatch.
+                  </p>
+                )}
               </div>
             )}
 
             {msg && <p className="mt-3 text-sm text-mist-300">{msg}</p>}
+            {mailbox.connected && appUrlLooksLocal && (
+              <p className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/5 px-4 py-2 text-xs text-amber-200/90">
+                <code className="text-mist-300">NEXTAUTH_URL</code> looks like localhost —
+                reconnect Google after setting the live Workers URL as a Wrangler secret.
+              </p>
+            )}
           </div>
 
           <div

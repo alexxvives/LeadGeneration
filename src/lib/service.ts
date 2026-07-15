@@ -7,7 +7,7 @@ import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
 import { verifyEmail } from "@/lib/email/verify";
 import { FREE_MAX_LEADS_PER_RUN, getPlan } from "@/lib/plans";
-import { QuotaError } from "@/lib/errors";
+import { NotFoundError, QuotaError } from "@/lib/errors";
 import { ensureUsageWindow } from "@/lib/workspace";
 import type {
   ContactMethod,
@@ -350,6 +350,8 @@ export interface SendOutcome {
   error?: string;
   rateLimited?: boolean;
   retryAfterMs?: number;
+  /** Transport that delivered (or would have, for local demo). */
+  provider?: "google" | "resend" | "maileroo" | "smtp" | "demo";
 }
 
 /**
@@ -441,10 +443,28 @@ export async function sendApprovedOutreach(
           resendApiKey: wsForEmail.resendApiKey,
           mailerooApiKey: wsForEmail.mailerooApiKey,
           easyEmailProvider: wsForEmail.easyEmailProvider,
+          preferredSendPath: wsForEmail.preferredSendPath,
           connectedMailbox: wsForEmail.connectedMailbox,
         }
       : undefined,
   );
+
+  // Production (metered): never treat demo/no-transport as a real send.
+  if (result.ok && result.provider === "demo" && ctx.metered) {
+    const updated = await db.updateOutreach(outreachId, {
+      status: "approved",
+      error:
+        "No email transport configured. Add a Resend/Maileroo key in Settings → Easy, or Connect Google on Pro.",
+      updatedAt: nowIso(),
+    });
+    return {
+      ok: false,
+      outreach: updated ?? undefined,
+      error:
+        "No email transport configured. Add a Resend/Maileroo key in Settings → Easy, or Connect Google on Pro.",
+      provider: "demo",
+    };
+  }
 
   if (result.ok) {
     recordSend();
@@ -497,7 +517,7 @@ export async function sendApprovedOutreach(
         updatedAt: nowIso(),
       });
     }
-    return { ok: true, outreach: updated ?? undefined };
+    return { ok: true, outreach: updated ?? undefined, provider: result.provider };
   }
 
   // Keep status "approved" so the user can fix setup and retry without re-approving.
@@ -507,7 +527,12 @@ export async function sendApprovedOutreach(
     error: result.error ?? "Unknown send error",
     updatedAt: nowIso(),
   });
-  return { ok: false, outreach: updated ?? undefined, error: result.error };
+  return {
+    ok: false,
+    outreach: updated ?? undefined,
+    error: result.error,
+    provider: result.provider,
+  };
 }
 
 function domainKey(website: string | null | undefined): string | null {
@@ -569,9 +594,18 @@ export async function updateWorkspaceEmailSettings(
     resendApiKey?: string | null;
     mailerooApiKey?: string | null;
     easyEmailProvider?: EasyEmailProvider;
+    preferredSendPath?: "easy" | "pro" | null;
   },
 ): Promise<void> {
-  await ctx.db.updateWorkspace(ctx.workspaceId, { ...patch, updatedAt: nowIso() });
+  const updated = await ctx.db.updateWorkspace(ctx.workspaceId, {
+    ...patch,
+    updatedAt: nowIso(),
+  });
+  if (!updated) {
+    throw new NotFoundError(
+      "Workspace not found — sign in again, then re-save Settings.",
+    );
+  }
 }
 
 /** Public mailbox status for Settings (no tokens). */
@@ -585,10 +619,12 @@ export async function connectMailbox(
   ctx: Ctx,
   mailbox: ConnectedMailbox,
 ): Promise<void> {
+  const existing = await ctx.db.getWorkspace(ctx.workspaceId);
   await ctx.db.updateWorkspace(ctx.workspaceId, {
     connectedMailbox: mailbox,
-    // Prefer mailbox email as From when user hasn't set one yet.
-    fromEmail: mailbox.email,
+    // Prefer mailbox email as From only when user hasn't set one yet.
+    ...(existing?.fromEmail?.trim() ? {} : { fromEmail: mailbox.email }),
+    preferredSendPath: "pro",
     updatedAt: nowIso(),
   });
 }

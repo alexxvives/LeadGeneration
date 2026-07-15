@@ -63,6 +63,7 @@ type WorkspaceRow = {
   resend_api_key: string | null;
   maileroo_api_key: string | null;
   easy_email_provider: string | null;
+  preferred_send_path: string | null;
   // Connected mailbox JSON (migration 0008)
   connected_mailbox_json: string | null;
 };
@@ -163,6 +164,10 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
     resendApiKey: r.resend_api_key ?? null,
     mailerooApiKey: r.maileroo_api_key ?? null,
     easyEmailProvider: r.easy_email_provider === "maileroo" ? "maileroo" : "resend",
+    preferredSendPath:
+      r.preferred_send_path === "pro" || r.preferred_send_path === "easy"
+        ? r.preferred_send_path
+        : null,
     connectedMailbox: parseConnectedMailbox(r.connected_mailbox_json),
   };
 }
@@ -328,6 +333,9 @@ export class D1Store implements LeadRepository {
     if ("resendApiKey" in patch) row.resend_api_key = patch.resendApiKey ?? null;
     if ("mailerooApiKey" in patch) row.maileroo_api_key = patch.mailerooApiKey ?? null;
     if ("easyEmailProvider" in patch) row.easy_email_provider = patch.easyEmailProvider ?? "resend";
+    if ("preferredSendPath" in patch) {
+      row.preferred_send_path = patch.preferredSendPath ?? null;
+    }
     if ("connectedMailbox" in patch) {
       row.connected_mailbox_json = patch.connectedMailbox
         ? JSON.stringify(patch.connectedMailbox)

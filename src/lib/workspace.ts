@@ -41,6 +41,7 @@ export function newWorkspace(args: {
     resendApiKey: null,
     mailerooApiKey: null,
     easyEmailProvider: "resend",
+    preferredSendPath: null,
     connectedMailbox: null,
   };
 }

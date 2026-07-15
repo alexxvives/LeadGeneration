@@ -1,9 +1,11 @@
+import { headers } from "next/headers";
 import { getD1Binding } from "@/lib/cf";
 import { getDb, LOCAL_WORKSPACE_ID } from "@/lib/db";
-import { authRequired } from "@/lib/config";
+import { authRequired, env } from "@/lib/config";
 import { auth } from "@/auth";
 import { getPlan } from "@/lib/plans";
 import { ensureUsageWindow, getOrCreateWorkspaceForUser, ensureLocalWorkspace } from "@/lib/workspace";
+import { AuthError } from "@/lib/errors";
 import type { Ctx } from "@/lib/service";
 import type { WorkspaceSummary } from "@/lib/types";
 
@@ -15,18 +17,21 @@ import type { WorkspaceSummary } from "@/lib/types";
  *    session; the repo is a workspace-scoped D1Store; metered = true.
  *  • Local dev / demo (no AUTH_SECRET, no binding): workspaceId = "local"; repo
  *    is the JSON store; metered = false → unmetered (constitution Art. I.2).
+ *  • Auth enforced but no resolvable workspace → AuthError (never silently use
+ *    "local" against D1 — that caused fake Settings saves).
  */
 export async function getCtx(): Promise<Ctx> {
   const binding = await getD1Binding();
   let workspaceId = LOCAL_WORKSPACE_ID;
+  let resolved = !authRequired();
 
   if (authRequired()) {
     try {
       const session = await auth();
       if (session?.workspaceId) {
         workspaceId = session.workspaceId;
+        resolved = true;
       } else if (session?.user?.email || session?.userId || session?.user?.id) {
-        // Token missing workspaceId (e.g. provision failed at sign-in) — recover.
         const db = getDb(binding);
         const userId =
           session.userId ??
@@ -38,14 +43,36 @@ export async function getCtx(): Promise<Ctx> {
           session.user?.email ?? null,
         );
         workspaceId = ws.id;
+        resolved = true;
       }
     } catch (err) {
       console.error("[getCtx] auth/session failed", err);
     }
+
+    if (!resolved) {
+      // Headless smoke bypass (middleware already checked the key).
+      const smokeKey = env.smokeApiKey();
+      if (smokeKey) {
+        try {
+          const h = await headers();
+          if (h.get("x-smoke-key") === smokeKey) {
+            workspaceId = LOCAL_WORKSPACE_ID;
+            resolved = true;
+          }
+        } catch {
+          // headers() unavailable outside a request — ignore
+        }
+      }
+    }
+
+    if (!resolved) {
+      throw new AuthError("Sign in required to use this workspace.");
+    }
   }
 
   const db = getDb(binding, workspaceId);
-  if (!binding) {
+  if (!binding || (authRequired() && workspaceId === LOCAL_WORKSPACE_ID)) {
+    // Local JSON always; smoke-on-D1 needs a concrete "local" row too.
     await ensureLocalWorkspace(db);
   }
   return { db, workspaceId, metered: !!binding };

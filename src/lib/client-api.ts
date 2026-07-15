@@ -115,7 +115,11 @@ export const api = {
     }),
 
   send: (outreachId: string) =>
-    jsonFetch<{ ok: boolean; error?: string }>("/api/send", {
+    jsonFetch<{
+      ok: boolean;
+      error?: string;
+      provider?: "google" | "resend" | "maileroo" | "smtp" | "demo";
+    }>("/api/send", {
       method: "POST",
       body: JSON.stringify({ outreachId }),
     }),

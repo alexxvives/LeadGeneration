@@ -26,6 +26,11 @@ function normalizeWorkspace(w: Workspace): Workspace {
       (raw.easyEmailProvider as Workspace["easyEmailProvider"] | undefined) === "maileroo"
         ? "maileroo"
         : "resend",
+    preferredSendPath:
+      (raw.preferredSendPath as Workspace["preferredSendPath"] | undefined) === "pro" ||
+      (raw.preferredSendPath as Workspace["preferredSendPath"] | undefined) === "easy"
+        ? (raw.preferredSendPath as "easy" | "pro")
+        : null,
     connectedMailbox: (raw.connectedMailbox as Workspace["connectedMailbox"] | undefined) ?? null,
   };
 }

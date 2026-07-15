@@ -27,6 +27,8 @@ export interface WorkspaceEmailSettings {
   mailerooApiKey?: string | null;
   /** Preferred Easy provider when both keys could exist. */
   easyEmailProvider?: EasyEmailProvider | null;
+  /** Settings tab: Easy vs Pro. Google only when `"pro"`. */
+  preferredSendPath?: "easy" | "pro" | null;
   /** Pro path — connected Google/Microsoft mailbox (ADR 0010). */
   connectedMailbox?: ConnectedMailbox | null;
 }
@@ -74,15 +76,24 @@ async function sendWithResendKey(
   }
 }
 
+function resolveSendPath(ws?: WorkspaceEmailSettings): "easy" | "pro" {
+  if (ws?.preferredSendPath === "easy" || ws?.preferredSendPath === "pro") {
+    return ws.preferredSendPath;
+  }
+  // Default: Pro when a mailbox is linked, otherwise Easy.
+  if (ws?.connectedMailbox?.provider === "google" && ws.connectedMailbox.refreshTokenEnc) {
+    return "pro";
+  }
+  return "easy";
+}
+
 /**
  * Send a single already-approved email.
  *
- * Priority (first available wins):
- *   1. Connected Google mailbox     → Pro path (ADR 0010)
- *   2. Workspace Easy key (Resend or Maileroo — ADR 0011)
- *   3. Platform Resend key          → platform's Resend sending domain
- *   4. Platform SMTP                → fallback for self-hosted setups
- *   5. Demo mode                    → logs only, nothing is delivered
+ * Priority depends on Settings preferred path:
+ *   • Pro → Google mailbox first (when connected)
+ *   • Easy → workspace Resend/Maileroo first
+ * Then: other BYO key → platform Resend → SMTP → demo.
  *
  * Workspace identity (fromName, fromEmail etc.) overrides env vars so each
  * workspace's outreach appears to come from its own representative.
@@ -102,9 +113,11 @@ export async function sendEmail(
   const replyToHeader = replyTo || undefined;
   const tags = input.tags?.length ? input.tags : undefined;
 
-  // 1. Connected Google mailbox (Pro path).
+  const path = resolveSendPath(ws);
   const mailbox = ws?.connectedMailbox;
-  if (mailbox?.provider === "google" && mailbox.refreshTokenEnc) {
+
+  const tryGoogle = async (): Promise<SendResult | null> => {
+    if (mailbox?.provider !== "google" || !mailbox.refreshTokenEnc) return null;
     const result = await sendViaGmail({
       mailbox,
       to: input.to,
@@ -120,9 +133,8 @@ export async function sendEmail(
       id: result.id,
       connectedMailbox: result.mailbox,
     };
-  }
+  };
 
-  // 2. Workspace Easy keys (Resend / Maileroo). Prefer the chosen provider.
   const wsResendKey = ws?.resendApiKey?.trim() || "";
   const wsMailerooKey = ws?.mailerooApiKey?.trim() || "";
   const preferred: EasyEmailProvider =
@@ -155,19 +167,37 @@ export async function sendEmail(
     });
   };
 
-  if (preferred === "maileroo") {
-    const m = await tryMaileroo();
-    if (m) return m;
-    const r = await tryResend();
-    if (r) return r;
+  /** Prefer first transport that succeeds; skip missing keys; fall through on failure. */
+  const tryEasyKeys = async (): Promise<SendResult | null> => {
+    const order =
+      preferred === "maileroo"
+        ? [tryMaileroo, tryResend]
+        : [tryResend, tryMaileroo];
+    let lastFail: SendResult | null = null;
+    for (const attempt of order) {
+      const r = await attempt();
+      if (!r) continue;
+      if (r.ok) return r;
+      lastFail = r;
+    }
+    return lastFail;
+  };
+
+  let proGoogleFail: SendResult | null = null;
+
+  if (path === "pro") {
+    const g = await tryGoogle();
+    if (g?.ok) return g;
+    if (g && !g.ok) proGoogleFail = g;
+    const easy = await tryEasyKeys();
+    if (easy?.ok) return easy;
   } else {
-    const r = await tryResend();
-    if (r) return r;
-    const m = await tryMaileroo();
-    if (m) return m;
+    const easy = await tryEasyKeys();
+    if (easy?.ok) return easy;
+    // Easy path does not auto-use Google (user chose Easy in Settings).
   }
 
-  // 3. Platform Resend key (primary — simple API key, no SMTP config needed).
+  // Platform Resend key (primary — simple API key, no SMTP config needed).
   if (caps.resend) {
     return sendWithResendKey(env.resendKey(), {
       from,
@@ -179,7 +209,7 @@ export async function sendEmail(
     });
   }
 
-  // 4. Platform SMTP (self-hosted fallback — Maileroo, SES, Postfix, etc.).
+  // Platform SMTP (self-hosted fallback — Maileroo, SES, Postfix, etc.).
   if (caps.smtp) {
     try {
       const nodemailer = await import("nodemailer");
@@ -203,7 +233,9 @@ export async function sendEmail(
     }
   }
 
-  // 5. Demo mode — no provider configured.
+  if (proGoogleFail) return proGoogleFail;
+
+  // Demo mode — no provider configured.
   console.log(
     `[email:demo] Would send to ${input.to} — subject: "${input.subject}" (no provider configured)`,
   );

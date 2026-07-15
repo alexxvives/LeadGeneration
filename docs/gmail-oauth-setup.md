@@ -114,9 +114,14 @@ Restart `npm run dev`.
 ```bash
 npx wrangler secret put GMAIL_OAUTH_CLIENT_ID
 npx wrangler secret put GMAIL_OAUTH_CLIENT_SECRET
+npx wrangler secret put NEXTAUTH_URL
 ```
 
-Ensure `NEXTAUTH_URL` / app URL matches the redirect URI host.
+For `NEXTAUTH_URL`, paste the live Workers origin (no trailing slash), e.g.
+`https://leadgeneration.alexxvives.workers.dev`. If this stays at
+`http://localhost:3000`, Connect Google fails with `redirect_uri_mismatch`.
+Settings → Pro shows a warning when OAuth is configured but the app URL looks
+local.
 
 ## 6. What happens next in the product
 
