@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core";
 import type { CrmStage, LeadWithOutreach } from "@/lib/types";
 import { Spinner } from "@/components/ui";
-import { CheckIcon, SparkIcon, MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
+import { SparkIcon, MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
 
@@ -87,22 +87,20 @@ export function PipelineView({
   onOpen,
   onMoveStage,
   onDraft,
-  onDecide,
 }: {
   leads: LeadWithOutreach[];
   onOpen: (id: string) => void;
   onMoveStage: (leadId: string, stage: CrmStage) => void;
   onDraft: (leadId: string) => Promise<void>;
-  onDecide: (outreachId: string, decision: "approved" | "rejected") => Promise<void>;
 }) {
   const [draftingAll, setDraftingAll] = useState(false);
-  const [approvingSelected, setApprovingSelected] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [parkedOpen, setParkedOpen] = useState<Record<string, boolean>>({
+    not_interested: false,
+    discarded: false,
+  });
 
-  const queuedLeads = leads.filter((l) => l.status === "queued" && l.outreach);
   const undraftedLeads = leads.filter((l) => l.status === "new" && !l.outreach && l.emails.length > 0);
-  const selectedQueued = queuedLeads.filter((l) => selectedIds.has(l.id));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -124,109 +122,93 @@ export function PipelineView({
     onMoveStage(String(active.id), newStage);
   }
 
-  const toggleSelect = (leadId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(leadId)) next.delete(leadId);
-      else next.add(leadId);
-      return next;
-    });
-  };
-
   const draftAll = async () => {
     setDraftingAll(true);
     for (const l of undraftedLeads) await onDraft(l.id);
     setDraftingAll(false);
   };
 
-  const approveSelected = async () => {
-    const targets = selectedQueued.length > 0 ? selectedQueued : queuedLeads;
-    setApprovingSelected(true);
-    for (const l of targets) {
-      if (l.outreach) await onDecide(l.outreach.id, "approved");
-    }
-    setSelectedIds(new Set());
-    setApprovingSelected(false);
-  };
-
-  const newHeaderActions = (
-    <>
-      {undraftedLeads.length > 0 && (
-        <button
-          type="button"
-          onClick={() => void draftAll()}
-          disabled={draftingAll}
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100 disabled:opacity-50"
-        >
-          {draftingAll ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3 w-3 text-aurora-300" />}
-          Draft all ({undraftedLeads.length})
-        </button>
-      )}
-      {queuedLeads.length > 0 && (
-        <button
-          type="button"
-          onClick={() => void approveSelected()}
-          disabled={approvingSelected}
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100 disabled:opacity-50"
-        >
-          {approvingSelected ? <Spinner className="h-3 w-3" /> : <CheckIcon className="h-3 w-3 text-aurora-300" />}
-          {selectedQueued.length > 0
-            ? `Approve selected (${selectedQueued.length})`
-            : `Approve all (${queuedLeads.length})`}
-        </button>
-      )}
-    </>
-  );
+  const newHeaderActions = undraftedLeads.length > 0 ? (
+    <button
+      type="button"
+      onClick={() => void draftAll()}
+      disabled={draftingAll}
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100 disabled:opacity-50"
+    >
+      {draftingAll ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3 w-3 text-aurora-300" />}
+      Draft all ({undraftedLeads.length})
+    </button>
+  ) : null;
 
   return (
-    <div className="space-y-4">
-      <p className="text-xs uppercase tracking-widest text-mist-500">
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
         {leads.length === 1 ? "" : "s"} · drag to move between stages
-        {queuedLeads.length > 0 && (
-          <span className="normal-case tracking-normal text-mist-600">
-            {" "}
-        · click a New card to select · ⓘ for details
-          </span>
-        )}
+        <span className="normal-case tracking-normal text-mist-600">
+          {" "}
+          · ⓘ for details
+        </span>
       </p>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div
-          className="grid min-h-[calc(100dvh-12rem)] gap-3"
-          style={{ gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(0, 1fr))` }}
-        >
-          {MAIN_COLUMNS.map((col) => {
-            const colLeads = leads.filter((l) => l.crmStage === col.stage);
-            return (
-              <PipelineColumn
-                key={col.stage}
-                col={col}
-                leads={colLeads}
-                onOpen={onOpen}
-                activeId={activeId}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-                headerActions={col.stage === "new" ? newHeaderActions : null}
-              />
-            );
-          })}
-        </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <div
+            className="grid min-h-0 flex-1 gap-3"
+            style={{ gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(0, 1fr))` }}
+          >
+            {MAIN_COLUMNS.map((col) => {
+              const colLeads = leads.filter((l) => l.crmStage === col.stage);
+              return (
+                <PipelineColumn
+                  key={col.stage}
+                  col={col}
+                  leads={colLeads}
+                  onOpen={onOpen}
+                  activeId={activeId}
+                  headerActions={col.stage === "new" ? newHeaderActions : null}
+                />
+              );
+            })}
+          </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {PARKED_COLUMNS.map((col) => {
-            const colLeads = leads.filter((l) => l.crmStage === col.stage);
-            return (
-              <PipelineColumn
-                key={col.stage}
-                col={col}
-                leads={colLeads}
-                onOpen={onOpen}
-                activeId={activeId}
-                compact
-              />
-            );
-          })}
+          <div className="grid shrink-0 gap-2 sm:grid-cols-2">
+            {PARKED_COLUMNS.map((col) => {
+              const colLeads = leads.filter((l) => l.crmStage === col.stage);
+              const open = parkedOpen[col.stage] ?? false;
+              return (
+                <div key={col.stage} className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setParkedOpen((prev) => ({ ...prev, [col.stage]: !prev[col.stage] }))
+                    }
+                    className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-ink-950/40 px-3 py-2 text-left transition-colors hover:bg-white/[0.03]"
+                  >
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
+                    <span className="truncate text-sm font-semibold text-mist-100">{col.title}</span>
+                    <span className="ml-auto font-display text-base tabular-nums text-mist-400">
+                      {colLeads.length}
+                    </span>
+                    <span className="text-xs text-mist-600">{open ? "▾" : "▸"}</span>
+                  </button>
+                  {open ? (
+                    <div className="mt-2 max-h-[28vh]">
+                      <PipelineColumn
+                        col={col}
+                        leads={colLeads}
+                        onOpen={onOpen}
+                        activeId={activeId}
+                        compact
+                      />
+                    </div>
+                  ) : (
+                    <CollapsedDropZone stage={col.stage} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <DragOverlay>
@@ -244,14 +226,25 @@ export function PipelineView({
   );
 }
 
+function CollapsedDropZone({ stage }: { stage: CrmStage }) {
+  const { setNodeRef, isOver } = useDroppable({ id: stage });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`mt-1 h-2 rounded-full transition-colors ${
+        isOver ? "bg-aurora-400/40" : "bg-transparent"
+      }`}
+      aria-hidden
+    />
+  );
+}
+
 function PipelineColumn({
   col,
   leads,
   onOpen,
   activeId,
   headerActions,
-  selectedIds,
-  onToggleSelect,
   compact,
 }: {
   col: (typeof MAIN_COLUMNS)[number] | (typeof PARKED_COLUMNS)[number];
@@ -259,16 +252,14 @@ function PipelineColumn({
   onOpen: (id: string) => void;
   activeId: string | null;
   headerActions?: React.ReactNode;
-  selectedIds?: Set<string>;
-  onToggleSelect?: (leadId: string) => void;
   compact?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.stage });
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-h-0 min-w-0 flex-col rounded-xl2 border transition-colors ${
-        compact ? "max-h-[min(40vh,360px)]" : "h-[calc(100dvh-12rem)]"
+      className={`flex h-full min-h-0 min-w-0 flex-col rounded-xl2 border transition-colors ${
+        compact ? "max-h-[28vh]" : ""
       } ${
         isOver ? "border-aurora-400/40 bg-aurora-400/5" : "border-white/10 bg-ink-950/40"
       }`}
@@ -296,9 +287,6 @@ function PipelineColumn({
               lead={l}
               onOpen={onOpen}
               isDragging={l.id === activeId}
-              selectable={l.status === "queued" && !!l.outreach}
-              selected={selectedIds?.has(l.id) ?? false}
-              onToggleSelect={onToggleSelect}
             />
           ))
         )}
@@ -311,16 +299,10 @@ function DraggablePipelineCard({
   lead,
   onOpen,
   isDragging,
-  selectable,
-  selected,
-  onToggleSelect,
 }: {
   lead: LeadWithOutreach;
   onOpen: (id: string) => void;
   isDragging: boolean;
-  selectable?: boolean;
-  selected?: boolean;
-  onToggleSelect?: (leadId: string) => void;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
   const pendingFollowUps = lead.followUps?.filter((f) => !f.done).length ?? 0;
@@ -332,23 +314,8 @@ function DraggablePipelineCard({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      role="button"
-      tabIndex={0}
-      onClick={() => {
-        if (selectable && onToggleSelect) onToggleSelect(lead.id);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          if (selectable && onToggleSelect) onToggleSelect(lead.id);
-        }
-      }}
-      className={`group flex min-h-[3.25rem] cursor-grab touch-none items-center gap-1 overflow-hidden rounded-xl border px-3 py-2.5 transition-all active:cursor-grabbing ${
+      className={`group flex min-h-[3.25rem] cursor-grab touch-none items-center gap-1 overflow-hidden rounded-xl border border-white/5 bg-ink-900/60 px-3 py-2.5 transition-all hover:bg-white/[0.03] active:cursor-grabbing ${
         isDragging ? "opacity-30" : ""
-      } ${
-        selected
-          ? "border-aurora-400/50 bg-aurora-400/10 ring-1 ring-aurora-400/40"
-          : "border-white/5 bg-ink-900/60 hover:bg-white/[0.03]"
       }`}
     >
       <div className="min-w-0 flex-1">

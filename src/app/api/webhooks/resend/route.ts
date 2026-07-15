@@ -8,6 +8,8 @@ import { env } from "@/lib/config";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type ResendTag = { name?: string; value?: string };
+
 /**
  * Resend → Lodestar delivery webhooks.
  *
@@ -18,7 +20,9 @@ export const dynamic = "force-dynamic";
  * Optional: RESEND_WEBHOOK_SECRET (Svix signing secret). When unset we accept
  * payloads in local/demo so zero-key mode still works; production should set it.
  *
- * Matching: by recipient email on the most recent sent outreach in the workspace.
+ * Matching order:
+ *   1. Tags `lodestar_ws` + `lodestar_outreach` (set on send)
+ *   2. Fallback: latest sent outreach by recipient email (cross-workspace)
  */
 export async function POST(req: Request) {
   const secret = process.env.RESEND_WEBHOOK_SECRET?.trim();
@@ -37,6 +41,7 @@ export async function POST(req: Request) {
       to?: string[] | string;
       email_id?: string;
       from?: string;
+      tags?: ResendTag[];
     };
   };
   try {
@@ -51,6 +56,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, ignored: type });
   }
 
+  const tags = body.data?.tags ?? [];
+  const tagWs = tagValue(tags, "lodestar_ws");
+  const tagOutreach = tagValue(tags, "lodestar_outreach");
+
+  const binding = await getD1Binding();
+  const probe = getDb(binding, LOCAL_WORKSPACE_ID);
+
+  if (tagWs && tagOutreach) {
+    const ctx: Ctx = {
+      db: getDb(binding, tagWs),
+      workspaceId: tagWs,
+      metered: !!env.authSecret(),
+    };
+    const existing = await ctx.db.getOutreach(tagOutreach);
+    if (existing) {
+      await setOutreachDeliveryStatus(ctx, tagOutreach, delivery);
+      return NextResponse.json({
+        ok: true,
+        matched: 1,
+        via: "tags",
+        outreachId: tagOutreach,
+        delivery,
+      });
+    }
+  }
+
   const toRaw = body.data?.to;
   const toList = Array.isArray(toRaw) ? toRaw : toRaw ? [toRaw] : [];
   const matchEmails =
@@ -62,20 +93,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, matched: 0 });
   }
 
-  const ctx = await webhookCtx();
-  const all = await ctx.db.listOutreach();
-  const candidates = all
-    .filter((o) => o.status === "sent" && o.toEmail)
-    .filter((o) => matchEmails.includes(o.toEmail!.toLowerCase()))
-    .sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
-
-  const target = candidates[0];
+  const target = await probe.findLatestSentByEmail(matchEmails[0]!);
   if (!target) {
     return NextResponse.json({ ok: true, matched: 0 });
   }
 
+  const ctx: Ctx = {
+    db: getDb(binding, target.workspaceId),
+    workspaceId: target.workspaceId,
+    metered: !!env.authSecret(),
+  };
   await setOutreachDeliveryStatus(ctx, target.id, delivery);
-  return NextResponse.json({ ok: true, matched: 1, outreachId: target.id, delivery });
+  return NextResponse.json({
+    ok: true,
+    matched: 1,
+    via: "email",
+    outreachId: target.id,
+    delivery,
+  });
+}
+
+function tagValue(tags: ResendTag[], name: string): string | null {
+  const hit = tags.find((t) => t.name === name);
+  const v = hit?.value?.trim();
+  return v || null;
 }
 
 function mapEvent(type: string): DeliveryStatus | null {
@@ -93,18 +134,6 @@ function mapEvent(type: string): DeliveryStatus | null {
     default:
       return null;
   }
-}
-
-async function webhookCtx(): Promise<Ctx> {
-  const binding = await getD1Binding();
-  const probe = getDb(binding, LOCAL_WORKSPACE_ID);
-  const runs = await probe.listRuns();
-  const wsId = runs[0]?.workspaceId ?? LOCAL_WORKSPACE_ID;
-  return {
-    db: getDb(binding, wsId),
-    workspaceId: wsId,
-    metered: !!env.authSecret(),
-  };
 }
 
 /** Minimal Svix-style verification (Resend webhooks). */

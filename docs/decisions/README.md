@@ -48,6 +48,7 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0007 — Auth.js session strategy: JWT + split edge/server config](0007-authjs-jwt-sessions.md)
 - [0008 — Stripe billing + service-layer quota model](0008-stripe-quota-model.md)
 - [0009 — Resend for send, Maileroo/Zeruh for verify](0009-resend-send-maileroo-verify.md)
+- [0010 — Google / Microsoft mailbox OAuth behind sendEmail()](0010-mailbox-oauth-send.md) _(accepted — Google first; multi-inbox deferred)_
 
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

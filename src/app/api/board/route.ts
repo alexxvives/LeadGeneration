@@ -10,9 +10,13 @@ export async function GET() {
   const ctx = await getCtx();
   const board = await getLatestBoard(ctx);
   const workspace = await getWorkspaceSummary(ctx);
+  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+  const caps = getCapabilities();
+  const canSendEmail =
+    caps.canSendEmail || !!ws?.resendApiKey?.trim() || !!ws?.connectedMailbox;
   return NextResponse.json({
     ...board,
-    capabilities: getCapabilities(),
+    capabilities: { ...caps, canSendEmail },
     workspace,
   });
 }

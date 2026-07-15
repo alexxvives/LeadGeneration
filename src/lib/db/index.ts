@@ -52,6 +52,12 @@ export interface LeadRepository {
   getOutreachByLead(leadId: string): Promise<Outreach | null>;
   listOutreach(): Promise<Outreach[]>;
 
+  /**
+   * Cross-workspace: latest sent outreach for a recipient (delivery webhooks).
+   * Prefer tag-based matching when Resend tags are present.
+   */
+  findLatestSentByEmail(email: string): Promise<Outreach | null>;
+
   /** Wipe runs/leads/outreach for this workspace (keeps the workspace row). */
   clearWorkspaceData(): Promise<void>;
 }

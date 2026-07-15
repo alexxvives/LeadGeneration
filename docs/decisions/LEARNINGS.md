@@ -4,6 +4,37 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Google mailbox OAuth E2E (local)
+- Env: `GMAIL_OAUTH_CLIENT_ID` / `SECRET` → Connect Google enabled in Settings → Pro.
+- Flow: `/api/mailbox/google/start` → consent → callback stores AES-GCM refresh
+  token on workspace (`connectedMailbox`); send prefers Gmail over Resend.
+- Warmup self-report (age + volume) at connect → soft daily recommend (UI).
+- **Hostinger/GoDaddy:** registrar doesn't matter for Resend — user pastes
+  SPF/DKIM/DMARC at wherever DNS is hosted; Resend never needs the registrar
+  account. Same for Cloudflare/Namecheap.
+- Prod still needs Wrangler secrets + D1 migration 0008.
+
+### 2026-07-15 — ADR 0010 accepted + studio UX fixes
+- **ADR 0010 accepted:** Google mailbox OAuth first; multi-inbox deferred.
+  Warmup: free = slow manual ramp; automated networks are paid — no free
+  durable warmup product to rely on; no in-house network.
+- **Bug:** `newId` used Node `crypto.randomUUID` → broke client notes in
+  LeadDrawer (local + prod). Fixed via `globalThis.crypto.randomUUID`.
+- **UX:** removed Outreach “Before real inbox delivery” banner → simulate
+  confirm modal on send when no provider; pipeline columns shorter; parked
+  stages collapsed by default; lead info drawer centered; Easy/Pro toggle
+  right-aligned on Settings.
+
+### 2026-07-15 — Easy send path shipped (P0) + mailbox ADR proposed
+- Deleted root `SKILL.md` (data-scraper-agent) — wrong stack; noted in roadmap.
+- Settings: Easy (Resend wizard) vs Pro (coming soon) via `SendSetupPanel`.
+- Live DNS: `fetchResendDomainHealth` + `POST /api/providers/resend/domain-health`;
+  Domain health is the Sending hero (copyable SPF/DKIM + DMARC hint + poll).
+- Webhooks: Resend tags `lodestar_ws` / `lodestar_outreach`; fallback
+  `findLatestSentByEmail` (cross-workspace). ADR **0010** proposed for OAuth —
+  do not implement until accepted.
+- Sequence templates remain Day+3/+7 HITL stubs (P1 polish later).
+
 ### 2026-07-15 — Dual send plan + agent scrape tooling
 - **Push policy:** user wants commit+push every meaningful change.
 - **Plan:** `docs/roadmap-send-paths.md` — Easy=Resend+DNS guide; Pro=Google/
@@ -11,7 +42,7 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 - **gstack `/scrape`:** Claude Code browser extract skill — useful for agent QA,
   not Lodestar production search (we use Firecrawl/Exa).
 - **Root `SKILL.md` data-scraper-agent:** wrong stack (Python/Actions); don’t
-  adopt for product scraping.
+  adopt for product scraping — **file removed**.
 - **Leads UX:** centered Export/layout toggles; table viewport-capped scroll.
 
 ### 2026-07-15 — Cold email infra reality + OSS notes
@@ -91,8 +122,8 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   progress dots, Resend step, confetti on finish.
 - **Sign-off:** profile builds `Name / Role | Company / site`; drafts use that
   block; mailing address appended at send only when lead location looks US.
-- **Pipeline:** no checkboxes — click highlights for Approve all; drag handle
-  spans full card height; double-click opens drawer.
+- **Pipeline:** drag to move stages; Approve all lives only on Outreach
+  (one toast with count). Draft all stays on New column.
 
 ### 2026-07-14 — Search lead-count, quieter compliance, Spanish drafts
 - **`maxLeads` on CreateRunInput** — UI offers 5/10/15/25; Free capped at

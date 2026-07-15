@@ -9,23 +9,22 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (push + Leads UX + send roadmap)
+## ⏱️ Status — updated 2026-07-15 (Google mailbox connect)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Leads header: true center grid — title | Export+Table/Cards/Map | usage bars.
-- Lead table: `max-h-[calc(100dvh-11rem)]` + sticky header; page doesn’t scroll,
-  table body does.
-- Prior: Outreach/Pipeline full-height columns; Pipeline whole-card drag + ⓘ.
-- Plan: [`docs/roadmap-send-paths.md`](roadmap-send-paths.md) — Easy Resend vs
-  Pro Google/Microsoft; OSS backlog; gstack/SKILL.md notes.
+- **Pro path live locally:** Connect Google OAuth (ADR 0010) — start/callback
+  APIs, encrypted refresh token on workspace, Gmail send behind `sendEmail()`,
+  warmup self-report on connect. Microsoft = soon.
+- Easy Resend path unchanged (DNS at any registrar incl. Hostinger/GoDaddy).
+- Migration `0008_connected_mailbox.sql` — apply on CF before prod use.
 
 ### Next
-1. Deploy CF so production Leads matches local.
-2. P0 from send roadmap: Easy-path Settings wizard + DNS poll hero.
-3. ADR before building mailbox OAuth.
+1. Put `GMAIL_OAUTH_*` as Wrangler secrets + run `cf:migrate` → Connect Google in prod.
+2. Soft-cap warning popup on send when over recommend.
+3. Microsoft Graph Mail.Send (same seam).
 
 ---
 

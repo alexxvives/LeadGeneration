@@ -5,7 +5,8 @@
 users, while keeping a clear “power user” path — without breaking HITL or
 zero-key demo mode.
 
-See also [`email-providers.md`](email-providers.md) and
+See also [`email-providers.md`](email-providers.md),
+[`gmail-oauth-setup.md`](gmail-oauth-setup.md), and
 [`decisions/competitor-features-2026-07.md`](decisions/competitor-features-2026-07.md).
 
 ---
@@ -59,14 +60,83 @@ to steal, not repos to vendor**.
 
 ---
 
+## Agent execution prompt (copy-paste)
+
+Use this when an agent should **apply the ordered steps one by one with
+validation gates**. Do not skip gates. Do not implement Pro OAuth until the ADR
+is accepted by a human.
+
+```text
+You are implementing docs/roadmap-send-paths.md for Lodestar.
+
+Before coding: read docs/constitution.md, docs/email-providers.md, and
+.cursor/skills/lodestar-ui/SKILL.md. Keep layering UI → API → service →
+repo/providers. Never break HITL approve-before-send or zero-key demo mode.
+
+Execute Ordered next steps IN ORDER. After EACH step:
+  - npx tsc --noEmit
+  - npm run lint
+  - If a smoke-relevant path changed and dev server is up: npm run smoke
+  - Stop and fix before the next step.
+
+Step 1 — P0 UX dual-path Settings
+  Add Easy vs Pro framing on Settings → Sending. Easy = Resend wizard steps
+  (key + From + DNS). Pro = “Connect Google / Microsoft — coming soon” (no
+  fake OAuth). Demo/simulate copy when no key. Validate.
+
+Step 2 — P0 live DNS + poll
+  Using workspace Resend key (via service), list/get Resend domains matching
+  From email domain; show exact SPF/DKIM(/DMARC) rows with copy; poll status
+  (Resend domain status + optional DoH). Domain health is the hero of Sending.
+  No key → manual checklist + Resend docs link (demo-safe). Validate.
+
+Step 3 — P0 harden Resend webhooks
+  Tag outbound Resend sends with workspaceId + outreachId. Webhook resolves
+  workspace from tags (fallback: latest sent by recipient email, cross-workspace
+  lookup via repository). Update Outreach delivery UI copy so webhook-driven
+  outcomes are clear; keep manual override. Validate.
+
+Step 4 — P1 ADR only (STOP for human accept)
+  Write docs/decisions/0010-mailbox-oauth-send.md (proposed): Google + Microsoft
+  behind sendEmail(), scopes, caps, feature flag, non-goals (no in-house warmup).
+  Do NOT implement OAuth until the ADR status is accepted.
+
+Step 5 — P1 sequence templates (after ADR accepted OR as thin HITL polish)
+  Real sequence templates still require approve→send per step. Prefer improving
+  Day+3/+7 stubs + Outreach copy over auto-blast. If ADR not accepted yet, only
+  polish stubs / docs — no new blast paths.
+
+Step 6 — P2 document only
+  Multi-inbox + partner warmup: backlog notes in ADR/roadmap only this pass.
+
+Finish: update docs/session-handoff.md, LEARNINGS.md, and this roadmap’s
+progress checklist. Commit only if the user asked.
+
+Verify always:
+  - Demo mode still simulates with no keys
+  - Easy path never requires Pro
+  - Pro path feature-flagged / coming-soon until built
+```
+
+### Progress (2026-07-15)
+
+| Step | Status |
+| --- | --- |
+| 1 P0 dual-path Settings | done |
+| 2 P0 live DNS + poll | done |
+| 3 P0 webhook harden | done |
+| 4 P1 ADR mailbox OAuth | **accepted** — Google E2E implemented (local); Microsoft next |
+| 5 P1 sequence templates | deferred (Day+3/+7 stubs; full templates later) |
+| 6 P2 multi-inbox / warmup | multi-inbox deferred; warmup = free DIY ramp (+ optional paid partner) |
+
+---
+
 ## Agent tooling (not product scraping)
 
 - **[gstack](https://github.com/garrytan/gstack) `/scrape`:** agent browser skill for
   *developers* extracting page data while coding. Useful for **QA / dogfood /
   agent workflows** — not a replacement for Firecrawl/Exa in production search.
-- **Root `SKILL.md` (data-scraper-agent):** Python + Gemini + Actions template for
-  scheduled collectors. Wrong stack for Lodestar’s Next.js search layer; skip
-  as product code. Optional inspiration only for batching LLM enrich calls.
+- ~~Root `SKILL.md` (data-scraper-agent)~~ **deleted** — wrong stack for Lodestar.
 
 ---
 

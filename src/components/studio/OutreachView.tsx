@@ -57,7 +57,6 @@ export function OutreachView({
   leads,
   canSendEmail,
   busyId,
-  setupHint,
   onOpenInfo,
   onOpenDraft,
   onDraft,
@@ -69,8 +68,6 @@ export function OutreachView({
   leads: LeadWithOutreach[];
   canSendEmail: boolean;
   busyId: string | null;
-  /** Shown when identity / provider isn't ready for real delivery. */
-  setupHint?: string | null;
   onOpenInfo: (id: string) => void;
   onOpenDraft: (id: string) => void;
   onDraft: (leadId: string) => Promise<void>;
@@ -96,15 +93,8 @@ export function OutreachView({
   const columns: OutreachBucket[] = ["needs_draft", "review", "ready"];
 
   return (
-    <div data-tour="outreach-queue" className="space-y-4">
-      {setupHint ? (
-        <div className="rounded-xl border border-amber-400/25 bg-amber-400/5 px-4 py-3 text-sm text-amber-100/90">
-          <p className="font-medium text-amber-200">Before real inbox delivery</p>
-          <p className="mt-1 text-xs leading-relaxed text-amber-100/70">{setupHint}</p>
-        </div>
-      ) : null}
-
-      <p className="text-xs text-mist-500">
+    <div data-tour="outreach-queue" className="flex h-full min-h-0 flex-col gap-3">
+      <p className="shrink-0 text-xs text-mist-500">
         Sequence stub: after a send we schedule Day +3 / Day +7 follow-up notes
         (still require approve → send — no auto-blast).
       </p>
@@ -114,14 +104,14 @@ export function OutreachView({
           No outreach yet. Run a search, then come back here to draft and send.
         </p>
       ) : (
-        <div className="grid min-h-[calc(100dvh-11rem)] gap-3 lg:grid-cols-3 lg:items-stretch">
+        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
           {columns.map((key) => {
             const meta = BUCKET_META[key];
             const rows = groups[key];
             return (
               <section
                 key={key}
-                className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-950/40 lg:h-[calc(100dvh-11rem)]"
+                className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
               >
                 <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
                   <div className="min-w-0">
@@ -198,14 +188,14 @@ export function OutreachView({
       )}
 
       {groups.sent.length > 0 ? (
-        <section className="rounded-xl2 border border-white/10 bg-ink-950/30">
+        <section className="shrink-0 rounded-xl2 border border-white/10 bg-ink-950/30">
           <div className="border-b border-white/5 px-3 py-2">
             <h3 className="text-[11px] font-semibold uppercase tracking-widest text-mist-500">
               Sent
               <span className="ml-1.5 tabular-nums text-mist-400">{groups.sent.length}</span>
             </h3>
           </div>
-          <ul className="max-h-36 divide-y divide-white/5 overflow-y-auto">
+          <ul className="max-h-28 divide-y divide-white/5 overflow-y-auto">
             {groups.sent.map((lead) => (
               <OutreachRow
                 key={lead.id}

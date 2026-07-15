@@ -61,6 +61,8 @@ type WorkspaceRow = {
   reply_to: string | null;
   physical_address: string | null;
   resend_api_key: string | null;
+  // Connected mailbox JSON (migration 0008)
+  connected_mailbox_json: string | null;
 };
 
 type RunRow = {
@@ -127,6 +129,17 @@ const arr = (s: string | null | undefined): string[] => {
   }
 };
 
+function parseConnectedMailbox(
+  raw: string | null | undefined,
+): Workspace["connectedMailbox"] {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Workspace["connectedMailbox"];
+  } catch {
+    return null;
+  }
+}
+
 function rowToWorkspace(r: WorkspaceRow): Workspace {
   return {
     id: r.id,
@@ -146,6 +159,7 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
     replyTo: r.reply_to ?? null,
     physicalAddress: r.physical_address ?? null,
     resendApiKey: r.resend_api_key ?? null,
+    connectedMailbox: parseConnectedMailbox(r.connected_mailbox_json),
   };
 }
 
@@ -308,6 +322,11 @@ export class D1Store implements LeadRepository {
     if ("replyTo" in patch) row.reply_to = patch.replyTo ?? null;
     if ("physicalAddress" in patch) row.physical_address = patch.physicalAddress ?? null;
     if ("resendApiKey" in patch) row.resend_api_key = patch.resendApiKey ?? null;
+    if ("connectedMailbox" in patch) {
+      row.connected_mailbox_json = patch.connectedMailbox
+        ? JSON.stringify(patch.connectedMailbox)
+        : null;
+    }
 
     if (Object.keys(row).length === 0) return this.getWorkspace(id);
     const { clause, values } = buildSet(row);
@@ -567,6 +586,22 @@ export class D1Store implements LeadRepository {
       .bind(this.workspaceId)
       .all<OutreachRow>();
     return results.map(rowToOutreach);
+  }
+
+  async findLatestSentByEmail(email: string): Promise<Outreach | null> {
+    const needle = email.trim().toLowerCase();
+    if (!needle) return null;
+    // Unscoped on purpose — Resend webhooks are not session-bound.
+    const row = await this.db
+      .prepare(
+        `SELECT * FROM outreach
+         WHERE status = 'sent' AND lower(to_email) = ?
+         ORDER BY sent_at DESC
+         LIMIT 1`,
+      )
+      .bind(needle)
+      .first<OutreachRow>();
+    return row ? rowToOutreach(row) : null;
   }
 
   async clearWorkspaceData(): Promise<void> {

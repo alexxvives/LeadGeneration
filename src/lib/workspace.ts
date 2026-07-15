@@ -39,6 +39,7 @@ export function newWorkspace(args: {
     replyTo: null,
     physicalAddress: null,
     resendApiKey: null,
+    connectedMailbox: null,
   };
 }
 

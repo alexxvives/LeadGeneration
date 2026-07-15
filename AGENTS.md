@@ -29,6 +29,7 @@ repository interface, provider-agnostic search (Firecrawl/Exa) and email
 | [`docs/session-handoff.md`](docs/session-handoff.md) | **At session start.** Current state, what's in flight, next steps. |
 | [`docs/roadmap-next.md`](docs/roadmap-next.md) | Next value plan + copy-paste execution prompt for agents. |
 | [`docs/roadmap-send-paths.md`](docs/roadmap-send-paths.md) | Easy Resend vs Pro mailbox send plan + OSS backlog. |
+| [`docs/gmail-oauth-setup.md`](docs/gmail-oauth-setup.md) | Step-by-step Google Cloud OAuth client for Gmail send. |
 | [`docs/constitution.md`](docs/constitution.md) | **Always first (before coding).** Principles + rules all code must follow. |
 | [`docs/how-it-works.md`](docs/how-it-works.md) | Understand the product, the user flow, and the architecture. |
 | [`docs/search-and-enrichment.md`](docs/search-and-enrichment.md) | Touch search, scraping, enrichment, or fit scoring. |
@@ -115,11 +116,11 @@ src/lib/
   db/                Repository (LeadRepository) + JsonStore (dev) & D1Store (prod), workspace-scoped.
   search/            Providers (firecrawl/exa), enrichment, demo fallback.
   outreach/          Draft generation + compliance footer.
-  email/             Rate-limited sender (resend/smtp/demo).
+  email/             Rate-limited sender (resend/smtp/google mailbox/demo).
   billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.
-migrations/          D1 SQL 0001–0007 (init, workspaces+auth, usage, run sender_name, crm_stage, workspace email settings, outreach delivery_status).
+migrations/          D1 SQL 0001–0008 (init … connected mailbox OAuth).
 wrangler.jsonc, open-next.config.ts   Cloudflare Workers deploy config.
 data/                Local JSON DB (git-ignored).
 ```

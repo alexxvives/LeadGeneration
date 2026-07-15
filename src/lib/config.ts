@@ -11,7 +11,9 @@ export interface Capabilities {
   resend: boolean;
   smtp: boolean;
   canSearchLive: boolean; // firecrawl or exa present
-  canSendEmail: boolean; // resend or smtp configured
+  canSendEmail: boolean; // resend or smtp configured (mailbox connect is workspace-scoped)
+  /** Platform Google OAuth client present — Pro → Connect Google enabled. */
+  gmailOAuth: boolean;
   /**
    * Whether authentication is ENFORCED. True only when AUTH_SECRET is set
    * (production / Wrangler secret). When false — local dev / demo with zero
@@ -42,6 +44,7 @@ export function getCapabilities(): Capabilities {
     smtp,
     canSearchLive: firecrawl || exa,
     canSendEmail: resend || smtp,
+    gmailOAuth: has(process.env.GMAIL_OAUTH_CLIENT_ID) && has(process.env.GMAIL_OAUTH_CLIENT_SECRET),
     authRequired: has(process.env.AUTH_SECRET),
     billing: has(process.env.STRIPE_SECRET_KEY),
     turnstile: has(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) && has(process.env.TURNSTILE_SECRET_KEY),
@@ -123,6 +126,18 @@ export const env = {
     process.env.NEXTAUTH_URL?.trim() ||
     process.env.AUTH_URL?.trim() ||
     "http://localhost:3000",
+
+  /**
+   * Gmail send OAuth (ADR 0010) — separate from Auth.js login Google.
+   * When unset, Pro → Connect Google stays disabled (Easy Resend still works).
+   */
+  gmailOAuthClientId: () => process.env.GMAIL_OAUTH_CLIENT_ID?.trim() || "",
+  gmailOAuthClientSecret: () => process.env.GMAIL_OAUTH_CLIENT_SECRET?.trim() || "",
+  gmailOAuthConfigured: () =>
+    !!(
+      process.env.GMAIL_OAUTH_CLIENT_ID?.trim() &&
+      process.env.GMAIL_OAUTH_CLIENT_SECRET?.trim()
+    ),
 
   // ── Billing (Stripe) ──
   stripeSecretKey: () => process.env.STRIPE_SECRET_KEY?.trim() ?? "",

@@ -11,16 +11,21 @@ import { QuotaError } from "@/lib/errors";
 import { ensureUsageWindow } from "@/lib/workspace";
 import type {
   ContactMethod,
+  ConnectedMailbox,
   CrmStage,
   CreateRunInput,
   DeliveryStatus,
   FollowUp,
   Lead,
   LeadWithOutreach,
+  MailboxAgeBand,
+  MailboxPublicStatus,
+  MailboxVolumeBand,
   Outreach,
   PlanId,
   Run,
 } from "@/lib/types";
+import { mailboxPublicStatus } from "@/lib/email/mailbox";
 
 /**
  * Application services. API routes stay thin and call into these functions,
@@ -407,7 +412,8 @@ export async function sendApprovedOutreach(
 
   // Pass workspace email identity overrides so each tenant's outreach uses
   // their own from-name, from-email etc. (configured in Settings → Sending).
-  const wsForEmail = ctx.metered ? await db.getWorkspace(ctx.workspaceId) : null;
+  // Always load workspace (local JSON too) so Pro mailbox + BYO Resend work in demo.
+  const wsForEmail = await db.getWorkspace(ctx.workspaceId);
   const leadForLocale = await db.getLead(outreach.leadId);
   const result = await sendEmail(
     {
@@ -419,6 +425,10 @@ export async function sendApprovedOutreach(
           physicalAddress: wsForEmail?.physicalAddress,
           includeAddress: leadForLocale ? leadLooksLikeUsa(leadForLocale) : false,
         }),
+      tags: [
+        { name: "lodestar_ws", value: ctx.workspaceId.slice(0, 256) },
+        { name: "lodestar_outreach", value: outreachId.slice(0, 256) },
+      ],
     },
     wsForEmail
       ? {
@@ -427,12 +437,19 @@ export async function sendApprovedOutreach(
           replyTo: wsForEmail.replyTo,
           physicalAddress: wsForEmail.physicalAddress,
           resendApiKey: wsForEmail.resendApiKey,
+          connectedMailbox: wsForEmail.connectedMailbox,
         }
       : undefined,
   );
 
   if (result.ok) {
     recordSend();
+    if (result.connectedMailbox) {
+      await db.updateWorkspace(ctx.workspaceId, {
+        connectedMailbox: result.connectedMailbox,
+        updatedAt: nowIso(),
+      });
+    }
     const updated = await db.updateOutreach(outreachId, {
       status: "sent",
       deliveryStatus: "sent",
@@ -541,6 +558,55 @@ export async function updateWorkspaceEmailSettings(
   },
 ): Promise<void> {
   await ctx.db.updateWorkspace(ctx.workspaceId, { ...patch, updatedAt: nowIso() });
+}
+
+/** Public mailbox status for Settings (no tokens). */
+export async function getMailboxStatus(ctx: Ctx): Promise<MailboxPublicStatus> {
+  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+  return mailboxPublicStatus(ws);
+}
+
+/** Persist a newly connected mailbox after OAuth callback. */
+export async function connectMailbox(
+  ctx: Ctx,
+  mailbox: ConnectedMailbox,
+): Promise<void> {
+  await ctx.db.updateWorkspace(ctx.workspaceId, {
+    connectedMailbox: mailbox,
+    // Prefer mailbox email as From when user hasn't set one yet.
+    fromEmail: mailbox.email,
+    updatedAt: nowIso(),
+  });
+}
+
+/** Disconnect Pro mailbox (tokens wiped). Easy Resend path unchanged. */
+export async function disconnectMailbox(ctx: Ctx): Promise<void> {
+  await ctx.db.updateWorkspace(ctx.workspaceId, {
+    connectedMailbox: null,
+    updatedAt: nowIso(),
+  });
+}
+
+/** Soft warmup self-report on an already-connected mailbox. */
+export async function updateMailboxWarmupProfile(
+  ctx: Ctx,
+  patch: { ageBand?: MailboxAgeBand | null; volumeBand?: MailboxVolumeBand | null },
+): Promise<MailboxPublicStatus> {
+  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+  if (!ws?.connectedMailbox) {
+    return mailboxPublicStatus(ws);
+  }
+  const next: ConnectedMailbox = {
+    ...ws.connectedMailbox,
+    ageBand: patch.ageBand !== undefined ? patch.ageBand : ws.connectedMailbox.ageBand,
+    volumeBand:
+      patch.volumeBand !== undefined ? patch.volumeBand : ws.connectedMailbox.volumeBand,
+  };
+  await ctx.db.updateWorkspace(ctx.workspaceId, {
+    connectedMailbox: next,
+    updatedAt: nowIso(),
+  });
+  return mailboxPublicStatus({ ...ws, connectedMailbox: next });
 }
 
 /** Update user-managed CRM fields on a lead (stage, contact method, notes, follow-ups). */

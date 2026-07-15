@@ -157,7 +157,7 @@ function LocationCombobox({
 
       {needsPick && (
         <p className="mt-1.5 text-xs text-amber-200/80">
-          Pick a place from the suggestions so we search the right Barcelona — not a namesake elsewhere.
+          Pick a place from the suggestions
         </p>
       )}
 
@@ -480,7 +480,7 @@ export function SearchPanel({
           )}
         </div>
       </div>
-      <div className="mt-5 flex items-center justify-end gap-4">
+      <div className="mt-5 flex items-center justify-center gap-4">
         <button
           type="submit"
           disabled={!canSubmit}

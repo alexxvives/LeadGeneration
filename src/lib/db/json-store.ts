@@ -21,6 +21,7 @@ function normalizeWorkspace(w: Workspace): Workspace {
     replyTo: (raw.replyTo as string | undefined) ?? null,
     physicalAddress: (raw.physicalAddress as string | undefined) ?? null,
     resendApiKey: (raw.resendApiKey as string | undefined) ?? null,
+    connectedMailbox: (raw.connectedMailbox as Workspace["connectedMailbox"] | undefined) ?? null,
   };
 }
 
@@ -237,6 +238,16 @@ export class JsonStore implements LeadRepository {
   async listOutreach(): Promise<Outreach[]> {
     const data = await this.read();
     return data.outreach.filter((o) => this.inScope(o)).map(normalizeOutreach);
+  }
+
+  async findLatestSentByEmail(email: string): Promise<Outreach | null> {
+    const needle = email.trim().toLowerCase();
+    if (!needle) return null;
+    const data = await this.read();
+    const candidates = data.outreach
+      .filter((o) => o.status === "sent" && o.toEmail?.toLowerCase() === needle)
+      .sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
+    return candidates[0] ? normalizeOutreach(candidates[0]) : null;
   }
 
   clearWorkspaceData(): Promise<void> {

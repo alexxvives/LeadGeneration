@@ -82,9 +82,9 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     (incl. full address), about blurb, fit-score reasons, CRM stage, dated notes
     journal, and the outreach composer (draft → edit → approve → send).
 
-- **`/app/settings`** — sender profile, **Sending identity** (from name / email /
-  address — editable on the live app), plan/usage, email delivery status,
-  “Ready to send?” checklist, Integrations (search + email connected or not),
+- **`/app/settings`** — sender profile, **Sending** dual path (Easy Resend + DNS
+  health, or Pro Connect Google mailbox), plan/usage, Integrations status,
+  “Ready to send?” checklist. Microsoft mailbox connect is next.
   Resources (Getting started wizard, How it works, Plans). No env-var names in
   the UI. Secrets are never shown. Reopen the guide via **Getting started**.
 
@@ -96,7 +96,7 @@ The app detects capabilities from environment variables (`config.ts`):
 | --- | --- | --- |
 | Search + enrichment | Realistic generated sample leads | Real web results (Firecrawl → Exa) |
 | Drafting / editing / approval | Full | Full |
-| Email send | Simulated + logged, never delivered | Delivered via Resend or SMTP |
+| Email send | Simulated + logged, never delivered | Delivered via connected Gmail, Resend, or SMTP |
 
 This is a hard product invariant: the whole UI works with zero keys. The
 **Getting Started** wizard walks new users from fallback → live (search key,
@@ -149,7 +149,8 @@ the local JSON-store path is always unmetered/demo.
 - **`src/lib/outreach/draft.ts`** — template-based personalization + the
   CAN-SPAM-style compliance footer. Swap in an LLM here without touching the
   approve/send flow.
-- **`src/lib/email/`** — `sendEmail()` (Resend → SMTP → demo) and a rolling
+- **`src/lib/email/`** — `sendEmail()` (Google mailbox → Resend → SMTP → demo),
+  domain health, mailbox OAuth helpers, and a rolling rate limit.
   per-minute `rate-limit.ts`.
 - **`src/auth.config.ts` / `src/auth.ts`** — Auth.js v5. The `.config` file is
   edge-safe (Credentials for keyless dev only — used by middleware). `auth.ts`

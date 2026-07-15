@@ -1,9 +1,13 @@
 import { env, getCapabilities } from "@/lib/config";
+import { sendViaGmail } from "@/lib/email/mailbox";
+import type { ConnectedMailbox } from "@/lib/types";
 
 export interface SendInput {
   to: string;
   subject: string;
   body: string; // plain text (with {{unsubscribe_url}} placeholder)
+  /** Resend tags for webhook → workspace/outreach matching. */
+  tags?: Array<{ name: string; value: string }>;
 }
 
 /**
@@ -18,13 +22,17 @@ export interface WorkspaceEmailSettings {
   physicalAddress?: string | null;
   /** User's own Resend API key (custom domain). Tried before the platform key. */
   resendApiKey?: string | null;
+  /** Pro path — connected Google/Microsoft mailbox (ADR 0010). */
+  connectedMailbox?: ConnectedMailbox | null;
 }
 
 export interface SendResult {
   ok: boolean;
-  provider: "resend" | "smtp" | "demo";
+  provider: "google" | "resend" | "smtp" | "demo";
   id?: string;
   error?: string;
+  /** Updated mailbox after token refresh — caller should persist. */
+  connectedMailbox?: ConnectedMailbox;
 }
 
 function finalizeBody(body: string, replyToOrFrom: string): string {
@@ -36,13 +44,15 @@ function finalizeBody(body: string, replyToOrFrom: string): string {
  * Send a single already-approved email.
  *
  * Priority (first available wins):
- *   1. Workspace's own Resend API key  → custom domain, user's Resend account
- *   2. Platform Resend key             → platform's Resend sending domain
- *   3. Platform SMTP                   → fallback for self-hosted setups
- *   4. Demo mode                       → logs only, nothing is delivered
+ *   1. Connected Google mailbox     → Pro path (ADR 0010)
+ *   2. Workspace's own Resend key   → custom domain, user's Resend account
+ *   3. Platform Resend key          → platform's Resend sending domain
+ *   4. Platform SMTP                → fallback for self-hosted setups
+ *   5. Demo mode                    → logs only, nothing is delivered
  *
  * Workspace identity (fromName, fromEmail etc.) overrides env vars so each
  * workspace's outreach appears to come from its own representative.
+ * Google sends always use the connected mailbox email as From.
  */
 export async function sendEmail(
   input: SendInput,
@@ -56,8 +66,29 @@ export async function sendEmail(
   const body = finalizeBody(input.body, replyTo || fromEmail);
   const from = `${fromName} <${fromEmail}>`;
   const replyToHeader = replyTo || undefined;
+  const tags = input.tags?.length ? input.tags : undefined;
 
-  // 1. Workspace's own Resend key (custom domain).
+  // 1. Connected Google mailbox (Pro path).
+  const mailbox = ws?.connectedMailbox;
+  if (mailbox?.provider === "google" && mailbox.refreshTokenEnc) {
+    const result = await sendViaGmail({
+      mailbox,
+      to: input.to,
+      subject: input.subject,
+      body,
+      fromName,
+      replyTo: replyToHeader,
+    });
+    if (!result.ok) return { ok: false, provider: "google", error: result.error };
+    return {
+      ok: true,
+      provider: "google",
+      id: result.id,
+      connectedMailbox: result.mailbox,
+    };
+  }
+
+  // 2. Workspace's own Resend key (custom domain).
   const wsResendKey = ws?.resendApiKey?.trim();
   if (wsResendKey) {
     try {
@@ -69,6 +100,7 @@ export async function sendEmail(
         subject: input.subject,
         text: body,
         ...(replyToHeader ? { replyTo: replyToHeader } : {}),
+        ...(tags ? { tags } : {}),
       });
       if (error) return { ok: false, provider: "resend", error: error.message };
       return { ok: true, provider: "resend", id: data?.id };
@@ -77,7 +109,7 @@ export async function sendEmail(
     }
   }
 
-  // 2. Platform Resend key (primary — simple API key, no SMTP config needed).
+  // 3. Platform Resend key (primary — simple API key, no SMTP config needed).
   if (caps.resend) {
     try {
       const { Resend } = await import("resend");
@@ -88,6 +120,7 @@ export async function sendEmail(
         subject: input.subject,
         text: body,
         ...(replyToHeader ? { replyTo: replyToHeader } : {}),
+        ...(tags ? { tags } : {}),
       });
       if (error) return { ok: false, provider: "resend", error: error.message };
       return { ok: true, provider: "resend", id: data?.id };
@@ -96,7 +129,7 @@ export async function sendEmail(
     }
   }
 
-  // 3. Platform SMTP (self-hosted fallback — Maileroo, SES, Postfix, etc.).
+  // 4. Platform SMTP (self-hosted fallback — Maileroo, SES, Postfix, etc.).
   if (caps.smtp) {
     try {
       const nodemailer = await import("nodemailer");
@@ -120,7 +153,7 @@ export async function sendEmail(
     }
   }
 
-  // 4. Demo mode — no provider configured.
+  // 5. Demo mode — no provider configured.
   console.log(
     `[email:demo] Would send to ${input.to} — subject: "${input.subject}" (no provider configured)`,
   );

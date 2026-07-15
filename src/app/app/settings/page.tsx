@@ -6,9 +6,8 @@ import type { Workspace } from "@/lib/types";
 import { UsageBar } from "@/components/studio/UpgradeModal";
 import { BillingActions } from "@/components/studio/BillingActions";
 import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
-import { EmailSettingsForm } from "@/components/studio/EmailSettingsForm";
 import { DeveloperModePanel } from "@/components/studio/DeveloperModePanel";
-import { DomainHealthChecklist } from "@/components/studio/DomainHealthChecklist";
+import { SendSetupPanel } from "@/components/studio/SendSetupPanel";
 import {
   isPlaceholderAddress,
   isPlaceholderEmail,
@@ -21,8 +20,14 @@ export const dynamic = "force-dynamic";
 
 // Settings: editable outreach profile + capability status.
 // Secrets are never rendered in the UI.
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const caps = getCapabilities();
+  const params = (await searchParams) ?? {};
+  const mailboxFlag = typeof params.mailbox === "string" ? params.mailbox : null;
 
   let ctx: Awaited<ReturnType<typeof getCtx>>;
   let usage: Awaited<ReturnType<typeof getWorkspaceSummary>>;
@@ -30,7 +35,8 @@ export default async function SettingsPage() {
   try {
     ctx = await getCtx();
     usage = await getWorkspaceSummary(ctx);
-    ws = ctx.metered ? await ctx.db.getWorkspace(ctx.workspaceId) : null;
+    // Local JSON + prod D1 — always load so Easy settings + Pro mailbox persist in demo.
+    ws = await ctx.db.getWorkspace(ctx.workspaceId);
   } catch (err) {
     console.error("[settings] getCtx failed", err);
     const { getDb, LOCAL_WORKSPACE_ID } = await import("@/lib/db");
@@ -39,10 +45,15 @@ export default async function SettingsPage() {
     ws = null;
   }
   const plan = getPlan(usage.planId);
+  const { mailboxPublicStatus } = await import("@/lib/email/mailbox");
+  const mailbox = mailboxPublicStatus(ws);
 
   const fromEmail = ws?.fromEmail || env.fromEmail();
   const fromName = ws?.fromName || env.fromName();
   const physicalAddress = ws?.physicalAddress || env.physicalAddress();
+
+  const canSendEmail =
+    caps.canSendEmail || !!ws?.resendApiKey?.trim() || !!ws?.connectedMailbox;
 
   const providers = [
     {
@@ -54,16 +65,33 @@ export default async function SettingsPage() {
     },
     {
       name: "Email delivery",
-      on: caps.canSendEmail,
-      desc: caps.canSendEmail
-        ? "Connected — approved messages can reach real inboxes."
+      on: canSendEmail,
+      desc: canSendEmail
+        ? ws?.connectedMailbox
+          ? `Connected — sending via ${ws.connectedMailbox.provider} (${ws.connectedMailbox.email}).`
+          : "Connected — approved messages can reach real inboxes."
         : "Not connected — approved messages stay inside the app.",
     },
   ];
 
+  const defaultPath = mailboxFlag === "connected" || mailbox.connected ? "pro" : "easy";
+
   return (
     <main className="mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-8">
       <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
+
+      {mailboxFlag === "connected" && (
+        <p className="mt-4 rounded-lg border border-aurora-400/30 bg-aurora-400/10 px-4 py-3 text-sm text-mist-100">
+          Google mailbox connected. Approved outreach can send from{" "}
+          <span className="text-aurora-300">{mailbox.email ?? "your Gmail"}</span>.
+        </p>
+      )}
+      {mailboxFlag === "error" && (
+        <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-mist-100">
+          Could not connect Google. Check redirect URI, test-user access, and try again
+          (see docs/gmail-oauth-setup.md).
+        </p>
+      )}
 
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
@@ -72,31 +100,26 @@ export default async function SettingsPage() {
         <SenderProfileForm />
       </section>
 
-      <section id="sending-identity" className="mt-8 scroll-mt-8" data-tour="sending-identity">
-        <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Sending identity
-        </h2>
-        <p className="mb-4 text-sm text-mist-500">
-          This is who your emails come from. Fill these in before sending real outreach.
-        </p>
-        <div className="rounded-xl2 border border-white/10 p-5">
-          <EmailSettingsForm
-            initial={{
-              fromName: ws?.fromName ?? null,
-              fromEmail: ws?.fromEmail ?? null,
-              replyTo: ws?.replyTo ?? null,
-              physicalAddress: ws?.physicalAddress ?? null,
-              resendApiKey: ws?.resendApiKey ?? null,
-            }}
-            defaults={{
-              fromName: env.fromName(),
-              fromEmail: env.fromEmail(),
-              replyTo: env.replyTo(),
-              physicalAddress: env.physicalAddress(),
-            }}
-            canEdit={true}
-          />
-        </div>
+      <section className="mt-8" data-tour="sending-setup" id="sending-setup">
+        <SendSetupPanel
+          canSendEmail={canSendEmail}
+          canEdit={true}
+          mailbox={mailbox}
+          defaultPath={defaultPath}
+          initial={{
+            fromName: ws?.fromName ?? null,
+            fromEmail: ws?.fromEmail ?? null,
+            replyTo: ws?.replyTo ?? null,
+            physicalAddress: ws?.physicalAddress ?? null,
+            resendApiKey: ws?.resendApiKey ?? null,
+          }}
+          defaults={{
+            fromName: env.fromName(),
+            fromEmail: env.fromEmail(),
+            replyTo: env.replyTo(),
+            physicalAddress: env.physicalAddress(),
+          }}
+        />
       </section>
 
       <section className="mt-8">
@@ -170,45 +193,6 @@ export default async function SettingsPage() {
 
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Email delivery
-        </h2>
-        <div className="rounded-xl2 border border-white/10 p-5">
-          <p className="text-sm text-mist-300">
-            Status of outbound email on this site. To send from your own domain, add it in{" "}
-            <a
-              href="https://resend.com/domains"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-aurora-300 hover:underline"
-            >
-              Resend → Domains
-            </a>
-            , finish DNS, then put that address under{" "}
-            <a href="#sending-identity" className="text-aurora-300 hover:underline">
-              Sending identity
-            </a>
-            .
-          </p>
-          <div className="mt-5 space-y-2">
-            <div className="flex items-center gap-3 rounded-lg border border-white/5 bg-ink-900/40 px-4 py-3">
-              <StatusDot on={caps.canSendEmail} />
-              <div>
-                <p className="text-sm font-medium">
-                  {caps.canSendEmail ? "Email delivery is on" : "Email delivery is off"}
-                </p>
-                <p className="text-xs text-mist-500">
-                  {caps.canSendEmail
-                    ? "Approved outreach can leave the app."
-                    : "Approved messages won’t be delivered until delivery is connected."}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Ready to send?
         </h2>
         <div className="overflow-hidden rounded-xl2 border border-white/10">
@@ -217,22 +201,22 @@ export default async function SettingsPage() {
               {
                 ok: !isPlaceholderEmail(fromEmail),
                 label: "From email",
-                hint: "Set under Sending identity — use an address on your verified domain",
+                hint: "Set under Easy path — use an address on your verified domain",
               },
               {
                 ok: !isPlaceholderName(fromName),
                 label: "From name",
-                hint: "Set under Sending identity — how you appear in the inbox",
+                hint: "Set under Easy path — how you appear in the inbox",
               },
               {
                 ok: !isPlaceholderAddress(physicalAddress),
                 label: "Mailing address",
-                hint: "Set under Sending identity — appended only when the lead looks US-based (CAN-SPAM)",
+                hint: "CAN-SPAM — appended only when the lead looks US-based",
               },
               {
                 ok: caps.canSendEmail,
                 label: "Email delivery",
-                hint: "Must be connected so approved messages can reach inboxes",
+                hint: "Resend or SMTP connected so approved messages can leave the app",
               },
               {
                 ok: caps.canSearchLive,
@@ -257,9 +241,6 @@ export default async function SettingsPage() {
               Full deliverability guide →
             </Link>
           </div>
-        </div>
-        <div className="mt-4">
-          <DomainHealthChecklist />
         </div>
       </section>
 

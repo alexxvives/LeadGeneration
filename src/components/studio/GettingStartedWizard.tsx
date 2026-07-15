@@ -61,7 +61,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="pipeline-board"]',
       prefer: "right",
       title: "Work the pipeline",
-      body: "New leads land in these columns. Drag a card anywhere to move stages, click ⓘ for details, click a queued card to select it for Approve all.",
+      body: "New leads land in these columns. Drag a card anywhere to move stages, click ⓘ for details. Approve drafts from the Outreach tab.",
       scrollBlock: "start",
     },
     {
@@ -253,7 +253,6 @@ function fireConfetti() {
 export function GettingStartedWizard({
   open,
   onClose,
-  caps,
 }: {
   open: boolean;
   onClose: () => void;

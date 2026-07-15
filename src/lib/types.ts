@@ -78,6 +78,41 @@ export type PlanId = "free" | "starter" | "pro" | "agency";
  * how multi-tenancy + plan/quota enforcement is scoped (constitution Art. II.2).
  * Local dev / demo mode uses a single implicit workspace with id "local".
  */
+/** Pro mailbox connect (ADR 0010) — Google first; Microsoft later. */
+export type MailboxProvider = "google" | "microsoft";
+export type MailboxAgeBand = "new" | "weeks" | "months" | "established";
+export type MailboxVolumeBand = "none" | "light" | "regular";
+
+/**
+ * Connected send mailbox. Refresh/access token ciphertext never leaves the
+ * server (not included in client-safe snapshots).
+ */
+export interface ConnectedMailbox {
+  provider: MailboxProvider;
+  email: string;
+  /** AES-GCM ciphertext of the OAuth refresh token. */
+  refreshTokenEnc: string;
+  accessTokenEnc: string | null;
+  accessTokenExpiresAt: string | null;
+  ageBand: MailboxAgeBand | null;
+  volumeBand: MailboxVolumeBand | null;
+  connectedAt: string;
+}
+
+/** Safe subset for Settings / board UI — no tokens. */
+export interface MailboxPublicStatus {
+  connected: boolean;
+  provider: MailboxProvider | null;
+  email: string | null;
+  ageBand: MailboxAgeBand | null;
+  volumeBand: MailboxVolumeBand | null;
+  connectedAt: string | null;
+  /** Platform Google OAuth client configured (Connect button enabled). */
+  googleReady: boolean;
+  /** Microsoft not shipped yet. */
+  microsoftReady: boolean;
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -101,6 +136,8 @@ export interface Workspace {
   // Optional per-workspace Resend API key (user's own account → custom domain).
   // Stored as plain text for now; encrypt at rest before GA.
   resendApiKey: string | null;
+  /** Pro path: one connected mailbox (multi-inbox deferred — ADR 0010). */
+  connectedMailbox: ConnectedMailbox | null;
 }
 
 /** A search + enrichment job kicked off from the search hero. */

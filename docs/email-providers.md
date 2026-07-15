@@ -103,13 +103,23 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 ## How this maps to code
 
 - `src/lib/email/sender.ts`: Resend (workspace key → platform key) → SMTP → demo.
+  Outbound Resend sends tag `lodestar_ws` + `lodestar_outreach` for webhooks.
+- `src/lib/email/domain-health.ts` + `POST /api/providers/resend/domain-health`:
+  live SPF/DKIM rows from Resend Domains API (demo-safe when no key).
 - `src/lib/email/verify.ts`: Zeruh/Maileroo verify on enrich + before send.
 - Quotas + rate limits in `service.ts`.
-- Identity + BYO key in Settings → workspace row.
+- Settings → Easy Resend wizard + Pro mailbox Connect Google (`SendSetupPanel`).
 - Stay pluggable: swapping to SES/Maileroo/Google is config, not a rewrite.
-- **Webhooks:** `POST /api/webhooks/resend` (public) — bounce/complaint →
+- **Webhooks:** `POST /api/webhooks/resend` (public) — prefer tags, else latest
+  sent by recipient email (cross-workspace). Bounce/complaint →
   `deliveryStatus=bounced`; inbound `email.received` → `replied` (+ CRM).
   Set `RESEND_WEBHOOK_SECRET` in production.
+- **Pro path:** [`0010-mailbox-oauth-send.md`](decisions/0010-mailbox-oauth-send.md)
+  (accepted) — Google OAuth behind `sendEmail()` when connected; Microsoft next.
+  Warmup: free DIY slow ramp; paid partner optional — no free automated network.
+- **Registrar note:** Domain at Hostinger/GoDaddy/etc. is fine for Easy path —
+  add Resend's DNS records there (or at the DNS host if nameservers differ).
+  Resend does not require moving the domain away from the registrar.
 
 **Bottom line:** Resend is the right **API shape** for v1 BYO sending; Zeruh is
 the **verify** layer. Deliverability still needs the customer’s domain, DNS,

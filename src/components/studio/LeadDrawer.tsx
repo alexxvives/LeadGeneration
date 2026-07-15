@@ -201,9 +201,15 @@ export function LeadDrawer(props: DrawerProps) {
   const sent = outreach?.status === "sent";
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" onClick={onClose} />
-      <aside className="animate-float-up relative flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-white/10 bg-ink-900 shadow-2xl">
+      <aside
+        className={`animate-float-up relative flex w-full flex-col overflow-y-auto border border-white/10 bg-ink-900 shadow-2xl ${
+          mode === "info"
+            ? "max-h-[min(90dvh,720px)] max-w-lg rounded-xl2"
+            : "h-full max-h-[min(92dvh,900px)] max-w-xl rounded-xl2 sm:max-h-[min(90dvh,860px)]"
+        }`}
+      >
 
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
@@ -630,7 +636,8 @@ export function LeadDrawer(props: DrawerProps) {
                         })}
                       </div>
                       <p className="mt-2 text-[11px] text-mist-600">
-                        Manual for now — Resend bounce/reply webhooks write the same field when configured.
+                        Resend webhooks update this automatically when configured
+                        (`RESEND_WEBHOOK_SECRET`). You can still correct it manually.
                       </p>
                     </div>
                   </div>

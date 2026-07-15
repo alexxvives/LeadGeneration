@@ -18,6 +18,7 @@ import { PipelineView } from "./PipelineView";
 import { OutreachView } from "./OutreachView";
 import { RunsView } from "./RunsView";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
+import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
 type UpgradePrompt = { kind: "leads" | "sends"; planId: PlanId };
@@ -58,6 +59,12 @@ export function Studio() {
   const [fcBefore, setFcBefore] = useState<FirecrawlUsage | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
+  const [pendingSendId, setPendingSendId] = useState<string | null>(null);
+  const [warmupWarn, setWarmupWarn] = useState<{
+    outreachId: string;
+    todayCount: number;
+    softCap: number;
+  } | null>(null);
   const activeRunIdRef = useRef<string | null>(null);
 
   const setView = useCallback(
@@ -230,7 +237,11 @@ export function Studio() {
     }
   };
 
-  const onDecide = async (outreachId: string, decision: "approved" | "rejected") => {
+  const onDecide = async (
+    outreachId: string,
+    decision: "approved" | "rejected",
+    opts?: { silent?: boolean },
+  ) => {
     try {
       const { outreach } = await api.updateOutreach(outreachId, { decision });
       const lead = findLeadByOutreach(outreachId);
@@ -240,15 +251,19 @@ export function Studio() {
           status: decision === "approved" ? "approved" : "rejected",
         });
       }
-      toast("ok", decision === "approved" ? "Approved — ready to send." : "Rejected.");
+      if (!opts?.silent) {
+        toast("ok", decision === "approved" ? "Approved — ready to send." : "Rejected.");
+      }
     } catch (e) {
       toast("err", (e as Error).message);
+      if (opts?.silent) throw e;
     }
   };
 
   const onSend = async (outreachId: string) => {
     try {
       await api.send(outreachId);
+      recordWarmupSend();
       await refresh();
       toast("ok", board?.capabilities.canSendEmail ? "Email sent." : "Sent (simulated — not delivered).");
     } catch (e) {
@@ -267,6 +282,47 @@ export function Studio() {
         handleError(e);
       }
     }
+  };
+
+  const runSend = async (outreachId: string) => {
+    setOutreachBusy(outreachId);
+    try {
+      await onSend(outreachId);
+    } finally {
+      setOutreachBusy(null);
+    }
+  };
+
+  /** Real delivery needs a provider; otherwise confirm simulate-or-settings. Soft warmup warn if over recommend. */
+  const requestSend = (outreachId: string) => {
+    if (!board?.capabilities.canSendEmail) {
+      setPendingSendId(outreachId);
+      return;
+    }
+    const status = warmupStatus();
+    if (status.overSoftCap) {
+      setWarmupWarn({
+        outreachId,
+        todayCount: status.todayCount,
+        softCap: status.softCap,
+      });
+      return;
+    }
+    void runSend(outreachId);
+  };
+
+  const confirmSimulateSend = async () => {
+    const id = pendingSendId;
+    setPendingSendId(null);
+    if (!id) return;
+    await runSend(id);
+  };
+
+  const confirmWarmupSend = async () => {
+    const id = warmupWarn?.outreachId;
+    setWarmupWarn(null);
+    if (!id) return;
+    await runSend(id);
   };
 
   const onSetDelivery = async (
@@ -338,10 +394,21 @@ export function Studio() {
           l.outreach.status === "failed"),
     );
     setOutreachBusy("approve-all");
+    let approved = 0;
     try {
       for (const l of targets) {
-        if (l.outreach) await onDecide(l.outreach.id, "approved");
+        if (!l.outreach) continue;
+        await onDecide(l.outreach.id, "approved", { silent: true });
+        approved += 1;
       }
+      if (approved > 0) {
+        toast(
+          "ok",
+          `Approved ${approved} draft${approved === 1 ? "" : "s"} — ready to send.`,
+        );
+      }
+    } catch {
+      /* per-item toast already shown */
     } finally {
       setOutreachBusy(null);
     }
@@ -358,20 +425,6 @@ export function Studio() {
 
   const selected = board?.leads.find((l) => l.id === selectedId) ?? null;
 
-  const outreachSetupHint = (() => {
-    if (!board) return null;
-    const parts: string[] = [];
-    if (!board.capabilities.canSendEmail) {
-      parts.push(
-        "No Resend/SMTP key on the server — clicks will simulate. Add RESEND_API_KEY (or a workspace Resend key in Settings → Sending) for real delivery.",
-      );
-    }
-    parts.push(
-      "From email must be on a domain verified in Resend (DNS: SPF + DKIM; DMARC recommended). Set name/email under Settings → Sending identity.",
-    );
-    return parts.join(" ");
-  })();
-
   if (loading) {
     return (
       <div className="grid min-h-[60vh] place-items-center">
@@ -382,10 +435,22 @@ export function Studio() {
 
   const hasLeads = (board?.leads.length ?? 0) > 0;
   const canSearchLive = board?.capabilities.canSearchLive ?? false;
+  const lockViewport =
+    view === "pipeline" || view === "outreach" || view === "leads";
 
   return (
-    <main className="mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-8">
-      <div className="mb-6 grid grid-cols-1 items-end gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+    <main
+      className={
+        lockViewport
+          ? "mx-auto flex h-dvh max-w-7xl flex-col overflow-hidden px-5 pb-3 pt-4 sm:px-8 sm:pt-5"
+          : "mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-8"
+      }
+    >
+      <div
+        className={`grid grid-cols-1 items-end gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] ${
+          lockViewport ? "mb-3 shrink-0" : "mb-6"
+        }`}
+      >
         <div className="min-w-0">
           <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
             {view === "pipeline"
@@ -514,17 +579,16 @@ export function Studio() {
       {/* Pipeline view — CRM kanban only */}
       {view === "pipeline" && (
         hasLeads ? (
-          <div data-tour="pipeline-board">
+          <div data-tour="pipeline-board" className="min-h-0 flex-1">
             <PipelineView
               leads={board!.leads}
               onOpen={openInfo}
               onMoveStage={onMoveStage}
               onDraft={onDraft}
-              onDecide={onDecide}
             />
           </div>
         ) : (
-          <div data-tour="pipeline-board">
+          <div data-tour="pipeline-board" className="min-h-0 flex-1">
             <EmptyState onLoadDemo={loadDemo} running={running} />
           </div>
         )
@@ -533,7 +597,7 @@ export function Studio() {
       {/* All leads — table / cards / map */}
       {view === "leads" && (
         hasLeads ? (
-          <div data-tour="leads-table">
+          <div data-tour="leads-table" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {layout === "map" ? (
               <LeadMap
                 leads={board!.leads}
@@ -551,47 +615,45 @@ export function Studio() {
             )}
           </div>
         ) : (
-          <EmptyState onLoadDemo={loadDemo} running={running} />
+          <div className="min-h-0 flex-1">
+            <EmptyState onLoadDemo={loadDemo} running={running} />
+          </div>
         )
       )}
 
       {/* Outreach queue — draft / approve / send */}
       {view === "outreach" && (
         hasLeads ? (
-          <OutreachView
-            leads={board!.leads}
-            canSendEmail={!!board!.capabilities.canSendEmail}
-            busyId={outreachBusy}
-            setupHint={outreachSetupHint}
-            onOpenInfo={openInfo}
-            onOpenDraft={openDraft}
-            onDraft={async (id) => {
-              setOutreachBusy(id);
-              try {
-                await onDraft(id);
-              } finally {
-                setOutreachBusy(null);
-              }
-            }}
-            onDecide={async (outreachId, decision) => {
-              setOutreachBusy(outreachId);
-              try {
-                await onDecide(outreachId, decision);
-              } finally {
-                setOutreachBusy(null);
-              }
-            }}
-            onSend={async (outreachId) => {
-              setOutreachBusy(outreachId);
-              try {
-                await onSend(outreachId);
-              } finally {
-                setOutreachBusy(null);
-              }
-            }}
-            onDraftAll={onDraftAllOutreach}
-            onApproveAll={onApproveAllOutreach}
-          />
+          <div className="min-h-0 flex-1">
+            <OutreachView
+              leads={board!.leads}
+              canSendEmail={!!board!.capabilities.canSendEmail}
+              busyId={outreachBusy}
+              onOpenInfo={openInfo}
+              onOpenDraft={openDraft}
+              onDraft={async (id) => {
+                setOutreachBusy(id);
+                try {
+                  await onDraft(id);
+                } finally {
+                  setOutreachBusy(null);
+                }
+              }}
+              onDecide={async (outreachId, decision) => {
+                setOutreachBusy(outreachId);
+                try {
+                  await onDecide(outreachId, decision);
+                } finally {
+                  setOutreachBusy(null);
+                }
+              }}
+              onSend={async (outreachId) => {
+                requestSend(outreachId);
+              }}
+              onDraftAll={onDraftAllOutreach}
+              onApproveAll={onApproveAllOutreach}
+            />
+          </div>
         ) : (
           <EmptyState onLoadDemo={loadDemo} running={running} />
         )
@@ -614,10 +676,86 @@ export function Studio() {
           onDraft={onDraft}
           onSaveDraft={onSaveDraft}
           onDecide={onDecide}
-          onSend={onSend}
+          onSend={async (id) => requestSend(id)}
           onSetDelivery={onSetDelivery}
           onUpdateCrm={onUpdateLeadCrm}
         />
+      )}
+
+      {pendingSendId && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
+            onClick={() => setPendingSendId(null)}
+          />
+          <div className="animate-float-up relative w-full max-w-md rounded-xl2 border border-white/10 bg-ink-900 p-6 shadow-2xl">
+            <p className="font-display text-xl font-semibold text-mist-100">Simulate send?</p>
+            <p className="mt-2 text-sm text-mist-300">
+              No email provider is configured yet, so this won&apos;t leave the app. Add your
+              Resend key under Settings → Sending for real inbox delivery — or continue to
+              simulate.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <a
+                href="/app/settings"
+                className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-mist-100 transition-colors hover:bg-white/5"
+              >
+                Open Settings
+              </a>
+              <button
+                type="button"
+                onClick={() => setPendingSendId(null)}
+                className="rounded-full px-4 py-2 text-sm font-medium text-mist-400 hover:text-mist-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmSimulateSend()}
+                className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.03]"
+              >
+                Simulate send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {warmupWarn && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
+            onClick={() => setWarmupWarn(null)}
+          />
+          <div className="animate-float-up relative w-full max-w-md rounded-xl2 border border-amber-400/20 bg-ink-900 p-6 shadow-2xl">
+            <p className="font-display text-xl font-semibold text-mist-100">
+              Soft warmup recommend
+            </p>
+            <p className="mt-2 text-sm text-mist-300">
+              You&apos;ve sent{" "}
+              <span className="text-mist-100">{warmupWarn.todayCount}</span> today. For a
+              newer sender we recommend staying around{" "}
+              <span className="text-mist-100">{warmupWarn.softCap}</span>/day so inbox
+              placement stays healthier. You can ignore this and send anyway.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setWarmupWarn(null)}
+                className="rounded-full px-4 py-2 text-sm font-medium text-mist-400 hover:text-mist-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmWarmupSend()}
+                className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.03]"
+              >
+                Send anyway
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {upgrade && (
