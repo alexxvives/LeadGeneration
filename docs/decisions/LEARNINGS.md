@@ -4,6 +4,25 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-16 — Outreach UX batch (profiles, bulk delete, webhooks UI)
+- Search toolbar: Standard/Smart · lead count · profile `Select` (`.select-ink`)
+  in one row. Settings profile: single name field + chevron switcher (not two boxes).
+- Sales pitch `<label>` wrapping the “Generate from website” button caused label
+  clicks to open the URL strip — use a `<div>` + only show prompt on that button.
+- `{lead_name}` resolves to `contactName` or **company** (many leads lack a person
+  name). Prefer `{company}` in subjects. Pitch supports light HTML (bold/lists) →
+  plain at send; `staticBody` skips opener/stock CTA.
+- Delivery webhooks already live (`/api/webhooks/maileroo|resend`); Settings Easy
+  panel now shows copyable webhook URL. Maileroo also maps `bounced`.
+
+### 2026-07-16 — Zeruh verify at send only + credit badge
+- Dropped enrich-time `filterVerifiableEmails` (search). Verify runs **once at
+  send** so Excel imports share the same gate and we burn ~1 credit per send,
+  not 1–3 per lead found. UI shows “Verifying email…” while send is in flight.
+- Zeruh credits badge mirrors Firecrawl: `GET /api/providers/zeruh/usage`
+  (account permanent + recurring). Free tier (~100/mo) is fine for dogfood;
+  buy credits for volume.
+
 ### 2026-07-15 — Outreach profiles + pitch language versions
 - Settings is now **Outreach profiles** (list): each profile has pitch *versions*
   per language (`pitches[lang]`). Preview flag switches which version you edit;
@@ -20,8 +39,9 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   *(Superseded for pitch: use per-language pitch versions, not sample swap.)*
 - `{lead_name}` = contact first name; `{company}` = company — use `{company}` in
   subject templates for “Propuesta para Bright Dental” style subjects.
-- Email verify (Zeruh/Maileroo) already runs on enrich (`filterVerifiableEmails`)
-  and again at send (`verifyEmail`); needs `MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY`.
+- Email verify (Zeruh) runs at send (`verifyEmail`); needs
+  `MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY`. *(Enrich-time verify removed
+  2026-07-16 — send-only.)*
 - Animated icon libs (`lucide-animated` / `lucide-react-motion`) need `motion` and
   are fine for client components; keep custom `icons.tsx` for now and adopt
   selectively later (nav + Find CTA) rather than a blanket swap.

@@ -102,6 +102,7 @@ export const api = {
     senderName?: string;
     subjectTemplate?: string;
     autoDraft?: boolean;
+    staticBody?: boolean;
     searchStrategy?: SearchStrategy;
     maxLeads?: number;
     demo?: boolean;
@@ -136,7 +137,12 @@ export const api = {
 
   draft: (
     leadId: string,
-    opts?: { signOff?: string; offerNotes?: string; subjectTemplate?: string },
+    opts?: {
+      signOff?: string;
+      offerNotes?: string;
+      subjectTemplate?: string;
+      staticBody?: boolean;
+    },
   ) =>
     jsonFetch<{ outreach: Outreach }>("/api/outreach", {
       method: "POST",
@@ -145,6 +151,7 @@ export const api = {
         ...(opts?.signOff ? { signOff: opts.signOff } : {}),
         ...(opts?.offerNotes ? { offerNotes: opts.offerNotes } : {}),
         ...(opts?.subjectTemplate ? { subjectTemplate: opts.subjectTemplate } : {}),
+        ...(opts?.staticBody ? { staticBody: true } : {}),
       }),
     }),
 
@@ -203,6 +210,8 @@ export const api = {
 
   firecrawlUsage: () =>
     jsonFetch<FirecrawlUsage>("/api/providers/firecrawl/usage"),
+
+  zeruhUsage: () => jsonFetch<ZeruhUsage>("/api/providers/zeruh/usage"),
 };
 
 export type FirecrawlUsage = {
@@ -210,5 +219,14 @@ export type FirecrawlUsage = {
   provider: "firecrawl";
   remainingCredits: number | null;
   planCredits: number | null;
+  error?: string;
+};
+
+export type ZeruhUsage = {
+  available: boolean;
+  provider: "zeruh";
+  remainingCredits: number | null;
+  permanentCredits: number | null;
+  recurringCredits: number | null;
   error?: string;
 };

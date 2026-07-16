@@ -215,7 +215,7 @@ export function LeadDrawer(props: DrawerProps) {
         className={`animate-float-up relative flex w-full flex-col overflow-hidden border border-white/10 bg-ink-900 shadow-2xl ${
           mode === "info"
             ? "max-h-[min(90dvh,720px)] max-w-[51rem] rounded-xl2"
-            : "h-full max-h-[min(92dvh,900px)] max-w-[43rem] rounded-xl2 sm:max-h-[min(90dvh,860px)]"
+            : "h-[min(92dvh,900px)] max-w-[43rem] rounded-xl2 sm:h-[min(90dvh,860px)]"
         }`}
       >
 
@@ -253,7 +253,7 @@ export function LeadDrawer(props: DrawerProps) {
           className={
             mode === "info"
               ? "grid min-h-0 flex-1 gap-0 overflow-hidden sm:grid-cols-[minmax(0,1.15fr)_minmax(14rem,0.85fr)]"
-              : "max-h-[min(70dvh,36rem)] space-y-5 overflow-y-auto p-5 sm:p-6"
+              : "min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6"
           }
         >
           {mode === "info" ? (
@@ -505,6 +505,67 @@ export function LeadDrawer(props: DrawerProps) {
               </div>
             ) : (
               <div className="space-y-3">
+                {sent ? (
+                  <div className="space-y-4">
+                    <div className="animate-sent-pop flex flex-col items-center gap-2 rounded-xl2 border border-aurora-400/25 bg-gradient-to-b from-aurora-400/15 to-transparent px-4 py-5 text-center">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-aurora-400 text-ink-950 shadow-[0_0_28px_-4px_rgba(67,224,168,0.65)]">
+                        <CheckIcon className="h-6 w-6" />
+                      </span>
+                      <p className="font-display text-lg font-semibold text-aurora-200">
+                        Sent
+                      </p>
+                      {outreach.sentAt ? (
+                        <p className="text-xs text-mist-400">
+                          {new Date(outreach.sentAt).toLocaleString()}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div>
+                      <p className="mb-2 text-center text-xs font-medium uppercase tracking-widest text-mist-500">
+                        Delivery outcome
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {(
+                          [
+                            { id: "sent", label: "Delivered" },
+                            { id: "replied", label: "Replied" },
+                            { id: "bounced", label: "Bounced" },
+                          ] as const
+                        ).map((opt) => {
+                          const active = (outreach.deliveryStatus ?? "unknown") === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              disabled={busy === "delivery"}
+                              onClick={() =>
+                                run("delivery", () =>
+                                  props.onSetDelivery(outreach.id, opt.id),
+                                )
+                              }
+                              className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition-colors ${
+                                active
+                                  ? opt.id === "bounced"
+                                    ? "bg-rose-500/15 text-rose-300 ring-rose-400/30"
+                                    : opt.id === "replied"
+                                      ? "bg-sky-400/15 text-sky-300 ring-sky-400/30"
+                                      : "bg-aurora-400/15 text-aurora-300 ring-aurora-400/30"
+                                  : "text-mist-400 ring-white/10 hover:bg-white/5 hover:text-mist-100"
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-center text-[11px] text-mist-600">
+                        Updates automatically via Maileroo/Resend webhooks. You can
+                        still correct it here.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+
                 <FieldMini label="To">
                   <input
                     value={toEmail}
@@ -527,7 +588,7 @@ export function LeadDrawer(props: DrawerProps) {
                     value={body}
                     onChange={(e) => { setBody(e.target.value); setDirty(true); }}
                     disabled={sent}
-                    rows={14}
+                    rows={sent ? 6 : 14}
                     className="w-full resize-y rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 font-sans text-sm leading-relaxed outline-none focus:border-aurora-400/60 disabled:opacity-60"
                   />
                 </FieldMini>
@@ -589,64 +650,28 @@ export function LeadDrawer(props: DrawerProps) {
                         title={!toEmail ? "Add a recipient email first" : undefined}
                         className="inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
                       >
-                        {busy === "send" ? <Spinner className="h-3.5 w-3.5" /> : <ArrowIcon className="h-4 w-4" />}
-                        {capabilities.canSendEmail ? "Send email" : "Send (simulate)"}
+                        {busy === "send" ? (
+                          <Spinner className="h-3.5 w-3.5" />
+                        ) : (
+                          <ArrowIcon className="h-4 w-4" />
+                        )}
+                        {busy === "send"
+                          ? capabilities.emailVerify
+                            ? "Verifying email…"
+                            : "Sending…"
+                          : capabilities.canSendEmail
+                            ? "Send email"
+                            : "Send (simulate)"}
                       </button>
                     )}
                   </div>
                 )}
 
-                {sent && (
-                  <div className="space-y-3">
-                    <p className="inline-flex items-center gap-2 rounded-lg bg-aurora-500/10 px-3 py-2 text-sm text-aurora-300">
-                      <CheckIcon className="h-4 w-4" /> Sent
-                      {outreach.sentAt ? ` · ${new Date(outreach.sentAt).toLocaleString()}` : ""}
-                    </p>
-                    <div>
-                      <p className="mb-2 text-xs font-medium uppercase tracking-widest text-mist-500">
-                        Delivery outcome
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {(
-                          [
-                            { id: "sent", label: "Delivered" },
-                            { id: "replied", label: "Replied" },
-                            { id: "bounced", label: "Bounced" },
-                          ] as const
-                        ).map((opt) => {
-                          const active = (outreach.deliveryStatus ?? "unknown") === opt.id;
-                          return (
-                            <button
-                              key={opt.id}
-                              type="button"
-                              disabled={busy === "delivery"}
-                              onClick={() =>
-                                run("delivery", () =>
-                                  props.onSetDelivery(outreach.id, opt.id),
-                                )
-                              }
-                              className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition-colors ${
-                                active
-                                  ? opt.id === "bounced"
-                                    ? "bg-rose-500/15 text-rose-300 ring-rose-400/30"
-                                    : opt.id === "replied"
-                                      ? "bg-sky-400/15 text-sky-300 ring-sky-400/30"
-                                      : "bg-aurora-400/15 text-aurora-300 ring-aurora-400/30"
-                                  : "text-mist-400 ring-white/10 hover:bg-white/5 hover:text-mist-100"
-                              }`}
-                            >
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="mt-2 text-[11px] text-mist-600">
-                        Delivery status updates from provider webhooks when configured.
-                        You can still correct it manually.
-                      </p>
-                    </div>
-                  </div>
-                )}
+                {!sent && busy === "send" && capabilities.emailVerify ? (
+                  <p className="text-center text-xs text-amber-200/80">
+                    Checking that this address is real before we send.
+                  </p>
+                ) : null}
 
                 {!capabilities.canSendEmail && !sent && (
                   <p className="text-xs text-mist-500">

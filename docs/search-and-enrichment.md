@@ -86,10 +86,10 @@ won't disturb the approval/send flow.
    rewrites lead `aboutBlurb` from scraped text after live search. Still to do:
    Firecrawl `/extract` for typed `{ company, emails[], phones[], contactName, services[] }`.
    Heuristic extract remains the zero-key fallback.
-2. **Email verification.** Run discovered emails through a verification API
-   (Maileroo includes one; also NeverBounce/ZeroBounce) and store a
-   `deliverable` flag. Down-rank or hide undeliverable addresses. **This alone
-   dramatically improves outreach outcomes.**
+2. **Email verification.** ✅ _Shipped (send-time)_ — Zeruh via
+   `MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY` in `sendApprovedOutreach`. Blocks
+   hard undeliverables. Not run on enrich (credit cost + Excel import parity).
+   Still to do: persist a `deliverable` flag on the lead for UI ranking.
 3. **Smarter query building.** ✅ _Shipped_ — `query.ts` expands the niche into
    multiple queries for the `smart`/`local` strategies and merges them. Still to
    do: LLM-driven synonym/ICP expansion and site-type hints (e.g. exclude

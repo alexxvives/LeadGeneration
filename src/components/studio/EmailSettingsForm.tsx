@@ -317,9 +317,9 @@ export function EmailSettingsForm({
           data-tour="resend-key"
           className="rounded-xl border border-aurora-400/20 bg-aurora-400/[0.04] p-4"
         >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="shrink-0">
-              <p className="mb-2 text-sm font-medium text-mist-100">Sending provider</p>
+              <p className="mb-1.5 text-sm font-medium text-mist-100">Sending provider</p>
               <div className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1">
                 <button
                   type="button"
@@ -416,6 +416,7 @@ export function EmailSettingsForm({
               )}
             </div>
           </div>
+          <WebhookHint provider={isMaileroo ? "maileroo" : "resend"} liveAppUrl={liveAppUrl} />
         </div>
       )}
 
@@ -461,6 +462,53 @@ function Field({
         ) : null}
       </div>
       {children}
+    </div>
+  );
+}
+
+function WebhookHint({
+  provider,
+  liveAppUrl,
+}: {
+  provider: "maileroo" | "resend";
+  liveAppUrl?: string | null;
+}) {
+  const origin =
+    (typeof window !== "undefined" ? window.location.origin : "") ||
+    liveAppUrl?.replace(/\/$/, "") ||
+    "https://leadgeneration.alexxvives.workers.dev";
+  const path =
+    provider === "maileroo" ? "/api/webhooks/maileroo" : "/api/webhooks/resend";
+  const url = `${origin}${path}`;
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <div className="mt-4 rounded-lg border border-white/8 bg-ink-950/40 px-3 py-2.5">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-mist-500">
+        Delivery webhooks
+      </p>
+      <p className="mt-1 text-[11px] leading-relaxed text-mist-400">
+        Point {provider === "maileroo" ? "Maileroo" : "Resend"} at this URL
+        (delivered / bounced events) so Leadify updates delivery status
+        automatically.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <code className="min-w-0 flex-1 truncate rounded-md border border-white/10 bg-ink-900/80 px-2 py-1.5 text-[11px] text-aurora-200/90">
+          {url}
+        </code>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard.writeText(url).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1600);
+            });
+          }}
+          className="shrink-0 rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-mist-300 hover:border-aurora-400/40 hover:text-mist-100"
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
     </div>
   );
 }

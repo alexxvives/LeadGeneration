@@ -2,6 +2,8 @@
  * Email verification via Zeruh (Maileroo's verify product).
  * https://zeruh.com/api-docs — base https://api.zeruh.com/v1/verify
  *
+ * Called at **send** time (not enrich) so we spend ~1 credit per outbound
+ * and cover search + Excel-imported leads equally.
  * Degrades to a local heuristic when no key is set (demo / zero-key mode).
  */
 
@@ -161,10 +163,12 @@ export async function verifyEmail(email: string): Promise<EmailVerifyResult> {
   }
 }
 
-/** Keep emails that are ok to send; preserve order. */
+/**
+ * Optional batch helper — unused on the search path (verify is send-only).
+ * Kept for scripts / future list-hygiene tools. Caps at first 3 candidates.
+ */
 export async function filterVerifiableEmails(emails: string[]): Promise<string[]> {
   if (emails.length === 0) return [];
-  // Cap API spend per lead — verify first 3 candidates.
   const head = emails.slice(0, 3);
   const rest = emails.slice(3);
   const kept: string[] = [];
@@ -172,8 +176,6 @@ export async function filterVerifiableEmails(emails: string[]): Promise<string[]
     const v = await verifyEmail(e);
     if (v.okToSend) kept.push(e);
   }
-  // Unverified tail kept (fail-open) so we don't drop contacts when key missing
-  // or we only checked the head.
   if (!env.emailVerifyKey()) return emails;
   return [...kept, ...rest.filter((e) => !head.includes(e))];
 }

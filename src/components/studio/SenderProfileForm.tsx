@@ -14,7 +14,8 @@ import { generateDraft } from "@/lib/outreach/draft";
 import { langLabel, type OutreachLang } from "@/lib/outreach/locale";
 import type { Lead, Run } from "@/lib/types";
 import { Spinner } from "@/components/ui";
-import { HelpIcon, SparkIcon } from "@/components/icons";
+import { ChevronDownIcon, HelpIcon, SparkIcon } from "@/components/icons";
+import { PitchEditor } from "@/components/studio/PitchEditor";
 
 const EXAMPLE_COMPANY = "Bright Dental";
 const EXAMPLE_NAME = "Maria";
@@ -102,6 +103,7 @@ function previewDraft(
     signOff: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
     offerNotes: pitch || `[Add ${langLabel(lang)} sales pitch]`,
     subjectTemplate: subjectTpl || null,
+    staticBody: Boolean(profile.staticBody),
   });
   return { ...draft, missingPitch };
 }
@@ -123,19 +125,13 @@ export function SenderProfileForm() {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [genProvider, setGenProvider] = useState<string | null>(null);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const offerRef = useRef<HTMLTextAreaElement | null>(null);
   const langMenuRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const focusSnapshot = useRef<string | null>(null);
 
   const profile = profiles.find((p) => p.id === activeId) ?? profiles[0] ?? null;
-
-  const growOffer = () => {
-    const el = offerRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.max(el.scrollHeight, 84)}px`;
-  };
 
   const reload = () => {
     const store = loadOutreachProfiles();
@@ -148,25 +144,27 @@ export function SenderProfileForm() {
   }, []);
 
   useEffect(() => {
-    growOffer();
-  }, [profile?.pitches, previewLang]);
-
-  useEffect(() => {
     return () => {
       if (savedTimer.current) clearTimeout(savedTimer.current);
     };
   }, []);
 
   useEffect(() => {
-    if (!langMenuOpen) return;
+    if (!langMenuOpen && !profileMenuOpen) return;
     const onDown = (e: MouseEvent) => {
       if (langMenuRef.current && !langMenuRef.current.contains(e.target as Node)) {
         setLangMenuOpen(false);
       }
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(e.target as Node)
+      ) {
+        setProfileMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [langMenuOpen]);
+  }, [langMenuOpen, profileMenuOpen]);
 
   const preview = useMemo(
     () => (profile ? previewDraft(profile, previewLang) : null),
@@ -302,41 +300,67 @@ export function SenderProfileForm() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="sr-only" htmlFor="outreach-profile-select">
-          Outreach profile
-        </label>
-        <select
-          id="outreach-profile-select"
-          value={profile.id}
-          onChange={(e) => {
-            setActiveOutreachProfile(e.target.value);
-            setActiveId(e.target.value);
-            setSavedField(null);
-          }}
-          className="min-w-[12rem] rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
-        >
-          {profiles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <input
-          value={profile.name}
-          onChange={(e) => patch({ name: e.target.value })}
-          onFocus={captureFocus}
-          onBlur={() => {
-            const name = profile.name.trim() || "Untitled";
-            const next = { ...profile, name };
-            const prev = loadOutreachProfiles().profiles.find(
-              (p) => p.id === profile.id,
-            );
-            if (prev && prev.name === name) return;
-            persist(next, null);
-          }}
-          aria-label="Profile name"
-          className="min-w-[8rem] flex-1 rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
-        />
+        <div ref={profileMenuRef} className="relative min-w-[14rem] flex-1">
+          <div className="flex overflow-hidden rounded-lg border border-white/10 bg-ink-900/60 focus-within:border-aurora-400/60">
+            <input
+              value={profile.name}
+              onChange={(e) => patch({ name: e.target.value })}
+              onFocus={captureFocus}
+              onBlur={() => {
+                const name = profile.name.trim() || "Untitled";
+                const next = { ...profile, name };
+                const prev = loadOutreachProfiles().profiles.find(
+                  (p) => p.id === profile.id,
+                );
+                if (prev && prev.name === name) return;
+                persist(next, null);
+              }}
+              aria-label="Outreach profile name"
+              className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-mist-100 outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setProfileMenuOpen((o) => !o)}
+              aria-label="Switch outreach profile"
+              aria-expanded={profileMenuOpen}
+              aria-haspopup="listbox"
+              className="shrink-0 border-l border-white/10 px-2.5 text-mist-400 transition-colors hover:bg-white/5 hover:text-mist-100"
+            >
+              <ChevronDownIcon
+                className={`h-3.5 w-3.5 transition-transform ${
+                  profileMenuOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+          </div>
+          {profileMenuOpen ? (
+            <ul
+              role="listbox"
+              className="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
+            >
+              {profiles.map((p) => (
+                <li key={p.id} role="option" aria-selected={p.id === profile.id}>
+                  <button
+                    type="button"
+                    className={`flex w-full px-3 py-2 text-left text-sm ${
+                      p.id === profile.id
+                        ? "bg-aurora-400/10 text-aurora-300"
+                        : "text-mist-200 hover:bg-white/5"
+                    }`}
+                    onClick={() => {
+                      setActiveOutreachProfile(p.id);
+                      setActiveId(p.id);
+                      setSavedField(null);
+                      setProfileMenuOpen(false);
+                    }}
+                  >
+                    {p.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={() => {
@@ -377,11 +401,12 @@ export function SenderProfileForm() {
                 <HelpIcon className="h-3.5 w-3.5 text-mist-500 transition-colors group-hover:text-mist-300" />
                 <span
                   role="tooltip"
-                  className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                  className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
                 >
-                  Insert variables with curly braces:{" "}
-                  <code className="text-aurora-300">{"{company}"}</code>,{" "}
-                  <code className="text-aurora-300">{"{lead_name}"}</code>,{" "}
+                  <code className="text-aurora-300">{"{company}"}</code> is
+                  safest — most leads have it.{" "}
+                  <code className="text-aurora-300">{"{lead_name}"}</code> uses
+                  the contact name when we have one, otherwise the company. Also{" "}
                   <code className="text-aurora-300">{"{location}"}</code>.
                 </span>
               </span>
@@ -397,7 +422,7 @@ export function SenderProfileForm() {
             />
           </label>
 
-          <label className="block">
+          <div className="block">
             <div className="mb-1.5 flex min-w-0 flex-wrap items-center justify-between gap-2">
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-mist-500">
                 Sales pitch
@@ -424,7 +449,7 @@ export function SenderProfileForm() {
                 {generating ? "Generating…" : "Generate from website"}
               </button>
             </div>
-            {websitePrompt && (
+            {websitePrompt ? (
               <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-aurora-400/20 bg-aurora-400/5 p-2.5">
                 <input
                   value={websiteDraft}
@@ -457,22 +482,38 @@ export function SenderProfileForm() {
                   Cancel
                 </button>
               </div>
-            )}
-            <textarea
-              ref={offerRef}
+            ) : null}
+            <PitchEditor
               value={pitchValue}
               onFocus={captureFocus}
-              onChange={(e) => {
+              onChange={(html) => {
                 patch({
-                  pitches: { ...profile.pitches, [previewLang]: e.target.value },
+                  pitches: { ...profile.pitches, [previewLang]: html },
                 });
-                requestAnimationFrame(growOffer);
               }}
               onBlur={() => saveOnBlur("pitch")}
-              rows={3}
-              placeholder={`Sales pitch in ${langLabel(previewLang)}…`}
-              className="w-full resize-none overflow-hidden rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+              placeholder={`Write your ${langLabel(previewLang)} pitch…`}
             />
+            <label className="mt-2 flex cursor-pointer items-start gap-2.5 rounded-lg border border-white/5 bg-ink-950/30 px-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={Boolean(profile.staticBody)}
+                onChange={(e) => {
+                  const next = { ...profile, staticBody: e.target.checked };
+                  persist(next, null);
+                }}
+                className="mt-0.5 rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40"
+              />
+              <span className="text-xs leading-relaxed text-mist-400">
+                <span className="font-medium text-mist-200">
+                  Use pitch as full draft body
+                </span>
+                {" — "}
+                skip auto opener &amp; stock CTA. Write greeting-ready copy here
+                (placeholders like{" "}
+                <code className="text-aurora-300/90">{"{company}"}</code> work).
+              </span>
+            </label>
             {genProvider && !genError && (
               <p className="mt-1.5 text-xs text-mist-500">
                 Generated with{" "}
@@ -480,7 +521,7 @@ export function SenderProfileForm() {
               </p>
             )}
             {genError && <p className="mt-1.5 text-xs text-rose-300">{genError}</p>}
-          </label>
+          </div>
 
           <label className="block">
             <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">

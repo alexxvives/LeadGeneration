@@ -12,7 +12,6 @@ import {
   extractLocation,
   extractPhones,
 } from "./enrich";
-import { filterVerifiableEmails } from "@/lib/email/verify";
 import { exaProvider } from "./exa";
 import { firecrawlProvider } from "./firecrawl";
 import type { PageResult, SearchProvider } from "./providers";
@@ -187,8 +186,9 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
   const useAi = await workersAiAvailable();
   const { blurbLooksLikeJunk } = await import("@/lib/outreach/draft");
 
+  // Email verify (Zeruh) runs only at send — not here — so we don't burn
+  // credits on leads that never go out, and Excel imports get the same gate.
   const leads: ScoredLead[] = await mapPool(ranked, 3, async (lead) => {
-    const emails = await filterVerifiableEmails(lead.emails);
     let aboutBlurb = lead.aboutBlurb;
     if (aboutBlurb && blurbLooksLikeJunk(aboutBlurb)) aboutBlurb = null;
     if (useAi) {
@@ -202,7 +202,7 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
       });
       if (polished && !blurbLooksLikeJunk(polished)) aboutBlurb = polished;
     }
-    return { ...lead, emails, aboutBlurb };
+    return { ...lead, aboutBlurb };
   });
 
   return { provider: provider.name, mode: "live", leads };

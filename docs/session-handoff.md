@@ -9,26 +9,28 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (profiles + verify Q&A)
+## ⏱️ Status — updated 2026-07-16 (outreach UX + webhooks UI)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- **Verify vs send:** bounce check = Zeruh (`MAILEROO_VERIFY_API_KEY` / alias
-  `ZERUH_API_KEY`) on enrich + before send — works regardless of Resend/Gmail
-  send path. Get key: Maileroo dashboard → Email Verification / Zeruh SSO, or
-  zeruh.com → API key → `.env.local` + Wrangler secret.
-- **Outreach profiles:** multi-profile list; pitch versions per language; search
-  profile picker (or none → Review without draft). Flag PNGs (not emoji GB/ES).
-- Saved flash inline; blur-save only when dirty; Easy 3-step copy removed;
-  outreach row click opens info; Excel = Table + conditional formatting + dropdowns.
+- Search: profile dropdown (`.select-ink`) side-by-side with Standard/Smart +
+  lead counts.
+- Leads table: multi-select + floating bulk delete bar.
+- Settings: one profile name+switcher; pitch rich editor + “use as full body”;
+  website URL only on “Generate from website”; Easy provider aligned with key;
+  copyable webhook URL for Maileroo/Resend.
+- Outreach: **Send all** on Ready (approved only). Draft CTAs softened; sent
+  drawer celebration + no nested `max-h` scroll trap.
+- `{lead_name}` = contactName || company (documented in Settings tooltip).
 
 ### Next
-1. Point Maileroo Dashboard webhook at `/api/webhooks/maileroo`.
+1. Point Maileroo/Resend dashboards at the webhook URL shown in Settings → Easy
+   (prod host + optional `MAILEROO_WEBHOOK_SECRET` / `RESEND_WEBHOOK_SECRET`).
 2. Soft-cap warning popup on send; Microsoft Graph Mail.Send.
 3. Optional: AI-assist translate when adding a missing pitch language version.
-4. Confirm `MAILEROO_VERIFY_API_KEY` in prod Wrangler secrets.
+4. Confirm `MAILEROO_VERIFY_API_KEY` in prod Wrangler secrets (if not already).
 
 ---
 

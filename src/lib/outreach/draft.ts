@@ -3,6 +3,7 @@ import {
   outreachLangFromLocation,
   type OutreachLang,
 } from "@/lib/outreach/locale";
+import { richToPlain } from "@/lib/outreach/rich-text";
 import type { Lead, Run } from "@/lib/types";
 
 // Deterministic, no-API-key outreach drafting. Language follows lead geography
@@ -23,10 +24,16 @@ export interface DraftOverrides {
   /**
    * Subject template with `{lead_name}`, `{company}`, `{location}`.
    * Empty / unset → locale default subject.
+   * `{lead_name}` = contact name when present, otherwise company.
    */
   subjectTemplate?: string | null;
   /** Force outreach language (Settings preview). Else inferred from lead.location. */
   forceLang?: OutreachLang;
+  /**
+   * When true: greeting + pitch (+ sign-off) only — no scraped opener / stock CTA.
+   * Pitch is the static body the user wrote in Settings.
+   */
+  staticBody?: boolean;
 }
 
 function firstName(lead: Lead): string {
@@ -42,9 +49,10 @@ function shortCompany(lead: Lead): string {
   );
 }
 
-/** Resolve `{lead_name}` / `{company}` / `{location}` in a subject template. */
+/** Resolve `{lead_name}` / `{company}` / `{location}` in subject or pitch text. */
 export function applySubjectTemplate(template: string, lead: Lead): string {
   const company = shortCompany(lead);
+  // contactName is often missing on scraped leads — fall back to company.
   const leadName = (lead.contactName?.trim() || company).trim();
   const location = (lead.location ?? "").trim();
   return template
@@ -52,6 +60,19 @@ export function applySubjectTemplate(template: string, lead: Lead): string {
     .replace(/\{company\}/gi, company)
     .replace(/\{location\}/gi, location)
     .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Same placeholders, but keep newlines (for pitch / static body). */
+function applyBodyPlaceholders(template: string, lead: Lead): string {
+  const company = shortCompany(lead);
+  const leadName = (lead.contactName?.trim() || company).trim();
+  const location = (lead.location ?? "").trim();
+  return template
+    .replace(/\{lead_name\}/gi, leadName)
+    .replace(/\{company\}/gi, company)
+    .replace(/\{location\}/gi, location)
+    .replace(/[^\S\n]{2,}/g, " ")
     .trim();
 }
 
@@ -126,7 +147,7 @@ const COPY: Record<OutreachLang, Copy> = {
     openerPlain: (c) => `Wanted to get in touch with ${c} directly.`,
     defaultPitch: (niche) =>
       `I work with ${niche || "teams like yours"} on turning inbound interest into booked conversations — quietly, without a big process change.`,
-    cta: `Open to a short call next week, or should I leave it?`,
+    cta: `If you’d like to see how this could fit your model, happy to do a 15-minute demo — no commitment.`,
   },
   es: {
     subject: (c) => `Nota para ${c}`,
@@ -138,7 +159,7 @@ const COPY: Record<OutreachLang, Copy> = {
     openerPlain: (c) => `Quería contactar a ${c} directamente.`,
     defaultPitch: (niche) =>
       `Trabajo con ${niche || "equipos como el suyo"} para convertir el interés entrante en conversaciones concretas — sin montar un proceso complicado.`,
-    cta: `¿Les viene bien una llamada corta la semana que viene, o lo dejamos?`,
+    cta: `Si os interesa ver cómo encajaría con vuestro modelo, podemos hacer una demo de 15 minutos sin compromiso.`,
   },
   fr: {
     subject: (c) => `Petit message pour ${c}`,
@@ -150,7 +171,7 @@ const COPY: Record<OutreachLang, Copy> = {
     openerPlain: (c) => `Je voulais contacter ${c} directement.`,
     defaultPitch: (niche) =>
       `J’aide ${niche || "des équipes comme la vôtre"} à transformer l’intérêt entrant en vraies conversations — sans changer tout le process.`,
-    cta: `Ouverts à un court appel la semaine prochaine, ou je laisse tomber ?`,
+    cta: `Si vous voulez voir comment ça s’intégrerait à votre modèle, on peut faire une démo de 15 minutes — sans engagement.`,
   },
   it: {
     subject: (c) => `Nota per ${c}`,
@@ -162,7 +183,7 @@ const COPY: Record<OutreachLang, Copy> = {
     openerPlain: (c) => `Volevo contattare ${c} direttamente.`,
     defaultPitch: (niche) =>
       `Lavoro con ${niche || "team come il vostro"} per trasformare l’interesse in conversazioni concrete — senza stravolgere il processo.`,
-    cta: `Vi va una breve call la prossima settimana, o lascio stare?`,
+    cta: `Se vi interessa vedere come si adatterebbe al vostro modello, possiamo fare una demo di 15 minuti senza impegno.`,
   },
   de: {
     subject: (c) => `Kurze Notiz für ${c}`,
@@ -174,7 +195,7 @@ const COPY: Record<OutreachLang, Copy> = {
     openerPlain: (c) => `Wollte ${c} direkt ansprechen.`,
     defaultPitch: (niche) =>
       `Ich helfe ${niche || "Teams wie eurem"}, eingehendes Interesse in echte Gespräche zu verwandeln — ohne großen Prozesswechsel.`,
-    cta: `Passt ein kurzer Call nächste Woche, oder soll ich es lassen?`,
+    cta: `Wenn ihr sehen wollt, wie das zu eurem Modell passen könnte, machen wir gerne eine unverbindliche 15-Minuten-Demo.`,
   },
   pt: {
     subject: (c) => `Nota para ${c}`,
@@ -186,7 +207,7 @@ const COPY: Record<OutreachLang, Copy> = {
     openerPlain: (c) => `Quis contactar a ${c} diretamente.`,
     defaultPitch: (niche) =>
       `Trabalho com ${niche || "equipas como a vossa"} para transformar interesse em conversas concretas — sem mudar o processo todo.`,
-    cta: `Faz sentido uma call curta na próxima semana, ou deixo estar?`,
+    cta: `Se quiserem ver como encaixaria no vosso modelo, podemos fazer uma demo de 15 minutos — sem compromisso.`,
   },
   pl: {
     subject: (c) => `Krótka wiadomość dla ${c}`,
@@ -198,7 +219,7 @@ const COPY: Record<OutreachLang, Copy> = {
     openerPlain: (c) => `Chciałem skontaktować się bezpośrednio z ${c}.`,
     defaultPitch: (niche) =>
       `Pomagam ${niche || "zespołom takim jak Wasz"} zamieniać zainteresowanie w konkretne rozmowy — bez wielkiej zmiany procesu.`,
-    cta: `Pasuje krótka rozmowa w przyszłym tygodniu, czy odpuścić?`,
+    cta: `Jeśli chcecie zobaczyć, jak to wpasuje się w Wasz model, możemy zrobić 15-minutowe demo — bez zobowiązań.`,
   },
 };
 
@@ -211,7 +232,7 @@ export function generateDraft(
   const copy = COPY[lang];
   const name = firstName(lead);
   const company = shortCompany(lead);
-  const offer =
+  const offerRaw =
     overrides?.offerNotes?.trim() || run.offerNotes?.trim() || "";
   const nicheHint = run.niche.trim();
   const signOff = (
@@ -225,6 +246,17 @@ export function generateDraft(
     ? applySubjectTemplate(subjectTpl, lead) || copy.subject(company)
     : copy.subject(company);
   const greeting = copy.greeting(name);
+
+  const pitchPlain = applyBodyPlaceholders(
+    richToPlain(offerRaw || copy.defaultPitch(nicheHint)),
+    lead,
+  );
+
+  // Static mode: user-authored pitch is the body (placeholders OK; no AI opener/CTA).
+  if (overrides?.staticBody) {
+    const body = [greeting, "", pitchPlain, "", signOff].join("\n");
+    return { subject, body };
+  }
 
   const blurb = lead.aboutBlurb?.trim() ?? "";
 
@@ -240,11 +272,17 @@ export function generateDraft(
     opener = copy.openerPlain(company);
   }
 
-  const pitch = offer || copy.defaultPitch(nicheHint);
-
-  const body = [greeting, "", opener, "", pitch, "", copy.cta, "", signOff].join(
-    "\n",
-  );
+  const body = [
+    greeting,
+    "",
+    opener,
+    "",
+    pitchPlain,
+    "",
+    copy.cta,
+    "",
+    signOff,
+  ].join("\n");
 
   return { subject, body };
 }

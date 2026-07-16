@@ -15,7 +15,8 @@ a clean verification API. Users asked us to pick one stack and stop hedging.
    already wired in `sendEmail()`.
 2. **Verify path:** Zeruh API (`https://api.zeruh.com/v1/verify`) via
    `MAILEROO_VERIFY_API_KEY` (alias `ZERUH_API_KEY`). Maileroo’s verification
-   product; used on enrich (filter) and before send (hard block undeliverable).
+   product; used **at send** (hard block undeliverable). Not on enrich — one
+   credit per send, covers search + Excel import equally.
 3. **SMTP:** Optional fallback only (Maileroo SMTP, SES, Google SMTP, etc.)
    when no Resend key — not the recommended cold path for v1 UX.
 4. **Not for v1:** Shared Lodestar From-domain, Instantly/Smartlead sequences.

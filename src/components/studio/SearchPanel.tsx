@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { SearchIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
+import { Select } from "@/components/ui/Select";
 import type { PlanId, SearchStrategy } from "@/lib/types";
 import { FREE_MAX_LEADS_PER_RUN, LEAD_COUNT_OPTIONS } from "@/lib/plans";
 import {
@@ -28,6 +29,8 @@ export interface SearchValues {
   subjectTemplate: string;
   /** False when user chose no outreach profile — leads go to Review without drafts. */
   autoDraft: boolean;
+  /** Profile static-body mode — pitch only, no assembled opener/CTA. */
+  staticBody?: boolean;
   maxLeads: number;
 }
 
@@ -272,6 +275,7 @@ export function SearchPanel({
       offerNotes: pitch,
       subjectTemplate: selectedProfile?.subjectTemplate.trim() ?? "",
       autoDraft: Boolean(selectedProfile),
+      staticBody: Boolean(selectedProfile?.staticBody),
       maxLeads,
     });
   };
@@ -340,27 +344,6 @@ export function SearchPanel({
         </Field>
       </div>
 
-      <div className="mt-4">
-        <Field
-          label="Outreach profile"
-          hint="Optional — without one, leads go to Review with no draft"
-        >
-          <select
-            value={profileId}
-            onChange={(e) => setProfileId(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none transition-colors focus:border-aurora-400/60"
-          >
-            <option value="">No profile — review without draft</option>
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-                {getDefaultOffer(p) ? "" : " (no pitch yet)"}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
       {(icps.length > 0 || niche.trim()) && (
         <div className="mt-4 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -426,11 +409,11 @@ export function SearchPanel({
       )}
 
       <div className="mt-4">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <div
             role="radiogroup"
             aria-label="Search mode"
-            className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1"
+            className="inline-flex justify-self-start rounded-full border border-white/10 bg-ink-900/60 p-1"
           >
             {STRATEGIES.map((s) => {
               const isActive = s.id === searchStrategy;
@@ -456,7 +439,7 @@ export function SearchPanel({
           <div
             role="radiogroup"
             aria-label="Number of leads to find"
-            className="inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-ink-900/60 p-1"
+            className="inline-flex flex-wrap justify-self-center gap-1 rounded-full border border-white/10 bg-ink-900/60 p-1"
           >
             {LEAD_COUNT_OPTIONS.map((n) => {
               const locked = n > planCap;
@@ -494,6 +477,26 @@ export function SearchPanel({
                 </button>
               );
             })}
+          </div>
+          <div className="w-full min-w-0 justify-self-stretch sm:max-w-[16rem] sm:justify-self-end">
+            <label className="sr-only" htmlFor="search-outreach-profile">
+              Outreach profile
+            </label>
+            <Select
+              id="search-outreach-profile"
+              value={profileId}
+              onChange={(e) => setProfileId(e.target.value)}
+              title="Optional — without one, leads go to Review with no draft"
+              className="w-full py-2 text-sm"
+            >
+              <option value="">No profile — review only</option>
+              {profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                  {getDefaultOffer(p) ? "" : " (no pitch yet)"}
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
         <div className="mt-3 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">

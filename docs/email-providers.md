@@ -70,8 +70,9 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - **Recommendation for Lodestar now:**
   1. **BYO Easy send:** Resend **or** Maileroo API key + customer domain
      (Settings → Easy — ADR 0011). Resend remains the default DX.
-  2. **Maileroo Verify (Zeruh API)** via `MAILEROO_VERIFY_API_KEY` — verify on
-     enrich + block undeliverable on send. Separate from Maileroo *send*.
+  2. **Maileroo Verify (Zeruh API)** via `MAILEROO_VERIFY_API_KEY` — verify
+     **at send** (hard-block undeliverable). Separate from Maileroo *send*.
+     Not run during search/enrich (saves credits; covers Excel imports too).
   3. Keep **SMTP path** as optional platform fallback.
   4. Do **not** market a shared Lodestar From-domain for client outreach.
   5. Later (agency plans): optional Instantly/Smartlead-style multi-inbox, or
@@ -109,7 +110,8 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - `src/lib/email/maileroo.ts`: Maileroo HTTP send (`smtp.maileroo.com/api/v2`).
 - `src/lib/email/domain-health.ts` + `POST /api/providers/resend/domain-health`:
   live SPF/DKIM rows from Resend Domains API (demo-safe when no key).
-- `src/lib/email/verify.ts`: Zeruh/Maileroo verify on enrich + before send.
+- `src/lib/email/verify.ts`: Zeruh/Maileroo verify **at send** only
+  (`sendApprovedOutreach`). Credits badge: `GET /api/providers/zeruh/usage`.
 - Quotas + rate limits in `service.ts`.
 - Settings → Easy Resend **or** Maileroo wizard + Pro mailbox Connect Google
   (`SendSetupPanel`). Workspace `preferredSendPath` chooses Easy vs Pro at send

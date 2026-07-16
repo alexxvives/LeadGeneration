@@ -51,6 +51,7 @@ const BUCKET_META: Record<
 export function OutreachView({
   leads,
   canSendEmail,
+  emailVerify = false,
   busyId,
   onOpenInfo,
   onOpenDraft,
@@ -58,9 +59,12 @@ export function OutreachView({
   onDecide,
   onSend,
   onApproveAll,
+  onSendAll,
 }: {
   leads: LeadWithOutreach[];
   canSendEmail: boolean;
+  /** When true, busy send shows verify copy. */
+  emailVerify?: boolean;
   busyId: string | null;
   onOpenInfo: (id: string) => void;
   onOpenDraft: (id: string) => void;
@@ -69,6 +73,7 @@ export function OutreachView({
   onSend: (outreachId: string) => Promise<void>;
   onDraftAll: () => Promise<void>;
   onApproveAll: () => Promise<void>;
+  onSendAll: () => Promise<void>;
 }) {
   const groups: Record<OutreachBucket, LeadWithOutreach[]> = {
     review: [],
@@ -122,6 +127,21 @@ export function OutreachView({
                       Approve all
                     </button>
                   ) : null}
+                  {key === "ready" && rows.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => void onSendAll()}
+                      disabled={busyId === "send-all"}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
+                    >
+                      {busyId === "send-all" ? (
+                        <Spinner className="h-3 w-3" />
+                      ) : (
+                        <ArrowIcon className="h-3 w-3" />
+                      )}
+                      Send all
+                    </button>
+                  ) : null}
                 </div>
 
                 <ul className="min-h-0 flex-1 divide-y divide-white/5 overflow-y-auto overscroll-contain">
@@ -137,6 +157,7 @@ export function OutreachView({
                         bucket={key}
                         busy={busyId === lead.id || busyId === lead.outreach?.id}
                         canSendEmail={canSendEmail}
+                        emailVerify={emailVerify}
                         onOpenInfo={() => onOpenInfo(lead.id)}
                         onOpenDraft={() => onOpenDraft(lead.id)}
                         onDraft={() => onDraft(lead.id)}
@@ -169,6 +190,7 @@ function OutreachRow({
   bucket,
   busy,
   canSendEmail,
+  emailVerify,
   onOpenInfo,
   onOpenDraft,
   onDraft,
@@ -179,6 +201,7 @@ function OutreachRow({
   bucket: OutreachBucket;
   busy: boolean;
   canSendEmail: boolean;
+  emailVerify: boolean;
   onOpenInfo: () => void;
   onOpenDraft: () => void;
   onDraft: () => Promise<void>;
@@ -262,14 +285,31 @@ function OutreachRow({
               type="button"
               disabled={busy || !email}
               onClick={() => void onSend()}
-              aria-label={canSendEmail ? "Send" : "Send (simulate)"}
-              title={canSendEmail ? "Send" : "Send (simulate)"}
+              aria-label={
+                busy && emailVerify
+                  ? "Verifying email"
+                  : canSendEmail
+                    ? "Send"
+                    : "Send (simulate)"
+              }
+              title={
+                busy && emailVerify
+                  ? "Verifying email is deliverable…"
+                  : canSendEmail
+                    ? "Send"
+                    : "Send (simulate)"
+              }
               className={`${ACTION_BTN} bg-aurora-400 text-ink-950 disabled:opacity-50`}
             >
               {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
             </button>
           </div>
         )}
+        {bucket === "ready" && busy && emailVerify ? (
+          <p className="max-w-[9rem] text-right text-[9px] leading-tight text-amber-200/80">
+            Verifying email…
+          </p>
+        ) : null}
         {bucket === "sent" && (
           <button
             type="button"

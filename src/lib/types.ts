@@ -315,6 +315,8 @@ export interface CreateRunInput {
    * Leads land in Review without a draft. Default true.
    */
   autoDraft?: boolean;
+  /** Pitch-only drafts (no scraped opener / stock CTA). From outreach profile. */
+  staticBody?: boolean;
   /** Search depth/strategy. Defaults to "standard" when omitted. */
   searchStrategy?: SearchStrategy;
   /**

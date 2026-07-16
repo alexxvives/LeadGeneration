@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, QuotaExceededError, type BoardResponse, type FirecrawlUsage } from "@/lib/client-api";
+import { api, QuotaExceededError, type BoardResponse, type FirecrawlUsage, type ZeruhUsage } from "@/lib/client-api";
 import type { ContactMethod, CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
@@ -11,6 +11,7 @@ import { LeadMap } from "./LeadMap";
 import { LeadDrawer } from "./LeadDrawer";
 import { UpgradeModal, UsageBar } from "./UpgradeModal";
 import { FirecrawlUsageBadge } from "./FirecrawlUsageBadge";
+import { ZeruhUsageBadge } from "./ZeruhUsageBadge";
 import { Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
@@ -93,8 +94,12 @@ export function Studio() {
   const [upgrade, setUpgrade] = useState<UpgradePrompt | null>(null);
   const [fcUsageKey, setFcUsageKey] = useState(0);
   const [fcBefore, setFcBefore] = useState<FirecrawlUsage | null>(null);
+  const [zeruhUsageKey, setZeruhUsageKey] = useState(0);
+  const [zeruhBefore, setZeruhBefore] = useState<ZeruhUsage | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
+  /** True while send is in flight and Zeruh verify is configured. */
+  const [sendVerifying, setSendVerifying] = useState(false);
   const [pendingSendId, setPendingSendId] = useState<string | null>(null);
   const [warmupWarn, setWarmupWarn] = useState<{
     outreachId: string;
@@ -206,6 +211,7 @@ export function Studio() {
         offerNotes: v.offerNotes.trim() || undefined,
         subjectTemplate: v.subjectTemplate.trim() || undefined,
         autoDraft: v.autoDraft,
+        staticBody: v.staticBody,
         maxLeads: v.maxLeads,
         boardId,
       });
@@ -326,6 +332,7 @@ export function Studio() {
         signOff: resolveSignature(profile),
         offerNotes: getDefaultOffer(profile) || undefined,
         subjectTemplate: profile.subjectTemplate.trim() || undefined,
+        staticBody: Boolean(profile.staticBody),
       });
       patchLeadLocal(leadId, { outreach, status: "queued" });
       toast("ok", "Draft written. Review before approving.");
@@ -377,10 +384,21 @@ export function Studio() {
   };
 
   const onSend = async (outreachId: string) => {
+    const verifyOn = Boolean(board?.capabilities.emailVerify);
+    let before: ZeruhUsage | null = null;
+    if (verifyOn) {
+      try {
+        before = await api.zeruhUsage();
+        setZeruhBefore(before);
+      } catch {
+        setZeruhBefore(null);
+      }
+    }
     try {
       const result = await api.send(outreachId);
       recordWarmupSend();
       await refresh();
+      if (verifyOn) setZeruhUsageKey((k) => k + 1);
       toast(
         "ok",
         result.provider === "demo"
@@ -389,6 +407,7 @@ export function Studio() {
       );
     } catch (e) {
       await refresh();
+      if (verifyOn) setZeruhUsageKey((k) => k + 1);
       const msg = (e as Error).message;
       if (/must be approved/i.test(msg)) {
         toast("err", "Approve the draft first, then send. (If a prior send failed, re-approve and retry.)");
@@ -407,15 +426,17 @@ export function Studio() {
 
   const runSend = async (outreachId: string) => {
     setOutreachBusy(outreachId);
+    setSendVerifying(Boolean(board?.capabilities.emailVerify));
     try {
       await onSend(outreachId);
     } finally {
       setOutreachBusy(null);
+      setSendVerifying(false);
     }
   };
 
   /** Real delivery needs a provider; otherwise confirm simulate-or-settings. Soft warmup warn if over recommend. */
-  const requestSend = (outreachId: string) => {
+  const requestSend = async (outreachId: string) => {
     if (!board?.capabilities.canSendEmail) {
       setPendingSendId(outreachId);
       return;
@@ -429,7 +450,7 @@ export function Studio() {
       });
       return;
     }
-    void runSend(outreachId);
+    await runSend(outreachId);
   };
 
   const confirmSimulateSend = async () => {
@@ -543,6 +564,68 @@ export function Studio() {
     }
   };
 
+  /** Send every approved draft (still one human approve each — constitution Art. I.1). */
+  const onSendAllOutreach = async () => {
+    if (!board) return;
+    const targets = board.leads.filter(
+      (l) =>
+        l.outreach?.status === "approved" &&
+        (l.outreach.toEmail || l.emails[0]),
+    );
+    if (targets.length === 0) return;
+
+    if (!board.capabilities.canSendEmail) {
+      toast(
+        "err",
+        "Add a sending key in Settings before Send all — or send one at a time to simulate.",
+      );
+      return;
+    }
+
+    const status = warmupStatus();
+    if (status.overSoftCap) {
+      const ok = confirm(
+        `Soft warmup recommend is ${status.softCap}/day (you've sent ${status.todayCount}). Send all ${targets.length} anyway?`,
+      );
+      if (!ok) return;
+    } else {
+      const ok = confirm(
+        `Send ${targets.length} approved email${targets.length === 1 ? "" : "s"} now?`,
+      );
+      if (!ok) return;
+    }
+
+    setOutreachBusy("send-all");
+    setSendVerifying(Boolean(board.capabilities.emailVerify));
+    let sent = 0;
+    let failed = 0;
+    try {
+      for (const l of targets) {
+        if (!l.outreach) continue;
+        try {
+          await api.send(l.outreach.id);
+          recordWarmupSend();
+          sent += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+      await refresh();
+      if (board.capabilities.emailVerify) setZeruhUsageKey((k) => k + 1);
+      if (sent > 0) {
+        toast(
+          "ok",
+          `Sent ${sent}${failed ? ` · ${failed} failed` : ""}.`,
+        );
+      } else if (failed > 0) {
+        toast("err", `Could not send ${failed} email${failed === 1 ? "" : "s"}.`);
+      }
+    } finally {
+      setOutreachBusy(null);
+      setSendVerifying(false);
+    }
+  };
+
   const openInfo = (id: string) => {
     setDrawerMode("info");
     setSelectedId(id);
@@ -577,6 +660,33 @@ export function Studio() {
     } catch (e) {
       await refresh();
       toast("err", (e as Error).message);
+    }
+  };
+
+  const onDeleteLeads = async (leadIds: string[]) => {
+    const idSet = new Set(leadIds);
+    setBoard((b) =>
+      b ? { ...b, leads: b.leads.filter((l) => !idSet.has(l.id)) } : b,
+    );
+    let failed = 0;
+    for (const id of leadIds) {
+      try {
+        await api.deleteLead(id);
+      } catch {
+        failed += 1;
+      }
+    }
+    if (failed > 0) {
+      await refresh();
+      toast(
+        "err",
+        `Deleted ${leadIds.length - failed}; ${failed} failed — refreshed.`,
+      );
+    } else {
+      toast(
+        "ok",
+        `Deleted ${leadIds.length} lead${leadIds.length === 1 ? "" : "s"}.`,
+      );
     }
   };
 
@@ -628,9 +738,20 @@ export function Studio() {
           ) : null}
         </div>
 
-        <div className="flex justify-start sm:justify-center">
-          {view === "board" && board?.capabilities.firecrawl ? (
-            <FirecrawlUsageBadge refreshKey={fcUsageKey} before={fcBefore} />
+        <div className="flex flex-col items-start gap-2 sm:items-center">
+          <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-center">
+            {view === "board" && board?.capabilities.firecrawl ? (
+              <FirecrawlUsageBadge refreshKey={fcUsageKey} before={fcBefore} />
+            ) : null}
+            {board?.capabilities.emailVerify ? (
+              <ZeruhUsageBadge refreshKey={zeruhUsageKey} before={zeruhBefore} />
+            ) : null}
+          </div>
+          {sendVerifying ? (
+            <p className="flex items-center gap-2 text-xs text-amber-200/90">
+              <Spinner className="h-3 w-3" />
+              Verifying email is deliverable…
+            </p>
           ) : null}
         </div>
 
@@ -804,6 +925,7 @@ export function Studio() {
                   onMoveStage={onMoveStage}
                   onUpdateLead={onUpdateLeadCrm}
                   onDeleteLead={(id) => void onDeleteLead(id)}
+                  onDeleteLeads={onDeleteLeads}
                 />
               )}
             </div>
@@ -822,6 +944,7 @@ export function Studio() {
             <OutreachView
               leads={board!.leads}
               canSendEmail={!!board!.capabilities.canSendEmail}
+              emailVerify={!!board!.capabilities.emailVerify}
               busyId={outreachBusy}
               onOpenInfo={openInfo}
               onOpenDraft={openDraft}
@@ -842,10 +965,11 @@ export function Studio() {
                 }
               }}
               onSend={async (outreachId) => {
-                requestSend(outreachId);
+                await requestSend(outreachId);
               }}
               onDraftAll={onDraftAllOutreach}
               onApproveAll={onApproveAllOutreach}
+              onSendAll={onSendAllOutreach}
             />
           </div>
         ) : (

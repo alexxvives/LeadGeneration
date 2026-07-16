@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { CrmStagePill, FitMeter, crmStageLabel } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
-import { MailIcon, PhoneIcon, TrashIcon } from "@/components/icons";
+import { CheckIcon, MailIcon, PhoneIcon, TrashIcon, XIcon } from "@/components/icons";
 import { displayWebsite } from "@/lib/website";
 import { shortLocation } from "@/lib/search/enrich";
 import { useLeadColumnState } from "@/components/studio/LeadColumnsMenu";
@@ -24,6 +24,7 @@ export function LeadTable({
   onMoveStage,
   onUpdateLead,
   onDeleteLead,
+  onDeleteLeads,
 }: {
   leads: LeadWithOutreach[];
   onOpen: (id: string) => void;
@@ -37,11 +38,33 @@ export function LeadTable({
     patch: { notes?: string | null; customFields?: Record<string, string> },
   ) => void;
   onDeleteLead?: (leadId: string) => void;
+  /** Bulk delete — preferred when selecting multiple. */
+  onDeleteLeads?: (leadIds: string[]) => void | Promise<void>;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const { customCols, vis } = useLeadColumnState();
   const visibleCustom = customCols.filter((c) => !!vis.custom[c.id]);
+  const canDelete = Boolean(onDeleteLead || onDeleteLeads);
+  const allSelected = leads.length > 0 && selected.size === leads.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
+  useEffect(() => {
+    // Drop selection for leads that left the table.
+    setSelected((prev) => {
+      const ids = new Set(leads.map((l) => l.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (ids.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [leads]);
 
   useEffect(() => {
     if (!openId) return;
@@ -54,12 +77,56 @@ export function LeadTable({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [openId]);
 
+  const toggleOne = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(leads.map((l) => l.id)));
+  };
+
+  const runBulkDelete = async () => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    setDeleting(true);
+    try {
+      if (onDeleteLeads) await onDeleteLeads(ids);
+      else if (onDeleteLead) {
+        for (const id of ids) onDeleteLead(id);
+      }
+      setSelected(new Set());
+      setConfirmBulk(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
-    <div className="flex max-h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-xl2 border border-white/10">
+    <div className="relative flex max-h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-xl2 border border-white/10">
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="sticky top-0 z-10 bg-ink-950/95 backdrop-blur-sm">
             <tr className="border-b border-white/10 text-left text-xs uppercase tracking-widest text-mist-500">
+              {canDelete ? (
+                <th className="w-10 px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected;
+                    }}
+                    onChange={toggleAll}
+                    aria-label={allSelected ? "Deselect all leads" : "Select all leads"}
+                    className="rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40"
+                  />
+                </th>
+              ) : null}
               <th className="px-5 py-3 font-medium">Company</th>
               <th className="px-5 py-3 font-medium">Location</th>
               <th className="px-5 py-3 font-medium">Contact</th>
@@ -73,7 +140,7 @@ export function LeadTable({
                   {c.name}
                 </th>
               ))}
-              {onDeleteLead ? <th className="w-10 px-2 py-3" aria-label="Actions" /> : null}
+              {canDelete ? <th className="w-10 px-2 py-3" aria-label="Actions" /> : null}
             </tr>
           </thead>
           <tbody>
@@ -82,12 +149,29 @@ export function LeadTable({
               const loc = shortLocation(l.location) ?? "—";
               const stage = l.crmStage ?? "new";
               const fields = l.customFields ?? {};
+              const isChecked = selected.has(l.id);
               return (
                 <tr
                   key={l.id}
                   onClick={() => onOpen(l.id)}
-                  className="group cursor-pointer border-b border-white/5 transition-colors last:border-0 hover:bg-white/5"
+                  className={`group cursor-pointer border-b border-white/5 transition-colors last:border-0 hover:bg-white/5 ${
+                    isChecked ? "bg-aurora-400/[0.04]" : ""
+                  }`}
                 >
+                  {canDelete ? (
+                    <td
+                      className="px-3 py-3.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleOne(l.id)}
+                        aria-label={`Select ${l.company}`}
+                        className="rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40"
+                      />
+                    </td>
+                  ) : null}
                   <td className="px-5 py-3.5">
                     <p className="font-medium text-mist-100">{l.company}</p>
                     {domain && <p className="text-xs text-mist-500">{domain}</p>}
@@ -129,7 +213,9 @@ export function LeadTable({
                       >
                         <button
                           type="button"
-                          onClick={() => setOpenId((id) => (id === l.id ? null : l.id))}
+                          onClick={() =>
+                            setOpenId((id) => (id === l.id ? null : l.id))
+                          }
                           className="rounded-full transition-transform hover:scale-[1.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora-400/50"
                           aria-haspopup="listbox"
                           aria-expanded={openId === l.id}
@@ -171,16 +257,16 @@ export function LeadTable({
                   </td>
                   {vis.notes ? (
                     <td
-                      className="max-w-[14rem] px-5 py-3.5"
+                      className="max-w-[12rem] px-5 py-3.5"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <input
                         defaultValue={l.notes ?? ""}
                         key={`${l.id}-notes-${l.notes ?? ""}`}
                         onBlur={(e) => {
-                          const next = e.target.value || null;
-                          if (next !== (l.notes ?? null)) {
-                            onUpdateLead?.(l.id, { notes: next });
+                          const next = e.target.value;
+                          if (next !== (l.notes ?? "")) {
+                            onUpdateLead?.(l.id, { notes: next || null });
                           }
                         }}
                         placeholder="—"
@@ -191,7 +277,7 @@ export function LeadTable({
                   {visibleCustom.map((c) => (
                     <td
                       key={c.id}
-                      className="max-w-[12rem] px-5 py-3.5"
+                      className="px-5 py-3.5"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {c.type === "select" ? (
@@ -230,7 +316,7 @@ export function LeadTable({
                       )}
                     </td>
                   ))}
-                  {onDeleteLead ? (
+                  {canDelete ? (
                     <td
                       className="px-2 py-3.5"
                       onClick={(e) => e.stopPropagation()}
@@ -244,7 +330,7 @@ export function LeadTable({
                               `Delete ${l.company}? This cannot be undone.`,
                             )
                           ) {
-                            onDeleteLead(l.id);
+                            onDeleteLead?.(l.id);
                           }
                         }}
                         className="rounded-lg p-1.5 text-mist-600 opacity-0 transition-opacity hover:bg-rose-400/10 hover:text-rose-300 group-hover:opacity-100 focus:opacity-100"
@@ -259,6 +345,63 @@ export function LeadTable({
           </tbody>
         </table>
       </div>
+
+      {selected.size > 0 ? (
+        <div className="absolute bottom-4 left-1/2 z-20 flex w-[min(100%-2rem,28rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-ink-900/95 px-3 py-2 shadow-2xl backdrop-blur-xl animate-float-up">
+          {confirmBulk ? (
+            <>
+              <p className="min-w-0 flex-1 truncate px-1 text-xs text-mist-200">
+                Delete{" "}
+                <span className="font-semibold text-rose-300">{selected.size}</span>{" "}
+                lead{selected.size === 1 ? "" : "s"}? Can&apos;t undo.
+              </p>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void runBulkDelete()}
+                className="inline-flex items-center gap-1 rounded-full bg-rose-400 px-3 py-1.5 text-xs font-medium text-ink-950 disabled:opacity-50"
+              >
+                <CheckIcon className="h-3 w-3" />
+                {deleting ? "Deleting…" : "Confirm"}
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setConfirmBulk(false)}
+                className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-mist-300 hover:bg-white/5"
+              >
+                Back
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="min-w-0 flex-1 truncate px-1 text-xs text-mist-200">
+                <span className="font-semibold text-aurora-300">{selected.size}</span>{" "}
+                selected
+              </p>
+              <button
+                type="button"
+                onClick={() => setConfirmBulk(true)}
+                className="inline-flex items-center gap-1 rounded-full bg-rose-400/90 px-3 py-1.5 text-xs font-medium text-ink-950 hover:bg-rose-400"
+              >
+                <TrashIcon className="h-3 w-3" />
+                Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelected(new Set());
+                  setConfirmBulk(false);
+                }}
+                aria-label="Clear selection"
+                className="rounded-full p-1.5 text-mist-500 hover:bg-white/5 hover:text-mist-200"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

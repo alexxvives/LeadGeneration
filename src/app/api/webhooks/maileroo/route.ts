@@ -109,6 +109,7 @@ function mapEvent(type: string): DeliveryStatus | null {
     case "failed":
     case "rejected":
     case "complained":
+    case "bounced":
       return "bounced";
     case "delivered":
     case "accepted":

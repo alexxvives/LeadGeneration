@@ -25,8 +25,14 @@ export type OutreachProfile = {
   /**
    * Sales pitch versions by language. Same offer, different language —
    * preview and drafting pick the matching version (no sample substitution).
+   * May contain light HTML (bold / lists) from the Settings editor.
    */
   pitches: Partial<Record<OutreachLang, string>>;
+  /**
+   * When true, drafts use greeting + sales pitch + sign-off only
+   * (no scraped opener / stock CTA). Default false = assembled template.
+   */
+  staticBody?: boolean;
 };
 
 export type SenderProfile = OutreachProfile;
@@ -76,6 +82,7 @@ function emptyProfile(partial?: Partial<OutreachProfile>): OutreachProfile {
     signature: partial?.signature ?? "",
     subjectTemplate: partial?.subjectTemplate ?? "",
     pitches: partial?.pitches ?? {},
+    staticBody: partial?.staticBody ?? false,
   };
 }
 
@@ -147,6 +154,7 @@ function migrateLegacySingle(raw: string): ProfileStore {
       signature: String(parsed.signature ?? ""),
       subjectTemplate: String(parsed.subjectTemplate ?? ""),
       pitches,
+      staticBody: Boolean(parsed.staticBody),
     });
     return { profiles: [profile], activeId: profile.id };
   } catch {
@@ -205,6 +213,7 @@ function normalizeProfile(p: Partial<OutreachProfile> & { defaultOffer?: string 
     signature: String(p.signature ?? ""),
     subjectTemplate: String(p.subjectTemplate ?? ""),
     pitches,
+    staticBody: Boolean(p.staticBody),
   });
 }
 

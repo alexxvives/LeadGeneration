@@ -365,6 +365,7 @@ export async function createAndRunSearch(
         signOff: input.senderName?.trim() || null,
         offerNotes: input.offerNotes?.trim() || null,
         subjectTemplate: input.subjectTemplate?.trim() || null,
+        staticBody: Boolean(input.staticBody),
       };
       const drafts: Outreach[] = leads.map((lead) => ({
         id: newId("out"),
@@ -539,6 +540,7 @@ export async function draftOutreach(
     signOff?: string | null;
     offerNotes?: string | null;
     subjectTemplate?: string | null;
+    staticBody?: boolean;
   },
 ): Promise<Outreach | null> {
   const db = ctx.db;
@@ -634,7 +636,8 @@ export async function sendApprovedOutreach(
     return { ok: false, error: "No recipient email on this lead" };
   }
 
-  // List hygiene — block hard undeliverables when a verify key is configured.
+  // List hygiene — Zeruh verify at send only (not on enrich). Blocks hard
+  // undeliverables when a verify key is configured.
   const verified = await verifyEmail(outreach.toEmail);
   if (!verified.okToSend) {
     return {
