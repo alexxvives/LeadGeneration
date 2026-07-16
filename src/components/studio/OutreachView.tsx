@@ -70,6 +70,7 @@ export function OutreachView({
   busyId,
   onOpenInfo,
   onOpenDraft,
+  onCreateDraft,
   onDraft,
   onSend,
   onDraftAll,
@@ -83,6 +84,8 @@ export function OutreachView({
   busyId: string | null;
   onOpenInfo: (id: string) => void;
   onOpenDraft: (id: string) => void;
+  /** Contact Draft: draft from latest profile, then open composer. */
+  onCreateDraft: (id: string) => Promise<void>;
   onDraft: (leadId: string) => Promise<void>;
   onSend: (outreachId: string) => Promise<void>;
   onDraftAll: () => Promise<void>;
@@ -174,6 +177,7 @@ export function OutreachView({
                         emailVerify={emailVerify}
                         onOpenInfo={() => onOpenInfo(lead.id)}
                         onOpenDraft={() => onOpenDraft(lead.id)}
+                        onCreateDraft={() => onCreateDraft(lead.id)}
                         onDraft={() => onDraft(lead.id)}
                         onSend={() =>
                           lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
@@ -203,6 +207,7 @@ function OutreachRow({
   emailVerify,
   onOpenInfo,
   onOpenDraft,
+  onCreateDraft,
   onDraft,
   onSend,
   onMarkContacted,
@@ -214,6 +219,7 @@ function OutreachRow({
   emailVerify: boolean;
   onOpenInfo: () => void;
   onOpenDraft: () => void;
+  onCreateDraft: () => Promise<void>;
   onDraft: () => Promise<void>;
   onSend: () => Promise<void>;
   onMarkContacted: (method: ContactMethod) => Promise<void>;
@@ -230,13 +236,19 @@ function OutreachRow({
           ? "Emailed"
           : null;
 
+  // Contact Draft: draft first, then open. Ready/Contacted: open existing.
+  const openComposer = () => {
+    if (bucket === "review") void onCreateDraft();
+    else onOpenDraft();
+  };
+
   return (
     <li className="flex items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03]">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={onOpenDraft}
+            onClick={openComposer}
             className="min-w-0 truncate rounded-md text-left text-sm font-medium text-mist-100 outline-none hover:text-aurora-200 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
           >
             {lead.company}
@@ -253,7 +265,7 @@ function OutreachRow({
         </div>
         <button
           type="button"
-          onClick={onOpenDraft}
+          onClick={openComposer}
           className="mt-0.5 flex w-full min-w-0 items-center gap-1 truncate rounded-md text-left text-[11px] text-mist-500 outline-none hover:text-mist-300 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
         >
           <MailIcon className="h-3 w-3 shrink-0" />
@@ -277,10 +289,11 @@ function OutreachRow({
           <div className="flex items-center justify-end gap-1">
             <button
               type="button"
-              onClick={onOpenDraft}
-              className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
+              disabled={busy}
+              onClick={() => void onCreateDraft()}
+              className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
             >
-              Create
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : "Create"}
             </button>
             <button
               type="button"

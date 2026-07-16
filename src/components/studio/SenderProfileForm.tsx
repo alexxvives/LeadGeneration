@@ -390,6 +390,24 @@ export function SenderProfileForm() {
     </span>
   );
 
+  const PlaceholderHelp = () => (
+    <span
+      className="group relative inline-flex"
+      title="{company}, {lead_name}, {location}"
+    >
+      <HelpIcon className="h-3.5 w-3.5 text-mist-500 transition-colors group-hover:text-mist-300" />
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+      >
+        Placeholders are replaced per lead:{" "}
+        <code className="text-aurora-300">{"{company}"}</code>,{" "}
+        <code className="text-aurora-300">{"{lead_name}"}</code>,{" "}
+        <code className="text-aurora-300">{"{location}"}</code>.
+      </span>
+    </span>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -487,22 +505,7 @@ export function SenderProfileForm() {
               <span className="text-xs font-medium text-mist-500">
                 Email subject template
               </span>
-              <span
-                className="group relative inline-flex"
-                title="Use variables like {company}, {lead_name}, or {location}"
-              >
-                <HelpIcon className="h-3.5 w-3.5 text-mist-500 transition-colors group-hover:text-mist-300" />
-                <span
-                  role="tooltip"
-                  className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                >
-                  Write in any language. Switch the preview flag to translate into
-                  another language. Placeholders:{" "}
-                  <code className="text-aurora-300">{"{company}"}</code>,{" "}
-                  <code className="text-aurora-300">{"{lead_name}"}</code>,{" "}
-                  <code className="text-aurora-300">{"{location}"}</code>.
-                </span>
-              </span>
+              <PlaceholderHelp />
               <SavedHint field="subject" />
             </div>
             <input
@@ -524,22 +527,7 @@ export function SenderProfileForm() {
             <div className="mb-1.5 flex min-w-0 flex-wrap items-center justify-between gap-2">
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-mist-500">
                 Email body template
-                <span
-                  className="group relative inline-flex"
-                  title="Write the email body; use placeholders for personalization"
-                >
-                  <HelpIcon className="h-3.5 w-3.5 text-mist-500 transition-colors group-hover:text-mist-300" />
-                  <span
-                    role="tooltip"
-                    className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                  >
-                    Your pitch paragraph. Placeholders:{" "}
-                    <code className="text-aurora-300">{"{company}"}</code>,{" "}
-                    <code className="text-aurora-300">{"{lead_name}"}</code>,{" "}
-                    <code className="text-aurora-300">{"{location}"}</code>. Switch
-                    the preview flag to translate into another language.
-                  </span>
-                </span>
+                <PlaceholderHelp />
                 <SavedHint field="pitch" />
               </span>
               <button
@@ -605,24 +593,43 @@ export function SenderProfileForm() {
               onBlur={() => saveOnBlur("pitch")}
               placeholder={`Write your ${langLabel(previewLang)} email body…`}
             />
-            <label className="mt-2 flex cursor-pointer items-start gap-2.5 rounded-lg border border-white/5 bg-ink-950/30 px-3 py-2.5">
-              <input
-                type="checkbox"
-                checked={Boolean(profile.aiPersonalize)}
-                onChange={(e) => {
-                  const next = {
-                    ...profile,
-                    aiPersonalize: e.target.checked,
-                    staticBody: !e.target.checked,
-                  };
-                  persist(next, null);
-                }}
-                className="mt-0.5 rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40"
-              />
-              <span className="text-xs font-medium text-mist-200">
-                AI personalize each email
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(profile.aiPersonalize)}
+              onClick={() => {
+                const on = !profile.aiPersonalize;
+                persist(
+                  { ...profile, aiPersonalize: on, staticBody: !on },
+                  null,
+                );
+              }}
+              className={`mt-2 flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors ${
+                profile.aiPersonalize
+                  ? "border-aurora-400/35 bg-aurora-400/10"
+                  : "border-white/10 bg-ink-950/40 hover:border-white/15 hover:bg-ink-950/60"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-mist-100">
+                  AI personalize each email
+                </span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-mist-500">
+                  Slightly vary wording per lead from this template
+                </span>
               </span>
-            </label>
+              <span
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                  profile.aiPersonalize ? "bg-aurora-400" : "bg-white/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-ink-950 shadow transition-transform ${
+                    profile.aiPersonalize ? "left-5" : "left-0.5"
+                  }`}
+                />
+              </span>
+            </button>
             {genProvider && !genError && (
               <p className="mt-1.5 text-xs text-mist-500">
                 Generated with{" "}
@@ -638,19 +645,7 @@ export function SenderProfileForm() {
           <label className="block">
             <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-xs font-medium text-mist-500">Email sign-off</span>
-              <span
-                className="group relative inline-flex"
-                title="Closing lines appended after the body"
-              >
-                <HelpIcon className="h-3.5 w-3.5 text-mist-500 transition-colors group-hover:text-mist-300" />
-                <span
-                  role="tooltip"
-                  className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                >
-                  Closing lines after the body (e.g. Best regards, your name,
-                  title). Shown on every draft from this profile.
-                </span>
-              </span>
+              <PlaceholderHelp />
               <SavedHint field="signOff" />
             </div>
             <textarea
@@ -737,7 +732,7 @@ export function SenderProfileForm() {
             <p className="mt-0.5 font-medium text-mist-100">{preview.subject}</p>
             <div className="mt-4 border-t border-white/5 pt-4">
               <div
-                className="pitch-preview font-sans text-sm leading-relaxed text-mist-300 [&_b]:font-semibold [&_strong]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-0"
+                className="pitch-preview font-sans text-sm leading-relaxed text-mist-300 [&_b]:font-semibold [&_strong]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_br]:block [&_br]:content-[''] [&_br]:leading-[1.55]"
                 dangerouslySetInnerHTML={{
                   __html: normalizePitchHtml(preview.body),
                 }}

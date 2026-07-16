@@ -144,6 +144,7 @@ export const api = {
       subjectTemplate?: string;
       staticBody?: boolean;
       aiPersonalize?: boolean;
+      forceLang?: string;
     },
   ) =>
     jsonFetch<{ outreach: Outreach }>("/api/outreach", {
@@ -160,6 +161,7 @@ export const api = {
         ...(opts?.aiPersonalize !== undefined
           ? { aiPersonalize: opts.aiPersonalize }
           : {}),
+        ...(opts?.forceLang !== undefined ? { forceLang: opts.forceLang } : {}),
       }),
     }),
 

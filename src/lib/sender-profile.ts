@@ -4,6 +4,7 @@
  */
 import { readMigratedKey } from "@/lib/browser-storage";
 import {
+  outreachLangFromLocation,
   outreachLangFromText,
   type OutreachLang,
 } from "@/lib/outreach/locale";
@@ -85,7 +86,7 @@ function newId(): string {
 function emptyProfile(partial?: Partial<OutreachProfile>): OutreachProfile {
   return {
     id: partial?.id ?? newId(),
-    name: partial?.name ?? "Default",
+    name: partial?.name ?? "Profile 1",
     displayName: partial?.displayName ?? "",
     company: partial?.company ?? DEFAULT_COMPANY,
     title: partial?.title ?? "",
@@ -141,7 +142,26 @@ export function subjectForLang(
 ): string {
   const exact = p.subjects[lang]?.trim();
   if (exact) return exact;
+  const primary = primaryPitchLang(p);
+  if (primary && primary !== lang) {
+    const fromPitchLang = p.subjects[primary]?.trim();
+    if (fromPitchLang) return fromPitchLang;
+  }
   return p.subjectTemplate.trim();
+}
+
+/**
+ * Language for drafting: prefer the lead's location language when a pitch exists
+ * there; otherwise follow the profile's primary pitch language so subject + body
+ * stay in the same language (avoids EN subject + ES body).
+ */
+export function resolveDraftLang(
+  p: OutreachProfile,
+  location: string | null | undefined,
+): OutreachLang {
+  const locLang = outreachLangFromLocation(location ?? null);
+  if (p.pitches[locLang]?.trim()) return locLang;
+  return primaryPitchLang(p) ?? locLang;
 }
 
 /** Primary pitch language (first non-empty, preferring detected). */
@@ -169,7 +189,7 @@ function migrateLegacySingle(raw: string): ProfileStore {
     }
     const profile = emptyProfile({
       id: parsed.id,
-      name: String(parsed.name ?? "Default"),
+      name: String(parsed.name ?? "Profile 1"),
       displayName: String(parsed.displayName ?? ""),
       company: String(parsed.company ?? DEFAULT_COMPANY) || DEFAULT_COMPANY,
       title: String(parsed.title ?? ""),
@@ -237,9 +257,10 @@ function normalizeProfile(p: Partial<OutreachProfile> & { defaultOffer?: string 
     pitches[outreachLangFromText(legacyOffer)] = legacyOffer;
   }
   const subjects: Partial<Record<OutreachLang, string>> = { ...(p.subjects ?? {}) };
+  const rawName = String(p.name ?? "").trim();
   return emptyProfile({
     id: p.id,
-    name: String(p.name ?? "Untitled"),
+    name: !rawName || rawName === "Default" ? "Profile 1" : rawName,
     displayName: String(p.displayName ?? ""),
     company: String(p.company ?? DEFAULT_COMPANY) || DEFAULT_COMPANY,
     title: String(p.title ?? ""),
@@ -278,7 +299,7 @@ export function saveOutreachProfiles(
   activeId: string | null,
 ): void {
   const safe =
-    profiles.length > 0 ? profiles : [emptyProfile({ name: "Default" })];
+    profiles.length > 0 ? profiles : [emptyProfile({ name: "Profile 1" })];
   const id =
     activeId && safe.some((p) => p.id === activeId) ? activeId : safe[0]!.id;
   writeStore({ profiles: safe, activeId: id });

@@ -37,12 +37,30 @@ export function plainToHtmlFragment(plain: string): string {
   return escapeHtml(t).replace(/\n/g, "<br>");
 }
 
-/** Strip unsafe tags; keep a small formatting subset. */
+/** Collapse messy paste breaks; keep single/double line breaks. */
+function tidyBreaks(html: string): string {
+  return html
+    .replace(/(?:<br\s*\/?>\s*){3,}/gi, "<br><br>")
+    .replace(/(?:<br\s*\/?>\s*)+$/i, "")
+    .replace(/^(?:<br\s*\/?>\s*)+/i, "")
+    .trim();
+}
+
+/**
+ * Strip unsafe tags; keep a small formatting subset.
+ * Block elements (div/p) become content + <br> so Word/Docs pastes keep line breaks.
+ * Styles (background, color) are dropped — tags are rebuilt without attributes.
+ */
 export function sanitizePitchHtml(html: string): string {
   if (typeof DOMParser === "undefined") {
-    return html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    return tidyBreaks(
+      html
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+        .replace(/\s(?:style|class|bgcolor|color)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+        .replace(/<\/?(div|p)[^>]*>/gi, "<br>")
+        .replace(/(?:<br\s*\/?>\s*){3,}/gi, "<br><br>"),
+    );
   }
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
   const root = doc.body.firstElementChild;
@@ -61,12 +79,17 @@ export function sanitizePitchHtml(html: string): string {
     if (tag === "BR") return "<br>";
     const inner = Array.from(el.childNodes).map(walk).join("");
     const t = tag.toLowerCase();
-    if (t === "span" || t === "div") return inner;
-    if (t === "p") return inner ? `<p>${inner}</p>` : "";
+    if (t === "span") return inner;
+    // Preserve line breaks from pasted block containers (Word/Docs/etc.).
+    if (t === "div" || t === "p") {
+      if (!inner.trim()) return "";
+      return `${inner}<br>`;
+    }
+    if (t === "li") return `<li>${inner}</li>`;
     return `<${t}>${inner}</${t}>`;
   };
 
-  return Array.from(root.childNodes).map(walk).join("").trim();
+  return tidyBreaks(Array.from(root.childNodes).map(walk).join(""));
 }
 
 /**
@@ -79,11 +102,15 @@ export function normalizePitchHtml(input: string): string {
   if (!looksLikeHtml(raw)) return plainToHtmlFragment(raw);
   if (typeof DOMParser !== "undefined") return sanitizePitchHtml(raw);
   // Workers / Node: strip scripts + event handlers; keep known tags.
-  return raw
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/<\/?(?!\/?(?:b|strong|i|em|u|ul|ol|li|br|p)\b)[a-z][^>]*>/gi, "")
-    .trim();
+  return tidyBreaks(
+    raw
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+      .replace(/\s(?:style|class|bgcolor|color)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+      .replace(/<\/?(?!\/?(?:b|strong|i|em|u|ul|ol|li|br|p)\b)[a-z][^>]*>/gi, "")
+      .replace(/<\/p>\s*<p[^>]*>/gi, "<br><br>")
+      .replace(/<\/?p[^>]*>/gi, "<br>"),
+  );
 }
 
 /** Convert pitch HTML (or legacy plain) to email-safe plain text. */
@@ -117,7 +144,7 @@ export function richToPlain(input: string): string {
 export function plainToRich(plain: string): string {
   const t = plain.replace(/\r\n/g, "\n").trim();
   if (!t) return "";
-  if (looksLikeHtml(t)) return t;
+  if (looksLikeHtml(t)) return sanitizePitchHtml(t);
   return t
     .split(/\n/)
     .map((line) => {

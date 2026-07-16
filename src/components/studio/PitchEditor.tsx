@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode, type MouseEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  type ClipboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { plainToRich, sanitizePitchHtml } from "@/lib/outreach/rich-text";
 
 /**
  * Lightweight rich pitch editor (bold / italic / underline + bullets).
+ * Pastes are sanitized (no white backgrounds / forced colors).
  * Stores sanitized HTML; drafts/preview/send keep the formatting.
  */
 export function PitchEditor({
@@ -26,7 +33,9 @@ export function PitchEditor({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const asHtml = /<[a-z][\s\S]*>/i.test(value) ? value : plainToRich(value);
+    const asHtml = /<[a-z][\s\S]*>/i.test(value)
+      ? sanitizePitchHtml(value)
+      : plainToRich(value);
     if (asHtml === lastExternal.current) return;
     if (document.activeElement === el) return;
     el.innerHTML = asHtml || "";
@@ -41,15 +50,31 @@ export function PitchEditor({
     onChange(html);
   };
 
-  const cmd = (command: string) => {
+  const cmd = (command: string, arg?: string) => {
     ref.current?.focus();
-    document.execCommand(command, false);
+    document.execCommand(command, false, arg);
+    emit();
+  };
+
+  const onPaste = (e: ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const html = e.clipboardData.getData("text/html");
+    const text = e.clipboardData.getData("text/plain");
+    if (html?.trim()) {
+      document.execCommand("insertHTML", false, sanitizePitchHtml(html));
+    } else if (text) {
+      document.execCommand(
+        "insertHTML",
+        false,
+        plainToRich(text.replace(/\r\n/g, "\n")),
+      );
+    }
     emit();
   };
 
   return (
     <div className="overflow-hidden rounded-lg border border-white/10 bg-ink-900/60 focus-within:border-aurora-400/60">
-      <div className="flex items-center gap-1 border-b border-white/5 px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-1 border-b border-white/5 px-2 py-1.5">
         <ToolbarBtn
           label="Bold"
           onMouseDown={(e) => {
@@ -86,9 +111,22 @@ export function PitchEditor({
         >
           <span className="text-[11px] leading-none">• ≡</span>
         </ToolbarBtn>
-        <p className="ml-auto text-[10px] text-mist-600">
-          Template text · placeholders OK
-        </p>
+        <span className="mx-0.5 h-4 w-px bg-white/10" aria-hidden />
+        <ToolbarBtn
+          label="Clear formatting"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            cmd("removeFormat");
+            // Also strip leftover paste styles from the whole selection/body.
+            const el = ref.current;
+            if (el) {
+              el.innerHTML = sanitizePitchHtml(el.innerHTML);
+              emit();
+            }
+          }}
+        >
+          <span className="text-[10px] font-medium tracking-wide">Clear</span>
+        </ToolbarBtn>
       </div>
       <div
         ref={ref}
@@ -100,11 +138,12 @@ export function PitchEditor({
         data-placeholder={placeholder}
         onFocus={onFocus}
         onInput={emit}
+        onPaste={onPaste}
         onBlur={() => {
           emit();
           onBlur?.();
         }}
-        className="min-h-[5.5rem] px-4 py-3 text-sm leading-relaxed text-mist-100 outline-none empty:before:pointer-events-none empty:before:text-mist-500 empty:before:content-[attr(data-placeholder)] [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
+        className="pitch-editor min-h-[5.5rem] px-4 py-3 text-sm leading-relaxed text-mist-100 outline-none empty:before:pointer-events-none empty:before:text-mist-500 empty:before:content-[attr(data-placeholder)] [&_*]:!bg-transparent [&_*]:!text-inherit [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
       />
     </div>
   );

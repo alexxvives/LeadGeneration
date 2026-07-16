@@ -25,10 +25,10 @@ import {
   draftFlagsFromProfile,
   loadSenderProfile,
   pitchForLang,
+  resolveDraftLang,
   resolveSignature,
   subjectForLang,
 } from "@/lib/sender-profile";
-import { outreachLangFromLocation } from "@/lib/outreach/locale";
 import { BoardAssignModal, type BoardDestination } from "./BoardAssignModal";
 import { DashboardView } from "./DashboardView";
 import { BoardsView } from "./BoardsView";
@@ -388,25 +388,40 @@ export function Studio() {
     );
   };
 
-  const onDraft = async (leadId: string) => {
+  const onDraft = async (leadId: string): Promise<boolean> => {
     try {
       const profile = loadSenderProfile();
       const lead = board?.leads.find((l) => l.id === leadId);
-      const lang = outreachLangFromLocation(lead?.location ?? null);
+      const lang = resolveDraftLang(profile, lead?.location ?? null);
       const flags = draftFlagsFromProfile(profile);
       const pitch = pitchForLang(profile, lang).trim();
       const { outreach } = await api.draft(leadId, {
         signOff: resolveSignature(profile),
         // Empty pitch → empty body (no stock opener / default pitch).
+        // Always pass offerNotes so we never fall back to stale run.offerNotes.
         offerNotes: pitch || "",
         subjectTemplate: subjectForLang(profile, lang) || undefined,
         staticBody: true,
         aiPersonalize: flags.aiPersonalize,
+        forceLang: lang,
       });
       patchLeadLocal(leadId, { outreach, status: "queued" });
       toast("ok", pitch ? "Draft written — ready to contact." : "Empty draft created — add your template in Settings, or edit the body.");
+      return true;
     } catch (e) {
       toast("err", (e as Error).message);
+      return false;
+    }
+  };
+
+  /** Contact Draft: generate from latest profile, then open the composer. */
+  const createAndOpenDraft = async (leadId: string) => {
+    setOutreachBusy(leadId);
+    try {
+      const ok = await onDraft(leadId);
+      if (ok) openDraft(leadId);
+    } finally {
+      setOutreachBusy(null);
     }
   };
 
@@ -1024,6 +1039,7 @@ export function Studio() {
               busyId={outreachBusy}
               onOpenInfo={openInfo}
               onOpenDraft={openDraft}
+              onCreateDraft={createAndOpenDraft}
               onDraft={async (id) => {
                 setOutreachBusy(id);
                 try {

@@ -50,7 +50,7 @@ interface DrawerProps {
   /** info = CRM/profile only; draft = outreach composer only */
   mode?: "info" | "draft";
   onClose: () => void;
-  onDraft: (leadId: string) => Promise<void>;
+  onDraft: (leadId: string) => Promise<void | boolean>;
   onSaveDraft: (
     outreachId: string,
     patch: { subject: string; body: string; toEmail: string | null },
@@ -141,7 +141,7 @@ export function LeadDrawer(props: DrawerProps) {
     setDirty(false);
   };
 
-  const run = async (key: string, fn: () => Promise<void>) => {
+  const run = async (key: string, fn: () => Promise<void | boolean>) => {
     setBusy(key);
     try { await fn(); } finally { setBusy(null); }
   };

@@ -9,20 +9,17 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-16 (studio UX polish + fit score)
+## ⏱️ Status — updated 2026-07-16 (pitch editor + draft freshness)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Pipeline: removed Draft all; removed Discarded stage (delete instead; legacy
-  `discarded` → `not_interested` on read).
-- Outreach: Contact Draft has Create + amber arrow; row click opens draft
-  drawer; info icon opens info; header “Draft all”; no Log contact in Contact Draft.
-- Settings: lang labels cleaned on templates; ? help on body/sign-off; domain
-  health inside sending-identity; Developer mode last with plan on the right.
-- Side nav grouped (Overview / Find / Engage / Organize). Fit score is
-  relevance-first (niche+location), contactability scaled when match is weak.
+- Pitch editor: strip paste styles, Clear formatting, preserve line breaks;
+  no “Template text · placeholders OK”; unified placeholder ? help.
+- Drafts always use latest profile body (no stale run.offerNotes fallback);
+  Create drafts then opens composer; Profile 1 naming; AI toggle restyle.
+- Body↔sign-off single break; company shortens before “. ” subtitle.
 
 ### Next
 1. Point Maileroo/Resend dashboards at the webhook URL in Settings → Easy.

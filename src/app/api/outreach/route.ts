@@ -9,10 +9,11 @@ export const dynamic = "force-dynamic";
 const DraftSchema = z.object({
   leadId: z.string().min(1),
   signOff: z.string().max(2000).optional(),
-  offerNotes: z.string().max(4000).optional(),
-  subjectTemplate: z.string().max(200).optional(),
+  offerNotes: z.string().max(12000).optional(),
+  subjectTemplate: z.string().max(300).optional(),
   staticBody: z.boolean().optional(),
   aiPersonalize: z.boolean().optional(),
+  forceLang: z.enum(["en", "es", "fr", "it", "de", "pt", "pl"]).optional(),
 });
 
 export async function POST(req: Request) {
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
     subjectTemplate: parsed.data.subjectTemplate,
     staticBody: parsed.data.staticBody,
     aiPersonalize: parsed.data.aiPersonalize,
+    forceLang: parsed.data.forceLang,
   });
   if (!outreach) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   return NextResponse.json({ outreach }, { status: 201 });

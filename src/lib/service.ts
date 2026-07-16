@@ -6,7 +6,10 @@ import {
   mapPool,
   personalizeDraftForLead,
 } from "@/lib/ai/generate";
-import { outreachLangFromLocation } from "@/lib/outreach/locale";
+import {
+  outreachLangFromLocation,
+  type OutreachLang,
+} from "@/lib/outreach/locale";
 import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
@@ -567,6 +570,7 @@ export async function draftOutreach(
     subjectTemplate?: string | null;
     staticBody?: boolean;
     aiPersonalize?: boolean;
+    forceLang?: OutreachLang;
   },
 ): Promise<Outreach | null> {
   const db = ctx.db;
@@ -576,8 +580,11 @@ export async function draftOutreach(
   if (!run) return null;
 
   const aiPersonalize = Boolean(overrides?.aiPersonalize);
+  const draftLang =
+    overrides?.forceLang ?? outreachLangFromLocation(lead.location);
   const draftOverrides = {
     ...overrides,
+    forceLang: draftLang,
     staticBody: aiPersonalize ? true : overrides?.staticBody !== false,
     aiPersonalize,
   };
@@ -589,7 +596,7 @@ export async function draftOutreach(
       location: lead.location,
       aboutBlurb: lead.aboutBlurb,
       website: lead.website,
-      lang: outreachLangFromLocation(lead.location),
+      lang: draftLang,
       subject,
       body,
     });

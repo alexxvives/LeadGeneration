@@ -51,11 +51,19 @@ function firstName(lead: Lead): string {
 }
 
 function shortCompany(lead: Lead): string {
-  return (
+  let name =
     lead.company
-      .replace(/\b(LLC|Inc|Co|Group|Studio|Partners|Collective|Labs|Academy|Academia)\b\.?/gi, "")
-      .trim() || lead.company
-  );
+      .replace(
+        /\b(LLC|Inc|Co|Group|Studio|Partners|Collective|Labs|Academy|Academia)\b\.?/gi,
+        "",
+      )
+      .trim() || lead.company;
+  // Prefer the brand before a subtitle ("Aquatonic. Parc Termal…" → "Aquatonic").
+  const beforeDot = name.split(/\.\s+/)[0]?.trim();
+  if (beforeDot && beforeDot.length >= 3 && beforeDot.length < name.length) {
+    name = beforeDot;
+  }
+  return name;
 }
 
 /** Resolve `{lead_name}` / `{company}` / `{location}` in subject or pitch text. */
@@ -93,11 +101,12 @@ function applyBodyPlaceholders(template: string, lead: Lead): string {
     .trim();
 }
 
+/** Join body + sign-off with a single break (no blank line between them). */
 function joinBodyParts(parts: string[]): string {
-  return parts
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0)
-    .join(parts.some(looksLikeHtml) ? "<br><br>" : "\n\n");
+  const cleaned = parts.map((p) => p.trim()).filter((p) => p.length > 0);
+  if (cleaned.length === 0) return "";
+  const html = cleaned.some(looksLikeHtml);
+  return cleaned.join(html ? "<br>" : "\n");
 }
 
 /**
@@ -256,14 +265,18 @@ export function generateDraft(
   const copy = COPY[lang];
   const name = firstName(lead);
   const company = shortCompany(lead);
+  // Prefer explicit overrides (incl. empty string) so an updated/cleared profile
+  // never falls back to a stale run.offerNotes from search time.
   const offerRaw =
-    overrides?.offerNotes?.trim() || run.offerNotes?.trim() || "";
+    overrides && "offerNotes" in overrides
+      ? (overrides.offerNotes ?? "").trim()
+      : run.offerNotes?.trim() || "";
   const nicheHint = run.niche.trim();
   // Sign-off comes from the outreach profile only — never inbox From name.
   const signOffPlain = (
-    overrides?.signOff?.trim() ||
-    run.senderName?.trim() ||
-    ""
+    overrides && "signOff" in overrides
+      ? (overrides.signOff ?? "").trim()
+      : run.senderName?.trim() || ""
   ).replace(/\r\n/g, "\n");
 
   const subjectTpl = overrides?.subjectTemplate?.trim();
