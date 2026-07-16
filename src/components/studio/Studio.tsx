@@ -105,6 +105,8 @@ export function Studio() {
     done: number;
     total: number;
   } | null>(null);
+  const [deletingLeads, setDeletingLeads] = useState(false);
+  const importAbortRef = useRef<AbortController | null>(null);
   /** True while send is in flight and Zeruh verify is configured. */
   const [sendVerifying, setSendVerifying] = useState(false);
   const [pendingSendId, setPendingSendId] = useState<string | null>(null);
@@ -279,9 +281,14 @@ export function Studio() {
     let merged = 0;
     let skipped = 0;
 
+    importAbortRef.current?.abort();
+    const ac = new AbortController();
+    importAbortRef.current = ac;
+
     setImportProgress({ done: 0, total });
     try {
       for (let i = 0; i < leads.length; i += CHUNK) {
+        if (ac.signal.aborted) throw new Error("Import cancelled");
         const chunk = leads.slice(i, i + CHUNK);
         const isLast = i + CHUNK >= leads.length;
         const res = await fetch("/api/leads/import", {
@@ -294,6 +301,7 @@ export function Studio() {
             runId: runId ?? null,
             finalize: isLast,
           }),
+          signal: ac.signal,
         });
         const data = (await res.json()) as {
           error?: string;
@@ -312,12 +320,13 @@ export function Studio() {
         setImportProgress({ done: Math.min(i + chunk.length, total), total });
       }
       // Safety finalize if the last data chunk didn't flip status (network blip).
-      if (runId) {
+      if (runId && !ac.signal.aborted) {
         try {
           await fetch("/api/leads/import", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ leads: [], runId, finalize: true }),
+            signal: ac.signal,
           });
         } catch {
           /* best-effort */
@@ -327,9 +336,11 @@ export function Studio() {
       const parts = [
         imported ? `Added ${imported} new` : null,
         merged
-          ? `updated ${merged} existing (same email or website)`
+          ? `updated ${merged} already in workspace (same email/website)`
           : null,
-        skipped ? `skipped ${skipped} unchanged` : null,
+        skipped
+          ? `${skipped} already in workspace — no new fields`
+          : null,
       ].filter(Boolean);
       toast(
         "ok",
@@ -341,7 +352,15 @@ export function Studio() {
       setActiveRunId(runId ?? null);
       await refresh();
       setView("leads");
+    } catch (e) {
+      if (ac.signal.aborted || (e as Error).name === "AbortError") {
+        toast("ok", "Import cancelled.");
+        await refresh();
+        return;
+      }
+      throw e;
     } finally {
+      if (importAbortRef.current === ac) importAbortRef.current = null;
       setImportProgress(null);
     }
   };
@@ -569,6 +588,10 @@ export function Studio() {
       crmStage: stage,
     };
     if (contactMethod !== undefined) patch.contactMethod = contactMethod;
+    // Moving back to New clears contact method so cards don’t keep Contacted chrome.
+    if (stage === "new" && contactMethod === undefined) {
+      patch.contactMethod = null;
+    }
     // Optimistic update first for instant feel.
     patchLeadLocal(leadId, patch);
     try {
@@ -697,6 +720,8 @@ export function Studio() {
     view === "pipeline" || view === "outreach" || view === "leads";
 
   const onDeleteLead = async (leadId: string) => {
+    // Stop any in-flight CSV import so rows don’t reappear after delete.
+    importAbortRef.current?.abort();
     setBoard((b) =>
       b ? { ...b, leads: b.leads.filter((l) => l.id !== leadId) } : b,
     );
@@ -711,28 +736,25 @@ export function Studio() {
 
   const onDeleteLeads = async (leadIds: string[]) => {
     const idSet = new Set(leadIds);
+    importAbortRef.current?.abort();
+    setDeletingLeads(true);
+    // Optimistic — empty board immediately so UI doesn’t flash old rows.
     setBoard((b) =>
       b ? { ...b, leads: b.leads.filter((l) => !idSet.has(l.id)) } : b,
     );
-    let failed = 0;
-    for (const id of leadIds) {
-      try {
-        await api.deleteLead(id);
-      } catch {
-        failed += 1;
-      }
-    }
-    if (failed > 0) {
-      await refresh();
-      toast(
-        "err",
-        `Deleted ${leadIds.length - failed}; ${failed} failed — refreshed.`,
-      );
-    } else {
+    try {
+      const { deleted } = await api.deleteLeads(leadIds);
       toast(
         "ok",
-        `Deleted ${leadIds.length} lead${leadIds.length === 1 ? "" : "s"}.`,
+        `Deleted ${deleted} lead${deleted === 1 ? "" : "s"}.`,
       );
+      // Confirm server state (also clears any race from a cancelled import).
+      await refresh();
+    } catch (e) {
+      await refresh();
+      toast("err", (e as Error).message);
+    } finally {
+      setDeletingLeads(false);
     }
   };
 
@@ -1047,6 +1069,16 @@ export function Studio() {
         />
       )}
 
+      {deletingLeads && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" />
+          <div className="animate-float-up relative flex items-center gap-3 rounded-xl2 border border-white/10 bg-ink-900 px-5 py-4 shadow-2xl">
+            <Spinner className="h-5 w-5 text-aurora-400" />
+            <p className="text-sm font-medium text-mist-100">Deleting leads…</p>
+          </div>
+        </div>
+      )}
+
       {importProgress && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" />
@@ -1173,7 +1205,7 @@ export function Studio() {
         subtitle={
           assignMode === "search"
             ? "Search results will be added to the board you pick."
-            : "Imported rows land on this board. Rows matching an existing email or website update that lead instead of creating a duplicate."
+            : "Rows land on this board. If an email or website already exists anywhere in your workspace, that lead is updated instead of duplicated."
         }
         boards={boards.length ? boards : board?.boards ?? []}
         preferredBoardId={filterBoardId}

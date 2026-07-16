@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-16 — Fit score from zero + delete vs stuck import
+- Fit score must not give a free ~40 for “appeared in search”; start at 0 and
+  score contactability + niche token hits + location (`scoreImportedLead` for CSV).
+- Bulk delete must abort client import + mark running import runs failed, or a
+  leftover CSV upload can recreate leads after “board is clear”.
+- “Skipped N unchanged” = same email/website already in workspace with no new
+  fields — not “file empty”.
+
 ### 2026-07-16 — Rich pitch HTML + From ≠ sign-off
 - Pitch editor HTML (`b`/`i`/`u`/lists) is preserved in `generateDraft`, Settings
   preview (`dangerouslySetInnerHTML` + sanitize), LeadDrawer composer

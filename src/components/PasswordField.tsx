@@ -68,36 +68,29 @@ export function PasswordField({
         disabled={disabled}
         autoComplete="new-password"
         spellCheck={false}
-        className={inputClassName ?? DEFAULT_INPUT}
+        className={
+          isMasked
+            ? (inputClassName ?? DEFAULT_INPUT).replace(/\bpr-11\b/g, "pr-4")
+            : (inputClassName ?? DEFAULT_INPUT)
+        }
       />
-      <button
-        type="button"
-        disabled={disabled || isMasked}
-        onClick={() => {
-          if (!isMasked) setVisible((v) => !v);
-        }}
-        aria-label={
-          isMasked
-            ? "Saved key cannot be shown"
-            : visible
-              ? "Hide key"
-              : "Show key"
-        }
-        title={
-          isMasked
-            ? "Saved keys can’t be shown — select the field and paste a new key to replace"
-            : visible
-              ? "Hide"
-              : "Show"
-        }
-        className="absolute right-1.5 top-1/2 z-10 -translate-y-1/2 rounded-md p-1.5 text-mist-500 transition-colors hover:bg-white/10 hover:text-mist-100 disabled:pointer-events-none disabled:opacity-40"
-      >
-        {visible && !isMasked ? (
-          <EyeOffIcon className="h-4 w-4" />
-        ) : (
-          <EyeIcon className="h-4 w-4" />
-        )}
-      </button>
+      {/* Saved keys can’t be revealed — hide the eye entirely. */}
+      {!isMasked ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? "Hide key" : "Show key"}
+          title={visible ? "Hide" : "Show"}
+          className="absolute right-1.5 top-1/2 z-10 -translate-y-1/2 rounded-md p-1.5 text-mist-500 transition-colors hover:bg-white/10 hover:text-mist-100 disabled:pointer-events-none disabled:opacity-40"
+        >
+          {visible ? (
+            <EyeOffIcon className="h-4 w-4" />
+          ) : (
+            <EyeIcon className="h-4 w-4" />
+          )}
+        </button>
+      ) : null}
     </div>
   );
 }

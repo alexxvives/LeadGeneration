@@ -339,6 +339,20 @@ export function EmailSettingsForm({
                 <Field
                   label="Maileroo sending key"
                   saved={saved && savedHint === "mailerooKey"}
+                  hint={
+                    <span className="max-w-[16rem] text-right leading-snug sm:max-w-[20rem]">
+                      Free account at{" "}
+                      <a
+                        href="https://maileroo.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-aurora-300 hover:underline"
+                      >
+                        maileroo.com
+                      </a>
+                      → add your domain → create a Sending Key → paste here.
+                    </span>
+                  }
                 >
                   <PasswordField
                     value={mailerooDraft}
@@ -350,23 +364,25 @@ export function EmailSettingsForm({
                     disabled={!canEdit}
                     inputClassName={`${inputCls} pr-11`}
                   />
-                  <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
-                    Free account at{" "}
-                    <a
-                      href="https://maileroo.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-aurora-300 hover:underline"
-                    >
-                      maileroo.com
-                    </a>
-                    → add your domain → create a Sending Key → paste here.
-                  </p>
                 </Field>
               ) : (
                 <Field
                   label="Resend API key"
                   saved={saved && savedHint === "resendKey"}
+                  hint={
+                    <span className="max-w-[16rem] text-right leading-snug sm:max-w-[20rem]">
+                      Free account at{" "}
+                      <a
+                        href="https://resend.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-aurora-300 hover:underline"
+                      >
+                        resend.com
+                      </a>
+                      → add your domain → create an API key → paste here.
+                    </span>
+                  }
                 >
                   <PasswordField
                     value={resendDraft}
@@ -378,18 +394,6 @@ export function EmailSettingsForm({
                     disabled={!canEdit}
                     inputClassName={`${inputCls} pr-11`}
                   />
-                  <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
-                    Free account at{" "}
-                    <a
-                      href="https://resend.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-aurora-300 hover:underline"
-                    >
-                      resend.com
-                    </a>
-                    → add your domain → create an API key → paste here.
-                  </p>
                 </Field>
               )}
             </div>
@@ -398,14 +402,16 @@ export function EmailSettingsForm({
         </div>
       )}
 
-      <div className="flex min-h-[1.5rem] items-center justify-end gap-3">
-        {error && <p className="text-sm text-rose-300">{error}</p>}
-        {saving && (
-          <span className="flex items-center gap-1.5 text-sm text-mist-500">
-            <Spinner className="h-3.5 w-3.5" /> Saving…
-          </span>
-        )}
-      </div>
+      {(error || saving) && (
+        <div className="flex items-center justify-end gap-3">
+          {error && <p className="text-sm text-rose-300">{error}</p>}
+          {saving && (
+            <span className="flex items-center gap-1.5 text-sm text-mist-500">
+              <Spinner className="h-3.5 w-3.5" /> Saving…
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -436,7 +442,7 @@ function Field({
           </span>
         </p>
         {hint ? (
-          <div className="ml-auto text-xs text-mist-500">{hint}</div>
+          <div className="ml-auto min-w-0 text-[11px] text-mist-500">{hint}</div>
         ) : null}
       </div>
       {children}

@@ -99,10 +99,6 @@ export function PipelineView({
     leadId: string;
     company: string;
   } | null>(null);
-  const [pendingMethod, setPendingMethod] = useState<{
-    leadId: string;
-    company: string;
-  } | null>(null);
   const [parkedOpen, setParkedOpen] = useState<Record<string, boolean>>({
     not_interested: false,
     discarded: false,
@@ -143,12 +139,6 @@ export function PipelineView({
       return;
     }
 
-    // Moving into Contacted without a known method — ask explicitly.
-    if (newStage === "contacted" && !lead.contactMethod) {
-      setPendingMethod({ leadId: lead.id, company: lead.company });
-      return;
-    }
-
     onMoveStage(String(active.id), newStage);
   }
 
@@ -176,50 +166,6 @@ export function PipelineView({
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
         {leads.length === 1 ? "" : "s"} · drag to move between stages
       </p>
-
-      {pendingMethod && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
-            onClick={() => setPendingMethod(null)}
-          />
-          <div className="animate-float-up relative w-full max-w-md rounded-xl2 border border-amber-400/20 bg-ink-900 p-6 shadow-2xl">
-            <p className="font-display text-lg font-semibold text-mist-100">
-              Log contact for{" "}
-              <span className="text-mist-200">{pendingMethod.company}</span>
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-              <p className="text-sm font-medium text-mist-300">How did you reach them?</p>
-              {(
-                [
-                  ["email", "Email"],
-                  ["phone", "Phone"],
-                  ["contact_form", "Contact form"],
-                ] as const
-              ).map(([method, label]) => (
-                <button
-                  key={method}
-                  type="button"
-                  onClick={() => {
-                    onMoveStage(pendingMethod.leadId, "contacted", method);
-                    setPendingMethod(null);
-                  }}
-                  className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-400/20"
-                >
-                  {label}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setPendingMethod(null)}
-                className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-mist-300 hover:bg-white/5"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {pendingRevert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -414,14 +360,17 @@ function DraggablePipelineCard({
   const subtitle = cardSubtitle(lead);
   const needsMethod =
     lead.crmStage === "contacted" && !lead.contactMethod;
-  const showMeta = pendingFollowUps > 0 || !!lead.contactMethod || needsMethod;
+  // Meta only on Contacted+ — keeps New cards compact after a round-trip.
+  const showMeta =
+    lead.crmStage !== "new" &&
+    (pendingFollowUps > 0 || !!lead.contactMethod);
 
   return (
     <div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`group flex min-h-[3.25rem] cursor-grab touch-none items-center gap-1 overflow-hidden rounded-xl border border-white/5 bg-ink-900/60 px-3 py-2.5 transition-all hover:bg-white/[0.03] active:cursor-grabbing ${
+      className={`group flex h-auto cursor-grab touch-none items-start gap-1 rounded-xl border border-white/5 bg-ink-900/60 px-3 py-2.5 transition-all hover:bg-white/[0.03] active:cursor-grabbing ${
         isDragging ? "opacity-30" : ""
       }`}
     >
@@ -430,7 +379,7 @@ function DraggablePipelineCard({
         {subtitle && (
           <p className="mt-0.5 truncate text-xs leading-snug text-mist-500">{subtitle}</p>
         )}
-        {showMeta && !needsMethod && (
+        {showMeta && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {pendingFollowUps > 0 && (
               <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">

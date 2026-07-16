@@ -36,6 +36,7 @@ import type {
   ImportLeadRow,
 } from "@/lib/types";
 import { mailboxPublicStatus } from "@/lib/email/mailbox";
+import { scoreImportedLead } from "@/lib/fit-score";
 
 /**
  * Application services. API routes stay thin and call into these functions,
@@ -968,6 +969,37 @@ export async function deleteLead(ctx: Ctx, leadId: string): Promise<boolean> {
   return ctx.db.deleteLead(leadId);
 }
 
+/**
+ * Bulk-delete leads. Also aborts any in-flight import runs so a leftover CSV
+ * upload can’t recreate rows after the user cleared the board.
+ */
+export async function deleteLeads(
+  ctx: Ctx,
+  leadIds: string[],
+): Promise<{ deleted: number }> {
+  const ids = [...new Set(leadIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return { deleted: 0 };
+  await cancelRunningImportRuns(ctx);
+  const deleted = await ctx.db.deleteLeads(ids);
+  return { deleted };
+}
+
+/** Mark every running import as failed so late chunks stop writing. */
+export async function cancelRunningImportRuns(ctx: Ctx): Promise<number> {
+  const runs = await ctx.db.listRuns();
+  let n = 0;
+  for (const r of runs) {
+    if (r.provider !== "import" || r.status !== "running") continue;
+    await ctx.db.updateRun(r.id, {
+      status: "failed",
+      error: "Cancelled — leads were deleted while import was still running",
+      completedAt: nowIso(),
+    });
+    n++;
+  }
+  return n;
+}
+
 /** Update user-managed CRM fields on a lead (stage, contact method, notes, follow-ups). */
 export async function updateLeadCrm(
   ctx: Ctx,
@@ -1103,8 +1135,19 @@ export async function importLeads(
     if (existing.provider !== "import") {
       throw new Error("Not an import run");
     }
+    // User deleted leads mid-import — refuse further chunks.
+    if (existing.status === "failed") {
+      throw new Error(
+        existing.error?.includes("Cancelled")
+          ? "Import cancelled — leads were deleted"
+          : existing.error || "Import was cancelled",
+      );
+    }
+    if (existing.status === "complete" && !finalize) {
+      throw new Error("Import already finished");
+    }
     run = existing;
-    if (run.status !== "running") {
+    if (run.status !== "running" && run.status !== "complete") {
       await db.updateRun(run.id, { status: "running", completedAt: null, error: null });
     }
   } else {
@@ -1203,21 +1246,32 @@ export async function importLeads(
     }
 
     const leads: Lead[] = freshRows.map((r) => {
-      const company =
+      const company = (
         r.company ||
         r.emails[0]?.split("@")[1]?.split(".")[0] ||
-        "Unknown company";
+        "Unknown company"
+      ).replace(/^./, (c) => c.toUpperCase());
       const website =
         r.website ||
         (r.emails[0]?.includes("@")
           ? `https://${r.emails[0].split("@")[1]}`
           : null);
+      const scored = scoreImportedLead({
+        company,
+        website,
+        emails: r.emails,
+        phones: r.phones,
+        aboutBlurb: null,
+        location: r.location,
+        tags: ["imported"],
+        contactName: r.contactName,
+      });
       return {
         id: newId("lead"),
         workspaceId: ctx.workspaceId,
         runId: run.id,
         boardId,
-        company: company.replace(/^./, (c) => c.toUpperCase()),
+        company,
         website,
         emails: r.emails,
         phones: r.phones,
@@ -1225,11 +1279,8 @@ export async function importLeads(
         location: r.location,
         aboutBlurb: null,
         tags: ["imported"],
-        fitScore: r.emails.length ? 55 : 40,
-        fitReasons: [
-          "Imported from your file",
-          r.emails.length ? "Has email on file" : "No email — add one before send",
-        ],
+        fitScore: scored.score,
+        fitReasons: scored.reasons,
         sourceUrl: website || "import",
         status: "new",
         crmStage: "new",
@@ -1247,8 +1298,14 @@ export async function importLeads(
     // COUNT(*) — avoid reloading every lead row on each chunk.
     const boardCount = await db.countLeads({ boardId });
     const parts: string[] = [];
-    if (merged > 0) parts.push(`merged ${merged} existing`);
-    if (skipped > 0) parts.push(`skipped ${skipped} unchanged`);
+    if (merged > 0) {
+      parts.push(`updated ${merged} already in workspace (same email/website)`);
+    }
+    if (skipped > 0) {
+      parts.push(
+        `${skipped} already in workspace — no new fields (same email/website)`,
+      );
+    }
 
     const updated = finalize
       ? await db.updateRun(run.id, {

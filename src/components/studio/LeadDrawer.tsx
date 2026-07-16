@@ -103,8 +103,6 @@ export function LeadDrawer(props: DrawerProps) {
   // CRM state (local, synced on changes)
   const [crmStage, setCrmStage] = useState<CrmStage>(lead.crmStage ?? "new");
   const [contactMethod, setContactMethod] = useState<ContactMethod | null>(lead.contactMethod ?? null);
-  const [showMethodPicker, setShowMethodPicker] = useState(false);
-  const [pendingStage, setPendingStage] = useState<CrmStage | null>(null);
   const [followUps, setFollowUps] = useState<FollowUp[]>(lead.followUps ?? []);
   const [showAddNote, setShowAddNote] = useState(false);
   const [newNoteDate, setNewNoteDate] = useState(todayIsoDate);
@@ -119,10 +117,6 @@ export function LeadDrawer(props: DrawerProps) {
     setCrmStage(lead.crmStage ?? "new");
     setContactMethod(lead.contactMethod ?? null);
     setFollowUps(lead.followUps ?? []);
-    const needsMethod =
-      (lead.crmStage ?? "new") === "contacted" && !lead.contactMethod;
-    setShowMethodPicker(needsMethod);
-    setPendingStage(needsMethod ? "contacted" : null);
     setShowAddNote(false);
     setNewNoteDate(todayIsoDate());
     setNewNoteText("");
@@ -155,11 +149,6 @@ export function LeadDrawer(props: DrawerProps) {
 
   // ── CRM stage change ──
   const handleStageClick = (stage: CrmStage) => {
-    if (stage === "contacted" && crmStage !== "contacted") {
-      setPendingStage(stage);
-      setShowMethodPicker(true);
-      return;
-    }
     const emailed =
       crmStage === "contacted" ||
       lead.status === "sent" ||
@@ -171,21 +160,20 @@ export function LeadDrawer(props: DrawerProps) {
       );
       if (!ok) return;
     }
-    void commitStage(stage, contactMethod);
+    // Moving to New clears method; Contacted no longer forces a method popup.
+    const nextMethod = stage === "new" ? null : contactMethod;
+    void commitStage(stage, nextMethod);
   };
 
   const commitStage = async (stage: CrmStage, method: ContactMethod | null) => {
     setCrmStage(stage);
     setContactMethod(method);
-    setShowMethodPicker(false);
-    setPendingStage(null);
     await props.onUpdateCrm(lead.id, { crmStage: stage, contactMethod: method });
   };
 
-  /** Set contact method for a lead already in Contacted (or completing the picker). */
+  /** Set contact method for a lead already in Contacted. */
   const commitContactMethod = async (method: ContactMethod) => {
-    const stage = pendingStage ?? (crmStage === "new" ? "contacted" : crmStage);
-    await commitStage(stage, method);
+    await commitStage(crmStage === "new" ? "contacted" : crmStage, method);
   };
 
   // ── Dated notes (journal) ──
@@ -216,7 +204,7 @@ export function LeadDrawer(props: DrawerProps) {
       <aside
         className={`animate-float-up relative flex w-full flex-col overflow-hidden border border-white/10 bg-ink-900 shadow-2xl ${
           mode === "info"
-            ? "max-h-[min(90dvh,720px)] max-w-[51rem] rounded-xl2"
+            ? "max-h-[min(90dvh,720px)] max-w-[61rem] rounded-xl2"
             : "h-[min(92dvh,900px)] max-w-[43rem] rounded-xl2 sm:h-[min(90dvh,860px)]"
         }`}
       >
@@ -281,8 +269,8 @@ export function LeadDrawer(props: DrawerProps) {
               ))}
             </div>
 
-            {/* Contact method picker — moving to Contacted, or Contacted without a method */}
-            {(showMethodPicker || (crmStage === "contacted" && !contactMethod)) && (
+            {/* Optional method when already Contacted without one set */}
+            {crmStage === "contacted" && !contactMethod && (
               <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <p className="text-xs font-medium text-amber-300">How did you reach them?</p>
@@ -296,15 +284,6 @@ export function LeadDrawer(props: DrawerProps) {
                       {label}
                     </button>
                   ))}
-                  {showMethodPicker && pendingStage && crmStage !== "contacted" && (
-                    <button
-                      type="button"
-                      onClick={() => { setShowMethodPicker(false); setPendingStage(null); }}
-                      className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 transition-colors hover:text-mist-300"
-                    >
-                      Cancel
-                    </button>
-                  )}
                 </div>
               </div>
             )}

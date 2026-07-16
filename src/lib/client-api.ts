@@ -202,6 +202,12 @@ export const api = {
   deleteLead: (id: string) =>
     jsonFetch<{ ok: boolean }>(`/api/leads/${id}`, { method: "DELETE" }),
 
+  deleteLeads: (ids: string[]) =>
+    jsonFetch<{ deleted: number }>("/api/leads/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+
   suggestLocations: (q: string) =>
     jsonFetch<{ suggestions: LocationSuggestion[] }>(
       `/api/geocode?suggest=1&q=${encodeURIComponent(q)}`,

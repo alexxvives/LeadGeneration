@@ -641,6 +641,32 @@ export class D1Store implements LeadRepository {
     return (result.meta?.changes ?? 0) > 0;
   }
 
+  async deleteLeads(ids: string[]): Promise<number> {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (unique.length === 0) return 0;
+    let deleted = 0;
+    // D1 batch limit — chunk deletes.
+    const CHUNK = 40;
+    for (let i = 0; i < unique.length; i += CHUNK) {
+      const chunk = unique.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(",");
+      await this.db
+        .prepare(
+          `DELETE FROM outreach WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
+        )
+        .bind(this.workspaceId, ...chunk)
+        .run();
+      const result = await this.db
+        .prepare(
+          `DELETE FROM leads WHERE workspace_id = ? AND id IN (${placeholders})`,
+        )
+        .bind(this.workspaceId, ...chunk)
+        .run();
+      deleted += result.meta?.changes ?? 0;
+    }
+    return deleted;
+  }
+
   async listLeads(filter?: LeadListFilter): Promise<Lead[]> {
     if (filter?.runId && filter?.boardId) {
       const { results } = await this.db

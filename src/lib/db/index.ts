@@ -64,6 +64,8 @@ export interface LeadRepository {
   countLeads(filter?: LeadListFilter): Promise<number>;
   /** Deletes the lead and its outreach row(s). */
   deleteLead(id: string): Promise<boolean>;
+  /** Bulk delete leads + their outreach. Returns number removed. */
+  deleteLeads(ids: string[]): Promise<number>;
 
   // Outreach
   upsertOutreach(outreach: Outreach): Promise<Outreach>;

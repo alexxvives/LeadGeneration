@@ -45,10 +45,11 @@ Code: `src/lib/search/` (`index.ts`, `query.ts`, `firecrawl.ts`, `exa.ts`,
    - **About blurb**: first substantial sentence from the scraped markdown,
      used for personalization in drafts.
 4. **Dedup**: collapses results by domain, then by company name (case-insensitive).
-5. **Fit score** (`fit-score.ts`): a **transparent heuristic** — base points for
-   matching the query, plus points for having an email, phone, website, a rich
-   blurb, and location alignment. Every point is explained in `fitReasons` and
-   shown in the Lead detail drawer.
+5. **Fit score** (`fit-score.ts`): a **transparent heuristic starting at 0**
+   (no free “search match” baseline). Contactability (email / phone / website /
+   named contact / blurb) + niche keyword hits + location match; penalties for
+   location mismatch. Imports use the same rubric via `scoreImportedLead`.
+   Every point is explained in `fitReasons` in the Lead detail drawer.
 6. **Fallback**: no key, zero results, or any provider error → deterministic
    **demo leads** from `demo.ts` so the UI always works (constitution Art. I.2).
 
@@ -68,8 +69,8 @@ about the limitations:
   dead. This is the single biggest quality lever for outreach.
 - **Shallow personalization signal.** The "about" blurb is the first long
   sentence — fine, but not a real summary of what the business does or a hook.
-- **The fit score is a proxy for "how contactable", not "how good a fit".** It
-  rewards having an email more than actually matching your ICP.
+- **The fit score blends contactability + light ICP signals** (niche tokens in
+  company/blurb, location). It is still heuristic — not LLM ICP reasoning.
 - **Single page per result.** We don't crawl the site (about/team/contact pages)
   to build a fuller profile.
 

@@ -9,18 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-16 (rich pitch + settings polish)
+## ⏱️ Status — updated 2026-07-16 (fit score + delete/import UX)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Pitch **bold/italic/underline/lists** kept through preview, Create Draft, and
-  send (HTML + plain fallback for Resend/Maileroo/Gmail/SMTP).
-- Settings Easy: From name is inbox identity only (no draft sign-off sync);
-  removed “Must match your verified domain”; Maileroo/Resend help copy clarified.
-- Sending-key eye no longer clears a saved mask; longer mask; eye disabled on
-  saved keys (select + paste to replace).
+- Fit score rewritten: starts at 0; contactability + niche tokens + location
+  (no +40 “search match” freebie). Imports use same rubric.
+- Pipeline: no “How did you reach them?” on drag to Contacted; New cards stay
+  compact; lead info drawer ~20% wider.
+- Bulk delete + cancel in-flight CSV imports; clearer “already in workspace”
+  import toast. Settings key help top-right; eye hidden on saved keys.
 
 ### Next
 1. Point Maileroo/Resend dashboards at the webhook URL in Settings → Easy.
