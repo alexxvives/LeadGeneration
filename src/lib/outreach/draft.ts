@@ -1,9 +1,12 @@
-import { env } from "@/lib/config";
 import {
   outreachLangFromLocation,
   type OutreachLang,
 } from "@/lib/outreach/locale";
-import { richToPlain } from "@/lib/outreach/rich-text";
+import {
+  looksLikeHtml,
+  normalizePitchHtml,
+  plainToHtmlFragment,
+} from "@/lib/outreach/rich-text";
 import type { Lead, Run } from "@/lib/types";
 
 // Deterministic, no-API-key outreach drafting. Language follows lead geography
@@ -17,7 +20,7 @@ export interface DraftResult {
 }
 
 export interface DraftOverrides {
-  /** Current Settings sign-off (multi-line). Prefer over run.senderName. */
+  /** Outreach profile email sign-off (multi-line). Prefer over run.senderName. */
   signOff?: string | null;
   /** Current Settings sales pitch. Prefer over run.offerNotes. */
   offerNotes?: string | null;
@@ -69,17 +72,32 @@ export function applySubjectTemplate(template: string, lead: Lead): string {
     .trim();
 }
 
-/** Same placeholders, but keep newlines (for pitch / static body). */
+/** Same placeholders, but keep newlines / HTML (for pitch / static body). */
 function applyBodyPlaceholders(template: string, lead: Lead): string {
   const company = shortCompany(lead);
   const leadName = (lead.contactName?.trim() || company).trim();
   const location = (lead.location ?? "").trim();
+  // Escape replacements so user-controlled names never inject tags into HTML bodies.
+  const esc = (s: string) =>
+    looksLikeHtml(template)
+      ? s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+      : s;
   return template
-    .replace(/\{lead_name\}/gi, leadName)
-    .replace(/\{company\}/gi, company)
-    .replace(/\{location\}/gi, location)
+    .replace(/\{lead_name\}/gi, esc(leadName))
+    .replace(/\{company\}/gi, esc(company))
+    .replace(/\{location\}/gi, esc(location))
     .replace(/[^\S\n]{2,}/g, " ")
     .trim();
+}
+
+function joinBodyParts(parts: string[]): string {
+  return parts
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
+    .join(parts.some(looksLikeHtml) ? "<br><br>" : "\n\n");
 }
 
 /**
@@ -241,10 +259,11 @@ export function generateDraft(
   const offerRaw =
     overrides?.offerNotes?.trim() || run.offerNotes?.trim() || "";
   const nicheHint = run.niche.trim();
-  const signOff = (
+  // Sign-off comes from the outreach profile only — never inbox From name.
+  const signOffPlain = (
     overrides?.signOff?.trim() ||
     run.senderName?.trim() ||
-    env.fromName()
+    ""
   ).replace(/\r\n/g, "\n");
 
   const subjectTpl = overrides?.subjectTemplate?.trim();
@@ -255,20 +274,26 @@ export function generateDraft(
 
   // Template path: use the profile pitch as-is (placeholders only). Never invent
   // a default pitch / greeting — empty profile → empty body (+ optional sign-off).
+  // Preserve bold/italic/lists from the pitch editor as light HTML.
   const assembleLegacy =
     overrides?.staticBody === false && !overrides?.aiPersonalize;
   if (!assembleLegacy) {
-    const pitchPlain = offerRaw
-      ? applyBodyPlaceholders(richToPlain(offerRaw), lead)
+    const pitchHtml = offerRaw
+      ? applyBodyPlaceholders(normalizePitchHtml(offerRaw), lead)
       : "";
-    const parts = [pitchPlain, signOff].filter((p) => p.trim().length > 0);
-    return { subject, body: parts.join("\n\n") };
+    const signOffHtml = signOffPlain
+      ? plainToHtmlFragment(signOffPlain)
+      : "";
+    return { subject, body: joinBodyParts([pitchHtml, signOffHtml]) };
   }
 
-  const pitchPlain = applyBodyPlaceholders(
-    richToPlain(offerRaw || copy.defaultPitch(nicheHint)),
+  const pitchHtml = applyBodyPlaceholders(
+    normalizePitchHtml(offerRaw || copy.defaultPitch(nicheHint)),
     lead,
   );
+  const signOffHtml = signOffPlain
+    ? plainToHtmlFragment(signOffPlain)
+    : "";
 
   const blurb = lead.aboutBlurb?.trim() ?? "";
 
@@ -284,17 +309,13 @@ export function generateDraft(
     opener = copy.openerPlain(company);
   }
 
-  const body = [
-    greeting,
-    "",
-    opener,
-    "",
-    pitchPlain,
-    "",
-    copy.cta,
-    "",
-    signOff,
-  ].join("\n");
+  const body = joinBodyParts([
+    plainToHtmlFragment(greeting),
+    plainToHtmlFragment(opener),
+    pitchHtml,
+    plainToHtmlFragment(copy.cta),
+    signOffHtml,
+  ]);
 
   return { subject, body };
 }

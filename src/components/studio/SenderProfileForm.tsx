@@ -15,6 +15,7 @@ import {
 } from "@/lib/sender-profile";
 import { generateDraft } from "@/lib/outreach/draft";
 import { langLabel, type OutreachLang } from "@/lib/outreach/locale";
+import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import type { Lead, Run } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import { ChevronDownIcon, HelpIcon, SparkIcon } from "@/components/icons";
@@ -712,9 +713,12 @@ export function SenderProfileForm() {
             <p className="mt-3 text-xs text-mist-500">Subject</p>
             <p className="mt-0.5 font-medium text-mist-100">{preview.subject}</p>
             <div className="mt-4 border-t border-white/5 pt-4">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-mist-300">
-                {preview.body}
-              </pre>
+              <div
+                className="pitch-preview font-sans text-sm leading-relaxed text-mist-300 [&_b]:font-semibold [&_strong]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-0"
+                dangerouslySetInnerHTML={{
+                  __html: normalizePitchHtml(preview.body),
+                }}
+              />
             </div>
             {preview.missingPitch && !translating ? (
               <p className="mt-3 text-[11px] leading-relaxed text-amber-200/80">

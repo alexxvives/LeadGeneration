@@ -16,6 +16,8 @@ import {
 } from "@/components/icons";
 import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
+import { normalizePitchHtml } from "@/lib/outreach/rich-text";
+import { PitchEditor } from "@/components/studio/PitchEditor";
 
 function todayIsoDate(): string {
   const d = new Date();
@@ -584,13 +586,23 @@ export function LeadDrawer(props: DrawerProps) {
                   />
                 </FieldMini>
                 <FieldMini label="Body">
-                  <textarea
-                    value={body}
-                    onChange={(e) => { setBody(e.target.value); setDirty(true); }}
-                    disabled={sent}
-                    rows={sent ? 6 : 14}
-                    className="w-full resize-y rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 font-sans text-sm leading-relaxed outline-none focus:border-aurora-400/60 disabled:opacity-60"
-                  />
+                  {sent ? (
+                    <div
+                      className="min-h-[6rem] rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 font-sans text-sm leading-relaxed text-mist-200 opacity-60 [&_b]:font-semibold [&_strong]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
+                      dangerouslySetInnerHTML={{
+                        __html: normalizePitchHtml(body),
+                      }}
+                    />
+                  ) : (
+                    <PitchEditor
+                      value={body}
+                      onChange={(html) => {
+                        setBody(html);
+                        setDirty(true);
+                      }}
+                      placeholder="Email body…"
+                    />
+                  )}
                 </FieldMini>
 
                 {outreach.error && (

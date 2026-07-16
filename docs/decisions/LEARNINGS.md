@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-16 — Rich pitch HTML + From ≠ sign-off
+- Pitch editor HTML (`b`/`i`/`u`/lists) is preserved in `generateDraft`, Settings
+  preview (`dangerouslySetInnerHTML` + sanitize), LeadDrawer composer
+  (`PitchEditor`), and send (`html` + `text` via `richToPlain`).
+- Inbox **From name** must not rewrite outreach-profile sign-off; drafts only use
+  profile signature / `run.senderName` — never `env.fromName()`.
+- Saved API-key mask: eye must not clear the field (can’t reveal server secrets);
+  show mask as `type=text` with a longer bullet string so length isn’t confusing.
+
 ### 2026-07-16 — Contact Draft flow + template-only bodies
 - Outreach: **Contact Draft** (undrafted) → **Ready to Contact** (has draft) →
   Contacted. Header **Create Draft** drafts undrafted; Send click promotes

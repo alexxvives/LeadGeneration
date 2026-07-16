@@ -1,12 +1,18 @@
 import { env, getCapabilities } from "@/lib/config";
 import { sendViaGmail } from "@/lib/email/mailbox";
 import { sendViaMaileroo } from "@/lib/email/maileroo";
+import {
+  looksLikeHtml,
+  richToPlain,
+  toEmailHtmlDocument,
+} from "@/lib/outreach/rich-text";
 import type { ConnectedMailbox, EasyEmailProvider } from "@/lib/types";
 
 export interface SendInput {
   to: string;
   subject: string;
-  body: string; // plain text (with {{unsubscribe_url}} placeholder)
+  /** Plain or light HTML body (with {{unsubscribe_url}} placeholder). */
+  body: string;
   /** Resend tags for webhook → workspace/outreach matching. */
   tags?: Array<{ name: string; value: string }>;
 }
@@ -47,13 +53,20 @@ function finalizeBody(body: string, replyToOrFrom: string): string {
   return body.replace(/\{\{unsubscribe_url\}\}/g, mailto);
 }
 
+function bodyParts(body: string): { text: string; html?: string } {
+  const text = richToPlain(body);
+  if (!looksLikeHtml(body)) return { text };
+  return { text, html: toEmailHtmlDocument(body) };
+}
+
 async function sendWithResendKey(
   apiKey: string,
   opts: {
     from: string;
     to: string;
     subject: string;
-    body: string;
+    text: string;
+    html?: string;
     replyTo?: string;
     tags?: Array<{ name: string; value: string }>;
   },
@@ -65,7 +78,8 @@ async function sendWithResendKey(
       from: opts.from,
       to: opts.to,
       subject: opts.subject,
-      text: opts.body,
+      text: opts.text,
+      ...(opts.html ? { html: opts.html } : {}),
       ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
       ...(opts.tags ? { tags: opts.tags } : {}),
     });
@@ -109,6 +123,7 @@ export async function sendEmail(
   const fromEmail = ws?.fromEmail || env.fromEmail();
   const replyTo = ws?.replyTo || env.replyTo();
   const body = finalizeBody(input.body, replyTo || fromEmail);
+  const { text, html } = bodyParts(body);
   const from = `${fromName} <${fromEmail}>`;
   const replyToHeader = replyTo || undefined;
   const tags = input.tags?.length ? input.tags : undefined;
@@ -122,7 +137,8 @@ export async function sendEmail(
       mailbox,
       to: input.to,
       subject: input.subject,
-      body,
+      body: text,
+      html,
       fromName,
       replyTo: replyToHeader,
     });
@@ -152,7 +168,8 @@ export async function sendEmail(
       fromEmail,
       to: input.to,
       subject: input.subject,
-      body,
+      body: text,
+      html,
       replyTo: replyToHeader,
       tags: Object.keys(tagMap).length ? tagMap : undefined,
     });
@@ -166,7 +183,8 @@ export async function sendEmail(
       from,
       to: input.to,
       subject: input.subject,
-      body,
+      text,
+      html,
       replyTo: replyToHeader,
       tags,
     });
@@ -211,7 +229,8 @@ export async function sendEmail(
       from,
       to: input.to,
       subject: input.subject,
-      body,
+      text,
+      html,
       replyTo: replyToHeader,
       tags,
     });
@@ -232,7 +251,8 @@ export async function sendEmail(
         from,
         to: input.to,
         subject: input.subject,
-        text: body,
+        text,
+        ...(html ? { html } : {}),
         ...(replyToHeader ? { replyTo: replyToHeader } : {}),
       });
       return { ok: true, provider: "smtp", id: info.messageId };

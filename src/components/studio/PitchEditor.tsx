@@ -5,7 +5,7 @@ import { plainToRich, sanitizePitchHtml } from "@/lib/outreach/rich-text";
 
 /**
  * Lightweight rich pitch editor (bold / italic / underline + bullets).
- * Stores sanitized HTML; emails convert to plain via richToPlain.
+ * Stores sanitized HTML; drafts/preview/send keep the formatting.
  */
 export function PitchEditor({
   value,

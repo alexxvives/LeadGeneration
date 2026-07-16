@@ -1,6 +1,6 @@
 /**
- * Lightweight pitch formatting: HTML subset in the editor → plain text in emails.
- * Allowed tags: b/strong, i/em, u, ul/ol/li, br, div/p.
+ * Lightweight pitch formatting: HTML subset in the editor → HTML in drafts/send
+ * (with plain-text fallback). Allowed tags: b/strong, i/em, u, ul/ol/li, br, div/p.
  */
 
 const ALLOWED = new Set([
@@ -18,12 +18,31 @@ const ALLOWED = new Set([
   "SPAN",
 ]);
 
+export function looksLikeHtml(input: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(input);
+}
+
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Plain text → HTML fragment (newlines → <br>). */
+export function plainToHtmlFragment(plain: string): string {
+  const t = plain.replace(/\r\n/g, "\n").trim();
+  if (!t) return "";
+  return escapeHtml(t).replace(/\n/g, "<br>");
+}
+
 /** Strip unsafe tags; keep a small formatting subset. */
 export function sanitizePitchHtml(html: string): string {
   if (typeof DOMParser === "undefined") {
     return html
       .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/on\w+="[^"]*"/gi, "");
+      .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
   }
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
   const root = doc.body.firstElementChild;
@@ -50,11 +69,28 @@ export function sanitizePitchHtml(html: string): string {
   return Array.from(root.childNodes).map(walk).join("").trim();
 }
 
+/**
+ * Normalize pitch/body for draft storage + send: sanitize HTML, or wrap plain.
+ * Server-side (no DOMParser) keeps a conservative tag strip.
+ */
+export function normalizePitchHtml(input: string): string {
+  const raw = input.replace(/\r\n/g, "\n").trim();
+  if (!raw) return "";
+  if (!looksLikeHtml(raw)) return plainToHtmlFragment(raw);
+  if (typeof DOMParser !== "undefined") return sanitizePitchHtml(raw);
+  // Workers / Node: strip scripts + event handlers; keep known tags.
+  return raw
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/<\/?(?!\/?(?:b|strong|i|em|u|ul|ol|li|br|p)\b)[a-z][^>]*>/gi, "")
+    .trim();
+}
+
 /** Convert pitch HTML (or legacy plain) to email-safe plain text. */
 export function richToPlain(input: string): string {
   const raw = input.replace(/\r\n/g, "\n").trim();
   if (!raw) return "";
-  if (!/<[a-z][\s\S]*>/i.test(raw)) return raw;
+  if (!looksLikeHtml(raw)) return raw;
 
   let s = raw;
   s = s.replace(/<\/p>\s*<p>/gi, "\n\n");
@@ -81,15 +117,19 @@ export function richToPlain(input: string): string {
 export function plainToRich(plain: string): string {
   const t = plain.replace(/\r\n/g, "\n").trim();
   if (!t) return "";
-  if (/<[a-z][\s\S]*>/i.test(t)) return t;
+  if (looksLikeHtml(t)) return t;
   return t
     .split(/\n/)
     .map((line) => {
-      const escaped = line
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+      const escaped = escapeHtml(line);
       return escaped || "<br>";
     })
     .join("<br>");
+}
+
+/** Wrap body HTML in a minimal email document fragment for ESP `html` fields. */
+export function toEmailHtmlDocument(bodyHtml: string): string {
+  const inner = normalizePitchHtml(bodyHtml);
+  if (!inner) return "";
+  return `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:14px;line-height:1.55;color:#111">${inner}</div>`;
 }

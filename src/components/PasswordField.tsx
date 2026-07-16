@@ -16,7 +16,7 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
   inputClassName?: string;
   /**
    * Stand-in value when a secret is saved server-side (never the real key).
-   * Eye cannot reveal it — clicking clears the field so you can paste a new one.
+   * Cannot be revealed — eye is disabled; select field and paste to replace.
    */
   savedMask?: string;
 };
@@ -32,6 +32,7 @@ export function PasswordField({
   savedMask,
   value,
   onChange,
+  onFocus,
   ...rest
 }: Props) {
   const [visible, setVisible] = useState(false);
@@ -41,46 +42,50 @@ export function PasswordField({
     savedMask.length > 0 &&
     value === savedMask;
 
-  const toggle = () => {
-    if (isMasked) {
-      // Real key is never in the browser — clear mask so user can paste a new one.
-      onChange?.({
-        target: { value: "" },
-        currentTarget: { value: "" },
-      } as ChangeEvent<HTMLInputElement>);
-      setVisible(true);
-      requestAnimationFrame(() => inputRef.current?.focus());
-      return;
-    }
-    setVisible((v) => !v);
-  };
-
   return (
     <div className={`relative ${className ?? ""}`}>
       <input
         {...rest}
         ref={inputRef}
         value={value}
-        onChange={onChange}
-        type={visible && !isMasked ? "text" : "password"}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+          if (isMasked && savedMask && e.target.value !== savedMask) {
+            // Replace the stand-in mask instead of editing into the bullets.
+            const next = e.target.value.replace(/•/g, "");
+            e.target.value = next;
+            onChange?.(e);
+            setVisible(false);
+            return;
+          }
+          onChange?.(e);
+        }}
+        onFocus={(e) => {
+          if (isMasked) e.target.select();
+          onFocus?.(e);
+        }}
+        // Saved mask is fake text (fixed length). Real keys use password discs.
+        type={isMasked ? "text" : visible ? "text" : "password"}
         disabled={disabled}
         autoComplete="new-password"
+        spellCheck={false}
         className={inputClassName ?? DEFAULT_INPUT}
       />
       <button
         type="button"
-        disabled={disabled}
-        onClick={toggle}
+        disabled={disabled || isMasked}
+        onClick={() => {
+          if (!isMasked) setVisible((v) => !v);
+        }}
         aria-label={
           isMasked
-            ? "Replace saved key"
+            ? "Saved key cannot be shown"
             : visible
               ? "Hide key"
               : "Show key"
         }
         title={
           isMasked
-            ? "Saved keys can’t be shown — click to replace"
+            ? "Saved keys can’t be shown — select the field and paste a new key to replace"
             : visible
               ? "Hide"
               : "Show"

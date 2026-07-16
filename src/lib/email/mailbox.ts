@@ -200,6 +200,7 @@ function encodeRawMessage(opts: {
   to: string;
   subject: string;
   body: string;
+  html?: string;
   replyTo?: string;
 }): string {
   const lines = [
@@ -207,10 +208,24 @@ function encodeRawMessage(opts: {
     `To: ${opts.to}`,
     `Subject: ${opts.subject}`,
     "MIME-Version: 1.0",
-    'Content-Type: text/plain; charset="UTF-8"',
   ];
   if (opts.replyTo) lines.push(`Reply-To: ${opts.replyTo}`);
-  lines.push("", opts.body);
+
+  if (opts.html) {
+    const boundary = `leadify_${Date.now().toString(36)}`;
+    lines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`, "");
+    lines.push(`--${boundary}`);
+    lines.push('Content-Type: text/plain; charset="UTF-8"', "");
+    lines.push(opts.body);
+    lines.push(`--${boundary}`);
+    lines.push('Content-Type: text/html; charset="UTF-8"', "");
+    lines.push(opts.html);
+    lines.push(`--${boundary}--`);
+  } else {
+    lines.push('Content-Type: text/plain; charset="UTF-8"', "");
+    lines.push(opts.body);
+  }
+
   return Buffer.from(lines.join("\r\n"), "utf8")
     .toString("base64")
     .replace(/\+/g, "-")
@@ -226,6 +241,7 @@ export async function sendViaGmail(opts: {
   to: string;
   subject: string;
   body: string;
+  html?: string;
   fromName: string;
   replyTo?: string;
 }): Promise<{ ok: true; id: string; mailbox: ConnectedMailbox } | { ok: false; error: string }> {
@@ -261,6 +277,7 @@ export async function sendViaGmail(opts: {
     to: opts.to,
     subject: opts.subject,
     body: opts.body,
+    html: opts.html,
     replyTo: opts.replyTo,
   });
 

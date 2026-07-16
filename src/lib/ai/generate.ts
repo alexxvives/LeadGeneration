@@ -166,7 +166,8 @@ export async function personalizeDraftForLead(opts: {
       `You personalize one cold B2B email in ${langLabel(opts.lang)} only.`,
       `Keep the same offer and intent as the template. Vary wording slightly so each send feels unique — do not invent claims.`,
       `Keep placeholders already resolved (real company/name). Keep a natural greeting and sign-off if present.`,
-      `Return JSON only: {"subject":"...","body":"..."} with plain-text body (use \\n for newlines).`,
+      `Keep light HTML tags if present (b, strong, i, em, u, ul, ol, li, p, br).`,
+      `Return JSON only: {"subject":"...","body":"..."} (use HTML or \\n for newlines).`,
     ].join(" "),
     [
       `Company: ${opts.company}`,

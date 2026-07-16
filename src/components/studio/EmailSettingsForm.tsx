@@ -4,11 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
-import { loadSenderProfile, saveSenderProfile, buildSignature } from "@/lib/sender-profile";
 import type { EasyEmailProvider } from "@/lib/types";
 
 /** Visual stand-in when a key is saved — never the real secret (Art. III.5). */
-const SAVED_KEY_MASK = "••••••••••••••••";
+const SAVED_KEY_MASK = "••••••••••••••••••••••••••••••••••••";
 
 export interface EmailSettingsValues {
   fromName: string | null;
@@ -191,18 +190,8 @@ export function EmailSettingsForm({
         const data = (await res.json()) as { error?: string };
         setError(data.error ?? "Save failed");
       } else {
-        if (values.fromName) {
-          const profile = loadSenderProfile();
-          const next = { ...profile, displayName: values.fromName };
-          const lines = profile.signature.split("\n");
-          if (!profile.signature.trim()) {
-            next.signature = buildSignature(next);
-          } else if (!profile.displayName || lines[0] === profile.displayName) {
-            lines[0] = values.fromName;
-            next.signature = lines.join("\n");
-          }
-          saveSenderProfile(next);
-        }
+        // From name is inbox identity only — email sign-off lives on the
+        // outreach profile (Settings → Outreach), not here.
         if (!isPro) {
           const nextHasResend = isNewKey(resendDraft) || hasResendKey;
           const nextHasMaileroo = isNewKey(mailerooDraft) || hasMailerooKey;
@@ -279,7 +268,7 @@ export function EmailSettingsForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           label="Your name"
-          hint="Inbox From + draft sign-off"
+          hint={fromLocked ? undefined : "Shown as the inbox From name"}
           saved={saved && savedHint === "fromName"}
         >
           <input
@@ -294,7 +283,7 @@ export function EmailSettingsForm({
         </Field>
         <Field
           label="From email"
-          hint={fromLocked ? "From your connected mailbox" : "Must match your verified domain"}
+          hint={fromLocked ? "From your connected mailbox" : undefined}
           saved={saved && savedHint === "fromEmail"}
         >
           <input
@@ -349,17 +338,13 @@ export function EmailSettingsForm({
               {isMaileroo ? (
                 <Field
                   label="Maileroo sending key"
-                  hint="Domains → your domain → Sending Keys"
                   saved={saved && savedHint === "mailerooKey"}
                 >
                   <PasswordField
                     value={mailerooDraft}
                     savedMask={SAVED_KEY_MASK}
                     onChange={(e) => onKeyDraftChange("maileroo", e.target.value)}
-                    onFocus={(e) => {
-                      captureFocus();
-                      if (mailerooDraft === SAVED_KEY_MASK) e.target.select();
-                    }}
+                    onFocus={captureFocus}
                     onBlur={() => void saveIfChanged()}
                     placeholder="Your Maileroo sending key"
                     disabled={!canEdit}
@@ -381,17 +366,13 @@ export function EmailSettingsForm({
               ) : (
                 <Field
                   label="Resend API key"
-                  hint="BYO domain"
                   saved={saved && savedHint === "resendKey"}
                 >
                   <PasswordField
                     value={resendDraft}
                     savedMask={SAVED_KEY_MASK}
                     onChange={(e) => onKeyDraftChange("resend", e.target.value)}
-                    onFocus={(e) => {
-                      captureFocus();
-                      if (resendDraft === SAVED_KEY_MASK) e.target.select();
-                    }}
+                    onFocus={captureFocus}
                     onBlur={() => void saveIfChanged()}
                     placeholder="re_xxxxxxxxxxxx"
                     disabled={!canEdit}

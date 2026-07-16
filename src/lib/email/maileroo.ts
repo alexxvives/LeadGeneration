@@ -9,6 +9,8 @@ export async function sendViaMaileroo(opts: {
   to: string;
   subject: string;
   body: string;
+  /** Optional HTML alternative (bold/italic from pitch editor). */
+  html?: string;
   replyTo?: string;
   /** Custom tags echoed on webhooks (leadify_ws / leadify_outreach). */
   tags?: Record<string, string>;
@@ -19,6 +21,7 @@ export async function sendViaMaileroo(opts: {
       to: [{ address: opts.to }],
       subject: opts.subject,
       plain: opts.body,
+      ...(opts.html ? { html: opts.html } : {}),
     };
     if (opts.replyTo) {
       payload.reply_to = { address: opts.replyTo };
