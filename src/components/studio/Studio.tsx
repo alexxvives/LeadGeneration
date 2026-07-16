@@ -68,10 +68,14 @@ export function Studio() {
   const searchParams = useSearchParams();
   const view = viewFromParams(searchParams.get("view"));
   const boardParam = searchParams.get("board");
-  const filterBoardId =
-    boardParam === "all" || !boardParam
-      ? null
-      : boardParam;
+  // Prefer URL; if nav omitted `board`, keep the stored sidebar selection.
+  const filterBoardId = (() => {
+    if (boardParam === "all") return null;
+    if (boardParam) return boardParam;
+    if (typeof window === "undefined") return null;
+    const stored = loadStoredBoardFilter();
+    return !stored || stored === "all" ? null : stored;
+  })();
 
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
@@ -265,11 +269,18 @@ export function Studio() {
     if (!res.ok) throw new Error(data.error ?? "Import failed");
     if (data.boardId) storeBoardFilter(data.boardId);
     const parts = [
-      `Added ${data.imported ?? 0} new`,
-      data.merged ? `merged ${data.merged} existing` : null,
+      data.imported ? `Added ${data.imported} new` : null,
+      data.merged
+        ? `updated ${data.merged} existing (same email or website)`
+        : null,
       data.skipped ? `skipped ${data.skipped} unchanged` : null,
     ].filter(Boolean);
-    toast("ok", `${parts.join(" · ")}.`);
+    toast(
+      "ok",
+      parts.length
+        ? `${parts.join(" · ")}.`
+        : "Import finished — no changes.",
+    );
     if (data.run?.id) await loadRunOnBoard(data.run.id);
     else {
       await refresh();
@@ -306,6 +317,7 @@ export function Studio() {
       const { outreach } = await api.draft(leadId, {
         signOff: resolveSignature(profile),
         offerNotes: profile.defaultOffer.trim() || undefined,
+        subjectTemplate: profile.subjectTemplate.trim() || undefined,
       });
       patchLeadLocal(leadId, { outreach, status: "queued" });
       toast("ok", "Draft written. Review before approving.");
@@ -556,16 +568,18 @@ export function Studio() {
       }
     >
       <div
-        className={`flex flex-wrap items-end justify-between gap-4 ${
-          lockViewport ? "mb-3 shrink-0" : "mb-6"
+        className={`grid shrink-0 grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_auto_1fr] ${
+          lockViewport ? "mb-3" : "mb-6"
         }`}
       >
         <div className="min-w-0">
-          {view !== "dashboard" && view !== "boards" ? (
-            <>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-                  {view === "pipeline"
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              {view === "dashboard"
+                ? "Dashboard"
+                : view === "boards"
+                  ? "Boards"
+                  : view === "pipeline"
                     ? "Pipeline"
                     : view === "leads"
                       ? "Leads"
@@ -574,21 +588,29 @@ export function Studio() {
                         : view === "runs"
                           ? "Search runs"
                           : "Search"}
-                </h1>
-                {view === "leads" && hasLeads ? <ExportButton /> : null}
-              </div>
-              {view === "runs" || view === "board" ? (
-                <p className="mt-1 text-mist-500">
-                  {view === "runs"
-                    ? "History of searches in this workspace."
+            </h1>
+            {view === "leads" && hasLeads ? <ExportButton /> : null}
+          </div>
+          {view === "runs" || view === "board" || view === "dashboard" || view === "boards" ? (
+            <p className="mt-1 text-sm text-mist-500">
+              {view === "runs"
+                ? "History of searches in this workspace."
+                : view === "dashboard"
+                  ? "Pipeline health and send activity."
+                  : view === "boards"
+                    ? "Named lists for campaigns or niches."
                     : "Find prospects by niche and location."}
-                </p>
-              ) : null}
-            </>
+            </p>
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex justify-start sm:justify-center">
+          {view === "board" && board?.capabilities.firecrawl ? (
+            <FirecrawlUsageBadge refreshKey={fcUsageKey} before={fcBefore} />
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-start gap-3 sm:justify-end">
           {view !== "dashboard" && view !== "boards" && board?.workspace && (
             <div className="hidden min-w-[16rem] flex-col gap-1 sm:flex sm:min-w-[20rem]">
               <div className="grid grid-cols-2 gap-3">
@@ -610,14 +632,13 @@ export function Studio() {
               )}
             </div>
           )}
-          {view === "board" && board?.capabilities.firecrawl && (
-            <FirecrawlUsageBadge refreshKey={fcUsageKey} before={fcBefore} />
-          )}
         </div>
       </div>
 
       {/* Dashboard */}
-      {view === "dashboard" && <DashboardView />}
+      {view === "dashboard" && (
+        <DashboardView boardFilterId={filterBoardId} boards={boards} />
+      )}
 
       {/* Boards management */}
       {view === "boards" && (
@@ -721,7 +742,11 @@ export function Studio() {
                   ))}
                 </div>
               ) : (
-                <LeadTable leads={board!.leads} onOpen={openInfo} />
+                <LeadTable
+                  leads={board!.leads}
+                  onOpen={openInfo}
+                  onMoveStage={onMoveStage}
+                />
               )}
             </div>
           </div>
@@ -883,7 +908,7 @@ export function Studio() {
         subtitle={
           assignMode === "search"
             ? "Search results will be added to the board you pick."
-            : "Imported rows land on this board (duplicates are merged)."
+            : "Imported rows land on this board. Rows matching an existing email or website update that lead instead of creating a duplicate."
         }
         boards={boards.length ? boards : board?.boards ?? []}
         preferredBoardId={filterBoardId}

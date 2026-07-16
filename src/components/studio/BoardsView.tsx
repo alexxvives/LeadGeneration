@@ -84,16 +84,7 @@ export function BoardsView({
   }
 
   return (
-    <div className="animate-float-up space-y-8">
-      <div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-          Boards
-        </h1>
-        <p className="mt-2 text-sm text-mist-400">
-          Named lists for campaigns or niches. Default catches anything unassigned.
-        </p>
-      </div>
-
+    <div className="animate-float-up space-y-6">
       <div className="flex flex-wrap gap-2">
         <input
           value={newName}

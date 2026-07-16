@@ -71,14 +71,9 @@ const PARKED_COLUMNS: {
   },
 ];
 
-/** Card subtitle: contact/location — not the niche tag (that looked like a wrong "category"). */
+/** Card subtitle: website host — not email or street address. */
 function cardSubtitle(lead: LeadWithOutreach): string | null {
-  return (
-    lead.emails[0] ??
-    lead.location ??
-    displayWebsite(lead.website) ??
-    null
-  );
+  return displayWebsite(lead.website) ?? null;
 }
 
 // ─── Pipeline (CRM kanban with drag-and-drop) ─────────────────────────────────
@@ -189,12 +184,12 @@ export function PipelineView({
             onClick={() => setPendingMethod(null)}
           />
           <div className="animate-float-up relative w-full max-w-md rounded-xl2 border border-amber-400/20 bg-ink-900 p-6 shadow-2xl">
-            <p className="font-display text-lg font-semibold text-mist-100">How did you reach them?</p>
-            <p className="mt-2 text-sm text-mist-300">
-              Pick how you contacted{" "}
-              <span className="text-mist-100">{pendingMethod.company}</span> so we can log a follow-up.
+            <p className="font-display text-lg font-semibold text-mist-100">
+              Log contact for{" "}
+              <span className="text-mist-200">{pendingMethod.company}</span>
             </p>
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <p className="text-sm font-medium text-mist-300">How did you reach them?</p>
               {(
                 [
                   ["email", "Email"],
@@ -209,7 +204,7 @@ export function PipelineView({
                     onMoveStage(pendingMethod.leadId, "contacted", method);
                     setPendingMethod(null);
                   }}
-                  className="rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-sm text-amber-200 hover:bg-amber-400/20"
+                  className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-400/20"
                 >
                   {label}
                 </button>
@@ -217,7 +212,7 @@ export function PipelineView({
               <button
                 type="button"
                 onClick={() => setPendingMethod(null)}
-                className="rounded-full border border-white/15 px-4 py-2 text-sm text-mist-300 hover:bg-white/5"
+                className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-mist-300 hover:bg-white/5"
               >
                 Cancel
               </button>

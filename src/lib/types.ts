@@ -194,6 +194,8 @@ export interface DashboardStats {
   boards: BoardSummary[];
   recentRuns: Run[];
   avgFitScore: number;
+  /** When set, stats are scoped to this board; null = all boards. */
+  activeBoardId: string | null;
 }
 
 /** A search + enrichment job kicked off from the search hero. */

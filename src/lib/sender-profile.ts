@@ -16,6 +16,11 @@ export type SenderProfile = {
   website: string;
   defaultOffer: string;
   signature: string;
+  /**
+   * Optional subject line template. Supports `{lead_name}`, `{company}`, `{location}`.
+   * Empty → locale default subject from draft templates.
+   */
+  subjectTemplate: string;
 };
 
 /** Default sign-off shown as placeholder + empty-state resolve target. */
@@ -50,6 +55,7 @@ const EMPTY: SenderProfile = {
   website: "",
   defaultOffer: "",
   signature: "",
+  subjectTemplate: "",
 };
 
 /** Build a 2–3 line sign-off from profile fields. */
@@ -87,6 +93,7 @@ export function loadSenderProfile(): SenderProfile {
       website: String(parsed.website ?? ""),
       defaultOffer: String(parsed.defaultOffer ?? ""),
       signature: String(parsed.signature ?? ""),
+      subjectTemplate: String(parsed.subjectTemplate ?? ""),
     };
   } catch {
     return { ...EMPTY };

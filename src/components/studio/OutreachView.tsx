@@ -159,7 +159,7 @@ export function OutreachView({
 }
 
 const ACTION_BTN =
-  "inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-full px-2.5 text-[11px]";
+  "inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-medium leading-none";
 
 function OutreachRow({
   lead,
@@ -182,7 +182,7 @@ function OutreachRow({
 }) {
   const email = lead.outreach?.toEmail ?? lead.emails[0] ?? null;
   return (
-    <li className="flex items-center gap-2 px-3 py-2.5 transition-colors hover:bg-white/[0.03]">
+    <li className="flex items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03]">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1">
           <span className="truncate text-sm font-medium text-mist-100">{lead.company}</span>
@@ -193,7 +193,7 @@ function OutreachRow({
             aria-label={`Lead info for ${lead.company}`}
             title="Lead info"
           >
-            <InfoIcon className="h-3.5 w-3.5" />
+            <InfoIcon className="h-3 w-3" />
           </button>
         </div>
         <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-mist-500">
@@ -204,10 +204,12 @@ function OutreachRow({
           <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
         ) : null}
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1.5">
-        <FitMeter score={lead.fitScore} />
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="origin-right scale-90">
+          <FitMeter score={lead.fitScore} />
+        </div>
         {bucket === "review" && (
-          <div className="flex items-center justify-end gap-1.5">
+          <div className="flex items-center justify-end gap-1">
             <button
               type="button"
               onClick={onOpenDraft}
@@ -223,12 +225,12 @@ function OutreachRow({
               title="Approve"
               className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
             >
-              {busy ? <Spinner className="h-3.5 w-3.5" /> : <CheckIcon className="h-3.5 w-3.5" />}
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : <CheckIcon className="h-2.5 w-2.5" />}
             </button>
           </div>
         )}
         {bucket === "ready" && (
-          <div className="flex items-center justify-end gap-1.5">
+          <div className="flex items-center justify-end gap-1">
             <button
               type="button"
               onClick={onOpenDraft}
@@ -244,7 +246,7 @@ function OutreachRow({
               title={canSendEmail ? "Send" : "Send (simulate)"}
               className={`${ACTION_BTN} bg-aurora-400 text-ink-950 disabled:opacity-50`}
             >
-              {busy ? <Spinner className="h-3.5 w-3.5" /> : <ArrowIcon className="h-3.5 w-3.5" />}
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
             </button>
           </div>
         )}
@@ -254,7 +256,7 @@ function OutreachRow({
             onClick={onOpenDraft}
             className={`${ACTION_BTN} border border-white/15 text-mist-400 hover:bg-white/5`}
           >
-            View draft
+            View
           </button>
         )}
       </div>

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
-import type { CrmStage, DashboardStats, WorkspaceSummary } from "@/lib/types";
+import type { BoardSummary, CrmStage, DashboardStats, WorkspaceSummary } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import Link from "next/link";
+import { loadStoredBoardFilter } from "@/components/studio/BoardPicker";
 
 const STAGE_LABELS: Record<CrmStage, string> = {
   new: "New",
@@ -68,7 +69,15 @@ function StatCard({
   );
 }
 
-export function DashboardView() {
+export function DashboardView({
+  boardFilterId,
+  boards: boardsProp,
+}: {
+  /** Sidebar board filter (`null` = all). */
+  boardFilterId?: string | null;
+  boards?: BoardSummary[];
+}) {
+  const [filter, setFilter] = useState<string>("all");
   const [data, setData] = useState<(DashboardStats & { workspace: WorkspaceSummary }) | null>(
     null,
   );
@@ -76,10 +85,19 @@ export function DashboardView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (boardFilterId) {
+      setFilter(boardFilterId);
+      return;
+    }
+    const stored = loadStoredBoardFilter();
+    setFilter(stored === "all" || !stored ? "all" : stored);
+  }, [boardFilterId]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     api
-      .dashboard()
+      .dashboard(filter === "all" ? null : filter)
       .then((d) => {
         if (!cancelled) setData(d);
       })
@@ -92,11 +110,13 @@ export function DashboardView() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [filter]);
 
-  if (loading) {
+  const boardOptions = boardsProp ?? data?.boards ?? [];
+
+  if (loading && !data) {
     return (
-      <div className="flex items-center justify-center py-24">
+      <div className="flex items-center justify-center py-16">
         <Spinner className="h-6 w-6 text-aurora-300" />
       </div>
     );
@@ -114,15 +134,34 @@ export function DashboardView() {
     color: STAGE_COLORS[k],
   }));
 
+  const scopeLabel =
+    filter === "all"
+      ? "All boards"
+      : (boardOptions.find((b) => b.id === filter)?.name ?? "Board");
+
   return (
-    <div className="animate-float-up space-y-8">
-      <div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-          Dashboard
-        </h1>
-        <p className="mt-2 text-sm text-mist-400">
-          Snapshot across all boards — pipeline health, sends, and recent runs.
+    <div className="animate-float-up space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="text-sm text-mist-400">
+          Pipeline health and sends
+          {filter === "all" ? " across all boards" : ` for ${scopeLabel}`}.
         </p>
+        <label className="flex items-center gap-2 text-xs text-mist-400">
+          <span className="sr-only">Filter by board</span>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="rounded-full border border-white/10 bg-ink-900/80 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/50"
+          >
+            <option value="all">All boards</option>
+            {boardOptions.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+                {b.isDefault ? " (Default)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -132,7 +171,7 @@ export function DashboardView() {
         <StatCard
           label="Avg fit score"
           value={data.avgFitScore}
-          hint="Across all leads"
+          hint={filter === "all" ? "Across all leads" : `On ${scopeLabel}`}
         />
       </div>
 
@@ -141,7 +180,9 @@ export function DashboardView() {
           <h2 className="font-display text-lg font-semibold text-mist-100">
             Pipeline stages
           </h2>
-          <p className="mt-1 text-xs text-mist-500">CRM stage across every board</p>
+          <p className="mt-1 text-xs text-mist-500">
+            CRM stage · {scopeLabel}
+          </p>
           <div className="mt-5">
             <BarChart items={stageItems} />
           </div>
@@ -193,51 +234,6 @@ export function DashboardView() {
               <li className="text-sm text-mist-500">No boards yet</li>
             ) : null}
           </ul>
-        </div>
-      </div>
-
-      <div className="glass rounded-xl2 p-6">
-        <h2 className="font-display text-lg font-semibold text-mist-100">Recent runs</h2>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[480px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-white/8 text-[11px] uppercase tracking-wider text-mist-500">
-                <th className="pb-2 font-medium">Niche</th>
-                <th className="pb-2 font-medium">Leads</th>
-                <th className="pb-2 font-medium">Mode</th>
-                <th className="pb-2 font-medium">When</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.recentRuns.map((r) => (
-                <tr key={r.id} className="border-b border-white/5 text-mist-200">
-                  <td className="py-2.5 pr-4">
-                    <span className="font-medium text-mist-100">{r.niche}</span>
-                    {r.location ? (
-                      <span className="mt-0.5 block text-xs text-mist-500">
-                        {r.location}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="py-2.5">{r.leadCount}</td>
-                  <td className="py-2.5 capitalize text-mist-400">{r.mode}</td>
-                  <td className="py-2.5 text-mist-500">
-                    {new Date(r.createdAt).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-              {data.recentRuns.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="py-6 text-center text-mist-500">
-                    No searches yet —{" "}
-                    <Link href="/app" className="text-aurora-300 hover:underline">
-                      find leads
-                    </Link>
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>

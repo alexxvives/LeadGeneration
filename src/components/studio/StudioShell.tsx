@@ -98,7 +98,8 @@ export function StudioShell({
     refreshBoards();
   }, [refreshBoards, pathname, view]);
 
-  // Sync board filter from URL, else localStorage (default All).
+  // Sync board filter from URL, else localStorage. Keep `board` in the URL so
+  // every view (leads/pipeline/…) filters the same way.
   useEffect(() => {
     if (boardParam === "all" || boardParam === "") {
       setActiveBoardId(null);
@@ -111,8 +112,17 @@ export function StudioShell({
       return;
     }
     const stored = loadStoredBoardFilter();
-    setActiveBoardId(stored === "all" ? null : stored);
-  }, [boardParam]);
+    const id = stored === "all" || !stored ? null : stored;
+    setActiveBoardId(id);
+    if (id && pathname.startsWith("/app")) {
+      const params = new URLSearchParams(searchParams.toString());
+      if (!params.has("board")) {
+        params.set("board", id);
+        const q = params.toString();
+        router.replace(q ? `${pathname}?${q}` : pathname);
+      }
+    }
+  }, [boardParam, pathname, router, searchParams]);
 
   const setBoardFilter = (id: string | null) => {
     const next = id ?? "all";
@@ -123,6 +133,12 @@ export function StudioShell({
     else params.set("board", next);
     const q = params.toString();
     router.replace(q ? `${pathname}?${q}` : pathname);
+  };
+
+  const boardHref = (href: string) => {
+    if (!activeBoardId) return href;
+    const join = href.includes("?") ? "&" : "?";
+    return `${href}${join}board=${encodeURIComponent(activeBoardId)}`;
   };
 
   useEffect(() => {
@@ -240,7 +256,7 @@ export function StudioShell({
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={boardHref(item.href)}
                 className={`group flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors sm:justify-start ${
                   item.active
                     ? "bg-aurora-400/10 text-aurora-300"

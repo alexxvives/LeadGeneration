@@ -85,8 +85,15 @@ export const api = {
   deleteBoard: (id: string) =>
     jsonFetch<{ ok: boolean }>(`/api/boards/${id}`, { method: "DELETE" }),
 
-  dashboard: () =>
-    jsonFetch<DashboardStats & { workspace: WorkspaceSummary }>("/api/dashboard"),
+  dashboard: (boardId?: string | null) => {
+    const q =
+      boardId && boardId !== "all"
+        ? `?boardId=${encodeURIComponent(boardId)}`
+        : "";
+    return jsonFetch<DashboardStats & { workspace: WorkspaceSummary }>(
+      `/api/dashboard${q}`,
+    );
+  },
 
   createRun: (input: {
     niche: string;
@@ -125,13 +132,17 @@ export const api = {
   runWithLeads: (id: string) =>
     jsonFetch<{ run: Run; leads: LeadWithOutreach[] }>(`/api/runs/${id}`),
 
-  draft: (leadId: string, opts?: { signOff?: string; offerNotes?: string }) =>
+  draft: (
+    leadId: string,
+    opts?: { signOff?: string; offerNotes?: string; subjectTemplate?: string },
+  ) =>
     jsonFetch<{ outreach: Outreach }>("/api/outreach", {
       method: "POST",
       body: JSON.stringify({
         leadId,
         ...(opts?.signOff ? { signOff: opts.signOff } : {}),
         ...(opts?.offerNotes ? { offerNotes: opts.offerNotes } : {}),
+        ...(opts?.subjectTemplate ? { subjectTemplate: opts.subjectTemplate } : {}),
       }),
     }),
 

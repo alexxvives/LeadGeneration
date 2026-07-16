@@ -9,22 +9,24 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (boards migration + empty search)
+## ⏱️ Status — updated 2026-07-15 (boards UX polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Applied remote D1 migration `0011_boards.sql` (`npm run cf:migrate`) — fixes
-  Dashboard/Boards 500s and import `no such table: boards`.
-- Search page: removed “Your board is clear / Load demo data” empty CTA; no-key
-  hint now points to Settings or import.
+- Deduped Default boards + migration `0012_boards_unique_default.sql` (unique
+  partial index); applied on remote D1.
+- Board filter persists across nav (URL + localStorage); dashboard board
+  dropdown; removed Recent runs; pipeline subtitle = website; table city/country
+  + clickable CRM status; outreach action buttons smaller; contact-method row
+  layout; settings subject template (`{lead_name}` etc.) with generate-from-
+  website prompt; unified page chrome margins/titles.
 
 ### Next
-1. Commit/push this UI + docs pass.
-2. Point Maileroo Dashboard webhook at `/api/webhooks/maileroo`.
-3. Soft-cap warning popup on send; Maileroo live DNS panel.
-4. Microsoft Graph Mail.Send.
+1. Point Maileroo Dashboard webhook at `/api/webhooks/maileroo`.
+2. Soft-cap warning popup on send; Maileroo live DNS panel.
+3. Microsoft Graph Mail.Send.
 
 ---
 

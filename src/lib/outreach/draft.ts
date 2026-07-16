@@ -20,6 +20,11 @@ export interface DraftOverrides {
   signOff?: string | null;
   /** Current Settings default offer / pitch notes. Prefer over run.offerNotes. */
   offerNotes?: string | null;
+  /**
+   * Subject template with `{lead_name}`, `{company}`, `{location}`.
+   * Empty / unset → locale default subject.
+   */
+  subjectTemplate?: string | null;
 }
 
 function firstName(lead: Lead): string {
@@ -33,6 +38,19 @@ function shortCompany(lead: Lead): string {
       .replace(/\b(LLC|Inc|Co|Group|Studio|Partners|Collective|Labs|Academy|Academia)\b\.?/gi, "")
       .trim() || lead.company
   );
+}
+
+/** Resolve `{lead_name}` / `{company}` / `{location}` in a subject template. */
+export function applySubjectTemplate(template: string, lead: Lead): string {
+  const company = shortCompany(lead);
+  const leadName = (lead.contactName?.trim() || company).trim();
+  const location = (lead.location ?? "").trim();
+  return template
+    .replace(/\{lead_name\}/gi, leadName)
+    .replace(/\{company\}/gi, company)
+    .replace(/\{location\}/gi, location)
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 /**
@@ -188,7 +206,10 @@ export function generateDraft(
     env.fromName()
   ).replace(/\r\n/g, "\n");
 
-  const subject = copy.subject(company);
+  const subjectTpl = overrides?.subjectTemplate?.trim();
+  const subject = subjectTpl
+    ? applySubjectTemplate(subjectTpl, lead) || copy.subject(company)
+    : copy.subject(company);
   const greeting = copy.greeting(name);
 
   const blurb = lead.aboutBlurb?.trim() ?? "";

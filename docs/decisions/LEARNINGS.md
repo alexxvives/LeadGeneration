@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Duplicate Default boards = race without unique index
+- Concurrent `ensureDefaultBoard` calls created two `is_default=1` rows; migration
+  0011 only had a non-unique index. Fix: dedupe in service + `0012` partial
+  unique index on `(workspace_id) WHERE is_default = 1`. Sidebar board filter
+  must travel in nav URLs — otherwise Leads/Pipeline silently show “all”.
+
 ### 2026-07-15 — Boards migration must land before UI
 - Shipping ADR 0014 code without `npm run cf:migrate` makes every
   `/api/boards`, `/api/board`, `/api/dashboard`, and board-aware import return

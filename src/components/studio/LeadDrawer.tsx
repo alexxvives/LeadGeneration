@@ -253,7 +253,7 @@ export function LeadDrawer(props: DrawerProps) {
           className={
             mode === "info"
               ? "grid min-h-0 flex-1 gap-0 overflow-hidden sm:grid-cols-[minmax(0,1.15fr)_minmax(14rem,0.85fr)]"
-              : "min-h-0 flex-1 space-y-6 overflow-y-auto p-6"
+              : "max-h-[min(70dvh,36rem)] space-y-5 overflow-y-auto p-5 sm:p-6"
           }
         >
           {mode === "info" ? (
@@ -281,9 +281,9 @@ export function LeadDrawer(props: DrawerProps) {
 
             {/* Contact method picker — moving to Contacted, or Contacted without a method */}
             {(showMethodPicker || (crmStage === "contacted" && !contactMethod)) && (
-              <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3">
-                <p className="mb-2 text-xs font-medium text-amber-300">How did you reach them?</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2.5">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <p className="text-xs font-medium text-amber-300">How did you reach them?</p>
                   {CONTACT_METHODS.map(({ method, label }) => (
                     <button
                       key={method}

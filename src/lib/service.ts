@@ -52,21 +52,53 @@ export interface Ctx {
 /**
  * Ensure the workspace has a Default board and back-fill any leads/runs that
  * predate boards (empty boardId). Idempotent — safe on every board read.
+ * Also collapses duplicate defaults (race before unique index / migration 0012).
  */
 export async function ensureDefaultBoard(ctx: Ctx): Promise<Board> {
   const { db } = ctx;
   const boards = await db.listBoards();
-  let def = boards.find((b) => b.isDefault) ?? null;
+  const defaults = boards
+    .filter((b) => b.isDefault)
+    .sort(
+      (a, b) =>
+        a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+    );
+  let def = defaults[0] ?? null;
+
   if (!def) {
     const now = nowIso();
-    def = await db.createBoard({
-      id: newId("board"),
-      workspaceId: ctx.workspaceId,
-      name: "Default",
-      isDefault: true,
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      def = await db.createBoard({
+        id: newId("board"),
+        workspaceId: ctx.workspaceId,
+        name: "Default",
+        isDefault: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch {
+      // Concurrent create (unique index) — re-read the winner.
+      const again = (await db.listBoards()).filter((b) => b.isDefault);
+      def = again.sort(
+        (a, b) =>
+          a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+      )[0]!;
+    }
+  } else if (defaults.length > 1) {
+    for (const extra of defaults.slice(1)) {
+      const [extraLeads, extraRuns] = await Promise.all([
+        db.listLeads({ boardId: extra.id }),
+        db.listRuns(),
+      ]);
+      await Promise.all([
+        ...extraLeads.map((l) => db.updateLead(l.id, { boardId: def!.id })),
+        ...extraRuns
+          .filter((r) => r.boardId === extra.id)
+          .map((r) => db.updateRun(r.id, { boardId: def!.id })),
+      ]);
+      await db.updateBoard(extra.id, { isDefault: false, updatedAt: nowIso() });
+      await db.deleteBoard(extra.id);
+    }
   }
 
   const [leads, runs] = await Promise.all([db.listLeads(), db.listRuns()]);
@@ -426,14 +458,27 @@ export async function getLatestBoard(
   };
 }
 
-export async function getDashboardStats(ctx: Ctx): Promise<DashboardStats> {
+export async function getDashboardStats(
+  ctx: Ctx,
+  boardId?: string | null,
+): Promise<DashboardStats> {
   await ensureDefaultBoard(ctx);
-  const [leads, boards, runs, outreach] = await Promise.all([
-    ctx.db.listLeads(),
-    listBoardSummaries(ctx),
+  const boards = await listBoardSummaries(ctx);
+  const active =
+    boardId && boardId !== "all" && boards.some((b) => b.id === boardId)
+      ? boardId
+      : null;
+
+  const [allLeads, runs, outreach] = await Promise.all([
+    ctx.db.listLeads(active ? { boardId: active } : undefined),
     ctx.db.listRuns(),
     ctx.db.listOutreach(),
   ]);
+
+  const leadIds = new Set(allLeads.map((l) => l.id));
+  const scopedOutreach = active
+    ? outreach.filter((o) => leadIds.has(o.leadId))
+    : outreach;
 
   const byCrmStage: Record<CrmStage, number> = {
     new: 0,
@@ -444,25 +489,28 @@ export async function getDashboardStats(ctx: Ctx): Promise<DashboardStats> {
     discarded: 0,
   };
   const byStatus: Record<string, number> = {};
-  for (const l of leads) {
+  for (const l of allLeads) {
     byCrmStage[l.crmStage] = (byCrmStage[l.crmStage] ?? 0) + 1;
     byStatus[l.status] = (byStatus[l.status] ?? 0) + 1;
   }
 
   const avgFitScore =
-    leads.length === 0
+    allLeads.length === 0
       ? 0
-      : Math.round(leads.reduce((s, l) => s + l.fitScore, 0) / leads.length);
+      : Math.round(allLeads.reduce((s, l) => s + l.fitScore, 0) / allLeads.length);
 
   return {
-    totalLeads: leads.length,
+    totalLeads: allLeads.length,
     byCrmStage,
     byStatus,
-    sentCount: outreach.filter((o) => o.status === "sent").length,
-    draftedCount: outreach.filter((o) => o.status === "draft" || o.status === "approved").length,
+    sentCount: scopedOutreach.filter((o) => o.status === "sent").length,
+    draftedCount: scopedOutreach.filter(
+      (o) => o.status === "draft" || o.status === "approved",
+    ).length,
     boards,
     recentRuns: runs.slice(0, 8),
     avgFitScore,
+    activeBoardId: active,
   };
 }
 
@@ -479,7 +527,11 @@ async function attachOutreach(
 export async function draftOutreach(
   ctx: Ctx,
   leadId: string,
-  overrides?: { signOff?: string | null; offerNotes?: string | null },
+  overrides?: {
+    signOff?: string | null;
+    offerNotes?: string | null;
+    subjectTemplate?: string | null;
+  },
 ): Promise<Outreach | null> {
   const db = ctx.db;
   const lead = await db.getLead(leadId);
