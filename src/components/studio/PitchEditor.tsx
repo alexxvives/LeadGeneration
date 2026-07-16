@@ -69,14 +69,14 @@ export function PitchEditor({
           <span className="text-[11px] leading-none">• ≡</span>
         </ToolbarBtn>
         <p className="ml-auto text-[10px] text-mist-600">
-          Static text · optional AI below
+          Template text · placeholders OK
         </p>
       </div>
       <div
         ref={ref}
         role="textbox"
         aria-multiline
-        aria-label={placeholder ?? "Sales pitch"}
+        aria-label={placeholder ?? "Email body template"}
         contentEditable
         suppressContentEditableWarning
         data-placeholder={placeholder}

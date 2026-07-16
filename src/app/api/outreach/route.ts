@@ -12,6 +12,7 @@ const DraftSchema = z.object({
   offerNotes: z.string().max(4000).optional(),
   subjectTemplate: z.string().max(200).optional(),
   staticBody: z.boolean().optional(),
+  aiPersonalize: z.boolean().optional(),
 });
 
 export async function POST(req: Request) {
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
     offerNotes: parsed.data.offerNotes,
     subjectTemplate: parsed.data.subjectTemplate,
     staticBody: parsed.data.staticBody,
+    aiPersonalize: parsed.data.aiPersonalize,
   });
   if (!outreach) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   return NextResponse.json({ outreach }, { status: 201 });

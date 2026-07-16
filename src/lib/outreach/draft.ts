@@ -30,10 +30,16 @@ export interface DraftOverrides {
   /** Force outreach language (Settings preview). Else inferred from lead.location. */
   forceLang?: OutreachLang;
   /**
-   * When true: greeting + pitch (+ sign-off) only — no scraped opener / stock CTA.
-   * Pitch is the static body the user wrote in Settings.
+   * When true (default path for Settings “raw template”): greeting + email body
+   * template + sign-off only — no scraped opener / stock CTA, no AI rewrite.
+   * @deprecated Prefer aiPersonalize=false for the same behavior.
    */
   staticBody?: boolean;
+  /**
+   * When true, caller should AI-vary the draft per lead (see service.draftOutreach).
+   * When false/omitted with staticBody, use the template text as-is (placeholders only).
+   */
+  aiPersonalize?: boolean;
 }
 
 function firstName(lead: Lead): string {
@@ -252,8 +258,11 @@ export function generateDraft(
     lead,
   );
 
-  // Static mode: user-authored pitch is the body (placeholders OK; no AI opener/CTA).
-  if (overrides?.staticBody) {
+  // Default / AI base: greeting + email body template + sign-off (placeholders only).
+  // Legacy: staticBody:false (and not AI) still assembles opener + stock CTA below.
+  const assembleLegacy =
+    overrides?.staticBody === false && !overrides?.aiPersonalize;
+  if (!assembleLegacy) {
     const body = [greeting, "", pitchPlain, "", signOff].join("\n");
     return { subject, body };
   }

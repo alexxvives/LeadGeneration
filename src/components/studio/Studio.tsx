@@ -22,10 +22,13 @@ import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 import {
+  draftFlagsFromProfile,
   getDefaultOffer,
   loadSenderProfile,
   resolveSignature,
+  subjectForLang,
 } from "@/lib/sender-profile";
+import { outreachLangFromLocation } from "@/lib/outreach/locale";
 import { BoardAssignModal, type BoardDestination } from "./BoardAssignModal";
 import { DashboardView } from "./DashboardView";
 import { BoardsView } from "./BoardsView";
@@ -98,6 +101,10 @@ export function Studio() {
   const [zeruhBefore, setZeruhBefore] = useState<ZeruhUsage | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
+  const [importProgress, setImportProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   /** True while send is in flight and Zeruh verify is configured. */
   const [sendVerifying, setSendVerifying] = useState(false);
   const [pendingSendId, setPendingSendId] = useState<string | null>(null);
@@ -212,6 +219,7 @@ export function Studio() {
         subjectTemplate: v.subjectTemplate.trim() || undefined,
         autoDraft: v.autoDraft,
         staticBody: v.staticBody,
+        aiPersonalize: v.aiPersonalize,
         maxLeads: v.maxLeads,
         boardId,
       });
@@ -263,42 +271,66 @@ export function Studio() {
   };
 
   const executeImport = async (leads: ImportLeadRow[], dest: BoardDestination) => {
-    const res = await fetch("/api/leads/import", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        leads,
-        boardId: dest.boardId,
-        newBoardName: dest.newBoardName,
-      }),
-    });
-    const data = (await res.json()) as {
-      error?: string;
-      imported?: number;
-      merged?: number;
-      skipped?: number;
-      run?: { id: string };
-      boardId?: string;
-    };
-    if (!res.ok) throw new Error(data.error ?? "Import failed");
-    if (data.boardId) storeBoardFilter(data.boardId);
-    const parts = [
-      data.imported ? `Added ${data.imported} new` : null,
-      data.merged
-        ? `updated ${data.merged} existing (same email or website)`
-        : null,
-      data.skipped ? `skipped ${data.skipped} unchanged` : null,
-    ].filter(Boolean);
-    toast(
-      "ok",
-      parts.length
-        ? `${parts.join(" · ")}.`
-        : "Import finished — no changes.",
-    );
-    if (data.run?.id) await loadRunOnBoard(data.run.id);
-    else {
+    const CHUNK = 40;
+    const total = leads.length;
+    let runId: string | undefined;
+    let boardIdOut: string | undefined;
+    let imported = 0;
+    let merged = 0;
+    let skipped = 0;
+
+    setImportProgress({ done: 0, total });
+    try {
+      for (let i = 0; i < leads.length; i += CHUNK) {
+        const chunk = leads.slice(i, i + CHUNK);
+        const isLast = i + CHUNK >= leads.length;
+        const res = await fetch("/api/leads/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leads: chunk,
+            boardId: dest.boardId,
+            newBoardName: dest.newBoardName,
+            runId: runId ?? null,
+            finalize: isLast,
+          }),
+        });
+        const data = (await res.json()) as {
+          error?: string;
+          imported?: number;
+          merged?: number;
+          skipped?: number;
+          run?: { id: string };
+          boardId?: string;
+        };
+        if (!res.ok) throw new Error(data.error ?? "Import failed");
+        runId = data.run?.id ?? runId;
+        boardIdOut = data.boardId ?? boardIdOut;
+        imported += data.imported ?? 0;
+        merged += data.merged ?? 0;
+        skipped += data.skipped ?? 0;
+        setImportProgress({ done: Math.min(i + chunk.length, total), total });
+      }
+      if (boardIdOut) storeBoardFilter(boardIdOut);
+      const parts = [
+        imported ? `Added ${imported} new` : null,
+        merged
+          ? `updated ${merged} existing (same email or website)`
+          : null,
+        skipped ? `skipped ${skipped} unchanged` : null,
+      ].filter(Boolean);
+      toast(
+        "ok",
+        parts.length
+          ? `${parts.join(" · ")}.`
+          : "Import finished — no changes.",
+      );
+      activeRunIdRef.current = runId ?? null;
+      setActiveRunId(runId ?? null);
       await refresh();
-      setView("pipeline");
+      setView("leads");
+    } finally {
+      setImportProgress(null);
     }
   };
 
@@ -328,16 +360,35 @@ export function Studio() {
   const onDraft = async (leadId: string) => {
     try {
       const profile = loadSenderProfile();
+      const lead = board?.leads.find((l) => l.id === leadId);
+      const lang = outreachLangFromLocation(lead?.location ?? null);
+      const flags = draftFlagsFromProfile(profile);
       const { outreach } = await api.draft(leadId, {
         signOff: resolveSignature(profile),
         offerNotes: getDefaultOffer(profile) || undefined,
-        subjectTemplate: profile.subjectTemplate.trim() || undefined,
-        staticBody: Boolean(profile.staticBody),
+        subjectTemplate: subjectForLang(profile, lang) || undefined,
+        staticBody: flags.staticBody,
+        aiPersonalize: flags.aiPersonalize,
       });
       patchLeadLocal(leadId, { outreach, status: "queued" });
       toast("ok", "Draft written. Review before approving.");
     } catch (e) {
       toast("err", (e as Error).message);
+    }
+  };
+
+  const onMarkContacted = async (leadId: string, method: ContactMethod) => {
+    setOutreachBusy(leadId);
+    try {
+      await onMoveStage(leadId, "contacted", method);
+      toast(
+        "ok",
+        method === "phone"
+          ? "Logged as called — moved to Contacted."
+          : "Logged contact form — moved to Contacted.",
+      );
+    } finally {
+      setOutreachBusy(null);
     }
   };
 
@@ -970,6 +1021,7 @@ export function Studio() {
               onDraftAll={onDraftAllOutreach}
               onApproveAll={onApproveAllOutreach}
               onSendAll={onSendAllOutreach}
+              onMarkContacted={onMarkContacted}
             />
           </div>
         ) : (
@@ -998,6 +1050,42 @@ export function Studio() {
           onSetDelivery={onSetDelivery}
           onUpdateCrm={onUpdateLeadCrm}
         />
+      )}
+
+      {importProgress && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" />
+          <div className="animate-float-up relative w-full max-w-sm rounded-xl2 border border-aurora-400/20 bg-ink-900 p-6 shadow-2xl">
+            <p className="font-display text-lg font-semibold text-mist-100">
+              Importing leads…
+            </p>
+            <p className="mt-2 text-sm text-mist-300">
+              <span className="tabular-nums text-mist-100">
+                {importProgress.done}
+              </span>
+              {" / "}
+              <span className="tabular-nums">{importProgress.total}</span> rows
+            </p>
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-ink-950/60">
+              <div
+                className="h-full rounded-full bg-aurora-400 transition-[width] duration-300 ease-out"
+                style={{
+                  width: `${
+                    importProgress.total
+                      ? Math.round(
+                          (importProgress.done / importProgress.total) * 100,
+                        )
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+            <p className="mt-3 flex items-center gap-2 text-xs text-mist-500">
+              <Spinner className="h-3.5 w-3.5 text-aurora-300" />
+              Then we&apos;ll open the Leads table.
+            </p>
+          </div>
+        </div>
       )}
 
       {pendingSendId && (

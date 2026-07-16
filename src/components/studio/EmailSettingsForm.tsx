@@ -313,10 +313,7 @@ export function EmailSettingsForm({
       </div>
 
       {!isPro && (
-        <div
-          data-tour="resend-key"
-          className="rounded-xl border border-aurora-400/20 bg-aurora-400/[0.04] p-4"
-        >
+        <div data-tour="resend-key" className="space-y-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="shrink-0">
               <p className="mb-1.5 text-sm font-medium text-mist-100">Sending provider</p>
@@ -352,7 +349,7 @@ export function EmailSettingsForm({
               {isMaileroo ? (
                 <Field
                   label="Maileroo sending key"
-                  hint="Dashboard → Domains → Sending Keys"
+                  hint="Domains → your domain → Sending Keys"
                   saved={saved && savedHint === "mailerooKey"}
                 >
                   <PasswordField

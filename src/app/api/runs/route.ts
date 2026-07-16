@@ -15,6 +15,7 @@ const CreateRunSchema = z.object({
   subjectTemplate: z.string().max(300).optional().nullable(),
   autoDraft: z.boolean().optional(),
   staticBody: z.boolean().optional(),
+  aiPersonalize: z.boolean().optional(),
   searchStrategy: z.enum(["standard", "smart", "local"]).optional(),
   maxLeads: z.number().int().min(1).max(500).optional(),
   demo: z.boolean().optional(),

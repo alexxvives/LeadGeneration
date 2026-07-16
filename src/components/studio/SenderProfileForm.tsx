@@ -5,8 +5,11 @@ import {
   createOutreachProfile,
   deleteOutreachProfile,
   loadOutreachProfiles,
+  pitchForLang,
+  primaryPitchLang,
   saveSenderProfile,
   setActiveOutreachProfile,
+  subjectForLang,
   SIGNATURE_PLACEHOLDER,
   type OutreachProfile,
 } from "@/lib/sender-profile";
@@ -95,15 +98,16 @@ function previewDraft(
 ): { subject: string; body: string; missingPitch: boolean } {
   const pitch = (profile.pitches[lang] ?? "").trim();
   const missingPitch = !pitch;
-  const subjectTpl = profile.subjectTemplate.trim();
+  const subjectTpl = subjectForLang(profile, lang);
   // Never fall back to locale sample pitch — that made EN previews look "wrong"
   // when only an ES (etc.) version existed.
   const draft = generateDraft(PREVIEW_LEAD, PREVIEW_RUN, {
     forceLang: lang,
     signOff: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-    offerNotes: pitch || `[Add ${langLabel(lang)} sales pitch]`,
+    offerNotes: pitch || `[Add ${langLabel(lang)} email body template]`,
     subjectTemplate: subjectTpl || null,
-    staticBody: Boolean(profile.staticBody),
+    aiPersonalize: false,
+    staticBody: true,
   });
   return { ...draft, missingPitch };
 }
@@ -126,6 +130,8 @@ export function SenderProfileForm() {
   const [genError, setGenError] = useState<string | null>(null);
   const [genProvider, setGenProvider] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [translateError, setTranslateError] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const langMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
@@ -201,9 +207,12 @@ export function SenderProfileForm() {
 
   const pitchValue = profile.pitches[previewLang] ?? "";
 
+  const subjectValue =
+    profile.subjects[previewLang] ?? profile.subjectTemplate ?? "";
+
   const fieldSnapshot = () =>
     JSON.stringify({
-      subjectTemplate: profile.subjectTemplate.trim(),
+      subject: subjectValue.trim(),
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
       pitch: (profile.pitches[previewLang] ?? "").trim(),
       name: profile.name.trim(),
@@ -213,14 +222,18 @@ export function SenderProfileForm() {
     const next: OutreachProfile = {
       ...profile,
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-      subjectTemplate: profile.subjectTemplate.trim(),
+      subjects: {
+        ...profile.subjects,
+        [previewLang]: subjectValue.trim(),
+      },
+      subjectTemplate: subjectValue.trim() || profile.subjectTemplate.trim(),
       pitches: {
         ...profile.pitches,
         [previewLang]: (profile.pitches[previewLang] ?? "").trim(),
       },
     };
     const serialized = JSON.stringify({
-      subjectTemplate: next.subjectTemplate,
+      subject: next.subjects[previewLang] ?? "",
       signature: next.signature,
       pitch: next.pitches[previewLang] ?? "",
       name: next.name.trim(),
@@ -229,6 +242,75 @@ export function SenderProfileForm() {
       return;
     }
     persist(next, field);
+  };
+
+  const switchPreviewLang = async (lang: OutreachLang) => {
+    setPreviewLang(lang);
+    setLangMenuOpen(false);
+    setSavedField(null);
+    setTranslateError(null);
+
+    const hasPitch = Boolean(profile.pitches[lang]?.trim());
+    const hasSubject = Boolean(profile.subjects[lang]?.trim());
+    if (hasPitch && hasSubject) return;
+
+    const sourceLang = primaryPitchLang(profile);
+    if (!sourceLang || sourceLang === lang) return;
+    const sourcePitch = pitchForLang(profile, sourceLang);
+    const sourceSubject = subjectForLang(profile, sourceLang);
+    if (!sourcePitch.trim() && !sourceSubject.trim()) return;
+
+    setTranslating(true);
+    try {
+      let nextPitch = profile.pitches[lang] ?? "";
+      let nextSubject = profile.subjects[lang] ?? "";
+      if (!hasPitch && sourcePitch.trim()) {
+        const res = await fetch("/api/ai/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: sourcePitch,
+            targetLang: lang,
+            kind: "body",
+          }),
+        });
+        const data = (await res.json()) as { text?: string; error?: string };
+        if (!res.ok || !data.text) {
+          setTranslateError(
+            data.error ??
+              `Could not translate into ${langLabel(lang)} — paste or write that version.`,
+          );
+          return;
+        }
+        nextPitch = data.text;
+      }
+      if (!profile.subjects[lang]?.trim() && sourceSubject.trim()) {
+        const res = await fetch("/api/ai/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: sourceSubject,
+            targetLang: lang,
+            kind: "subject",
+          }),
+        });
+        const data = (await res.json()) as { text?: string; error?: string };
+        if (res.ok && data.text) nextSubject = data.text;
+      }
+      const next: OutreachProfile = {
+        ...profile,
+        pitches: { ...profile.pitches, [lang]: nextPitch },
+        subjects: {
+          ...profile.subjects,
+          ...(nextSubject.trim() ? { [lang]: nextSubject.trim() } : {}),
+        },
+      };
+      persist(next, "pitch");
+    } catch {
+      setTranslateError("Network error while translating");
+    } finally {
+      setTranslating(false);
+    }
   };
 
   const captureFocus = () => {
@@ -393,6 +475,9 @@ export function SenderProfileForm() {
             <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-xs font-medium text-mist-500">
                 Email subject template
+                <span className="ml-1.5 font-normal text-mist-600">
+                  · {langLabel(previewLang)}
+                </span>
               </span>
               <span
                 className="group relative inline-flex"
@@ -403,19 +488,24 @@ export function SenderProfileForm() {
                   role="tooltip"
                   className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
                 >
-                  <code className="text-aurora-300">{"{company}"}</code> is
-                  safest — most leads have it.{" "}
-                  <code className="text-aurora-300">{"{lead_name}"}</code> uses
-                  the contact name when we have one, otherwise the company. Also{" "}
+                  Write in any language. Switch the preview flag to translate into
+                  another language. Placeholders:{" "}
+                  <code className="text-aurora-300">{"{company}"}</code>,{" "}
+                  <code className="text-aurora-300">{"{lead_name}"}</code>,{" "}
                   <code className="text-aurora-300">{"{location}"}</code>.
                 </span>
               </span>
               <SavedHint field="subject" />
             </div>
             <input
-              value={profile.subjectTemplate}
+              value={subjectValue}
               onFocus={captureFocus}
-              onChange={(e) => patch({ subjectTemplate: e.target.value })}
+              onChange={(e) =>
+                patch({
+                  subjects: { ...profile.subjects, [previewLang]: e.target.value },
+                  subjectTemplate: e.target.value,
+                })
+              }
               onBlur={() => saveOnBlur("subject")}
               placeholder="Quick note for {company}"
               className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
@@ -425,7 +515,7 @@ export function SenderProfileForm() {
           <div className="block">
             <div className="mb-1.5 flex min-w-0 flex-wrap items-center justify-between gap-2">
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-mist-500">
-                Sales pitch
+                Email body template
                 <span className="font-normal text-mist-600">
                   · {langLabel(previewLang)} version
                 </span>
@@ -492,26 +582,30 @@ export function SenderProfileForm() {
                 });
               }}
               onBlur={() => saveOnBlur("pitch")}
-              placeholder={`Write your ${langLabel(previewLang)} pitch…`}
+              placeholder={`Write your ${langLabel(previewLang)} email body…`}
             />
             <label className="mt-2 flex cursor-pointer items-start gap-2.5 rounded-lg border border-white/5 bg-ink-950/30 px-3 py-2.5">
               <input
                 type="checkbox"
-                checked={Boolean(profile.staticBody)}
+                checked={Boolean(profile.aiPersonalize)}
                 onChange={(e) => {
-                  const next = { ...profile, staticBody: e.target.checked };
+                  const next = {
+                    ...profile,
+                    aiPersonalize: e.target.checked,
+                    staticBody: !e.target.checked,
+                  };
                   persist(next, null);
                 }}
                 className="mt-0.5 rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40"
               />
               <span className="text-xs leading-relaxed text-mist-400">
                 <span className="font-medium text-mist-200">
-                  Use pitch as full draft body
+                  AI personalize each email
                 </span>
                 {" — "}
-                skip auto opener &amp; stock CTA. Write greeting-ready copy here
-                (placeholders like{" "}
-                <code className="text-aurora-300/90">{"{company}"}</code> work).
+                when checked, drafting rewrites the template slightly per lead.
+                Unchecked uses your text as-is (only placeholders like{" "}
+                <code className="text-aurora-300/90">{"{company}"}</code> change).
               </span>
             </label>
             {genProvider && !genError && (
@@ -521,6 +615,9 @@ export function SenderProfileForm() {
               </p>
             )}
             {genError && <p className="mt-1.5 text-xs text-rose-300">{genError}</p>}
+            {translateError && (
+              <p className="mt-1.5 text-xs text-amber-200/90">{translateError}</p>
+            )}
           </div>
 
           <label className="block">
@@ -553,13 +650,18 @@ export function SenderProfileForm() {
                 <button
                   type="button"
                   onClick={() => setLangMenuOpen((o) => !o)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-ink-950/50 transition-colors hover:border-aurora-400/40 hover:bg-ink-900"
+                  disabled={translating}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-ink-950/50 transition-colors hover:border-aurora-400/40 hover:bg-ink-900 disabled:opacity-50"
                   aria-label={`Preview language: ${langLabel(previewLang)}`}
                   aria-expanded={langMenuOpen}
                   aria-haspopup="listbox"
-                  title="Preview / edit pitch in other languages"
+                  title="Preview / translate into other languages"
                 >
-                  <FlagImg cc={activeCc} />
+                  {translating ? (
+                    <Spinner className="h-3.5 w-3.5" />
+                  ) : (
+                    <FlagImg cc={activeCc} />
+                  )}
                 </button>
                 {langMenuOpen ? (
                   <ul
@@ -581,11 +683,7 @@ export function SenderProfileForm() {
                                 ? "bg-aurora-400/10 text-aurora-300"
                                 : "text-mist-200 hover:bg-white/5"
                             }`}
-                            onClick={() => {
-                              setPreviewLang(l.id);
-                              setLangMenuOpen(false);
-                              setSavedField(null);
-                            }}
+                            onClick={() => void switchPreviewLang(l.id)}
                           >
                             <FlagImg cc={l.cc} />
                             <span className="flex-1">{langLabel(l.id)}</span>
@@ -602,6 +700,11 @@ export function SenderProfileForm() {
                 ) : null}
               </div>
             </div>
+            {translating ? (
+              <p className="mt-3 text-xs text-aurora-200/90">
+                Translating into {langLabel(previewLang)}…
+              </p>
+            ) : null}
             <p className="mt-3 text-xs text-mist-500">Subject</p>
             <p className="mt-0.5 font-medium text-mist-100">{preview.subject}</p>
             <div className="mt-4 border-t border-white/5 pt-4">
@@ -609,10 +712,10 @@ export function SenderProfileForm() {
                 {preview.body}
               </pre>
             </div>
-            {preview.missingPitch ? (
+            {preview.missingPitch && !translating ? (
               <p className="mt-3 text-[11px] leading-relaxed text-amber-200/80">
-                No {langLabel(previewLang)} pitch yet — add that version on the left
-                (same offer, this language). Other languages keep their own text.
+                No {langLabel(previewLang)} body yet — switch the flag again to
+                auto-translate from your existing version, or write it on the left.
               </p>
             ) : null}
           </div>

@@ -20,6 +20,10 @@ const BodySchema = z.object({
   leads: z.array(RowSchema).min(1).max(500),
   boardId: z.string().min(1).max(80).optional().nullable(),
   newBoardName: z.string().min(1).max(80).optional().nullable(),
+  /** Continue a chunked import. */
+  runId: z.string().min(1).max(80).optional().nullable(),
+  /** When false, leave the run "running" for more chunks. Default true. */
+  finalize: z.boolean().optional(),
 });
 
 export async function POST(req: Request) {
@@ -43,6 +47,8 @@ export async function POST(req: Request) {
     const result = await importLeads(ctx, parsed.data.leads, {
       boardId: parsed.data.boardId,
       newBoardName: parsed.data.newBoardName,
+      runId: parsed.data.runId,
+      finalize: parsed.data.finalize,
     });
     return NextResponse.json(result);
   } catch (err) {

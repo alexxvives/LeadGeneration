@@ -4,6 +4,19 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-16 — Contacted queue, AI personalize, import progress
+- Outreach third column is **Contacted** (not Sent): email sends + phone /
+  contact-form logs. No-email rows get **Log contact → Called / Form**.
+- Settings: “Email body template” + checkbox **AI personalize each email**
+  (`aiPersonalize`). Unchecked = template as-is (placeholders only). Checked =
+  Workers AI/Groq/Gemini rewrite per lead (falls back to template if no AI).
+- Preview flag: missing language versions auto-translate via `/api/ai/translate`
+  (subject + body). Subject is per-language (`subjects[lang]`).
+- Import: chunked (40 rows) with progress modal → redirect to **Leads**. No
+  auto-draft (was leaving runs `running` on timeout). Stuck import runs healed
+  after 15m. Maileroo shared/trial domain → spam is expected; need own domain +
+  SPF/DKIM/DMARC.
+
 ### 2026-07-16 — Outreach UX batch (profiles, bulk delete, webhooks UI)
 - Search toolbar: Standard/Smart · lead count · profile `Select` (`.select-ink`)
   in one row. Settings profile: single name field + chevron switcher (not two boxes).

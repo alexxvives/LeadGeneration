@@ -21,16 +21,27 @@ export type OutreachProfile = {
   /** Kept for backward-compat / AI generate website hint. */
   website: string;
   signature: string;
+  /** Fallback subject when no per-language subject is set. */
   subjectTemplate: string;
   /**
-   * Sales pitch versions by language. Same offer, different language —
+   * Subject templates by language (optional). Preview/drafting prefer these
+   * over `subjectTemplate`.
+   */
+  subjects: Partial<Record<OutreachLang, string>>;
+  /**
+   * Email body template versions by language. Same offer, different language —
    * preview and drafting pick the matching version (no sample substitution).
    * May contain light HTML (bold / lists) from the Settings editor.
    */
   pitches: Partial<Record<OutreachLang, string>>;
   /**
-   * When true, drafts use greeting + sales pitch + sign-off only
-   * (no scraped opener / stock CTA). Default false = assembled template.
+   * When true, each draft is AI-rewritten so wording varies per lead.
+   * When false, the email body template is used as-is (placeholders only).
+   */
+  aiPersonalize?: boolean;
+  /**
+   * @deprecated Prefer aiPersonalize. Kept for migration of older profiles.
+   * true = raw template; false = legacy assembled opener/CTA.
    */
   staticBody?: boolean;
 };
@@ -81,8 +92,10 @@ function emptyProfile(partial?: Partial<OutreachProfile>): OutreachProfile {
     website: partial?.website ?? "",
     signature: partial?.signature ?? "",
     subjectTemplate: partial?.subjectTemplate ?? "",
+    subjects: partial?.subjects ?? {},
     pitches: partial?.pitches ?? {},
-    staticBody: partial?.staticBody ?? false,
+    aiPersonalize: partial?.aiPersonalize ?? false,
+    staticBody: partial?.staticBody,
   };
 }
 
@@ -121,6 +134,16 @@ export function pitchForLang(
   return "";
 }
 
+/** Subject template for a language; falls back to shared subjectTemplate. */
+export function subjectForLang(
+  p: OutreachProfile,
+  lang: OutreachLang,
+): string {
+  const exact = p.subjects[lang]?.trim();
+  if (exact) return exact;
+  return p.subjectTemplate.trim();
+}
+
 /** Primary pitch language (first non-empty, preferring detected). */
 export function primaryPitchLang(p: OutreachProfile): OutreachLang | null {
   const entries = (Object.entries(p.pitches) as [OutreachLang, string][]).filter(
@@ -153,13 +176,23 @@ function migrateLegacySingle(raw: string): ProfileStore {
       website: String(parsed.website ?? ""),
       signature: String(parsed.signature ?? ""),
       subjectTemplate: String(parsed.subjectTemplate ?? ""),
+      subjects: parsed.subjects ?? {},
       pitches,
-      staticBody: Boolean(parsed.staticBody),
+      aiPersonalize: resolveAiPersonalize(parsed),
+      staticBody: parsed.staticBody,
     });
     return { profiles: [profile], activeId: profile.id };
   } catch {
     return { profiles: [emptyProfile()], activeId: null };
   }
+}
+
+function resolveAiPersonalize(
+  p: Partial<OutreachProfile> & { aiPersonalize?: boolean; staticBody?: boolean },
+): boolean {
+  if (typeof p.aiPersonalize === "boolean") return p.aiPersonalize;
+  // Older "use pitch as full body" checkbox stored staticBody=true for raw text.
+  return false;
 }
 
 function readStore(): ProfileStore {
@@ -203,6 +236,7 @@ function normalizeProfile(p: Partial<OutreachProfile> & { defaultOffer?: string 
   if (legacyOffer && Object.values(pitches).every((t) => !t?.trim())) {
     pitches[outreachLangFromText(legacyOffer)] = legacyOffer;
   }
+  const subjects: Partial<Record<OutreachLang, string>> = { ...(p.subjects ?? {}) };
   return emptyProfile({
     id: p.id,
     name: String(p.name ?? "Untitled"),
@@ -212,8 +246,10 @@ function normalizeProfile(p: Partial<OutreachProfile> & { defaultOffer?: string 
     website: String(p.website ?? ""),
     signature: String(p.signature ?? ""),
     subjectTemplate: String(p.subjectTemplate ?? ""),
+    subjects,
     pitches,
-    staticBody: Boolean(p.staticBody),
+    aiPersonalize: resolveAiPersonalize(p),
+    staticBody: p.staticBody,
   });
 }
 
@@ -296,4 +332,17 @@ export function deleteOutreachProfile(id: string): void {
 /** Compat getter — primary pitch text (any language). */
 export function getDefaultOffer(p: OutreachProfile): string {
   return pitchForLang(p, primaryPitchLang(p) ?? "en");
+}
+
+/** Draft flags derived from the active profile. */
+export function draftFlagsFromProfile(p: OutreachProfile): {
+  aiPersonalize: boolean;
+  staticBody: boolean;
+} {
+  const aiPersonalize = Boolean(p.aiPersonalize);
+  return {
+    aiPersonalize,
+    // Raw template unless AI is on (AI uses raw as base then rewrites).
+    staticBody: !aiPersonalize,
+  };
 }

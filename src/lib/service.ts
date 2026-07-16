@@ -2,6 +2,11 @@ import type { LeadRepository } from "@/lib/db";
 import { newId, nowIso } from "@/lib/id";
 import { runSearch, SearchUnavailableError } from "@/lib/search";
 import { generateDraft, stripLegacyCompliance } from "@/lib/outreach/draft";
+import {
+  mapPool,
+  personalizeDraftForLead,
+} from "@/lib/ai/generate";
+import { outreachLangFromLocation } from "@/lib/outreach/locale";
 import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
@@ -361,26 +366,48 @@ export async function createAndRunSearch(
     const shouldDraft = input.autoDraft !== false;
     if (shouldDraft) {
       const now = nowIso();
+      const aiPersonalize = Boolean(input.aiPersonalize);
       const draftOverrides = {
         signOff: input.senderName?.trim() || null,
         offerNotes: input.offerNotes?.trim() || null,
         subjectTemplate: input.subjectTemplate?.trim() || null,
-        staticBody: Boolean(input.staticBody),
+        staticBody: aiPersonalize ? true : input.staticBody !== false,
+        aiPersonalize,
       };
-      const drafts: Outreach[] = leads.map((lead) => ({
-        id: newId("out"),
-        workspaceId: ctx.workspaceId,
-        leadId: lead.id,
-        runId: run.id,
-        toEmail: lead.emails[0] ?? null,
-        ...generateDraft(lead, run, draftOverrides),
-        status: "draft" as const,
-        deliveryStatus: "unknown" as const,
-        sentAt: null,
-        error: null,
-        createdAt: now,
-        updatedAt: now,
-      }));
+      const drafts: Outreach[] = await mapPool(leads, 3, async (lead) => {
+        let { subject, body } = generateDraft(lead, run, draftOverrides);
+        if (aiPersonalize) {
+          const varied = await personalizeDraftForLead({
+            company: lead.company,
+            contactName: lead.contactName,
+            location: lead.location,
+            aboutBlurb: lead.aboutBlurb,
+            website: lead.website,
+            lang: outreachLangFromLocation(lead.location),
+            subject,
+            body,
+          });
+          if (varied) {
+            subject = varied.subject;
+            body = varied.body;
+          }
+        }
+        return {
+          id: newId("out"),
+          workspaceId: ctx.workspaceId,
+          leadId: lead.id,
+          runId: run.id,
+          toEmail: lead.emails[0] ?? null,
+          subject,
+          body,
+          status: "draft" as const,
+          deliveryStatus: "unknown" as const,
+          sentAt: null,
+          error: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+      });
       await Promise.all(drafts.map((d) => db.upsertOutreach(d)));
       await Promise.all(leads.map((l) => db.updateLead(l.id, { status: "queued" })));
     }
@@ -541,6 +568,7 @@ export async function draftOutreach(
     offerNotes?: string | null;
     subjectTemplate?: string | null;
     staticBody?: boolean;
+    aiPersonalize?: boolean;
   },
 ): Promise<Outreach | null> {
   const db = ctx.db;
@@ -549,7 +577,29 @@ export async function draftOutreach(
   const run = await db.getRun(lead.runId);
   if (!run) return null;
 
-  const { subject, body } = generateDraft(lead, run, overrides);
+  const aiPersonalize = Boolean(overrides?.aiPersonalize);
+  const draftOverrides = {
+    ...overrides,
+    staticBody: aiPersonalize ? true : overrides?.staticBody !== false,
+    aiPersonalize,
+  };
+  let { subject, body } = generateDraft(lead, run, draftOverrides);
+  if (aiPersonalize) {
+    const varied = await personalizeDraftForLead({
+      company: lead.company,
+      contactName: lead.contactName,
+      location: lead.location,
+      aboutBlurb: lead.aboutBlurb,
+      website: lead.website,
+      lang: outreachLangFromLocation(lead.location),
+      subject,
+      body,
+    });
+    if (varied) {
+      subject = varied.subject;
+      body = varied.body;
+    }
+  }
   const existing = await db.getOutreachByLead(leadId);
   const now = nowIso();
 
@@ -973,17 +1023,34 @@ export type { ImportLeadRow };
 
 /**
  * Import leads from a spreadsheet onto a board (ADR 0014).
- * Always creates an import run on the target board. Matching email/domain rows
- * already in the workspace are pulled onto that board and gap-filled.
+ * Supports chunked uploads via `runId` so the client can show progress.
+ * Does not auto-draft (keeps import fast); draft from Outreach / Pipeline.
  */
 export async function importLeads(
   ctx: Ctx,
   rows: ImportLeadRow[],
-  opts?: { boardId?: string | null; newBoardName?: string | null },
-): Promise<{ imported: number; merged: number; skipped: number; run: Run; boardId: string }> {
+  opts?: {
+    boardId?: string | null;
+    newBoardName?: string | null;
+    /** Continue an in-progress import run (chunked client uploads). */
+    runId?: string | null;
+    /** Mark the run complete after this chunk (default true). */
+    finalize?: boolean;
+  },
+): Promise<{
+  imported: number;
+  merged: number;
+  skipped: number;
+  run: Run;
+  boardId: string;
+  processed: number;
+}> {
   const { db } = ctx;
   const ws = await db.getWorkspace(ctx.workspaceId);
   if (ws) await ensureUsageWindow(db, ws);
+
+  // Heal abandoned import runs (skip the one we're continuing).
+  await healStuckImportRuns(ctx, opts?.runId ?? undefined);
 
   const boardId = await resolveBoardId(ctx, {
     boardId: opts?.boardId,
@@ -1007,23 +1074,39 @@ export async function importLeads(
     throw new Error("No usable rows — need at least a company name or email.");
   }
 
-  const run: Run = {
-    id: newId("run"),
-    workspaceId: ctx.workspaceId,
-    boardId,
-    niche: "Imported list",
-    location: null,
-    offerNotes: null,
-    senderName: null,
-    status: "running",
-    mode: "live",
-    provider: "import",
-    leadCount: 0,
-    error: null,
-    createdAt: nowIso(),
-    completedAt: null,
-  };
-  await db.createRun(run);
+  const finalize = opts?.finalize !== false;
+  let run: Run;
+  if (opts?.runId) {
+    const existing = await db.getRun(opts.runId);
+    if (!existing || existing.workspaceId !== ctx.workspaceId) {
+      throw new Error("Import run not found");
+    }
+    if (existing.provider !== "import") {
+      throw new Error("Not an import run");
+    }
+    run = existing;
+    if (run.status !== "running") {
+      await db.updateRun(run.id, { status: "running", completedAt: null, error: null });
+    }
+  } else {
+    run = {
+      id: newId("run"),
+      workspaceId: ctx.workspaceId,
+      boardId,
+      niche: "Imported list",
+      location: null,
+      offerNotes: null,
+      senderName: null,
+      status: "running",
+      mode: "live",
+      provider: "import",
+      leadCount: 0,
+      error: null,
+      createdAt: nowIso(),
+      completedAt: null,
+    };
+    await db.createRun(run);
+  }
 
   try {
     const prior = await db.listLeads();
@@ -1133,24 +1216,6 @@ export async function importLeads(
     });
 
     if (leads.length > 0) await db.createLeads(leads);
-
-    const now = nowIso();
-    const drafts: Outreach[] = leads.map((lead) => ({
-      id: newId("out"),
-      workspaceId: ctx.workspaceId,
-      leadId: lead.id,
-      runId: run.id,
-      toEmail: lead.emails[0] ?? null,
-      ...generateDraft(lead, run),
-      status: "draft",
-      deliveryStatus: "unknown",
-      sentAt: null,
-      error: null,
-      createdAt: now,
-      updatedAt: now,
-    }));
-    await Promise.all(drafts.map((d) => db.upsertOutreach(d)));
-    await Promise.all(leads.map((l) => db.updateLead(l.id, { status: "queued" })));
     if (leads.length > 0) await recordLeadUsage(ctx, leads.length);
 
     const boardCount = (await db.listLeads({ boardId })).length;
@@ -1158,12 +1223,18 @@ export async function importLeads(
     if (merged > 0) parts.push(`merged ${merged} existing`);
     if (skipped > 0) parts.push(`skipped ${skipped} unchanged`);
 
-    const updated = await db.updateRun(run.id, {
-      status: "complete",
-      leadCount: boardCount,
-      error: parts.length ? parts.join(" · ") : null,
-      completedAt: nowIso(),
-    });
+    const updated = finalize
+      ? await db.updateRun(run.id, {
+          status: "complete",
+          leadCount: boardCount,
+          error: parts.length ? parts.join(" · ") : null,
+          completedAt: nowIso(),
+        })
+      : await db.updateRun(run.id, {
+          status: "running",
+          leadCount: boardCount,
+          error: parts.length ? parts.join(" · ") : null,
+        });
 
     return {
       imported: leads.length,
@@ -1171,6 +1242,7 @@ export async function importLeads(
       skipped,
       run: updated ?? run,
       boardId,
+      processed: cleaned.length,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1180,6 +1252,26 @@ export async function importLeads(
       completedAt: nowIso(),
     });
     throw err instanceof Error ? err : new Error(message);
+  }
+}
+
+/** Mark abandoned import runs (client disconnect / timeout) as failed. */
+async function healStuckImportRuns(
+  ctx: Ctx,
+  exceptRunId?: string,
+): Promise<void> {
+  const runs = await ctx.db.listRuns();
+  const cutoff = Date.now() - 15 * 60 * 1000;
+  for (const r of runs) {
+    if (exceptRunId && r.id === exceptRunId) continue;
+    if (r.provider !== "import" || r.status !== "running") continue;
+    const started = Date.parse(r.createdAt);
+    if (!Number.isFinite(started) || started > cutoff) continue;
+    await ctx.db.updateRun(r.id, {
+      status: "failed",
+      error: "Import timed out — re-upload the file to retry.",
+      completedAt: nowIso(),
+    });
   }
 }
 

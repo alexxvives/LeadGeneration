@@ -103,6 +103,7 @@ export const api = {
     subjectTemplate?: string;
     autoDraft?: boolean;
     staticBody?: boolean;
+    aiPersonalize?: boolean;
     searchStrategy?: SearchStrategy;
     maxLeads?: number;
     demo?: boolean;
@@ -142,6 +143,7 @@ export const api = {
       offerNotes?: string;
       subjectTemplate?: string;
       staticBody?: boolean;
+      aiPersonalize?: boolean;
     },
   ) =>
     jsonFetch<{ outreach: Outreach }>("/api/outreach", {
@@ -151,7 +153,8 @@ export const api = {
         ...(opts?.signOff ? { signOff: opts.signOff } : {}),
         ...(opts?.offerNotes ? { offerNotes: opts.offerNotes } : {}),
         ...(opts?.subjectTemplate ? { subjectTemplate: opts.subjectTemplate } : {}),
-        ...(opts?.staticBody ? { staticBody: true } : {}),
+        ...(opts?.staticBody !== undefined ? { staticBody: opts.staticBody } : {}),
+        ...(opts?.aiPersonalize ? { aiPersonalize: true } : {}),
       }),
     }),
 

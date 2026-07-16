@@ -115,3 +115,85 @@ export async function mapPool<T, R>(
   await Promise.all(workers);
   return results;
 }
+
+/**
+ * Translate subject + body (or pitch HTML/plain) into a target outreach language.
+ * Returns null when no AI provider is available.
+ */
+export async function translateOutreachCopy(opts: {
+  text: string;
+  targetLang: OutreachLang;
+  /** Optional hint — subject line vs body/pitch. */
+  kind?: "subject" | "body";
+}): Promise<{ text: string; provider: AiProvider } | null> {
+  const src = opts.text.replace(/\r\n/g, "\n").trim();
+  if (!src) return null;
+  const kind = opts.kind ?? "body";
+  const out = await aiChat(
+    [
+      `You translate B2B cold-email ${kind === "subject" ? "subject lines" : "copy"} into ${langLabel(opts.targetLang)} only.`,
+      `Preserve meaning, tone, and placeholders exactly as written (e.g. {company}, {lead_name}, {location}).`,
+      `Keep light HTML tags if present (b, strong, ul, ol, li, p, br). Do not add a greeting or sign-off.`,
+      `Output the translation only — no quotes, no preamble.`,
+    ].join(" "),
+    src.slice(0, kind === "subject" ? 400 : 3500),
+  );
+  if (!out) return null;
+  const text = out.text
+    .replace(/^["'\s]+|["'\s]+$/g, "")
+    .trim()
+    .slice(0, kind === "subject" ? 300 : 4000);
+  if (!text) return null;
+  return { text, provider: out.provider };
+}
+
+/**
+ * Rewrite a template draft into a slightly different version for one lead.
+ * Falls back to null when AI is unavailable (caller keeps the template).
+ */
+export async function personalizeDraftForLead(opts: {
+  company: string;
+  contactName: string | null;
+  location: string | null;
+  aboutBlurb: string | null;
+  website: string | null;
+  lang: OutreachLang;
+  subject: string;
+  body: string;
+}): Promise<{ subject: string; body: string; provider: AiProvider } | null> {
+  const out = await aiChat(
+    [
+      `You personalize one cold B2B email in ${langLabel(opts.lang)} only.`,
+      `Keep the same offer and intent as the template. Vary wording slightly so each send feels unique — do not invent claims.`,
+      `Keep placeholders already resolved (real company/name). Keep a natural greeting and sign-off if present.`,
+      `Return JSON only: {"subject":"...","body":"..."} with plain-text body (use \\n for newlines).`,
+    ].join(" "),
+    [
+      `Company: ${opts.company}`,
+      opts.contactName ? `Contact: ${opts.contactName}` : null,
+      opts.location ? `Location: ${opts.location}` : null,
+      opts.website ? `Website: ${opts.website}` : null,
+      opts.aboutBlurb ? `About: ${opts.aboutBlurb}` : null,
+      `Template subject: ${opts.subject}`,
+      `Template body:`,
+      opts.body.slice(0, 3000),
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
+  if (!out) return null;
+  try {
+    const match = out.text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const parsed = JSON.parse(match[0]) as { subject?: string; body?: string };
+    const subject = String(parsed.subject ?? "").trim().slice(0, 300);
+    const body = String(parsed.body ?? "")
+      .replace(/\\n/g, "\n")
+      .trim()
+      .slice(0, 6000);
+    if (!subject || !body) return null;
+    return { subject, body, provider: out.provider };
+  } catch {
+    return null;
+  }
+}

@@ -7,11 +7,13 @@ import { Select } from "@/components/ui/Select";
 import type { PlanId, SearchStrategy } from "@/lib/types";
 import { FREE_MAX_LEADS_PER_RUN, LEAD_COUNT_OPTIONS } from "@/lib/plans";
 import {
+  draftFlagsFromProfile,
   getDefaultOffer,
   loadOutreachProfiles,
   loadSenderProfile,
   pitchForLang,
   resolveSignature,
+  subjectForLang,
   type OutreachProfile,
 } from "@/lib/sender-profile";
 import { outreachLangFromLocation } from "@/lib/outreach/locale";
@@ -29,8 +31,10 @@ export interface SearchValues {
   subjectTemplate: string;
   /** False when user chose no outreach profile — leads go to Review without drafts. */
   autoDraft: boolean;
-  /** Profile static-body mode — pitch only, no assembled opener/CTA. */
+  /** @deprecated Prefer aiPersonalize. */
   staticBody?: boolean;
+  /** AI rewrite each draft from the email body template. */
+  aiPersonalize?: boolean;
   maxLeads: number;
 }
 
@@ -265,6 +269,9 @@ export function SearchPanel({
     const pitch = selectedProfile
       ? pitchForLang(selectedProfile, lang) || getDefaultOffer(selectedProfile)
       : "";
+    const flags = selectedProfile
+      ? draftFlagsFromProfile(selectedProfile)
+      : { aiPersonalize: false, staticBody: true };
     onSearch({
       niche,
       location,
@@ -273,9 +280,12 @@ export function SearchPanel({
         : senderName,
       searchStrategy,
       offerNotes: pitch,
-      subjectTemplate: selectedProfile?.subjectTemplate.trim() ?? "",
+      subjectTemplate: selectedProfile
+        ? subjectForLang(selectedProfile, lang)
+        : "",
       autoDraft: Boolean(selectedProfile),
-      staticBody: Boolean(selectedProfile?.staticBody),
+      staticBody: flags.staticBody,
+      aiPersonalize: flags.aiPersonalize,
       maxLeads,
     });
   };
