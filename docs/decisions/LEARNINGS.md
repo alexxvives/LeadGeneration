@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Boards migration must land before UI
+- Shipping ADR 0014 code without `npm run cf:migrate` makes every
+  `/api/boards`, `/api/board`, `/api/dashboard`, and board-aware import return
+  `D1_ERROR: no such table: boards` (browser shows opaque 500s). Always apply
+  remote D1 migrations in the same release window as schema-dependent deploys.
+
 ### 2026-07-15 — First-class Boards (ADR 0014)
 - `Board` entity + `Lead.boardId` / `Run.boardId`; Default board auto-created
   per workspace; orphans back-filled via `ensureDefaultBoard`.

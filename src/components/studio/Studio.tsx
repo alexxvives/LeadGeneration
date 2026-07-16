@@ -644,11 +644,10 @@ export function Studio() {
             }
           />
           {running && <SearchProgress running={running} />}
-          {!canSearchLive && !hasLeads && !running && (
+          {!canSearchLive && !running && (
             <p className="mt-3 text-xs text-mist-500">
-              No Firecrawl/Exa key — live search is unavailable. Use{" "}
-              <span className="text-mist-300">Load demo data</span> below, or add a key in
-              Settings.
+              No Firecrawl/Exa key — live search is unavailable. Add a key in Settings, or
+              import leads below.
             </p>
           )}
           {!running && (
@@ -661,7 +660,6 @@ export function Studio() {
               }}
             />
           )}
-          {!hasLeads && !running && <div className="mt-6"><EmptyState onLoadDemo={loadDemo} running={running} /></div>}
         </div>
       )}
 
