@@ -23,11 +23,17 @@ function isContacted(lead: LeadWithOutreach): boolean {
 function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   if (isContacted(lead)) return "contacted";
   const o = lead.outreach;
-  if (o?.status === "approved") return "ready";
-  if (o && (o.status === "draft" || o.status === "rejected" || o.status === "failed")) {
-    return "review";
+  // Drafts (and approved/retry) live in Ready to Contact.
+  if (
+    o &&
+    (o.status === "draft" ||
+      o.status === "approved" ||
+      o.status === "rejected" ||
+      o.status === "failed")
+  ) {
+    return "ready";
   }
-  // No draft yet — still show in Review (incl. no-email leads).
+  // No draft yet — Contact Draft column (incl. no-email leads).
   if (!o) return "review";
   return null;
 }
@@ -37,14 +43,14 @@ const BUCKET_META: Record<
   { title: string; hint: string; empty: string }
 > = {
   review: {
-    title: "Review & approve",
-    hint: "Edit or draft, then approve to unlock send",
-    empty: "Nothing waiting for approval.",
+    title: "Contact Draft",
+    hint: "Create a draft from your outreach profile",
+    empty: "All leads with email already have a draft.",
   },
   ready: {
-    title: "Ready to send",
-    hint: "Approved — deliver (or simulate)",
-    empty: "No approved drafts yet.",
+    title: "Ready to Contact",
+    hint: "Edit if needed, then send (or log a call/form)",
+    empty: "No drafts yet — create some from Contact Draft.",
   },
   contacted: {
     title: "Contacted",
@@ -65,9 +71,8 @@ export function OutreachView({
   onOpenInfo,
   onOpenDraft,
   onDraft,
-  onDecide,
   onSend,
-  onApproveAll,
+  onDraftAll,
   onSendAll,
   onMarkContacted,
 }: {
@@ -79,10 +84,8 @@ export function OutreachView({
   onOpenInfo: (id: string) => void;
   onOpenDraft: (id: string) => void;
   onDraft: (leadId: string) => Promise<void>;
-  onDecide: (outreachId: string, decision: "approved" | "rejected") => Promise<void>;
   onSend: (outreachId: string) => Promise<void>;
   onDraftAll: () => Promise<void>;
-  onApproveAll: () => Promise<void>;
   onSendAll: () => Promise<void>;
   onMarkContacted: (leadId: string, method: ContactMethod) => Promise<void>;
 }) {
@@ -126,16 +129,16 @@ export function OutreachView({
                   {key === "review" && rows.length > 0 ? (
                     <button
                       type="button"
-                      onClick={() => void onApproveAll()}
-                      disabled={busyId === "approve-all"}
+                      onClick={() => void onDraftAll()}
+                      disabled={busyId === "draft-all"}
                       className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
                     >
-                      {busyId === "approve-all" ? (
+                      {busyId === "draft-all" ? (
                         <Spinner className="h-3 w-3" />
                       ) : (
                         <CheckIcon className="h-3 w-3" />
                       )}
-                      Approve all
+                      Create Draft
                     </button>
                   ) : null}
                   {key === "ready" && rows.length > 0 ? (
@@ -172,11 +175,6 @@ export function OutreachView({
                         onOpenInfo={() => onOpenInfo(lead.id)}
                         onOpenDraft={() => onOpenDraft(lead.id)}
                         onDraft={() => onDraft(lead.id)}
-                        onApprove={() =>
-                          lead.outreach
-                            ? onDecide(lead.outreach.id, "approved")
-                            : Promise.resolve()
-                        }
                         onSend={() =>
                           lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
                         }
@@ -206,7 +204,6 @@ function OutreachRow({
   onOpenInfo,
   onOpenDraft,
   onDraft,
-  onApprove,
   onSend,
   onMarkContacted,
 }: {
@@ -218,12 +215,10 @@ function OutreachRow({
   onOpenInfo: () => void;
   onOpenDraft: () => void;
   onDraft: () => Promise<void>;
-  onApprove: () => Promise<void>;
   onSend: () => Promise<void>;
   onMarkContacted: (method: ContactMethod) => Promise<void>;
 }) {
   const email = lead.outreach?.toEmail ?? lead.emails[0] ?? null;
-  const hasDraft = Boolean(lead.outreach);
   const [pickingMethod, setPickingMethod] = useState(false);
 
   const methodLabel =
@@ -254,7 +249,7 @@ function OutreachRow({
         {lead.outreach?.status === "failed" && lead.outreach.error ? (
           <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
         ) : null}
-        {!hasDraft && bucket === "review" ? (
+        {bucket === "review" ? (
           <p className="mt-1 text-[10px] text-mist-600">No draft yet</p>
         ) : null}
         {bucket === "contacted" && methodLabel ? (
@@ -268,27 +263,7 @@ function OutreachRow({
         {bucket === "review" && (
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center justify-end gap-1">
-              {hasDraft ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={onOpenDraft}
-                    className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy || !email}
-                    onClick={() => void onApprove()}
-                    aria-label="Approve"
-                    title={email ? "Approve" : "Add an email to approve for send"}
-                    className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
-                  >
-                    {busy ? <Spinner className="h-2.5 w-2.5" /> : <CheckIcon className="h-2.5 w-2.5" />}
-                  </button>
-                </>
-              ) : email ? (
+              {email ? (
                 <button
                   type="button"
                   disabled={busy}
@@ -297,8 +272,7 @@ function OutreachRow({
                 >
                   {busy ? <Spinner className="h-2.5 w-2.5" /> : "Draft"}
                 </button>
-              ) : null}
-              {!email ? (
+              ) : (
                 <button
                   type="button"
                   disabled={busy}
@@ -307,7 +281,7 @@ function OutreachRow({
                 >
                   Log contact
                 </button>
-              ) : null}
+              )}
             </div>
             {pickingMethod && !email ? (
               <div className="flex flex-wrap justify-end gap-1">
@@ -335,77 +309,79 @@ function OutreachRow({
           </div>
         )}
         {bucket === "ready" && (
-          <div className="flex items-center justify-end gap-1">
-            <button
-              type="button"
-              onClick={onOpenDraft}
-              className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
-            >
-              Edit
-            </button>
-            {email ? (
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center justify-end gap-1">
               <button
                 type="button"
-                disabled={busy}
-                onClick={() => void onSend()}
-                aria-label={
-                  busy && emailVerify
-                    ? "Verifying email"
-                    : canSendEmail
-                      ? "Send"
-                      : "Send (simulate)"
-                }
-                title={
-                  busy && emailVerify
-                    ? "Verifying email is deliverable…"
-                    : canSendEmail
-                      ? "Send"
-                      : "Send (simulate)"
-                }
-                className={`${ACTION_BTN} bg-aurora-400 text-ink-950 disabled:opacity-50`}
+                onClick={onOpenDraft}
+                className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
               >
-                {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
+                Edit
               </button>
-            ) : (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => setPickingMethod((v) => !v)}
-                className={`${ACTION_BTN} border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 disabled:opacity-50`}
-              >
-                Log contact
-              </button>
-            )}
+              {email ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onSend()}
+                  aria-label={
+                    busy && emailVerify
+                      ? "Verifying email"
+                      : canSendEmail
+                        ? "Send"
+                        : "Send (simulate)"
+                  }
+                  title={
+                    busy && emailVerify
+                      ? "Verifying email is deliverable…"
+                      : canSendEmail
+                        ? "Send"
+                        : "Send (simulate)"
+                  }
+                  className={`${ACTION_BTN} bg-aurora-400 text-ink-950 disabled:opacity-50`}
+                >
+                  {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setPickingMethod((v) => !v)}
+                  className={`${ACTION_BTN} border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 disabled:opacity-50`}
+                >
+                  Log contact
+                </button>
+              )}
+            </div>
+            {pickingMethod && !email ? (
+              <div className="flex flex-wrap justify-end gap-1">
+                {(
+                  [
+                    ["phone", "Called"],
+                    ["contact_form", "Form"],
+                  ] as const
+                ).map(([method, label]) => (
+                  <button
+                    key={method}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setPickingMethod(false);
+                      void onMarkContacted(method);
+                    }}
+                    className={`${ACTION_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-100 disabled:opacity-50`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {busy && emailVerify ? (
+              <p className="max-w-[9rem] text-right text-[9px] leading-tight text-amber-200/80">
+                Verifying email…
+              </p>
+            ) : null}
           </div>
         )}
-        {bucket === "ready" && pickingMethod && !email ? (
-          <div className="flex flex-wrap justify-end gap-1">
-            {(
-              [
-                ["phone", "Called"],
-                ["contact_form", "Form"],
-              ] as const
-            ).map(([method, label]) => (
-              <button
-                key={method}
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  setPickingMethod(false);
-                  void onMarkContacted(method);
-                }}
-                className={`${ACTION_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-100 disabled:opacity-50`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {bucket === "ready" && busy && emailVerify ? (
-          <p className="max-w-[9rem] text-right text-[9px] leading-tight text-amber-200/80">
-            Verifying email…
-          </p>
-        ) : null}
         {bucket === "contacted" && (
           <button
             type="button"

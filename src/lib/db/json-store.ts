@@ -270,6 +270,22 @@ export class JsonStore implements LeadRepository {
     });
   }
 
+  updateLeads(
+    patches: Array<{ id: string; patch: Partial<Lead> }>,
+  ): Promise<number> {
+    if (patches.length === 0) return Promise.resolve(0);
+    return this.mutate((data) => {
+      let n = 0;
+      for (const { id, patch } of patches) {
+        const idx = data.leads.findIndex((l) => l.id === id && this.inScope(l));
+        if (idx === -1) continue;
+        data.leads[idx] = { ...data.leads[idx], ...patch };
+        n++;
+      }
+      return { data, result: n };
+    });
+  }
+
   async getLead(id: string): Promise<Lead | null> {
     const data = await this.read();
     const l = data.leads.find((l) => l.id === id && this.inScope(l));
@@ -286,6 +302,16 @@ export class JsonStore implements LeadRepository {
       return true;
     });
     return [...leads].map(normalizeLead).sort((a, b) => b.fitScore - a.fitScore);
+  }
+
+  async countLeads(filter?: LeadListFilter): Promise<number> {
+    const data = await this.read();
+    return data.leads.filter((l) => {
+      if (!this.inScope(l)) return false;
+      if (filter?.runId && l.runId !== filter.runId) return false;
+      if (filter?.boardId && (l.boardId || "") !== filter.boardId) return false;
+      return true;
+    }).length;
   }
 
   deleteLead(id: string): Promise<boolean> {

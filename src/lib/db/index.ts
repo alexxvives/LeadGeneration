@@ -54,8 +54,14 @@ export interface LeadRepository {
   // Leads
   createLeads(leads: Lead[]): Promise<Lead[]>;
   updateLead(id: string, patch: Partial<Lead>): Promise<Lead | null>;
+  /** Batch patch (one write / D1 batch) — used by chunked import merges. */
+  updateLeads(
+    patches: Array<{ id: string; patch: Partial<Lead> }>,
+  ): Promise<number>;
   getLead(id: string): Promise<Lead | null>;
   listLeads(filter?: LeadListFilter): Promise<Lead[]>;
+  /** Fast count for import progress (avoids loading every lead row). */
+  countLeads(filter?: LeadListFilter): Promise<number>;
   /** Deletes the lead and its outreach row(s). */
   deleteLead(id: string): Promise<boolean>;
 

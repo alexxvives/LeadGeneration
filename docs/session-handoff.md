@@ -9,18 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-16 (contacted + template/AI + import)
+## ⏱️ Status — updated 2026-07-16 (outreach UX + draft/import fixes)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Outreach: **Contacted** column; no-email → Log contact (Called / Form).
-- Settings: “Email body template”; **AI personalize each email** checkbox;
-  subject/body per language + preview auto-translate; Maileroo hint
-  `Domains → your domain → Sending Keys`; flattened Easy provider layout.
-- Import: chunked progress popup → **Leads** view; no auto-draft; heal stuck
-  `running` import runs.
+- Pitch editor: bold / italic / underline; preview = template + sign-off (no
+  auto “Hi …” greeting); lang switch keeps old text until translate lands.
+- Outreach columns: **Contact Draft** → **Ready to Contact** → Contacted;
+  **Create Draft** (not Approve all); Send click approves then sends.
+- Drafts use profile pitch only (empty if none) — no stock opener/default pitch.
+- Boards: click card to open; hover ✕ delete + pencil rename (no Open pipeline).
+- Leads: company column capped; map preloads while on Leads (any layout).
+- Import: chunk 80, batched merges, `countLeads`, finalize ping; heal stuck
+  `running` imports on Runs list (5m → complete if leadCount > 0).
 
 ### Next
 1. Point Maileroo/Resend dashboards at the webhook URL in Settings → Easy.

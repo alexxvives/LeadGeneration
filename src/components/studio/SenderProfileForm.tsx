@@ -245,20 +245,29 @@ export function SenderProfileForm() {
   };
 
   const switchPreviewLang = async (lang: OutreachLang) => {
-    setPreviewLang(lang);
     setLangMenuOpen(false);
     setSavedField(null);
     setTranslateError(null);
 
     const hasPitch = Boolean(profile.pitches[lang]?.trim());
     const hasSubject = Boolean(profile.subjects[lang]?.trim());
-    if (hasPitch && hasSubject) return;
+    // Keep current editor/preview text until the new language is ready.
+    if (hasPitch && hasSubject) {
+      setPreviewLang(lang);
+      return;
+    }
 
     const sourceLang = primaryPitchLang(profile);
-    if (!sourceLang || sourceLang === lang) return;
+    if (!sourceLang || sourceLang === lang) {
+      setPreviewLang(lang);
+      return;
+    }
     const sourcePitch = pitchForLang(profile, sourceLang);
     const sourceSubject = subjectForLang(profile, sourceLang);
-    if (!sourcePitch.trim() && !sourceSubject.trim()) return;
+    if (!sourcePitch.trim() && !sourceSubject.trim()) {
+      setPreviewLang(lang);
+      return;
+    }
 
     setTranslating(true);
     try {
@@ -306,6 +315,7 @@ export function SenderProfileForm() {
         },
       };
       persist(next, "pitch");
+      setPreviewLang(lang);
     } catch {
       setTranslateError("Network error while translating");
     } finally {
@@ -598,14 +608,8 @@ export function SenderProfileForm() {
                 }}
                 className="mt-0.5 rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40"
               />
-              <span className="text-xs leading-relaxed text-mist-400">
-                <span className="font-medium text-mist-200">
-                  AI personalize each email
-                </span>
-                {" — "}
-                when checked, drafting rewrites the template slightly per lead.
-                Unchecked uses your text as-is (only placeholders like{" "}
-                <code className="text-aurora-300/90">{"{company}"}</code> change).
+              <span className="text-xs font-medium text-mist-200">
+                AI personalize each email
               </span>
             </label>
             {genProvider && !genError && (

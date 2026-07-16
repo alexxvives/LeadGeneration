@@ -1,9 +1,22 @@
 /**
  * Lightweight pitch formatting: HTML subset in the editor → plain text in emails.
- * Allowed tags: b/strong, i/em, ul/ol/li, br, div/p.
+ * Allowed tags: b/strong, i/em, u, ul/ol/li, br, div/p.
  */
 
-const ALLOWED = new Set(["B", "STRONG", "I", "EM", "UL", "OL", "LI", "BR", "DIV", "P", "SPAN"]);
+const ALLOWED = new Set([
+  "B",
+  "STRONG",
+  "I",
+  "EM",
+  "U",
+  "UL",
+  "OL",
+  "LI",
+  "BR",
+  "DIV",
+  "P",
+  "SPAN",
+]);
 
 /** Strip unsafe tags; keep a small formatting subset. */
 export function sanitizePitchHtml(html: string): string {
@@ -53,6 +66,7 @@ export function richToPlain(input: string): string {
   s = s.replace(/<\/?(ul|ol)[^>]*>/gi, "\n");
   s = s.replace(/<\/?(strong|b)>/gi, "");
   s = s.replace(/<\/?(em|i)>/gi, "");
+  s = s.replace(/<\/?u>/gi, "");
   s = s.replace(/<[^>]+>/g, "");
   s = s
     .replace(/&nbsp;/g, " ")

@@ -565,7 +565,7 @@ export class D1Store implements LeadRepository {
     return leads;
   }
 
-  async updateLead(id: string, patch: Partial<Lead>): Promise<Lead | null> {
+  private leadPatchToRow(patch: Partial<Lead>): Record<string, unknown> {
     const row: Record<string, unknown> = {};
     if ("runId" in patch) row.run_id = patch.runId;
     if ("boardId" in patch) row.board_id = patch.boardId;
@@ -587,7 +587,11 @@ export class D1Store implements LeadRepository {
     if ("followUps" in patch) row.follow_ups = JSON.stringify(patch.followUps ?? []);
     if ("customFields" in patch) row.custom_fields = JSON.stringify(patch.customFields ?? {});
     if ("createdAt" in patch) row.created_at = patch.createdAt;
+    return row;
+  }
 
+  async updateLead(id: string, patch: Partial<Lead>): Promise<Lead | null> {
+    const row = this.leadPatchToRow(patch);
     if (Object.keys(row).length === 0) return this.getLead(id);
     const { clause, values } = buildSet(row);
     await this.db
@@ -595,6 +599,26 @@ export class D1Store implements LeadRepository {
       .bind(...values, id, this.workspaceId)
       .run();
     return this.getLead(id);
+  }
+
+  async updateLeads(
+    patches: Array<{ id: string; patch: Partial<Lead> }>,
+  ): Promise<number> {
+    if (patches.length === 0) return 0;
+    const stmts = [];
+    for (const { id, patch } of patches) {
+      const row = this.leadPatchToRow(patch);
+      if (Object.keys(row).length === 0) continue;
+      const { clause, values } = buildSet(row);
+      stmts.push(
+        this.db
+          .prepare(`UPDATE leads SET ${clause} WHERE id = ? AND workspace_id = ?`)
+          .bind(...values, id, this.workspaceId),
+      );
+    }
+    if (stmts.length === 0) return 0;
+    await this.db.batch(stmts);
+    return stmts.length;
   }
 
   async getLead(id: string): Promise<Lead | null> {
@@ -651,6 +675,37 @@ export class D1Store implements LeadRepository {
       .bind(this.workspaceId)
       .all<LeadRow>();
     return results.map(rowToLead);
+  }
+
+  async countLeads(filter?: LeadListFilter): Promise<number> {
+    if (filter?.runId && filter?.boardId) {
+      const row = await this.db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM leads WHERE workspace_id = ? AND run_id = ? AND board_id = ?`,
+        )
+        .bind(this.workspaceId, filter.runId, filter.boardId)
+        .first<{ n: number }>();
+      return Number(row?.n ?? 0);
+    }
+    if (filter?.runId) {
+      const row = await this.db
+        .prepare(`SELECT COUNT(*) AS n FROM leads WHERE workspace_id = ? AND run_id = ?`)
+        .bind(this.workspaceId, filter.runId)
+        .first<{ n: number }>();
+      return Number(row?.n ?? 0);
+    }
+    if (filter?.boardId) {
+      const row = await this.db
+        .prepare(`SELECT COUNT(*) AS n FROM leads WHERE workspace_id = ? AND board_id = ?`)
+        .bind(this.workspaceId, filter.boardId)
+        .first<{ n: number }>();
+      return Number(row?.n ?? 0);
+    }
+    const row = await this.db
+      .prepare(`SELECT COUNT(*) AS n FROM leads WHERE workspace_id = ?`)
+      .bind(this.workspaceId)
+      .first<{ n: number }>();
+    return Number(row?.n ?? 0);
   }
 
   // ---- Outreach ----

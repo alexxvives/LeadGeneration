@@ -23,8 +23,8 @@ import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 import {
   draftFlagsFromProfile,
-  getDefaultOffer,
   loadSenderProfile,
+  pitchForLang,
   resolveSignature,
   subjectForLang,
 } from "@/lib/sender-profile";
@@ -271,7 +271,7 @@ export function Studio() {
   };
 
   const executeImport = async (leads: ImportLeadRow[], dest: BoardDestination) => {
-    const CHUNK = 40;
+    const CHUNK = 80;
     const total = leads.length;
     let runId: string | undefined;
     let boardIdOut: string | undefined;
@@ -310,6 +310,18 @@ export function Studio() {
         merged += data.merged ?? 0;
         skipped += data.skipped ?? 0;
         setImportProgress({ done: Math.min(i + chunk.length, total), total });
+      }
+      // Safety finalize if the last data chunk didn't flip status (network blip).
+      if (runId) {
+        try {
+          await fetch("/api/leads/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ leads: [], runId, finalize: true }),
+          });
+        } catch {
+          /* best-effort */
+        }
       }
       if (boardIdOut) storeBoardFilter(boardIdOut);
       const parts = [
@@ -363,15 +375,17 @@ export function Studio() {
       const lead = board?.leads.find((l) => l.id === leadId);
       const lang = outreachLangFromLocation(lead?.location ?? null);
       const flags = draftFlagsFromProfile(profile);
+      const pitch = pitchForLang(profile, lang).trim();
       const { outreach } = await api.draft(leadId, {
         signOff: resolveSignature(profile),
-        offerNotes: getDefaultOffer(profile) || undefined,
+        // Empty pitch → empty body (no stock opener / default pitch).
+        offerNotes: pitch || "",
         subjectTemplate: subjectForLang(profile, lang) || undefined,
-        staticBody: flags.staticBody,
+        staticBody: true,
         aiPersonalize: flags.aiPersonalize,
       });
       patchLeadLocal(leadId, { outreach, status: "queued" });
-      toast("ok", "Draft written. Review before approving.");
+      toast("ok", pitch ? "Draft written — ready to contact." : "Empty draft created — add your template in Settings, or edit the body.");
     } catch (e) {
       toast("err", (e as Error).message);
     }
@@ -488,6 +502,12 @@ export function Studio() {
 
   /** Real delivery needs a provider; otherwise confirm simulate-or-settings. Soft warmup warn if over recommend. */
   const requestSend = async (outreachId: string) => {
+    // Send click is the per-lead human gate — promote draft → approved first.
+    const lead = findLeadByOutreach(outreachId);
+    const st = lead?.outreach?.status;
+    if (st === "draft" || st === "rejected" || st === "failed") {
+      await onDecide(outreachId, "approved", { silent: true });
+    }
     if (!board?.capabilities.canSendEmail) {
       setPendingSendId(outreachId);
       return;
@@ -585,44 +605,16 @@ export function Studio() {
     }
   };
 
-  const onApproveAllOutreach = async () => {
-    if (!board) return;
-    const targets = board.leads.filter(
-      (l) =>
-        l.outreach &&
-        (l.outreach.status === "draft" ||
-          l.outreach.status === "rejected" ||
-          l.outreach.status === "failed"),
-    );
-    setOutreachBusy("approve-all");
-    let approved = 0;
-    try {
-      for (const l of targets) {
-        if (!l.outreach) continue;
-        await onDecide(l.outreach.id, "approved", { silent: true });
-        approved += 1;
-      }
-      if (approved > 0) {
-        toast(
-          "ok",
-          `Approved ${approved} draft${approved === 1 ? "" : "s"} — ready to send.`,
-        );
-      }
-    } catch {
-      /* per-item toast already shown */
-    } finally {
-      setOutreachBusy(null);
-    }
-  };
-
-  /** Send every approved draft (still one human approve each — constitution Art. I.1). */
+  /** Send every draft/approved outreach (Send click = per-lead approval — Art. I.1). */
   const onSendAllOutreach = async () => {
     if (!board) return;
-    const targets = board.leads.filter(
-      (l) =>
-        l.outreach?.status === "approved" &&
-        (l.outreach.toEmail || l.emails[0]),
-    );
+    const targets = board.leads.filter((l) => {
+      const s = l.outreach?.status;
+      return (
+        (s === "draft" || s === "approved" || s === "rejected" || s === "failed") &&
+        (l.outreach?.toEmail || l.emails[0])
+      );
+    });
     if (targets.length === 0) return;
 
     if (!board.capabilities.canSendEmail) {
@@ -641,7 +633,7 @@ export function Studio() {
       if (!ok) return;
     } else {
       const ok = confirm(
-        `Send ${targets.length} approved email${targets.length === 1 ? "" : "s"} now?`,
+        `Send ${targets.length} email${targets.length === 1 ? "" : "s"} now?`,
       );
       if (!ok) return;
     }
@@ -654,6 +646,9 @@ export function Studio() {
       for (const l of targets) {
         if (!l.outreach) continue;
         try {
+          if (l.outreach.status !== "approved") {
+            await onDecide(l.outreach.id, "approved", { silent: true });
+          }
           await api.send(l.outreach.id);
           recordWarmupSend();
           sent += 1;
@@ -953,23 +948,32 @@ export function Studio() {
               </div>
             </div>
             <div
-              className={`min-h-0 flex-1 ${
+              className={`relative min-h-0 flex-1 ${
                 layout === "map" ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
               }`}
             >
-              {layout === "map" ? (
+              {/* Keep map mounted while on Leads so Leaflet/geocode warm in the background. */}
+              <div
+                className={
+                  layout === "map"
+                    ? "absolute inset-0"
+                    : "pointer-events-none invisible absolute inset-0 -z-10"
+                }
+                aria-hidden={layout !== "map"}
+              >
                 <LeadMap
                   leads={board!.leads}
                   locationHint={board!.run?.location ?? null}
                   onOpen={openInfo}
                 />
-              ) : layout === "cards" ? (
+              </div>
+              {layout === "cards" ? (
                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {board!.leads.map((lead, i) => (
                     <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => openInfo(lead.id)} />
                   ))}
                 </div>
-              ) : (
+              ) : layout === "table" ? (
                 <LeadTable
                   leads={board!.leads}
                   onOpen={openInfo}
@@ -978,7 +982,7 @@ export function Studio() {
                   onDeleteLead={(id) => void onDeleteLead(id)}
                   onDeleteLeads={onDeleteLeads}
                 />
-              )}
+              ) : null}
             </div>
           </div>
         ) : (
@@ -1007,19 +1011,10 @@ export function Studio() {
                   setOutreachBusy(null);
                 }
               }}
-              onDecide={async (outreachId, decision) => {
-                setOutreachBusy(outreachId);
-                try {
-                  await onDecide(outreachId, decision);
-                } finally {
-                  setOutreachBusy(null);
-                }
-              }}
               onSend={async (outreachId) => {
                 await requestSend(outreachId);
               }}
               onDraftAll={onDraftAllOutreach}
-              onApproveAll={onApproveAllOutreach}
               onSendAll={onSendAllOutreach}
               onMarkContacted={onMarkContacted}
             />

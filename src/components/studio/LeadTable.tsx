@@ -172,9 +172,15 @@ export function LeadTable({
                       />
                     </td>
                   ) : null}
-                  <td className="px-5 py-3.5">
-                    <p className="font-medium text-mist-100">{l.company}</p>
-                    {domain && <p className="text-xs text-mist-500">{domain}</p>}
+                  <td className="max-w-[14rem] px-5 py-3.5">
+                    <p className="truncate font-medium text-mist-100" title={l.company}>
+                      {l.company}
+                    </p>
+                    {domain && (
+                      <p className="truncate text-xs text-mist-500" title={domain}>
+                        {domain}
+                      </p>
+                    )}
                   </td>
                   <td className="max-w-[12rem] px-5 py-3.5 text-mist-300">
                     <span className="line-clamp-1" title={l.location ?? undefined}>

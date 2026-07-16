@@ -150,11 +150,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({
         leadId,
-        ...(opts?.signOff ? { signOff: opts.signOff } : {}),
-        ...(opts?.offerNotes ? { offerNotes: opts.offerNotes } : {}),
-        ...(opts?.subjectTemplate ? { subjectTemplate: opts.subjectTemplate } : {}),
+        ...(opts?.signOff !== undefined ? { signOff: opts.signOff } : {}),
+        // Always pass offerNotes when set (incl. "") so empty profile ≠ run fallback.
+        ...(opts && "offerNotes" in opts ? { offerNotes: opts.offerNotes ?? "" } : {}),
+        ...(opts?.subjectTemplate !== undefined
+          ? { subjectTemplate: opts.subjectTemplate }
+          : {}),
         ...(opts?.staticBody !== undefined ? { staticBody: opts.staticBody } : {}),
-        ...(opts?.aiPersonalize ? { aiPersonalize: true } : {}),
+        ...(opts?.aiPersonalize !== undefined
+          ? { aiPersonalize: opts.aiPersonalize }
+          : {}),
       }),
     }),
 

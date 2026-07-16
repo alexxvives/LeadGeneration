@@ -16,15 +16,21 @@ const RowSchema = z.object({
   location: z.string().max(400).nullable().optional(),
 });
 
-const BodySchema = z.object({
-  leads: z.array(RowSchema).min(1).max(500),
-  boardId: z.string().min(1).max(80).optional().nullable(),
-  newBoardName: z.string().min(1).max(80).optional().nullable(),
-  /** Continue a chunked import. */
-  runId: z.string().min(1).max(80).optional().nullable(),
-  /** When false, leave the run "running" for more chunks. Default true. */
-  finalize: z.boolean().optional(),
-});
+const BodySchema = z
+  .object({
+    /** Empty allowed only with runId + finalize (mark import complete). */
+    leads: z.array(RowSchema).max(500).default([]),
+    boardId: z.string().min(1).max(80).optional().nullable(),
+    newBoardName: z.string().min(1).max(80).optional().nullable(),
+    /** Continue a chunked import. */
+    runId: z.string().min(1).max(80).optional().nullable(),
+    /** When false, leave the run "running" for more chunks. Default true. */
+    finalize: z.boolean().optional(),
+  })
+  .refine(
+    (b) => b.leads.length > 0 || (Boolean(b.runId) && b.finalize === true),
+    { message: "leads required unless finalizing an existing import run" },
+  );
 
 export async function POST(req: Request) {
   let body: unknown;

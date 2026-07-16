@@ -360,10 +360,8 @@ export async function createAndRunSearch(
     }));
     await db.createLeads(leads);
 
-    // Auto-draft when an outreach profile was selected (autoDraft !== false).
-    // Without a profile, leads stay "new" in Review so the user can pick a
-    // profile and draft later — never sent here.
-    const shouldDraft = input.autoDraft !== false;
+    // Auto-draft only when Search explicitly selected an outreach profile.
+    const shouldDraft = input.autoDraft === true;
     if (shouldDraft) {
       const now = nowIso();
       const aiPersonalize = Boolean(input.aiPersonalize);
@@ -1049,8 +1047,8 @@ export async function importLeads(
   const ws = await db.getWorkspace(ctx.workspaceId);
   if (ws) await ensureUsageWindow(db, ws);
 
-  // Heal abandoned import runs (skip the one we're continuing).
-  await healStuckImportRuns(ctx, opts?.runId ?? undefined);
+  // Heal abandoned imports once per upload (first chunk only).
+  if (!opts?.runId) await healStuckImportRuns(ctx);
 
   const boardId = await resolveBoardId(ctx, {
     boardId: opts?.boardId,
@@ -1070,11 +1068,32 @@ export async function importLeads(
     }))
     .filter((r) => r.company.length > 0 || r.emails.length > 0);
 
+  const finalize = opts?.finalize !== false;
+  // Finalize-only ping (empty chunk) after a successful upload — closes stuck "running".
   if (cleaned.length === 0) {
-    throw new Error("No usable rows — need at least a company name or email.");
+    if (!opts?.runId || !finalize) {
+      throw new Error("No usable rows — need at least a company name or email.");
+    }
+    const existing = await db.getRun(opts.runId);
+    if (!existing || existing.workspaceId !== ctx.workspaceId) {
+      throw new Error("Import run not found");
+    }
+    const boardCount = await db.countLeads({ boardId: existing.boardId });
+    const updated = await db.updateRun(existing.id, {
+      status: "complete",
+      leadCount: boardCount,
+      completedAt: nowIso(),
+    });
+    return {
+      imported: 0,
+      merged: 0,
+      skipped: 0,
+      run: updated ?? existing,
+      boardId: existing.boardId,
+      processed: 0,
+    };
   }
 
-  const finalize = opts?.finalize !== false;
   let run: Run;
   if (opts?.runId) {
     const existing = await db.getRun(opts.runId);
@@ -1119,7 +1138,7 @@ export async function importLeads(
     }
 
     const freshRows: typeof cleaned = [];
-    let merged = 0;
+    const mergePatches: Array<{ id: string; patch: Partial<Lead> }> = [];
     let skipped = 0;
 
     for (const r of cleaned) {
@@ -1152,12 +1171,19 @@ export async function importLeads(
         if (mergedEmails.length > match.emails.length) patch.emails = mergedEmails;
       }
       if (Object.keys(patch).length > 0) {
-        await db.updateLead(match.id, patch);
-        merged++;
+        mergePatches.push({ id: match.id, patch });
+        // Keep in-memory maps current for later rows in this chunk.
+        const next = { ...match, ...patch };
+        for (const e of next.emails) byEmail.set(e.toLowerCase(), next);
+        const nd = domainKey(next.website);
+        if (nd) byDomain.set(nd, next);
       } else {
         skipped++;
       }
     }
+
+    const merged =
+      mergePatches.length > 0 ? await db.updateLeads(mergePatches) : 0;
 
     if (ctx.metered && freshRows.length > 0) {
       const freshWs = ws ? await db.getWorkspace(ctx.workspaceId) : null;
@@ -1218,7 +1244,8 @@ export async function importLeads(
     if (leads.length > 0) await db.createLeads(leads);
     if (leads.length > 0) await recordLeadUsage(ctx, leads.length);
 
-    const boardCount = (await db.listLeads({ boardId })).length;
+    // COUNT(*) — avoid reloading every lead row on each chunk.
+    const boardCount = await db.countLeads({ boardId });
     const parts: string[] = [];
     if (merged > 0) parts.push(`merged ${merged} existing`);
     if (skipped > 0) parts.push(`skipped ${skipped} unchanged`);
@@ -1255,23 +1282,32 @@ export async function importLeads(
   }
 }
 
-/** Mark abandoned import runs (client disconnect / timeout) as failed. */
-async function healStuckImportRuns(
-  ctx: Ctx,
-  exceptRunId?: string,
-): Promise<void> {
+/**
+ * Mark abandoned import runs as failed (or complete if chunks already wrote leads).
+ * Called on import start and when listing Runs so the UI doesn't stay on RUNNING.
+ */
+export async function healStuckImportRuns(ctx: Ctx): Promise<void> {
   const runs = await ctx.db.listRuns();
-  const cutoff = Date.now() - 15 * 60 * 1000;
+  const cutoff = Date.now() - 5 * 60 * 1000;
   for (const r of runs) {
-    if (exceptRunId && r.id === exceptRunId) continue;
     if (r.provider !== "import" || r.status !== "running") continue;
     const started = Date.parse(r.createdAt);
     if (!Number.isFinite(started) || started > cutoff) continue;
-    await ctx.db.updateRun(r.id, {
-      status: "failed",
-      error: "Import timed out — re-upload the file to retry.",
-      completedAt: nowIso(),
-    });
+    // Client dropped after chunks wrote — run.leadCount is updated each chunk.
+    if (r.leadCount > 0) {
+      await ctx.db.updateRun(r.id, {
+        status: "complete",
+        leadCount: r.leadCount,
+        error: r.error,
+        completedAt: nowIso(),
+      });
+    } else {
+      await ctx.db.updateRun(r.id, {
+        status: "failed",
+        error: "Import timed out — re-upload the file to retry.",
+        completedAt: nowIso(),
+      });
+    }
   }
 }
 

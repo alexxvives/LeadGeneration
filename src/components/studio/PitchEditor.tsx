@@ -4,8 +4,8 @@ import { useEffect, useRef, type ReactNode, type MouseEvent } from "react";
 import { plainToRich, sanitizePitchHtml } from "@/lib/outreach/rich-text";
 
 /**
- * Lightweight rich pitch editor (bold + bullets). Stores sanitized HTML;
- * emails convert to plain via richToPlain.
+ * Lightweight rich pitch editor (bold / italic / underline + bullets).
+ * Stores sanitized HTML; emails convert to plain via richToPlain.
  */
 export function PitchEditor({
   value,
@@ -58,6 +58,24 @@ export function PitchEditor({
           }}
         >
           <span className="font-bold">B</span>
+        </ToolbarBtn>
+        <ToolbarBtn
+          label="Italic"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            cmd("italic");
+          }}
+        >
+          <span className="italic">I</span>
+        </ToolbarBtn>
+        <ToolbarBtn
+          label="Underline"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            cmd("underline");
+          }}
+        >
+          <span className="underline">U</span>
         </ToolbarBtn>
         <ToolbarBtn
           label="Bullet list"

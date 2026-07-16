@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-16 — Contact Draft flow + template-only bodies
+- Outreach: **Contact Draft** (undrafted) → **Ready to Contact** (has draft) →
+  Contacted. Header **Create Draft** drafts undrafted; Send click promotes
+  draft→approved then sends (still per-lead human gate).
+- `generateDraft` template path no longer prepends locale greeting or falls
+  back to `defaultPitch` / scraped opener — empty profile pitch → empty body
+  (+ sign-off). Auto-draft only when `autoDraft === true`.
+- Import speed: `updateLeads` batch + `countLeads`; client chunk 80 + empty
+  finalize ping. Stuck `running` imports healed on `GET /api/runs` after 5m.
+- Map stays mounted (hidden) on Leads so Leaflet/geocode warm before Map tab.
+
 ### 2026-07-16 — Contacted queue, AI personalize, import progress
 - Outreach third column is **Contacted** (not Sent): email sends + phone /
   contact-form logs. No-email rows get **Log contact → Called / Form**.

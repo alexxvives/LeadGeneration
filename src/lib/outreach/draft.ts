@@ -30,8 +30,8 @@ export interface DraftOverrides {
   /** Force outreach language (Settings preview). Else inferred from lead.location. */
   forceLang?: OutreachLang;
   /**
-   * When true (default path for Settings “raw template”): greeting + email body
-   * template + sign-off only — no scraped opener / stock CTA, no AI rewrite.
+   * When true (default): email body template + optional sign-off only —
+   * no auto greeting, scraped opener, or stock CTA.
    * @deprecated Prefer aiPersonalize=false for the same behavior.
    */
   staticBody?: boolean;
@@ -253,19 +253,22 @@ export function generateDraft(
     : copy.subject(company);
   const greeting = copy.greeting(name);
 
+  // Template path: use the profile pitch as-is (placeholders only). Never invent
+  // a default pitch / greeting — empty profile → empty body (+ optional sign-off).
+  const assembleLegacy =
+    overrides?.staticBody === false && !overrides?.aiPersonalize;
+  if (!assembleLegacy) {
+    const pitchPlain = offerRaw
+      ? applyBodyPlaceholders(richToPlain(offerRaw), lead)
+      : "";
+    const parts = [pitchPlain, signOff].filter((p) => p.trim().length > 0);
+    return { subject, body: parts.join("\n\n") };
+  }
+
   const pitchPlain = applyBodyPlaceholders(
     richToPlain(offerRaw || copy.defaultPitch(nicheHint)),
     lead,
   );
-
-  // Default / AI base: greeting + email body template + sign-off (placeholders only).
-  // Legacy: staticBody:false (and not AI) still assembles opener + stock CTA below.
-  const assembleLegacy =
-    overrides?.staticBody === false && !overrides?.aiPersonalize;
-  if (!assembleLegacy) {
-    const body = [greeting, "", pitchPlain, "", signOff].join("\n");
-    return { subject, body };
-  }
 
   const blurb = lead.aboutBlurb?.trim() ?? "";
 
