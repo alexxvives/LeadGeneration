@@ -339,7 +339,7 @@ export function SearchPanel({
       data-tour="search-panel"
     >
       <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
-        <Field label="Who do you want to reach?" hint="Niche / ICP">
+        <Field label="Who do you want to reach?">
           <input
             autoFocus
             value={niche}

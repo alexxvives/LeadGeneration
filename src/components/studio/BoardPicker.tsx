@@ -48,7 +48,7 @@ export function BoardPicker({
   }, []);
 
   return (
-    <div ref={wrapRef} className="relative mb-3 hidden sm:block">
+    <div ref={wrapRef} className="relative mb-2 hidden sm:block">
       <p className="mb-1.5 px-1 text-[10px] uppercase tracking-wider text-mist-500">
         Board
       </p>

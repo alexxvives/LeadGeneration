@@ -856,9 +856,9 @@ export function Studio() {
             </label>
           ) : null}
           {view !== "dashboard" && view !== "boards" && board?.workspace && (
-            <div className="hidden min-w-[16rem] flex-col gap-1 sm:flex sm:min-w-[20rem]">
+            <div className="hidden min-w-[18rem] flex-col gap-1 sm:flex sm:min-w-[26rem]">
               <div
-                className={`grid gap-3 ${
+                className={`grid gap-4 ${
                   board.capabilities.emailVerify ? "grid-cols-3" : "grid-cols-2"
                 }`}
               >

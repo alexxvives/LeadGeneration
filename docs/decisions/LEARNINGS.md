@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-16 — MyEmailVerifier vs Zeruh free tier
+- MyEmailVerifier advertises **100 free API credits/day** (no card) ≈ ~3k/mo —
+  far above Zeruh’s ~100/mo. Not wired yet; park key as `MYEMAILVERIFIER_API_KEY`
+  in `.env.local`. Current verify path remains Zeruh (`MAILEROO_VERIFY_API_KEY`).
+
 ### 2026-07-16 — Draft buckets, profile picker, pitch breaks
 - Contact Draft keeps unapproved drafts (`Create` → `Review`); Ready = approved
   only. Closing the draft drawer without Approve must not advance the column.
@@ -14,8 +19,8 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   lead is in Catalonia.
 - contenteditable: first line is often a bare text node + later `<div>`s —
   sanitize must insert `<br>` before those blocks or preview concatenates lines.
-- Mailgun Validate (and similar) are not free at volume; stick with Zeruh via
-  `MAILEROO_VERIFY_API_KEY` (already wired at send).
+- Mailgun Validate (and similar) are not free at volume; Zeruh is wired today;
+  MyEmailVerifier is the next candidate (see entry above).
 
 ### 2026-07-16 — Zeruh toggle, pitch `<br>`, profile freshness
 - Zeruh verifies **emails** (deliverability), not domain DNS. Workspace

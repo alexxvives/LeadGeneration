@@ -20,6 +20,10 @@ import type { Lead, Run } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import { ChevronDownIcon, HelpIcon, SparkIcon } from "@/components/icons";
 import { PitchEditor } from "@/components/studio/PitchEditor";
+import {
+  PlaceholderInput,
+  PlaceholderTextarea,
+} from "@/components/studio/PlaceholderText";
 
 const EXAMPLE_COMPANY = "Bright Dental";
 const EXAMPLE_NAME = "Maria";
@@ -508,7 +512,7 @@ export function SenderProfileForm() {
               <PlaceholderHelp />
               <SavedHint field="subject" />
             </div>
-            <input
+            <PlaceholderInput
               value={subjectValue}
               onFocus={captureFocus}
               onChange={(e) =>
@@ -519,7 +523,7 @@ export function SenderProfileForm() {
               }
               onBlur={() => saveOnBlur("subject")}
               placeholder="Quick note for {company}"
-              className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+              className="w-full rounded-lg border border-white/10 bg-ink-900/60 outline-none focus-within:border-aurora-400/60"
             />
           </label>
 
@@ -607,24 +611,63 @@ export function SenderProfileForm() {
 
           <label className="block">
             <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-xs font-medium text-mist-500">Email sign-off</span>
+              <span className="text-xs font-medium text-mist-500">
+                Email sign-off template
+              </span>
               <PlaceholderHelp />
               <SavedHint field="signOff" />
             </div>
-            <textarea
+            <PlaceholderTextarea
               value={profile.signature}
               onFocus={captureFocus}
               onChange={(e) => patch({ signature: e.target.value })}
               onBlur={() => saveOnBlur("signOff")}
               rows={4}
               placeholder={SIGNATURE_PLACEHOLDER}
-              className="w-full resize-y rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 font-sans text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+              className="w-full rounded-lg border border-white/10 bg-ink-900/60 outline-none focus-within:border-aurora-400/60"
             />
           </label>
         </div>
 
         {preview ? (
           <div className="relative rounded-xl2 border border-white/10 bg-ink-900/40 p-5">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(profile.aiPersonalize)}
+              onClick={() => {
+                const on = !profile.aiPersonalize;
+                persist(
+                  { ...profile, aiPersonalize: on, staticBody: !on },
+                  null,
+                );
+              }}
+              className={`mb-4 flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors ${
+                profile.aiPersonalize
+                  ? "border-aurora-400/35 bg-aurora-400/10"
+                  : "border-white/10 bg-ink-950/40 hover:border-white/15 hover:bg-ink-950/60"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-mist-100">
+                  AI personalize each email
+                </span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-mist-500">
+                  Slightly vary wording per lead from this template
+                </span>
+              </span>
+              <span
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                  profile.aiPersonalize ? "bg-aurora-400" : "bg-white/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-ink-950 shadow transition-transform ${
+                    profile.aiPersonalize ? "left-5" : "left-0.5"
+                  }`}
+                />
+              </span>
+            </button>
             <div className="flex items-start justify-between gap-3">
               <p className="text-[10px] uppercase tracking-wider text-mist-500">
                 Preview · example to {EXAMPLE_COMPANY}
@@ -707,43 +750,6 @@ export function SenderProfileForm() {
                 auto-translate from your existing version, or write it on the left.
               </p>
             ) : null}
-            <button
-              type="button"
-              role="switch"
-              aria-checked={Boolean(profile.aiPersonalize)}
-              onClick={() => {
-                const on = !profile.aiPersonalize;
-                persist(
-                  { ...profile, aiPersonalize: on, staticBody: !on },
-                  null,
-                );
-              }}
-              className={`mt-4 flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors ${
-                profile.aiPersonalize
-                  ? "border-aurora-400/35 bg-aurora-400/10"
-                  : "border-white/10 bg-ink-950/40 hover:border-white/15 hover:bg-ink-950/60"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-mist-100">
-                  AI personalize each email
-                </span>
-                <span className="mt-0.5 block text-[11px] leading-snug text-mist-500">
-                  Slightly vary wording per lead from this template
-                </span>
-              </span>
-              <span
-                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                  profile.aiPersonalize ? "bg-aurora-400" : "bg-white/15"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-ink-950 shadow transition-transform ${
-                    profile.aiPersonalize ? "left-5" : "left-0.5"
-                  }`}
-                />
-              </span>
-            </button>
           </div>
         ) : null}
       </div>

@@ -122,13 +122,26 @@ export function LeadDrawer(props: DrawerProps) {
   }, [lead.id, lead.crmStage, lead.contactMethod, lead.followUps,
       outreach?.id, outreach?.subject, outreach?.body, outreach?.toEmail, lead.emails]);
 
+  const requestClose = () => {
+    if (
+      dirty &&
+      !window.confirm(
+        "You have unsaved email changes. Leave without saving?",
+      )
+    ) {
+      return;
+    }
+    onClose();
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") requestClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- close only needs dirty + onClose
+  }, [onClose, dirty]);
 
   /** Persist composer fields before approve/send so edits aren't lost. */
   const persistIfDirty = async () => {
@@ -199,12 +212,15 @@ export function LeadDrawer(props: DrawerProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
+        onClick={requestClose}
+      />
       <aside
         className={`animate-float-up relative flex w-full flex-col overflow-hidden border border-white/10 bg-ink-900 shadow-2xl ${
           mode === "info"
             ? "max-h-[min(90dvh,720px)] max-w-[61rem] rounded-xl2"
-            : "h-[min(92dvh,900px)] max-w-[43rem] rounded-xl2 sm:h-[min(90dvh,860px)]"
+            : "h-[min(92dvh,900px)] max-w-[56rem] rounded-xl2 sm:h-[min(90dvh,860px)]"
         }`}
       >
 
@@ -229,7 +245,8 @@ export function LeadDrawer(props: DrawerProps) {
             ) : null}
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={requestClose}
             className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100"
             aria-label="Close (Esc)"
             title="Close (Esc)"
@@ -604,8 +621,8 @@ export function LeadDrawer(props: DrawerProps) {
                           setDirty(false);
                         })
                       }
-                      disabled={!dirty || busy === "save"}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-mist-200 transition-colors hover:bg-white/5 disabled:opacity-40"
+                      disabled={busy === "save"}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-mist-100 transition-colors hover:bg-white/5 disabled:opacity-50"
                     >
                       {busy === "save" ? <Spinner className="h-3.5 w-3.5" /> : null}
                       Save draft

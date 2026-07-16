@@ -7,7 +7,11 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { plainToRich, sanitizePitchHtml } from "@/lib/outreach/rich-text";
+import {
+  highlightTemplatePlaceholders,
+  plainToRich,
+  sanitizePitchHtml,
+} from "@/lib/outreach/rich-text";
 
 /**
  * Lightweight rich pitch editor (bold / italic / underline + bullets).
@@ -33,9 +37,11 @@ export function PitchEditor({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const asHtml = /<[a-z][\s\S]*>/i.test(value)
-      ? sanitizePitchHtml(value)
-      : plainToRich(value);
+    const asHtml = highlightTemplatePlaceholders(
+      /<[a-z][\s\S]*>/i.test(value)
+        ? sanitizePitchHtml(value)
+        : plainToRich(value),
+    );
     if (asHtml === lastExternal.current) return;
     if (document.activeElement === el) return;
     el.innerHTML = asHtml || "";
@@ -45,8 +51,9 @@ export function PitchEditor({
   const emit = () => {
     const el = ref.current;
     if (!el) return;
+    // Persist clean HTML (no data-ph markers) so tint never leaks into sends.
     const html = sanitizePitchHtml(el.innerHTML);
-    lastExternal.current = html;
+    lastExternal.current = highlightTemplatePlaceholders(html);
     onChange(html);
   };
 
@@ -123,7 +130,9 @@ export function PitchEditor({
             document.execCommand("selectAll", false);
             document.execCommand("removeFormat", false);
             // Re-sanitize; linebreak-preserving sanitize keeps <br> / blank lines.
-            el.innerHTML = sanitizePitchHtml(el.innerHTML);
+            el.innerHTML = highlightTemplatePlaceholders(
+              sanitizePitchHtml(el.innerHTML),
+            );
             emit();
           }}
         >
@@ -142,10 +151,18 @@ export function PitchEditor({
         onInput={emit}
         onPaste={onPaste}
         onBlur={() => {
-          emit();
+          // Re-tint placeholders in the DOM after edit; persist clean HTML.
+          const el = ref.current;
+          if (el) {
+            const clean = sanitizePitchHtml(el.innerHTML);
+            const tinted = highlightTemplatePlaceholders(clean);
+            el.innerHTML = tinted;
+            lastExternal.current = tinted;
+            onChange(clean);
+          }
           onBlur?.();
         }}
-        className="pitch-editor min-h-[5.5rem] px-4 py-3 text-sm leading-relaxed text-mist-100 outline-none empty:before:pointer-events-none empty:before:text-mist-500 empty:before:content-[attr(data-placeholder)] [&_*]:!bg-transparent [&_*]:!text-inherit [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
+        className="pitch-editor min-h-[5.5rem] px-4 py-3 text-sm leading-relaxed text-mist-100 outline-none empty:before:pointer-events-none empty:before:text-mist-500 empty:before:content-[attr(data-placeholder)] [&_*]:!bg-transparent [&_:not([data-ph])]:!text-inherit [&_[data-ph]]:!text-aurora-300 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
       />
     </div>
   );

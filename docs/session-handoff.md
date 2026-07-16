@@ -9,22 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-16 (draft UX + verify key)
+## ⏱️ Status — updated 2026-07-16 (studio UX polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Pitch preview linebreak fix (contenteditable text + `<div>` lines).
-- Sidebar **Outreach profile** dropdown (like Board); removed banner.
-- Drafts use active profile’s primary (`en`) pitch — not stale location `es`.
-- Contact Draft: unapproved stays; button `Create` → `Review`; Ready = approved.
-- Docs: `MAILEROO_VERIFY_API_KEY` on Wrangler secrets checklist.
+- Template vars `{company}` etc. tinted green in subject / body / sign-off editors.
+- AI personalize toggle moved to top of outreach preview; sign-off labeled “template”.
+- Draft drawer ~30% wider; Save draft always active; unsaved-close confirm.
+- Sidebar Board/Profile spaced above account card; “Edit profiles…” white.
+- Search: removed “Niche / ICP” hint; usage bars wider + Verifies column reserved.
+- MyEmailVerifier: 100 free credits/**day** (better than Zeruh ~100/mo) — not wired yet; park key as `MYEMAILVERIFIER_API_KEY` in `.env.local`.
 
 ### Next
 1. Apply D1 migration `0014` on prod if not done (`npm run cf:migrate`).
-2. Soft-cap warning popup on send; Microsoft Graph Mail.Send.
-3. Deploy when user asks (`MAILEROO_VERIFY_API_KEY` is now on the Worker).
+2. Switch verify provider to MyEmailVerifier once key is confirmed working.
+3. Deploy when user asks.
 
 ---
 

@@ -107,6 +107,7 @@ export function sanitizePitchHtml(html: string): string {
     if (tag === "BR") return "<br>";
     const inner = walkChildren(el);
     const t = tag.toLowerCase();
+    // Unwrap spans (incl. editor-only placeholder tints) — never persist them.
     if (t === "span") return inner;
     // Preserve line breaks from pasted / contenteditable block containers.
     if (t === "div" || t === "p") {
@@ -167,6 +168,22 @@ export function richToPlain(input: string): string {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"');
   return s.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+const TEMPLATE_PH_RE = /\{(company|lead_name|location)\}/gi;
+
+/**
+ * Tint `{company}` / `{lead_name}` / `{location}` in editor HTML.
+ * Markers use data-ph so sanitizePitchHtml preserves them (no class attrs).
+ */
+export function highlightTemplatePlaceholders(html: string): string {
+  if (!html) return "";
+  // Unwrap prior markers so we don't nest.
+  const bare = html.replace(/<span data-ph="1">(\{[^}]+\})<\/span>/gi, "$1");
+  return bare.replace(
+    TEMPLATE_PH_RE,
+    '<span data-ph="1">{$1}</span>',
+  );
 }
 
 /** Plain → minimal HTML for the editor (preserve newlines). */

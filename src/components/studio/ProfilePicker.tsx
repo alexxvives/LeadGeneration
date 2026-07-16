@@ -58,7 +58,7 @@ export function ProfilePicker({
   const label = active?.name?.trim() || "No profile";
 
   return (
-    <div ref={wrapRef} className="relative mb-3 hidden sm:block">
+    <div ref={wrapRef} className="relative mb-0 hidden sm:block">
       <p className="mb-1.5 px-1 text-[10px] uppercase tracking-wider text-mist-500">
         Outreach profile
       </p>
@@ -108,7 +108,7 @@ export function ProfilePicker({
           <li className="border-t border-white/5">
             <Link
               href="/app/settings"
-              className="block px-3 py-2 text-sm text-aurora-300/90 hover:bg-white/5"
+              className="block px-3 py-2 text-sm text-mist-100 hover:bg-white/5"
               onClick={() => setOpen(false)}
             >
               Edit profiles…

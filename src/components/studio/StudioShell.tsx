@@ -302,13 +302,15 @@ export function StudioShell({
         </nav>
 
         {/* Board + outreach profile filters + account card */}
-        <div className="mt-auto border-t border-white/5 pt-4">
-          <BoardPicker
-            boards={boards}
-            activeBoardId={activeBoardId}
-            onChange={setBoardFilter}
-          />
-          <ProfilePicker />
+        <div className="mt-auto border-t border-white/5 pt-5">
+          <div className="mb-5 space-y-2">
+            <BoardPicker
+              boards={boards}
+              activeBoardId={activeBoardId}
+              onChange={setBoardFilter}
+            />
+            <ProfilePicker />
+          </div>
 
           <div className="hidden sm:block">
             <Link

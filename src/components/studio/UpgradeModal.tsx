@@ -90,10 +90,10 @@ export function UsageBar({
     const tone =
       remaining <= 0 ? "bg-rose-400" : remaining < 25 ? "bg-amber-400" : "bg-aurora-400";
     return (
-      <div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-mist-300">{label}</span>
-          <span className="tabular-nums text-mist-500">
+      <div className="min-w-0">
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="shrink-0 text-mist-300">{label}</span>
+          <span className="min-w-0 truncate tabular-nums text-mist-500">
             {remaining.toLocaleString()} left
           </span>
         </div>
@@ -112,10 +112,10 @@ export function UsageBar({
   const pct = lim > 0 ? Math.min(100, Math.round((u / lim) * 100)) : 0;
   const tone = pct >= 100 ? "bg-rose-400" : pct >= 80 ? "bg-amber-400" : "bg-aurora-400";
   return (
-    <div>
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-mist-300">{label}</span>
-        <span className="tabular-nums text-mist-500">
+    <div className="min-w-0">
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="shrink-0 text-mist-300">{label}</span>
+        <span className="min-w-0 truncate tabular-nums text-mist-500">
           {u} / {lim}
         </span>
       </div>
