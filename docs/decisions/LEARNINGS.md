@@ -4,10 +4,20 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Outreach profiles + pitch language versions
+- Settings is now **Outreach profiles** (list): each profile has pitch *versions*
+  per language (`pitches[lang]`). Preview flag switches which version you edit;
+  never substitutes a sample dental pitch for another language.
+- Windows shows emoji flags as `GB`/`ES` — use flagcdn PNG icons instead.
+- Search: pick a profile or “No profile”; `autoDraft: false` skips draft creation
+  so leads land in Review without outreach (Draft button on the card).
+- Verify key: `MAILEROO_VERIFY_API_KEY` (alias `ZERUH_API_KEY`) is **list hygiene**
+  (Zeruh API), independent of Resend/Gmail *send*. Get it from Maileroo → Email
+  Verification / Zeruh dashboard (https://zeruh.com or maileroo.com).
+
 ### 2026-07-15 — Outreach preview languages + search polish
 - Settings email preview defaults to English; flag menu switches ES/FR/IT/PT/PL/DE.
-  Mixed-language previews are avoided by substituting a localized sample pitch
-  (and locale subject) when the saved pitch/template language ≠ selected lang.
+  *(Superseded for pitch: use per-language pitch versions, not sample swap.)*
 - `{lead_name}` = contact first name; `{company}` = company — use `{company}` in
   subject templates for “Propuesta para Bright Dental” style subjects.
 - Email verify (Zeruh/Maileroo) already runs on enrich (`filterVerifiableEmails`)

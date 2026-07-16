@@ -5,7 +5,15 @@ import { SearchIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import type { PlanId, SearchStrategy } from "@/lib/types";
 import { FREE_MAX_LEADS_PER_RUN, LEAD_COUNT_OPTIONS } from "@/lib/plans";
-import { loadSenderProfile, resolveSignature } from "@/lib/sender-profile";
+import {
+  getDefaultOffer,
+  loadOutreachProfiles,
+  loadSenderProfile,
+  pitchForLang,
+  resolveSignature,
+  type OutreachProfile,
+} from "@/lib/sender-profile";
+import { outreachLangFromLocation } from "@/lib/outreach/locale";
 import { deleteSavedIcp, loadSavedIcps, saveIcp } from "@/lib/saved-icps";
 import type { SavedIcp } from "@/lib/types";
 import { api } from "@/lib/client-api";
@@ -17,6 +25,9 @@ export interface SearchValues {
   senderName: string;
   searchStrategy: SearchStrategy;
   offerNotes: string;
+  subjectTemplate: string;
+  /** False when user chose no outreach profile — leads go to Review without drafts. */
+  autoDraft: boolean;
   maxLeads: number;
 }
 
@@ -203,7 +214,8 @@ export function SearchPanel({
   const [niche, setNiche] = useState("");
   const [location, setLocation] = useState("");
   const [locationConfirmed, setLocationConfirmed] = useState(true);
-  const [offerNotes, setOfferNotes] = useState("");
+  const [profileId, setProfileId] = useState<string>("");
+  const [profiles, setProfiles] = useState<OutreachProfile[]>([]);
   const [searchStrategy, setSearchStrategy] = useState<SearchStrategy>("standard");
   const [senderName, setSenderName] = useState("");
   const [maxLeads, setMaxLeads] = useState(10);
@@ -211,28 +223,18 @@ export function SearchPanel({
   const [icps, setIcps] = useState<SavedIcp[]>([]);
   const [saveName, setSaveName] = useState("");
   const [showSave, setShowSave] = useState(false);
-  const offerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const freeTierLocked = planId === "free";
   const planCap = freeTierLocked ? FREE_MAX_LEADS_PER_RUN : Math.max(...LEAD_COUNT_OPTIONS);
 
-  const growOffer = () => {
-    const el = offerRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.max(el.scrollHeight, 52)}px`;
-  };
-
   useEffect(() => {
+    const store = loadOutreachProfiles();
+    setProfiles(store.profiles);
+    setProfileId(store.activeId ?? store.profiles[0]?.id ?? "");
     const profile = loadSenderProfile();
     setSenderName(resolveSignature(profile));
-    setOfferNotes(profile.defaultOffer);
     setIcps(loadSavedIcps());
   }, []);
-
-  useEffect(() => {
-    growOffer();
-  }, [offerNotes]);
 
   // Clamp selection if plan/remaining credits shrink.
   useEffect(() => {
@@ -245,20 +247,39 @@ export function SearchPanel({
     });
   }, [planCap, leadsRemaining]);
 
+  const selectedProfile =
+    profileId && profiles.find((p) => p.id === profileId)
+      ? profiles.find((p) => p.id === profileId)!
+      : null;
+
   const canSubmit =
     niche.trim().length > 0 && locationConfirmed && !running;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    onSearch({ niche, location, senderName, searchStrategy, offerNotes, maxLeads });
+    const lang = outreachLangFromLocation(location);
+    const pitch = selectedProfile
+      ? pitchForLang(selectedProfile, lang) || getDefaultOffer(selectedProfile)
+      : "";
+    onSearch({
+      niche,
+      location,
+      senderName: selectedProfile
+        ? resolveSignature(selectedProfile)
+        : senderName,
+      searchStrategy,
+      offerNotes: pitch,
+      subjectTemplate: selectedProfile?.subjectTemplate.trim() ?? "",
+      autoDraft: Boolean(selectedProfile),
+      maxLeads,
+    });
   };
 
   const applyIcp = (icp: SavedIcp) => {
     setNiche(icp.niche);
     setLocation(icp.location);
-    setLocationConfirmed(true); // saved ICPs already used a confirmed place
-    setOfferNotes(icp.offerNotes);
+    setLocationConfirmed(true);
   };
 
   const handleSaveIcp = () => {
@@ -267,7 +288,7 @@ export function SearchPanel({
       name: saveName.trim() || niche.trim(),
       niche,
       location,
-      offerNotes,
+      offerNotes: selectedProfile ? getDefaultOffer(selectedProfile) : "",
     });
     setIcps(loadSavedIcps());
     setSaveName("");
@@ -320,18 +341,23 @@ export function SearchPanel({
       </div>
 
       <div className="mt-4">
-        <Field label="Offer / pitch notes" hint="Optional — used in drafts">
-          <textarea
-            ref={offerRef}
-            value={offerNotes}
-            onChange={(e) => {
-              setOfferNotes(e.target.value);
-              requestAnimationFrame(growOffer);
-            }}
-            rows={2}
-            placeholder="What you're offering and why it fits…"
-            className="w-full resize-none overflow-hidden rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60"
-          />
+        <Field
+          label="Outreach profile"
+          hint="Optional — without one, leads go to Review with no draft"
+        >
+          <select
+            value={profileId}
+            onChange={(e) => setProfileId(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none transition-colors focus:border-aurora-400/60"
+          >
+            <option value="">No profile — review without draft</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+                {getDefaultOffer(p) ? "" : " (no pitch yet)"}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
 

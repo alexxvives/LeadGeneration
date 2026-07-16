@@ -9,24 +9,26 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (preview langs + search UI)
+## ⏱️ Status — updated 2026-07-15 (profiles + verify Q&A)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Outreach preview: EN default + flag language switcher (ES/FR/IT/PT/PL/DE);
-  no mixed-language bodies; subject example uses `{company}`.
-- Saved flash sits next to field titles (no layout shift).
-- Dashboard board filter: glass select, far right on title row.
-- Search: auto-growing pitch, lead counts 10/25/50/100/500 beside mode toggle,
-  shiny Find leads CTA (no arrow).
-- Email bounce verify already wired (Zeruh) — confirm verify key in prod secrets.
+- **Verify vs send:** bounce check = Zeruh (`MAILEROO_VERIFY_API_KEY` / alias
+  `ZERUH_API_KEY`) on enrich + before send — works regardless of Resend/Gmail
+  send path. Get key: Maileroo dashboard → Email Verification / Zeruh SSO, or
+  zeruh.com → API key → `.env.local` + Wrangler secret.
+- **Outreach profiles:** multi-profile list; pitch versions per language; search
+  profile picker (or none → Review without draft). Flag PNGs (not emoji GB/ES).
+- Saved flash inline; blur-save only when dirty; Easy 3-step copy removed;
+  outreach row click opens info; Excel = Table + conditional formatting + dropdowns.
 
 ### Next
 1. Point Maileroo Dashboard webhook at `/api/webhooks/maileroo`.
 2. Soft-cap warning popup on send; Microsoft Graph Mail.Send.
-3. Optional: adopt `lucide-animated` selectively for nav / Find CTA.
+3. Optional: AI-assist translate when adding a missing pitch language version.
+4. Confirm `MAILEROO_VERIFY_API_KEY` in prod Wrangler secrets.
 
 ---
 

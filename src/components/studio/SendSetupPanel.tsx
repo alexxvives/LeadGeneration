@@ -25,7 +25,7 @@ export function SendSetupPanel({
   initial,
   defaults,
   canEdit,
-  canSendEmail,
+  canSendEmail: _canSendEmail,
   mailbox: mailboxInitial,
   defaultPath = "easy",
   appUrlLooksLocal = false,
@@ -39,6 +39,7 @@ export function SendSetupPanel({
   /** True when Gmail OAuth is configured but NEXTAUTH_URL still points at localhost. */
   appUrlLooksLocal?: boolean;
 }) {
+  void _canSendEmail;
   const [path, setPath] = useState<PathId>(defaultPath);
   const [easyProvider, setEasyProvider] = useState<EasyEmailProvider>(
     initial.easyEmailProvider ?? "resend",
@@ -147,36 +148,6 @@ export function SendSetupPanel({
 
       {path === "easy" ? (
         <div className="space-y-6">
-          <ol className="space-y-3 text-sm text-mist-300">
-            <li className="flex gap-3">
-              <span className="font-display text-lg font-semibold text-aurora-300">1</span>
-              <span>
-                Pick <span className="text-mist-100">Resend</span> or{" "}
-                <span className="text-mist-100">Maileroo</span> below, create a free account,
-                and add your sending domain.
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="font-display text-lg font-semibold text-aurora-300">2</span>
-              <span>
-                Paste From name, From email on <span className="text-mist-100">your domain</span>,
-                and the API key. Then add the SPF / DKIM records{" "}
-                <span className="text-mist-100">{isMaileroo ? "Maileroo" : "Resend"}</span> shows
-                in their dashboard to your DNS host (Cloudflare, GoDaddy, Hostinger…). This is
-                new auth for <em>sending</em> — separate from Zoho/Hostinger mailbox login.
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="font-display text-lg font-semibold text-aurora-300">3</span>
-              <span>
-                {isMaileroo
-                  ? "Confirm the domain shows verified in Maileroo. Approve each outreach before send"
-                  : "Watch domain health turn green. Approve each outreach before send"}
-                {canSendEmail ? "" : " (without a key, sends stay simulated — demo-safe)"}.
-              </span>
-            </li>
-          </ol>
-
           <div
             id="sending-identity"
             className="scroll-mt-8 rounded-xl2 border border-white/10 p-5"

@@ -4,38 +4,42 @@ import { useState } from "react";
 import { api } from "@/lib/client-api";
 import { ExportIcon } from "@/components/icons";
 import { Spinner, crmStageLabel } from "@/components/ui";
-import type { CrmStage } from "@/lib/types";
+import type { CrmStage, LeadStatus } from "@/lib/types";
 
-/** Leadify ink/aurora palette as ARGB hex for ExcelJS. */
-const INK = "FF0A1120";
-const AURORA = "FF43E0A8";
-const AURORA_DARK = "FF0E9D74";
-const MIST = "FFEAF1FB";
-const MIST_MUTED = "FFB6C4DC";
-const SKY = "FF38BDF8";
-const AMBER = "FFF7B955";
-const ROSE = "FFFB7185";
-const ROW_ALT = "FF131F34";
-const WHITE = "FFFFFFFF";
+const STAGE_LABELS: CrmStage[] = [
+  "new",
+  "contacted",
+  "in_conversation",
+  "closed",
+  "not_interested",
+  "discarded",
+];
 
-const STAGE_FILL: Record<CrmStage, string> = {
-  new: "FF7F92B3",
-  contacted: AMBER,
-  in_conversation: SKY,
-  closed: "FF7FF2C8",
-  not_interested: ROSE,
-  discarded: "FF5C6B82",
-};
+const EMAIL_STATUS_LABELS: LeadStatus[] = [
+  "new",
+  "queued",
+  "approved",
+  "sent",
+  "rejected",
+  "failed",
+];
 
-const STAGE_FONT: Record<CrmStage, string> = {
-  new: WHITE,
-  contacted: INK,
-  in_conversation: INK,
-  closed: INK,
-  not_interested: WHITE,
-  discarded: WHITE,
-};
+function statusLabel(s: LeadStatus): string {
+  const map: Record<LeadStatus, string> = {
+    new: "New",
+    queued: "Draft ready",
+    approved: "Approved",
+    sent: "Sent",
+    rejected: "Rejected",
+    failed: "Failed",
+  };
+  return map[s] ?? s;
+}
 
+/**
+ * Export leads as a real Excel Table with conditional formatting rules
+ * and data-validation dropdowns for categorical columns (not hardcoded fills).
+ */
 export function ExportButton() {
   const [exporting, setExporting] = useState(false);
 
@@ -45,6 +49,7 @@ export function ExportButton() {
       const ExcelJS = (await import("exceljs")).default;
       const board = await api.board();
       const rows = board.leads;
+      const lastRow = Math.max(rows.length + 1, 2);
 
       const wb = new ExcelJS.Workbook();
       wb.creator = "Leadify";
@@ -52,94 +57,133 @@ export function ExportButton() {
 
       const ws = wb.addWorksheet("Leads", {
         views: [{ state: "frozen", ySplit: 1 }],
-        properties: { defaultRowHeight: 22 },
+        properties: { defaultRowHeight: 20 },
       });
 
-      ws.columns = [
-        { header: "Company", key: "company", width: 28 },
-        { header: "Website", key: "website", width: 32 },
-        { header: "Location", key: "location", width: 22 },
-        { header: "Emails", key: "emails", width: 36 },
-        { header: "Phones", key: "phones", width: 18 },
-        { header: "Fit Score", key: "fitScore", width: 12 },
-        { header: "Pipeline Stage", key: "stage", width: 18 },
-        { header: "Email Status", key: "emailStatus", width: 14 },
-        { header: "Subject", key: "subject", width: 36 },
-        { header: "Source URL", key: "sourceUrl", width: 40 },
-      ];
-
-      const headerRow = ws.getRow(1);
-      headerRow.height = 28;
-      headerRow.eachCell((cell) => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AURORA_DARK } };
-        cell.font = { bold: true, color: { argb: WHITE }, name: "Calibri", size: 11 };
-        cell.alignment = { vertical: "middle", horizontal: "left" };
-        cell.border = {
-          bottom: { style: "thin", color: { argb: AURORA } },
-        };
-      });
-
-      for (const [i, l] of rows.entries()) {
+      const tableRows = rows.map((l) => {
         const stage = (l.crmStage ?? "new") as CrmStage;
-        const row = ws.addRow({
-          company: l.company,
-          website: l.website ?? "",
-          location: l.location ?? "",
-          emails: l.emails.join("; "),
-          phones: l.phones.join("; "),
-          fitScore: l.fitScore,
-          stage: crmStageLabel(stage),
-          emailStatus: l.status,
-          subject: l.outreach?.subject ?? "",
-          sourceUrl: l.sourceUrl,
-        });
+        return [
+          l.company,
+          l.website ?? "",
+          l.location ?? "",
+          l.emails.join("; "),
+          l.phones.join("; "),
+          l.fitScore,
+          crmStageLabel(stage),
+          statusLabel(l.status),
+          l.outreach?.subject ?? "",
+          l.sourceUrl,
+        ];
+      });
 
-        const alt = i % 2 === 1;
-        row.eachCell((cell, colNumber) => {
-          cell.font = { name: "Calibri", size: 10, color: { argb: MIST } };
-          cell.alignment = { vertical: "middle" };
-          if (alt) {
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ROW_ALT } };
-          } else {
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: INK } };
-          }
-          // Soft grid
-          cell.border = {
-            bottom: { style: "hair", color: { argb: "FF1E2D45" } },
-          };
+      ws.addTable({
+        name: "LeadsTable",
+        ref: `A1:J${lastRow}`,
+        headerRow: true,
+        totalsRow: false,
+        style: {
+          theme: "TableStyleMedium9",
+          showRowStripes: true,
+        },
+        columns: [
+          { name: "Company", filterButton: true },
+          { name: "Website", filterButton: true },
+          { name: "Location", filterButton: true },
+          { name: "Emails", filterButton: true },
+          { name: "Phones", filterButton: true },
+          { name: "Fit Score", filterButton: true },
+          { name: "Pipeline Stage", filterButton: true },
+          { name: "Email Status", filterButton: true },
+          { name: "Subject", filterButton: true },
+          { name: "Source URL", filterButton: true },
+        ],
+        rows: tableRows.length > 0 ? tableRows : [["", "", "", "", "", 0, "", "", "", ""]],
+      });
 
-          // Pipeline stage chip coloring
-          if (colNumber === 7) {
-            cell.fill = {
-              type: "pattern",
-              pattern: "solid",
-              fgColor: { argb: STAGE_FILL[stage] },
-            };
-            cell.font = {
-              name: "Calibri",
-              size: 10,
-              bold: true,
-              color: { argb: STAGE_FONT[stage] },
-            };
-            cell.alignment = { vertical: "middle", horizontal: "center" };
-          }
+      ws.getColumn(1).width = 28;
+      ws.getColumn(2).width = 32;
+      ws.getColumn(3).width = 22;
+      ws.getColumn(4).width = 36;
+      ws.getColumn(5).width = 18;
+      ws.getColumn(6).width = 12;
+      ws.getColumn(7).width = 18;
+      ws.getColumn(8).width = 14;
+      ws.getColumn(9).width = 36;
+      ws.getColumn(10).width = 40;
 
-          // Fit score — color by band
-          if (colNumber === 6) {
-            const score = Number(l.fitScore);
-            const tone =
-              score >= 75 ? AURORA : score >= 55 ? AMBER : MIST_MUTED;
-            cell.font = { name: "Calibri", size: 10, bold: true, color: { argb: tone } };
-            cell.alignment = { vertical: "middle", horizontal: "center" };
-          }
+      // Fit score — color scale (conditional formatting, not hardcoded cells)
+      ws.addConditionalFormatting({
+        ref: `F2:F${lastRow}`,
+        rules: [
+          {
+            type: "colorScale",
+            priority: 1,
+            cfvo: [
+              { type: "num", value: 0 },
+              { type: "num", value: 55 },
+              { type: "num", value: 100 },
+            ],
+            color: [
+              { argb: "FFFB7185" },
+              { argb: "FFF7B955" },
+              { argb: "FF43E0A8" },
+            ],
+          },
+        ],
+      });
+
+      // Pipeline stage — formula rules by label
+      const stageColors: Record<string, string> = {
+        New: "FFB6C4DC",
+        Contacted: "FFF7B955",
+        "In Conversation": "FF38BDF8",
+        Closed: "FF7FF2C8",
+        "Not Interested": "FFFB7185",
+        Discarded: "FF5C6B82",
+      };
+      let priority = 2;
+      for (const [label, argb] of Object.entries(stageColors)) {
+        ws.addConditionalFormatting({
+          ref: `G2:G${lastRow}`,
+          rules: [
+            {
+              type: "expression",
+              priority: priority++,
+              formulae: [`$G2="${label}"`],
+              style: {
+                fill: {
+                  type: "pattern",
+                  pattern: "solid",
+                  bgColor: { argb },
+                },
+              },
+            },
+          ],
         });
       }
 
-      // Auto-filter on header
-      ws.autoFilter = {
-        from: { row: 1, column: 1 },
-        to: { row: 1, column: 10 },
-      };
+      // Dropdowns for categorical columns (per-cell dataValidation in ExcelJS)
+      const stageList = STAGE_LABELS.map(crmStageLabel).join(",");
+      const statusList = EMAIL_STATUS_LABELS.map(statusLabel).join(",");
+      const validationEnd = Math.max(lastRow, rows.length + 50);
+      for (let r = 2; r <= validationEnd; r++) {
+        ws.getCell(r, 7).dataValidation = {
+          type: "list",
+          allowBlank: true,
+          formulae: [`"${stageList}"`],
+          showErrorMessage: true,
+          errorTitle: "Pipeline Stage",
+          error: "Pick a stage from the list.",
+        };
+        ws.getCell(r, 8).dataValidation = {
+          type: "list",
+          allowBlank: true,
+          formulae: [`"${statusList}"`],
+          showErrorMessage: true,
+          errorTitle: "Email Status",
+          error: "Pick a status from the list.",
+        };
+      }
 
       const buf = await wb.xlsx.writeBuffer();
       const blob = new Blob([buf], {

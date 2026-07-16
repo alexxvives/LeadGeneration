@@ -15,10 +15,11 @@ function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   const o = lead.outreach;
   if (o?.status === "sent") return "sent";
   if (o?.status === "approved") return "ready";
-  // Search + import auto-draft; anything with a draftable status lands in Review.
   if (o && (o.status === "draft" || o.status === "rejected" || o.status === "failed")) {
     return "review";
   }
+  // No draft yet (search without outreach profile) — still show in Review.
+  if (!o) return "review";
   return null;
 }
 
@@ -28,7 +29,7 @@ const BUCKET_META: Record<
 > = {
   review: {
     title: "Review & approve",
-    hint: "Edit, then approve to unlock send",
+    hint: "Edit or draft, then approve to unlock send",
     empty: "Nothing waiting for approval.",
   },
   ready: {
@@ -45,7 +46,7 @@ const BUCKET_META: Record<
 
 /**
  * Compact 3-column send queue: Review → Ready → Sent.
- * Drafts are created automatically on search/import (no "Needs draft" column).
+ * Leads without a draft (no outreach profile on search) stay in Review.
  */
 export function OutreachView({
   leads,
@@ -53,6 +54,7 @@ export function OutreachView({
   busyId,
   onOpenInfo,
   onOpenDraft,
+  onDraft,
   onDecide,
   onSend,
   onApproveAll,
@@ -137,6 +139,7 @@ export function OutreachView({
                         canSendEmail={canSendEmail}
                         onOpenInfo={() => onOpenInfo(lead.id)}
                         onOpenDraft={() => onOpenDraft(lead.id)}
+                        onDraft={() => onDraft(lead.id)}
                         onApprove={() =>
                           lead.outreach
                             ? onDecide(lead.outreach.id, "approved")
@@ -168,6 +171,7 @@ function OutreachRow({
   canSendEmail,
   onOpenInfo,
   onOpenDraft,
+  onDraft,
   onApprove,
   onSend,
 }: {
@@ -177,24 +181,24 @@ function OutreachRow({
   canSendEmail: boolean;
   onOpenInfo: () => void;
   onOpenDraft: () => void;
+  onDraft: () => Promise<void>;
   onApprove: () => Promise<void>;
   onSend: () => Promise<void>;
 }) {
   const email = lead.outreach?.toEmail ?? lead.emails[0] ?? null;
+  const hasDraft = Boolean(lead.outreach);
+
   return (
     <li className="flex items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03]">
-      <div className="min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={onOpenInfo}
+        className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-1 focus-visible:ring-aurora-400/50"
+        aria-label={`Lead info for ${lead.company}`}
+      >
         <div className="flex items-center gap-1">
           <span className="truncate text-sm font-medium text-mist-100">{lead.company}</span>
-          <button
-            type="button"
-            onClick={onOpenInfo}
-            className="shrink-0 rounded p-0.5 text-mist-600 transition-colors hover:bg-white/5 hover:text-mist-300"
-            aria-label={`Lead info for ${lead.company}`}
-            title="Lead info"
-          >
-            <InfoIcon className="h-3 w-3" />
-          </button>
+          <InfoIcon className="h-3 w-3 shrink-0 text-mist-600" aria-hidden />
         </div>
         <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-mist-500">
           <MailIcon className="h-3 w-3 shrink-0" />
@@ -203,30 +207,46 @@ function OutreachRow({
         {lead.outreach?.status === "failed" && lead.outreach.error ? (
           <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
         ) : null}
-      </div>
+        {!hasDraft && bucket === "review" ? (
+          <p className="mt-1 text-[10px] text-mist-600">No draft yet</p>
+        ) : null}
+      </button>
       <div className="flex shrink-0 flex-col items-end gap-1">
         <div className="origin-right scale-90">
           <FitMeter score={lead.fitScore} />
         </div>
         {bucket === "review" && (
           <div className="flex items-center justify-end gap-1">
-            <button
-              type="button"
-              onClick={onOpenDraft}
-              className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void onApprove()}
-              aria-label="Approve"
-              title="Approve"
-              className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
-            >
-              {busy ? <Spinner className="h-2.5 w-2.5" /> : <CheckIcon className="h-2.5 w-2.5" />}
-            </button>
+            {hasDraft ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onOpenDraft}
+                  className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onApprove()}
+                  aria-label="Approve"
+                  title="Approve"
+                  className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
+                >
+                  {busy ? <Spinner className="h-2.5 w-2.5" /> : <CheckIcon className="h-2.5 w-2.5" />}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onDraft()}
+                className={`${ACTION_BTN} border border-aurora-400/40 text-aurora-300 hover:bg-aurora-400/10 disabled:opacity-50`}
+              >
+                {busy ? <Spinner className="h-2.5 w-2.5" /> : "Draft"}
+              </button>
+            )}
           </div>
         )}
         {bucket === "ready" && (

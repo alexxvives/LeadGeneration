@@ -355,27 +355,34 @@ export async function createAndRunSearch(
     }));
     await db.createLeads(leads);
 
-    // Auto-draft outreach for every lead up front, so the human's job is simply
-    // "review + approve + send" rather than "generate, then review". Drafting is
-    // local + template-based (no external calls), so this stays fast. Nothing is
-    // ever sent here — leads land in the approval queue as "queued".
-    const now = nowIso();
-    const drafts: Outreach[] = leads.map((lead) => ({
-      id: newId("out"),
-      workspaceId: ctx.workspaceId,
-      leadId: lead.id,
-      runId: run.id,
-      toEmail: lead.emails[0] ?? null,
-      ...generateDraft(lead, run),
-      status: "draft",
-      deliveryStatus: "unknown",
-      sentAt: null,
-      error: null,
-      createdAt: now,
-      updatedAt: now,
-    }));
-    await Promise.all(drafts.map((d) => db.upsertOutreach(d)));
-    await Promise.all(leads.map((l) => db.updateLead(l.id, { status: "queued" })));
+    // Auto-draft when an outreach profile was selected (autoDraft !== false).
+    // Without a profile, leads stay "new" in Review so the user can pick a
+    // profile and draft later — never sent here.
+    const shouldDraft = input.autoDraft !== false;
+    if (shouldDraft) {
+      const now = nowIso();
+      const draftOverrides = {
+        signOff: input.senderName?.trim() || null,
+        offerNotes: input.offerNotes?.trim() || null,
+        subjectTemplate: input.subjectTemplate?.trim() || null,
+      };
+      const drafts: Outreach[] = leads.map((lead) => ({
+        id: newId("out"),
+        workspaceId: ctx.workspaceId,
+        leadId: lead.id,
+        runId: run.id,
+        toEmail: lead.emails[0] ?? null,
+        ...generateDraft(lead, run, draftOverrides),
+        status: "draft" as const,
+        deliveryStatus: "unknown" as const,
+        sentAt: null,
+        error: null,
+        createdAt: now,
+        updatedAt: now,
+      }));
+      await Promise.all(drafts.map((d) => db.upsertOutreach(d)));
+      await Promise.all(leads.map((l) => db.updateLead(l.id, { status: "queued" })));
+    }
 
     // Enriched leads consume lead credits (1 credit = 1 lead — business-plan §6).
     await recordLeadUsage(ctx, leads.length);

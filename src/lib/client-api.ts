@@ -100,6 +100,8 @@ export const api = {
     location?: string;
     offerNotes?: string;
     senderName?: string;
+    subjectTemplate?: string;
+    autoDraft?: boolean;
     searchStrategy?: SearchStrategy;
     maxLeads?: number;
     demo?: boolean;

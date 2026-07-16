@@ -90,7 +90,7 @@ export default async function SettingsPage({
 
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Outreach profile
+          Outreach profiles
         </h2>
         <SenderProfileForm />
       </section>

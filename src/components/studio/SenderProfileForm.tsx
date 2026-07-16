@@ -2,17 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  loadSenderProfile,
+  createOutreachProfile,
+  deleteOutreachProfile,
+  loadOutreachProfiles,
   saveSenderProfile,
+  setActiveOutreachProfile,
   SIGNATURE_PLACEHOLDER,
-  type SenderProfile,
+  type OutreachProfile,
 } from "@/lib/sender-profile";
 import { generateDraft } from "@/lib/outreach/draft";
-import {
-  langLabel,
-  outreachLangFromText,
-  type OutreachLang,
-} from "@/lib/outreach/locale";
+import { langLabel, type OutreachLang } from "@/lib/outreach/locale";
 import type { Lead, Run } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import { HelpIcon, SparkIcon } from "@/components/icons";
@@ -21,15 +20,31 @@ const EXAMPLE_COMPANY = "Bright Dental";
 const EXAMPLE_NAME = "Maria";
 const EXAMPLE_HOST = "brightdental.com";
 
-const PREVIEW_LANGS: { id: OutreachLang; flag: string }[] = [
-  { id: "en", flag: "🇬🇧" },
-  { id: "es", flag: "🇪🇸" },
-  { id: "fr", flag: "🇫🇷" },
-  { id: "it", flag: "🇮🇹" },
-  { id: "pt", flag: "🇵🇹" },
-  { id: "pl", flag: "🇵🇱" },
-  { id: "de", flag: "🇩🇪" },
+/** ISO 3166-1 alpha-2 for flagcdn (Windows-safe — emoji flags render as GB/ES). */
+const PREVIEW_LANGS: { id: OutreachLang; cc: string }[] = [
+  { id: "en", cc: "gb" },
+  { id: "es", cc: "es" },
+  { id: "fr", cc: "fr" },
+  { id: "it", cc: "it" },
+  { id: "pt", cc: "pt" },
+  { id: "pl", cc: "pl" },
+  { id: "de", cc: "de" },
 ];
+
+function FlagImg({ cc, className = "h-4 w-5" }: { cc: string; className?: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`https://flagcdn.com/w40/${cc}.png`}
+      alt=""
+      width={20}
+      height={15}
+      className={`${className} rounded-[2px] object-cover`}
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
 
 const PREVIEW_LEAD: Lead = {
   id: "preview",
@@ -74,38 +89,32 @@ const PREVIEW_RUN: Run = {
 };
 
 function previewDraft(
-  profile: SenderProfile,
+  profile: OutreachProfile,
   lang: OutreachLang,
-): { subject: string; body: string; pitchSubstituted: boolean } {
-  const pitch = profile.defaultOffer.trim();
-  const pitchLang = pitch ? outreachLangFromText(pitch) : lang;
-  // Avoid mixed-language previews: if saved pitch ≠ selected lang, show
-  // localized sample pitch instead of splicing languages together.
-  const pitchSubstituted = Boolean(pitch) && pitchLang !== lang;
+): { subject: string; body: string; missingPitch: boolean } {
+  const pitch = (profile.pitches[lang] ?? "").trim();
+  const missingPitch = !pitch;
   const subjectTpl = profile.subjectTemplate.trim();
-  const subjectLang = subjectTpl ? outreachLangFromText(subjectTpl) : lang;
-  // Custom subject templates are written in one language — use locale default
-  // when previewing another language so the whole email stays consistent.
-  const useSubjectTpl = Boolean(subjectTpl) && subjectLang === lang;
-
+  // Never fall back to locale sample pitch — that made EN previews look "wrong"
+  // when only an ES (etc.) version existed.
   const draft = generateDraft(PREVIEW_LEAD, PREVIEW_RUN, {
     forceLang: lang,
     signOff: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-    offerNotes: pitchSubstituted ? null : pitch || null,
-    subjectTemplate: useSubjectTpl ? subjectTpl : null,
+    offerNotes: pitch || `[Add ${langLabel(lang)} sales pitch]`,
+    subjectTemplate: subjectTpl || null,
   });
-  return { ...draft, pitchSubstituted };
+  return { ...draft, missingPitch };
 }
 
 type SavedField = "subject" | "pitch" | "signOff" | null;
 
 /**
- * Editable outreach voice fields (local to this browser). Used to prefill
- * search offer notes, subject templates, and the multi-line email sign-off.
- * Saves automatically when a field loses focus.
+ * List of outreach profiles; each holds pitch versions per language.
+ * Saves on blur only when the value actually changed.
  */
 export function SenderProfileForm() {
-  const [profile, setProfile] = useState<SenderProfile | null>(null);
+  const [profiles, setProfiles] = useState<OutreachProfile[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [savedField, setSavedField] = useState<SavedField>(null);
   const [previewLang, setPreviewLang] = useState<OutreachLang>("en");
   const [langMenuOpen, setLangMenuOpen] = useState(false);
@@ -117,7 +126,9 @@ export function SenderProfileForm() {
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const offerRef = useRef<HTMLTextAreaElement | null>(null);
   const langMenuRef = useRef<HTMLDivElement | null>(null);
-  const lastEdited = useRef<SavedField>(null);
+  const focusSnapshot = useRef<string | null>(null);
+
+  const profile = profiles.find((p) => p.id === activeId) ?? profiles[0] ?? null;
 
   const growOffer = () => {
     const el = offerRef.current;
@@ -126,15 +137,19 @@ export function SenderProfileForm() {
     el.style.height = `${Math.max(el.scrollHeight, 84)}px`;
   };
 
+  const reload = () => {
+    const store = loadOutreachProfiles();
+    setProfiles(store.profiles);
+    setActiveId(store.activeId);
+  };
+
   useEffect(() => {
-    const p = loadSenderProfile();
-    if (!p.signature.trim()) p.signature = SIGNATURE_PLACEHOLDER;
-    setProfile(p);
+    reload();
   }, []);
 
   useEffect(() => {
     growOffer();
-  }, [profile?.defaultOffer]);
+  }, [profile?.pitches, previewLang]);
 
   useEffect(() => {
     return () => {
@@ -161,7 +176,7 @@ export function SenderProfileForm() {
   if (!profile) {
     return (
       <div className="rounded-xl2 border border-white/10 p-5 text-sm text-mist-500">
-        Loading profile…
+        Loading profiles…
       </div>
     );
   }
@@ -172,24 +187,54 @@ export function SenderProfileForm() {
     savedTimer.current = setTimeout(() => setSavedField(null), 2000);
   };
 
-  const persist = (next: SenderProfile, field: SavedField) => {
+  const persist = (next: OutreachProfile, field: SavedField) => {
     saveSenderProfile(next);
-    setProfile(next);
-    flashSaved(field);
+    setProfiles((prev) => prev.map((p) => (p.id === next.id ? next : p)));
+    setActiveId(next.id);
+    if (field) flashSaved(field);
   };
 
-  const patch = (partial: Partial<SenderProfile>) => {
-    setProfile((prev) => (prev ? { ...prev, ...partial } : prev));
+  const patch = (partial: Partial<OutreachProfile>) => {
+    setProfiles((prev) =>
+      prev.map((p) => (p.id === profile.id ? { ...p, ...partial } : p)),
+    );
     setSavedField(null);
   };
 
+  const pitchValue = profile.pitches[previewLang] ?? "";
+
+  const fieldSnapshot = () =>
+    JSON.stringify({
+      subjectTemplate: profile.subjectTemplate.trim(),
+      signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
+      pitch: (profile.pitches[previewLang] ?? "").trim(),
+      name: profile.name.trim(),
+    });
+
   const saveOnBlur = (field: SavedField) => {
-    const next = {
+    const next: OutreachProfile = {
       ...profile,
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
       subjectTemplate: profile.subjectTemplate.trim(),
+      pitches: {
+        ...profile.pitches,
+        [previewLang]: (profile.pitches[previewLang] ?? "").trim(),
+      },
     };
-    persist(next, field ?? lastEdited.current);
+    const serialized = JSON.stringify({
+      subjectTemplate: next.subjectTemplate,
+      signature: next.signature,
+      pitch: next.pitches[previewLang] ?? "",
+      name: next.name.trim(),
+    });
+    if (focusSnapshot.current !== null && focusSnapshot.current === serialized) {
+      return;
+    }
+    persist(next, field);
+  };
+
+  const captureFocus = () => {
+    focusSnapshot.current = fieldSnapshot();
   };
 
   const providerLabel = (p: string) => {
@@ -223,11 +268,11 @@ export function SenderProfileForm() {
       }
       if (data.pitch) {
         if (data.provider) setGenProvider(data.provider);
-        const next = {
+        const next: OutreachProfile = {
           ...profile,
-          defaultOffer: data.pitch,
           website: site.trim(),
           signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
+          pitches: { ...profile.pitches, [previewLang]: data.pitch },
         };
         persist(next, "pitch");
         setWebsitePrompt(false);
@@ -240,226 +285,298 @@ export function SenderProfileForm() {
     }
   };
 
-  const activeFlag =
-    PREVIEW_LANGS.find((l) => l.id === previewLang)?.flag ?? "🇬🇧";
+  const activeCc =
+    PREVIEW_LANGS.find((l) => l.id === previewLang)?.cc ?? "gb";
+
+  const SavedHint = ({ field }: { field: SavedField }) => (
+    <span
+      aria-live="polite"
+      className={`text-xs font-medium text-aurora-300 transition-opacity ${
+        savedField === field ? "opacity-100" : "pointer-events-none opacity-0"
+      }`}
+    >
+      Saved
+    </span>
+  );
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <div className="space-y-4 rounded-xl2 border border-white/10 p-5">
-        <label className="block">
-          <div className="relative mb-1.5 flex items-center gap-1.5">
-            <span className="text-xs font-medium text-mist-500">Email subject template</span>
-            <span
-              className="group relative inline-flex"
-              title='Use variables like {company}, {lead_name}, or {location} — e.g. Quick note for {company}'
-            >
-              <HelpIcon className="h-3.5 w-3.5 text-mist-500 transition-colors group-hover:text-mist-300" />
-              <span
-                role="tooltip"
-                className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-              >
-                Insert variables with curly braces:{" "}
-                <code className="text-aurora-300">{"{company}"}</code>,{" "}
-                <code className="text-aurora-300">{"{lead_name}"}</code>,{" "}
-                <code className="text-aurora-300">{"{location}"}</code>. Example:{" "}
-                <span className="text-mist-100">Quick note for {"{company}"}</span>
-              </span>
-            </span>
-            <span
-              aria-live="polite"
-              className={`pointer-events-none absolute left-full ml-2 text-xs font-medium text-aurora-300 transition-opacity ${
-                savedField === "subject" ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              Saved
-            </span>
-          </div>
-          <input
-            value={profile.subjectTemplate}
-            onChange={(e) => {
-              lastEdited.current = "subject";
-              patch({ subjectTemplate: e.target.value });
-            }}
-            onBlur={() => saveOnBlur("subject")}
-            placeholder="Quick note for {company}"
-            className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
-          />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="sr-only" htmlFor="outreach-profile-select">
+          Outreach profile
         </label>
-
-        <label className="block">
-          <div className="relative mb-1.5 flex items-center justify-between gap-2">
-            <span className="relative text-xs font-medium text-mist-500">
-              Sales pitch
-              <span
-                aria-live="polite"
-                className={`pointer-events-none absolute left-full top-0 ml-2 whitespace-nowrap text-xs font-medium text-aurora-300 transition-opacity ${
-                  savedField === "pitch" ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                Saved
-              </span>
-            </span>
-            <button
-              type="button"
-              disabled={generating}
-              onClick={() => {
-                setWebsitePrompt(true);
-                setGenError(null);
-                setWebsiteDraft(profile.website || "");
-              }}
-              className="inline-flex items-center gap-1 text-[11px] text-aurora-300 hover:underline disabled:opacity-40"
-            >
-              {generating ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3.5 w-3.5" />}
-              {generating ? "Generating…" : "Generate from website"}
-            </button>
-          </div>
-          {websitePrompt && (
-            <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-aurora-400/20 bg-aurora-400/5 p-2.5">
-              <input
-                value={websiteDraft}
-                onChange={(e) => setWebsiteDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && websiteDraft.trim().length >= 3) {
-                    void generatePitch(websiteDraft);
-                  }
-                }}
-                placeholder="https://yourcompany.com"
-                autoFocus
-                className="min-w-[12rem] flex-1 rounded-md border border-white/10 bg-ink-950/60 px-3 py-2 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
-              />
-              <button
-                type="button"
-                disabled={generating || websiteDraft.trim().length < 3}
-                onClick={() => void generatePitch(websiteDraft)}
-                className="rounded-full bg-aurora-400 px-3 py-1.5 text-xs font-medium text-ink-950 disabled:opacity-50"
-              >
-                Generate
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setWebsitePrompt(false);
-                  setWebsiteDraft("");
-                }}
-                className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-mist-400 hover:text-mist-200"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-          <textarea
-            ref={offerRef}
-            value={profile.defaultOffer}
-            onChange={(e) => {
-              lastEdited.current = "pitch";
-              patch({ defaultOffer: e.target.value });
-              requestAnimationFrame(growOffer);
+        <select
+          id="outreach-profile-select"
+          value={profile.id}
+          onChange={(e) => {
+            setActiveOutreachProfile(e.target.value);
+            setActiveId(e.target.value);
+            setSavedField(null);
+          }}
+          className="min-w-[12rem] rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+        >
+          {profiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <input
+          value={profile.name}
+          onChange={(e) => patch({ name: e.target.value })}
+          onFocus={captureFocus}
+          onBlur={() => {
+            const name = profile.name.trim() || "Untitled";
+            const next = { ...profile, name };
+            const prev = loadOutreachProfiles().profiles.find(
+              (p) => p.id === profile.id,
+            );
+            if (prev && prev.name === name) return;
+            persist(next, null);
+          }}
+          aria-label="Profile name"
+          className="min-w-[8rem] flex-1 rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            const created = createOutreachProfile();
+            reload();
+            setActiveId(created.id);
+          }}
+          className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-mist-300 hover:border-aurora-400/40 hover:text-mist-100"
+        >
+          New profile
+        </button>
+        {profiles.length > 1 ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (!confirm(`Delete profile “${profile.name}”?`)) return;
+              deleteOutreachProfile(profile.id);
+              reload();
             }}
-            onBlur={() => saveOnBlur("pitch")}
-            rows={3}
-            placeholder="We help clinics turn website visitors into booked appointments…"
-            className="w-full resize-none overflow-hidden rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
-          />
-          {genProvider && !genError && (
-            <p className="mt-1.5 text-xs text-mist-500">
-              Generated with{" "}
-              <span className="text-mist-300">{providerLabel(genProvider)}</span>
-            </p>
-          )}
-          {genError && <p className="mt-1.5 text-xs text-rose-300">{genError}</p>}
-        </label>
-        <label className="block">
-          <div className="relative mb-1.5">
-            <span className="relative text-xs font-medium text-mist-500">
-              Email sign-off
-              <span
-                aria-live="polite"
-                className={`pointer-events-none absolute left-full top-0 ml-2 whitespace-nowrap text-xs font-medium text-aurora-300 transition-opacity ${
-                  savedField === "signOff" ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                Saved
-              </span>
-            </span>
-          </div>
-          <textarea
-            value={profile.signature}
-            onChange={(e) => {
-              lastEdited.current = "signOff";
-              patch({ signature: e.target.value });
-            }}
-            onBlur={() => saveOnBlur("signOff")}
-            rows={4}
-            placeholder={SIGNATURE_PLACEHOLDER}
-            className="w-full resize-y rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 font-sans text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
-          />
-        </label>
+            className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-rose-300/80 hover:border-rose-400/40 hover:text-rose-200"
+          >
+            Delete
+          </button>
+        ) : null}
       </div>
 
-      {preview ? (
-        <div className="relative rounded-xl2 border border-white/10 bg-ink-900/40 p-5">
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-[10px] uppercase tracking-wider text-mist-500">
-              Preview · example to {EXAMPLE_COMPANY}
-              <span className="ml-1.5 normal-case tracking-normal text-mist-600">
-                · {langLabel(previewLang)}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="space-y-4 rounded-xl2 border border-white/10 p-5">
+          <label className="block">
+            <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-xs font-medium text-mist-500">
+                Email subject template
               </span>
-            </p>
-            <div ref={langMenuRef} className="relative shrink-0">
+              <span
+                className="group relative inline-flex"
+                title="Use variables like {company}, {lead_name}, or {location}"
+              >
+                <HelpIcon className="h-3.5 w-3.5 text-mist-500 transition-colors group-hover:text-mist-300" />
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                >
+                  Insert variables with curly braces:{" "}
+                  <code className="text-aurora-300">{"{company}"}</code>,{" "}
+                  <code className="text-aurora-300">{"{lead_name}"}</code>,{" "}
+                  <code className="text-aurora-300">{"{location}"}</code>.
+                </span>
+              </span>
+              <SavedHint field="subject" />
+            </div>
+            <input
+              value={profile.subjectTemplate}
+              onFocus={captureFocus}
+              onChange={(e) => patch({ subjectTemplate: e.target.value })}
+              onBlur={() => saveOnBlur("subject")}
+              placeholder="Quick note for {company}"
+              className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+            />
+          </label>
+
+          <label className="block">
+            <div className="mb-1.5 flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-mist-500">
+                Sales pitch
+                <span className="font-normal text-mist-600">
+                  · {langLabel(previewLang)} version
+                </span>
+                <SavedHint field="pitch" />
+              </span>
               <button
                 type="button"
-                onClick={() => setLangMenuOpen((o) => !o)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-ink-950/50 text-base transition-colors hover:border-aurora-400/40 hover:bg-ink-900"
-                aria-label={`Preview language: ${langLabel(previewLang)}`}
-                aria-expanded={langMenuOpen}
-                aria-haspopup="listbox"
-                title="Preview in other languages"
+                disabled={generating}
+                onClick={() => {
+                  setWebsitePrompt(true);
+                  setGenError(null);
+                  setWebsiteDraft(profile.website || "");
+                }}
+                className="inline-flex items-center gap-1 text-[11px] text-aurora-300 hover:underline disabled:opacity-40"
               >
-                <span aria-hidden>{activeFlag}</span>
+                {generating ? (
+                  <Spinner className="h-3 w-3" />
+                ) : (
+                  <SparkIcon className="h-3.5 w-3.5" />
+                )}
+                {generating ? "Generating…" : "Generate from website"}
               </button>
-              {langMenuOpen ? (
-                <ul
-                  role="listbox"
-                  className="absolute right-0 z-30 mt-1.5 min-w-[10rem] overflow-hidden rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
-                >
-                  {PREVIEW_LANGS.map((l) => (
-                    <li key={l.id} role="option" aria-selected={previewLang === l.id}>
-                      <button
-                        type="button"
-                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
-                          previewLang === l.id
-                            ? "bg-aurora-400/10 text-aurora-300"
-                            : "text-mist-200 hover:bg-white/5"
-                        }`}
-                        onClick={() => {
-                          setPreviewLang(l.id);
-                          setLangMenuOpen(false);
-                        }}
-                      >
-                        <span aria-hidden>{l.flag}</span>
-                        {langLabel(l.id)}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
             </div>
-          </div>
-          <p className="mt-3 text-xs text-mist-500">Subject</p>
-          <p className="mt-0.5 font-medium text-mist-100">{preview.subject}</p>
-          <div className="mt-4 border-t border-white/5 pt-4">
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-mist-300">
-              {preview.body}
-            </pre>
-          </div>
-          {preview.pitchSubstituted ? (
-            <p className="mt-3 text-[11px] leading-relaxed text-mist-500">
-              Sample pitch in {langLabel(previewLang)} — your saved pitch is in another
-              language, so it isn’t mixed into this preview.
-            </p>
-          ) : null}
+            {websitePrompt && (
+              <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-aurora-400/20 bg-aurora-400/5 p-2.5">
+                <input
+                  value={websiteDraft}
+                  onChange={(e) => setWebsiteDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && websiteDraft.trim().length >= 3) {
+                      void generatePitch(websiteDraft);
+                    }
+                  }}
+                  placeholder="https://yourcompany.com"
+                  autoFocus
+                  className="min-w-[12rem] flex-1 rounded-md border border-white/10 bg-ink-950/60 px-3 py-2 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+                />
+                <button
+                  type="button"
+                  disabled={generating || websiteDraft.trim().length < 3}
+                  onClick={() => void generatePitch(websiteDraft)}
+                  className="rounded-full bg-aurora-400 px-3 py-1.5 text-xs font-medium text-ink-950 disabled:opacity-50"
+                >
+                  Generate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWebsitePrompt(false);
+                    setWebsiteDraft("");
+                  }}
+                  className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-mist-400 hover:text-mist-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            <textarea
+              ref={offerRef}
+              value={pitchValue}
+              onFocus={captureFocus}
+              onChange={(e) => {
+                patch({
+                  pitches: { ...profile.pitches, [previewLang]: e.target.value },
+                });
+                requestAnimationFrame(growOffer);
+              }}
+              onBlur={() => saveOnBlur("pitch")}
+              rows={3}
+              placeholder={`Sales pitch in ${langLabel(previewLang)}…`}
+              className="w-full resize-none overflow-hidden rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+            />
+            {genProvider && !genError && (
+              <p className="mt-1.5 text-xs text-mist-500">
+                Generated with{" "}
+                <span className="text-mist-300">{providerLabel(genProvider)}</span>
+              </p>
+            )}
+            {genError && <p className="mt-1.5 text-xs text-rose-300">{genError}</p>}
+          </label>
+
+          <label className="block">
+            <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-xs font-medium text-mist-500">Email sign-off</span>
+              <SavedHint field="signOff" />
+            </div>
+            <textarea
+              value={profile.signature}
+              onFocus={captureFocus}
+              onChange={(e) => patch({ signature: e.target.value })}
+              onBlur={() => saveOnBlur("signOff")}
+              rows={4}
+              placeholder={SIGNATURE_PLACEHOLDER}
+              className="w-full resize-y rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 font-sans text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+            />
+          </label>
         </div>
-      ) : null}
+
+        {preview ? (
+          <div className="relative rounded-xl2 border border-white/10 bg-ink-900/40 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[10px] uppercase tracking-wider text-mist-500">
+                Preview · example to {EXAMPLE_COMPANY}
+                <span className="ml-1.5 normal-case tracking-normal text-mist-600">
+                  · {langLabel(previewLang)}
+                </span>
+              </p>
+              <div ref={langMenuRef} className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setLangMenuOpen((o) => !o)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-ink-950/50 transition-colors hover:border-aurora-400/40 hover:bg-ink-900"
+                  aria-label={`Preview language: ${langLabel(previewLang)}`}
+                  aria-expanded={langMenuOpen}
+                  aria-haspopup="listbox"
+                  title="Preview / edit pitch in other languages"
+                >
+                  <FlagImg cc={activeCc} />
+                </button>
+                {langMenuOpen ? (
+                  <ul
+                    role="listbox"
+                    className="absolute right-0 z-30 mt-1.5 min-w-[10rem] overflow-hidden rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
+                  >
+                    {PREVIEW_LANGS.map((l) => {
+                      const has = Boolean(profile.pitches[l.id]?.trim());
+                      return (
+                        <li
+                          key={l.id}
+                          role="option"
+                          aria-selected={previewLang === l.id}
+                        >
+                          <button
+                            type="button"
+                            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
+                              previewLang === l.id
+                                ? "bg-aurora-400/10 text-aurora-300"
+                                : "text-mist-200 hover:bg-white/5"
+                            }`}
+                            onClick={() => {
+                              setPreviewLang(l.id);
+                              setLangMenuOpen(false);
+                              setSavedField(null);
+                            }}
+                          >
+                            <FlagImg cc={l.cc} />
+                            <span className="flex-1">{langLabel(l.id)}</span>
+                            {has ? (
+                              <span className="text-[10px] text-aurora-400/80">●</span>
+                            ) : (
+                              <span className="text-[10px] text-mist-600">○</span>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-mist-500">Subject</p>
+            <p className="mt-0.5 font-medium text-mist-100">{preview.subject}</p>
+            <div className="mt-4 border-t border-white/5 pt-4">
+              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-mist-300">
+                {preview.body}
+              </pre>
+            </div>
+            {preview.missingPitch ? (
+              <p className="mt-3 text-[11px] leading-relaxed text-amber-200/80">
+                No {langLabel(previewLang)} pitch yet — add that version on the left
+                (same offer, this language). Other languages keep their own text.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

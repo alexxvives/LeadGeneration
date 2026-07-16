@@ -10,10 +10,12 @@ export const dynamic = "force-dynamic";
 const CreateRunSchema = z.object({
   niche: z.string().min(2, "Describe who you want to reach").max(200),
   location: z.string().max(120).optional().nullable(),
-  offerNotes: z.string().max(1000).optional().nullable(),
+  offerNotes: z.string().max(4000).optional().nullable(),
   senderName: z.string().max(500).optional().nullable(),
+  subjectTemplate: z.string().max(300).optional().nullable(),
+  autoDraft: z.boolean().optional(),
   searchStrategy: z.enum(["standard", "smart", "local"]).optional(),
-  maxLeads: z.number().int().min(1).max(50).optional(),
+  maxLeads: z.number().int().min(1).max(500).optional(),
   demo: z.boolean().optional(),
   boardId: z.string().min(1).max(80).optional().nullable(),
 });

@@ -308,6 +308,13 @@ export interface CreateRunInput {
    * back to OUTREACH_FROM_NAME when absent.
    */
   senderName?: string | null;
+  /** Optional subject template from the selected outreach profile. */
+  subjectTemplate?: string | null;
+  /**
+   * When false, skip auto-drafting (search without an outreach profile).
+   * Leads land in Review without a draft. Default true.
+   */
+  autoDraft?: boolean;
   /** Search depth/strategy. Defaults to "standard" when omitted. */
   searchStrategy?: SearchStrategy;
   /**

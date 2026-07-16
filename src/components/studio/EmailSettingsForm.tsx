@@ -118,6 +118,41 @@ export function EmailSettingsForm({
     onEasyProviderChange?.(p);
   };
 
+  const focusBaseline = useRef<{
+    fromName: string | null;
+    fromEmail: string | null;
+    resendDraft: string;
+    mailerooDraft: string;
+    provider: EasyEmailProvider;
+  } | null>(null);
+
+  const captureFocus = () => {
+    focusBaseline.current = {
+      fromName: values.fromName,
+      fromEmail: values.fromEmail,
+      resendDraft,
+      mailerooDraft,
+      provider,
+    };
+  };
+
+  const isDirtyVsFocus = () => {
+    const b = focusBaseline.current;
+    if (!b) return true;
+    return (
+      b.fromName !== values.fromName ||
+      b.fromEmail !== values.fromEmail ||
+      b.resendDraft !== resendDraft ||
+      b.mailerooDraft !== mailerooDraft ||
+      b.provider !== provider
+    );
+  };
+
+  const saveIfChanged = async () => {
+    if (!isDirtyVsFocus()) return;
+    await save();
+  };
+
   const isNewKey = (draft: string) =>
     !!draft.trim() && draft !== SAVED_KEY_MASK;
 
@@ -250,7 +285,8 @@ export function EmailSettingsForm({
           <input
             value={values.fromName ?? ""}
             onChange={(e) => setField("fromName", e.target.value)}
-            onBlur={() => void save()}
+            onFocus={captureFocus}
+            onBlur={() => void saveIfChanged()}
             placeholder={defaults.fromName}
             disabled={!canEdit}
             className={inputCls}
@@ -265,8 +301,9 @@ export function EmailSettingsForm({
             type="email"
             value={fromLocked ? lockedFromEmail! : (values.fromEmail ?? "")}
             onChange={(e) => setField("fromEmail", e.target.value)}
+            onFocus={captureFocus}
             onBlur={() => {
-              if (!fromLocked) void save();
+              if (!fromLocked) void saveIfChanged();
             }}
             placeholder={defaults.fromEmail}
             disabled={!canEdit || fromLocked}
@@ -323,9 +360,10 @@ export function EmailSettingsForm({
                     savedMask={SAVED_KEY_MASK}
                     onChange={(e) => onKeyDraftChange("maileroo", e.target.value)}
                     onFocus={(e) => {
+                      captureFocus();
                       if (mailerooDraft === SAVED_KEY_MASK) e.target.select();
                     }}
-                    onBlur={() => void save()}
+                    onBlur={() => void saveIfChanged()}
                     placeholder="Your Maileroo sending key"
                     disabled={!canEdit}
                     inputClassName={`${inputCls} pr-11`}
@@ -354,9 +392,10 @@ export function EmailSettingsForm({
                     savedMask={SAVED_KEY_MASK}
                     onChange={(e) => onKeyDraftChange("resend", e.target.value)}
                     onFocus={(e) => {
+                      captureFocus();
                       if (resendDraft === SAVED_KEY_MASK) e.target.select();
                     }}
-                    onBlur={() => void save()}
+                    onBlur={() => void saveIfChanged()}
                     placeholder="re_xxxxxxxxxxxx"
                     disabled={!canEdit}
                     inputClassName={`${inputCls} pr-11`}

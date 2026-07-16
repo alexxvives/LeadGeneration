@@ -20,7 +20,11 @@ import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
-import { loadSenderProfile, resolveSignature } from "@/lib/sender-profile";
+import {
+  getDefaultOffer,
+  loadSenderProfile,
+  resolveSignature,
+} from "@/lib/sender-profile";
 import { BoardAssignModal, type BoardDestination } from "./BoardAssignModal";
 import { DashboardView } from "./DashboardView";
 import { BoardsView } from "./BoardsView";
@@ -200,6 +204,8 @@ export function Studio() {
         senderName: v.senderName,
         searchStrategy: v.searchStrategy,
         offerNotes: v.offerNotes.trim() || undefined,
+        subjectTemplate: v.subjectTemplate.trim() || undefined,
+        autoDraft: v.autoDraft,
         maxLeads: v.maxLeads,
         boardId,
       });
@@ -318,7 +324,7 @@ export function Studio() {
       const profile = loadSenderProfile();
       const { outreach } = await api.draft(leadId, {
         signOff: resolveSignature(profile),
-        offerNotes: profile.defaultOffer.trim() || undefined,
+        offerNotes: getDefaultOffer(profile) || undefined,
         subjectTemplate: profile.subjectTemplate.trim() || undefined,
       });
       patchLeadLocal(leadId, { outreach, status: "queued" });
