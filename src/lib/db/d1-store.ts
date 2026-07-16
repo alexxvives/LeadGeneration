@@ -1,4 +1,5 @@
-import type { Board, Lead, Outreach, Run, Workspace, PlanId, CrmStage, ContactMethod, FollowUp, DeliveryStatus } from "@/lib/types";
+import type { Board, Lead, Outreach, Run, Workspace, PlanId, ContactMethod, FollowUp, DeliveryStatus } from "@/lib/types";
+import { normalizeCrmStage } from "@/lib/types";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -251,7 +252,7 @@ function rowToLead(r: LeadRow): Lead {
     fitReasons: arr(r.fit_reasons),
     sourceUrl: r.source_url,
     status: r.status,
-    crmStage: (r.crm_stage as CrmStage) ?? "new",
+    crmStage: normalizeCrmStage(r.crm_stage),
     contactMethod: (r.contact_method as ContactMethod) ?? null,
     notes: r.notes ?? null,
     followUps: parseFollowUps(r.follow_ups),

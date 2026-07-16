@@ -59,31 +59,35 @@ export function DeveloperModePanel({
 
   return (
     <div className="rounded-xl2 border border-dashed border-amber-400/25 bg-amber-400/[0.03] p-5">
-      <p className="text-xs font-semibold uppercase tracking-widest text-amber-200/70">
-        Developer mode · temporary
-      </p>
-      <p className="mt-1 text-sm text-mist-500">
-        Tools for testing. Will be removed before launch.
-      </p>
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Link
-          href="/app?setup=1"
-          className="inline-flex items-center gap-2 rounded-full border border-aurora-400/30 bg-aurora-400/10 px-4 py-2 text-sm font-medium text-aurora-200 transition-colors hover:bg-aurora-400/15"
-        >
-          <StarIcon className="h-4 w-4" />
-          Replay product tour
-        </Link>
-        <button
-          type="button"
-          onClick={() => void resetCredits()}
-          disabled={resetting}
-          title="Zero lead and send usage counters"
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-mist-200 transition-colors hover:bg-white/5 disabled:opacity-40"
-        >
-          {resetting ? <Spinner className="h-3.5 w-3.5" /> : null}
-          Reset credits
-        </button>
-        <label className="inline-flex items-center gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-amber-200/70">
+            Developer mode · temporary
+          </p>
+          <p className="mt-1 text-sm text-mist-500">
+            Tools for testing. Will be removed before launch.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Link
+              href="/app?setup=1"
+              className="inline-flex items-center gap-2 rounded-full border border-aurora-400/30 bg-aurora-400/10 px-4 py-2 text-sm font-medium text-aurora-200 transition-colors hover:bg-aurora-400/15"
+            >
+              <StarIcon className="h-4 w-4" />
+              Replay product tour
+            </Link>
+            <button
+              type="button"
+              onClick={() => void resetCredits()}
+              disabled={resetting}
+              title="Zero lead and send usage counters"
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-mist-200 transition-colors hover:bg-white/5 disabled:opacity-40"
+            >
+              {resetting ? <Spinner className="h-3.5 w-3.5" /> : null}
+              Reset credits
+            </button>
+          </div>
+        </div>
+        <label className="inline-flex shrink-0 items-center gap-2 sm:pt-0.5">
           <span className="text-xs font-medium text-mist-500">Plan</span>
           <Select
             value={planId}

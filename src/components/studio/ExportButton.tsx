@@ -12,7 +12,6 @@ const STAGE_LABELS: CrmStage[] = [
   "in_conversation",
   "closed",
   "not_interested",
-  "discarded",
 ];
 
 const EMAIL_STATUS_LABELS: LeadStatus[] = [

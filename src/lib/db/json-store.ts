@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { Board, Lead, Outreach, Run, Workspace } from "@/lib/types";
+import { normalizeCrmStage, type Board, type Lead, type Outreach, type Run, type Workspace } from "@/lib/types";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -43,7 +43,7 @@ function normalizeLead(l: Lead): Lead {
   return {
     ...l,
     boardId: typeof raw.boardId === "string" ? raw.boardId : "",
-    crmStage: (raw.crmStage as Lead["crmStage"] | undefined) ?? "new",
+    crmStage: normalizeCrmStage(raw.crmStage),
     contactMethod: (raw.contactMethod as Lead["contactMethod"] | undefined) ?? null,
     notes: (raw.notes as Lead["notes"] | undefined) ?? null,
     followUps: (raw.followUps as Lead["followUps"] | undefined) ?? [],

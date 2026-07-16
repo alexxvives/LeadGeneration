@@ -935,7 +935,6 @@ export function Studio() {
               leads={board!.leads}
               onOpen={openInfo}
               onMoveStage={onMoveStage}
-              onDraft={onDraft}
             />
           </div>
         ) : (
@@ -1107,10 +1106,6 @@ export function Studio() {
                 }}
               />
             </div>
-            <p className="mt-3 flex items-center gap-2 text-xs text-mist-500">
-              <Spinner className="h-3.5 w-3.5 text-aurora-300" />
-              Then we&apos;ll open the Leads table.
-            </p>
           </div>
         </div>
       )}

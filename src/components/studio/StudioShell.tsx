@@ -179,53 +179,76 @@ export function StudioShell({
   const userEmail = (session?.user?.email as string | undefined) ?? null;
   const settingsActive = pathname.startsWith("/app/settings");
 
-  const nav: {
-    href: string;
+  const navSections: {
     label: string;
-    icon: Icon;
-    active: boolean;
+    items: {
+      href: string;
+      label: string;
+      icon: Icon;
+      active: boolean;
+    }[];
   }[] = [
     {
-      href: "/app?view=dashboard",
-      label: "Dashboard",
-      icon: DashboardIcon,
-      active: pathname === "/app" && view === "dashboard",
+      label: "Overview",
+      items: [
+        {
+          href: "/app?view=dashboard",
+          label: "Dashboard",
+          icon: DashboardIcon,
+          active: pathname === "/app" && view === "dashboard",
+        },
+      ],
     },
     {
-      href: "/app",
-      label: "Search",
-      icon: SearchIcon,
-      active: pathname === "/app" && !view,
+      label: "Find",
+      items: [
+        {
+          href: "/app",
+          label: "Search",
+          icon: SearchIcon,
+          active: pathname === "/app" && !view,
+        },
+        {
+          href: "/app?view=leads",
+          label: "Leads",
+          icon: UsersIcon,
+          active: pathname === "/app" && view === "leads",
+        },
+      ],
     },
     {
-      href: "/app?view=pipeline",
-      label: "Pipeline",
-      icon: PipelineIcon,
-      active: pathname === "/app" && view === "pipeline",
+      label: "Engage",
+      items: [
+        {
+          href: "/app?view=pipeline",
+          label: "Pipeline",
+          icon: PipelineIcon,
+          active: pathname === "/app" && view === "pipeline",
+        },
+        {
+          href: "/app?view=outreach",
+          label: "Outreach",
+          icon: MailIcon,
+          active: pathname === "/app" && view === "outreach",
+        },
+      ],
     },
     {
-      href: "/app?view=leads",
-      label: "Leads",
-      icon: UsersIcon,
-      active: pathname === "/app" && view === "leads",
-    },
-    {
-      href: "/app?view=outreach",
-      label: "Outreach",
-      icon: MailIcon,
-      active: pathname === "/app" && view === "outreach",
-    },
-    {
-      href: "/app?view=runs",
-      label: "Runs",
-      icon: HistoryIcon,
-      active: pathname === "/app" && view === "runs",
-    },
-    {
-      href: "/app?view=boards",
-      label: "Boards",
-      icon: BoardsIcon,
-      active: pathname === "/app" && view === "boards",
+      label: "Organize",
+      items: [
+        {
+          href: "/app?view=boards",
+          label: "Boards",
+          icon: BoardsIcon,
+          active: pathname === "/app" && view === "boards",
+        },
+        {
+          href: "/app?view=runs",
+          label: "Runs",
+          icon: HistoryIcon,
+          active: pathname === "/app" && view === "runs",
+        },
+      ],
     },
   ];
 
@@ -246,31 +269,35 @@ export function StudioShell({
           </span>
         </Link>
 
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
-          <p className="mb-1 hidden px-3 text-[10px] uppercase tracking-wider text-mist-500 sm:block">
-            Workspace
-          </p>
-          {nav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={boardHref(item.href)}
-                className={`group flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors sm:justify-start ${
-                  item.active
-                    ? "bg-aurora-400/10 text-aurora-300"
-                    : "text-mist-300 hover:bg-white/5 hover:text-mist-100"
-                }`}
-              >
-                <Icon
-                  className={`h-5 w-5 shrink-0 transition-transform duration-300 ease-out group-hover:scale-125 group-hover:-translate-y-0.5 group-hover:rotate-[-6deg] ${
-                    item.active ? "text-aurora-300" : "text-mist-500 group-hover:text-aurora-300"
-                  }`}
-                />
-                <span className="hidden sm:inline">{item.label}</span>
-              </Link>
-            );
-          })}
+        <nav className="flex flex-1 flex-col gap-4 overflow-y-auto">
+          {navSections.map((section) => (
+            <div key={section.label} className="flex flex-col gap-1">
+              <p className="mb-0.5 hidden px-3 text-[10px] uppercase tracking-wider text-mist-500 sm:block">
+                {section.label}
+              </p>
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={boardHref(item.href)}
+                    className={`group flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors sm:justify-start ${
+                      item.active
+                        ? "bg-aurora-400/10 text-aurora-300"
+                        : "text-mist-300 hover:bg-white/5 hover:text-mist-100"
+                    }`}
+                  >
+                    <Icon
+                      className={`h-5 w-5 shrink-0 transition-transform duration-300 ease-out group-hover:scale-125 group-hover:-translate-y-0.5 group-hover:rotate-[-6deg] ${
+                        item.active ? "text-aurora-300" : "text-mist-500 group-hover:text-aurora-300"
+                      }`}
+                    />
+                    <span className="hidden sm:inline">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Board filter + account card */}

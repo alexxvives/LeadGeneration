@@ -123,13 +123,6 @@ export default async function SettingsPage({
 
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Developer mode
-        </h2>
-        <DeveloperModePanel metered={usage.metered} currentPlanId={usage.planId} />
-      </section>
-
-      <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Resources
         </h2>
         <div className="overflow-hidden rounded-xl2 border border-white/10">
@@ -199,6 +192,13 @@ export default async function SettingsPage({
             </div>
           )}
         </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Developer mode
+        </h2>
+        <DeveloperModePanel metered={usage.metered} currentPlanId={usage.planId} />
       </section>
     </main>
   );

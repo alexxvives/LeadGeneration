@@ -12,7 +12,6 @@ const STAGE_LABELS: Record<CrmStage, string> = {
   in_conversation: "In conversation",
   closed: "Closed",
   not_interested: "Not interested",
-  discarded: "Discarded",
 };
 
 const STAGE_COLORS: Record<CrmStage, string> = {
@@ -21,7 +20,6 @@ const STAGE_COLORS: Record<CrmStage, string> = {
   in_conversation: "bg-amber-400",
   closed: "bg-emerald-400",
   not_interested: "bg-rose-400/70",
-  discarded: "bg-mist-600",
 };
 
 function BarChart({

@@ -13,8 +13,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
-import { Spinner } from "@/components/ui";
-import { SparkIcon, MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
+import { MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
 import { displayWebsite } from "@/lib/website";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
@@ -63,12 +62,6 @@ const PARKED_COLUMNS: {
     empty: "Move here when they decline.",
     color: "bg-rose-400",
   },
-  {
-    stage: "discarded",
-    title: "Discarded",
-    empty: "Move bad-fit or incorrect leads here.",
-    color: "bg-mist-600",
-  },
 ];
 
 /** Card subtitle: website host — not email or street address. */
@@ -82,7 +75,6 @@ export function PipelineView({
   leads,
   onOpen,
   onMoveStage,
-  onDraft,
 }: {
   leads: LeadWithOutreach[];
   onOpen: (id: string) => void;
@@ -91,9 +83,7 @@ export function PipelineView({
     stage: CrmStage,
     contactMethod?: ContactMethod | null,
   ) => void;
-  onDraft: (leadId: string) => Promise<void>;
 }) {
-  const [draftingAll, setDraftingAll] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pendingRevert, setPendingRevert] = useState<{
     leadId: string;
@@ -101,10 +91,7 @@ export function PipelineView({
   } | null>(null);
   const [parkedOpen, setParkedOpen] = useState<Record<string, boolean>>({
     not_interested: false,
-    discarded: false,
   });
-
-  const undraftedLeads = leads.filter((l) => l.status === "new" && !l.outreach && l.emails.length > 0);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -141,24 +128,6 @@ export function PipelineView({
 
     onMoveStage(String(active.id), newStage);
   }
-
-  const draftAll = async () => {
-    setDraftingAll(true);
-    for (const l of undraftedLeads) await onDraft(l.id);
-    setDraftingAll(false);
-  };
-
-  const newHeaderActions = undraftedLeads.length > 0 ? (
-    <button
-      type="button"
-      onClick={() => void draftAll()}
-      disabled={draftingAll}
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100 disabled:opacity-50"
-    >
-      {draftingAll ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3 w-3 text-aurora-300" />}
-      Draft all ({undraftedLeads.length})
-    </button>
-  ) : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -217,13 +186,12 @@ export function PipelineView({
                   leads={colLeads}
                   onOpen={onOpen}
                   activeId={activeId}
-                  headerActions={col.stage === "new" ? newHeaderActions : null}
                 />
               );
             })}
           </div>
 
-          <div className="grid shrink-0 gap-2 sm:grid-cols-2">
+          <div className="grid shrink-0 gap-2 sm:grid-cols-1">
             {PARKED_COLUMNS.map((col) => {
               const colLeads = leads.filter((l) => l.crmStage === col.stage);
               const open = parkedOpen[col.stage] ?? false;
@@ -295,14 +263,12 @@ function PipelineColumn({
   leads,
   onOpen,
   activeId,
-  headerActions,
   compact,
 }: {
   col: (typeof MAIN_COLUMNS)[number] | (typeof PARKED_COLUMNS)[number];
   leads: LeadWithOutreach[];
   onOpen: (id: string) => void;
   activeId: string | null;
-  headerActions?: React.ReactNode;
   compact?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.stage });
@@ -318,9 +284,6 @@ function PipelineColumn({
       <div className="flex min-h-[2.75rem] shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2.5 sm:px-4">
         <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
         <h3 className="truncate text-sm font-semibold leading-none text-mist-100">{col.title}</h3>
-        {headerActions && (
-          <div className="flex shrink-0 items-center gap-1">{headerActions}</div>
-        )}
         <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
           {leads.length}
         </span>

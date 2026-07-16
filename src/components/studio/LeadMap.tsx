@@ -26,10 +26,8 @@ const STAGE_PIN: Record<CrmStage, { fill: string; glow: string; label: string }>
   in_conversation: { fill: "#38bdf8", glow: "rgba(56,189,248,0.4)", label: "In Conversation" },
   closed: { fill: "#7ff2c8", glow: "rgba(127,242,200,0.45)", label: "Closed" },
   not_interested: { fill: "#fb7185", glow: "rgba(251,113,133,0.4)", label: "Not Interested" },
-  discarded: { fill: "#5c6b82", glow: "rgba(92,107,130,0.35)", label: "Discarded" },
 };
 
-/** Discarded leads are parked off the map (same idea as collapsed pipeline columns). */
 const LEGEND_ORDER: CrmStage[] = [
   "new",
   "contacted",
@@ -109,10 +107,7 @@ export function LeadMap({
   const [loadingPins, setLoadingPins] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
 
-  const mapLeads = useMemo(
-    () => leads.filter((l) => (l.crmStage ?? "new") !== "discarded"),
-    [leads],
-  );
+  const mapLeads = leads;
 
   const hint = useMemo(
     () =>

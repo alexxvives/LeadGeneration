@@ -15,7 +15,6 @@ const STAGE_OPTIONS: CrmStage[] = [
   "in_conversation",
   "closed",
   "not_interested",
-  "discarded",
 ];
 
 export function LeadTable({

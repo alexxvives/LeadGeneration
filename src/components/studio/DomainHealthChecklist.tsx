@@ -37,10 +37,10 @@ function statusTone(status: DomainDnsRecord["status"]) {
 }
 
 /**
- * Hero of Easy Sending: live Resend DNS rows + poll, with manual fallback when
- * no API key (demo-safe). Uses the saved workspace From email from the API.
+ * Easy Sending: live Resend DNS rows + poll, with manual fallback when
+ * no API key (demo-safe). Compact mode fits inside the sending-identity card.
  */
-export function DomainHealthPanel() {
+export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
   const [health, setHealth] = useState<DomainHealthResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +112,82 @@ export function DomainHealthPanel() {
   };
 
   const showManual = !health || health.mode === "demo" || health.records.length === 0;
+
+  if (compact) {
+    const statusLabel = health?.ready
+      ? "Ready to send"
+      : health?.domain
+        ? `DNS for ${health.domain}`
+        : "Verify sending domain";
+    return (
+      <div className="rounded-lg border border-white/8 bg-ink-950/40 px-3 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-mist-500">
+              Domain health
+            </p>
+            <p className="mt-0.5 text-sm text-mist-200">{statusLabel}</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-mist-500">
+              {health?.message ??
+                "Add SPF / DKIM at your DNS host — we poll Resend until they verify."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void poll()}
+            disabled={loading}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-mist-200 hover:bg-white/5 disabled:opacity-50"
+          >
+            {loading ? <Spinner className="h-3 w-3" /> : null}
+            {loading ? "Checking…" : "Poll"}
+          </button>
+        </div>
+        {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
+        {health && health.records.length > 0 ? (
+          <ul className="mt-2 space-y-1">
+            {health.records.map((r, i) => (
+              <li
+                key={`${r.name}-${r.type}-${i}`}
+                className="flex items-center gap-2 text-[11px] text-mist-400"
+              >
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  r.status === "verified" ? "bg-aurora-400" : "bg-mist-600"
+                }`} />
+                <span className="truncate text-mist-300">{r.record}</span>
+                <span className="ml-auto shrink-0 uppercase tracking-wider text-mist-600">
+                  {r.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {showManual ? (
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 border-t border-white/5 pt-2">
+            {(
+              [
+                { key: "spf" as const, label: "SPF" },
+                { key: "dkim" as const, label: "DKIM" },
+                { key: "dmarc" as const, label: "DMARC" },
+              ] as const
+            ).map(({ key, label }) => (
+              <label
+                key={key}
+                className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] text-mist-400"
+              >
+                <input
+                  type="checkbox"
+                  checked={manual[key]}
+                  onChange={() => toggleManual(key)}
+                  className="rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-hidden rounded-xl2 border border-aurora-400/20 bg-aurora-400/[0.03]">

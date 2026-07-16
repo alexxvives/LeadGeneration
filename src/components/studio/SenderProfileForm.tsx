@@ -486,9 +486,6 @@ export function SenderProfileForm() {
             <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-xs font-medium text-mist-500">
                 Email subject template
-                <span className="ml-1.5 font-normal text-mist-600">
-                  · {langLabel(previewLang)}
-                </span>
               </span>
               <span
                 className="group relative inline-flex"
@@ -527,8 +524,21 @@ export function SenderProfileForm() {
             <div className="mb-1.5 flex min-w-0 flex-wrap items-center justify-between gap-2">
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-mist-500">
                 Email body template
-                <span className="font-normal text-mist-600">
-                  · {langLabel(previewLang)} version
+                <span
+                  className="group relative inline-flex"
+                  title="Write the email body; use placeholders for personalization"
+                >
+                  <HelpIcon className="h-3.5 w-3.5 text-mist-500 transition-colors group-hover:text-mist-300" />
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                  >
+                    Your pitch paragraph. Placeholders:{" "}
+                    <code className="text-aurora-300">{"{company}"}</code>,{" "}
+                    <code className="text-aurora-300">{"{lead_name}"}</code>,{" "}
+                    <code className="text-aurora-300">{"{location}"}</code>. Switch
+                    the preview flag to translate into another language.
+                  </span>
                 </span>
                 <SavedHint field="pitch" />
               </span>
@@ -628,6 +638,19 @@ export function SenderProfileForm() {
           <label className="block">
             <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-xs font-medium text-mist-500">Email sign-off</span>
+              <span
+                className="group relative inline-flex"
+                title="Closing lines appended after the body"
+              >
+                <HelpIcon className="h-3.5 w-3.5 text-mist-500 transition-colors group-hover:text-mist-300" />
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-mist-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                >
+                  Closing lines after the body (e.g. Best regards, your name,
+                  title). Shown on every draft from this profile.
+                </span>
+              </span>
               <SavedHint field="signOff" />
             </div>
             <textarea

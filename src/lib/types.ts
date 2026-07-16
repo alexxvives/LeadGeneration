@@ -33,8 +33,24 @@ export type CrmStage =
   | "contacted"      // first outreach sent
   | "in_conversation" // they replied / active dialogue
   | "closed"         // won — became a client
-  | "not_interested" // lost — prospect declined
-  | "discarded";     // bad fit / incorrect lead — parked without outreach
+  | "not_interested"; // lost — prospect declined
+
+const CRM_STAGES: readonly CrmStage[] = [
+  "new",
+  "contacted",
+  "in_conversation",
+  "closed",
+  "not_interested",
+] as const;
+
+/** Coerce persisted/legacy stage strings (e.g. old `discarded`) into a valid CrmStage. */
+export function normalizeCrmStage(raw: unknown): CrmStage {
+  if (raw === "discarded") return "not_interested";
+  if (typeof raw === "string" && (CRM_STAGES as readonly string[]).includes(raw)) {
+    return raw as CrmStage;
+  }
+  return "new";
+}
 
 /** How a prospect was first reached. Set when crmStage → "contacted". */
 export type ContactMethod = "email" | "phone" | "contact_form";

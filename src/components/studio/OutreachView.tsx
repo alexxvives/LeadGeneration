@@ -61,7 +61,7 @@ const BUCKET_META: Record<
 
 /**
  * Compact 3-column send queue: Review → Ready → Contacted.
- * No-email leads can be marked contacted via phone / contact form.
+ * No-email leads can be marked contacted via phone / contact form (Ready).
  */
 export function OutreachView({
   leads,
@@ -138,7 +138,7 @@ export function OutreachView({
                       ) : (
                         <CheckIcon className="h-3 w-3" />
                       )}
-                      Create Draft
+                      Draft all
                     </button>
                   ) : null}
                   {key === "ready" && rows.length > 0 ? (
@@ -232,20 +232,33 @@ function OutreachRow({
 
   return (
     <li className="flex items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03]">
-      <button
-        type="button"
-        onClick={onOpenInfo}
-        className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-1 focus-visible:ring-aurora-400/50"
-        aria-label={`Lead info for ${lead.company}`}
-      >
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1">
-          <span className="truncate text-sm font-medium text-mist-100">{lead.company}</span>
-          <InfoIcon className="h-3 w-3 shrink-0 text-mist-600" aria-hidden />
+          <button
+            type="button"
+            onClick={onOpenDraft}
+            className="min-w-0 truncate rounded-md text-left text-sm font-medium text-mist-100 outline-none hover:text-aurora-200 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
+          >
+            {lead.company}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenInfo}
+            className="shrink-0 rounded p-0.5 text-mist-600 outline-none hover:bg-white/5 hover:text-mist-300 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
+            aria-label={`Lead info for ${lead.company}`}
+            title="Lead info"
+          >
+            <InfoIcon className="h-3 w-3" />
+          </button>
         </div>
-        <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-mist-500">
+        <button
+          type="button"
+          onClick={onOpenDraft}
+          className="mt-0.5 flex w-full min-w-0 items-center gap-1 truncate rounded-md text-left text-[11px] text-mist-500 outline-none hover:text-mist-300 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
+        >
           <MailIcon className="h-3 w-3 shrink-0" />
           <span className="truncate">{email ?? "No email"}</span>
-        </p>
+        </button>
         {lead.outreach?.status === "failed" && lead.outreach.error ? (
           <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
         ) : null}
@@ -255,57 +268,30 @@ function OutreachRow({
         {bucket === "contacted" && methodLabel ? (
           <p className="mt-1 text-[10px] text-amber-200/70">{methodLabel}</p>
         ) : null}
-      </button>
+      </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
         <div className="origin-right scale-90">
           <FitMeter score={lead.fitScore} />
         </div>
         {bucket === "review" && (
-          <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center justify-end gap-1">
-              {email ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void onDraft()}
-                  className={`${ACTION_BTN} border border-aurora-400/40 text-aurora-300 hover:bg-aurora-400/10 disabled:opacity-50`}
-                >
-                  {busy ? <Spinner className="h-2.5 w-2.5" /> : "Draft"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setPickingMethod((v) => !v)}
-                  className={`${ACTION_BTN} border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 disabled:opacity-50`}
-                >
-                  Log contact
-                </button>
-              )}
-            </div>
-            {pickingMethod && !email ? (
-              <div className="flex flex-wrap justify-end gap-1">
-                {(
-                  [
-                    ["phone", "Called"],
-                    ["contact_form", "Form"],
-                  ] as const
-                ).map(([method, label]) => (
-                  <button
-                    key={method}
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      setPickingMethod(false);
-                      void onMarkContacted(method);
-                    }}
-                    className={`${ACTION_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-100 disabled:opacity-50`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+          <div className="flex items-center justify-end gap-1">
+            <button
+              type="button"
+              onClick={onOpenDraft}
+              className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
+            >
+              Create
+            </button>
+            <button
+              type="button"
+              disabled={busy || !email}
+              onClick={() => void onDraft()}
+              aria-label="Create draft"
+              title={email ? "Create draft" : "Needs an email to draft"}
+              className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
+            >
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
+            </button>
           </div>
         )}
         {bucket === "ready" && (

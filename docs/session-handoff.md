@@ -9,18 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-16 (fit score + delete/import UX)
+## ⏱️ Status — updated 2026-07-16 (studio UX polish + fit score)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Fit score rewritten: starts at 0; contactability + niche tokens + location
-  (no +40 “search match” freebie). Imports use same rubric.
-- Pipeline: no “How did you reach them?” on drag to Contacted; New cards stay
-  compact; lead info drawer ~20% wider.
-- Bulk delete + cancel in-flight CSV imports; clearer “already in workspace”
-  import toast. Settings key help top-right; eye hidden on saved keys.
+- Pipeline: removed Draft all; removed Discarded stage (delete instead; legacy
+  `discarded` → `not_interested` on read).
+- Outreach: Contact Draft has Create + amber arrow; row click opens draft
+  drawer; info icon opens info; header “Draft all”; no Log contact in Contact Draft.
+- Settings: lang labels cleaned on templates; ? help on body/sign-off; domain
+  health inside sending-identity; Developer mode last with plan on the right.
+- Side nav grouped (Overview / Find / Engage / Organize). Fit score is
+  relevance-first (niche+location), contactability scaled when match is weak.
 
 ### Next
 1. Point Maileroo/Resend dashboards at the webhook URL in Settings → Easy.

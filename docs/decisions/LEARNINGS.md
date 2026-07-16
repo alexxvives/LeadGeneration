@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-16 — Studio UX polish + relevance-first fit
+- Discarded CRM stage removed — delete covers bad leads; `normalizeCrmStage`
+  maps legacy `discarded` → `not_interested`.
+- Outreach Contact Draft mirrors Ready controls (Create + amber arrow); card
+  click → draft drawer, info icon → info. Pipeline no longer has Draft all.
+- Fit score: niche/location spine; contactability scaled down when relevance
+  is weak (no free points for “search hit”).
+
 ### 2026-07-16 — Fit score from zero + delete vs stuck import
 - Fit score must not give a free ~40 for “appeared in search”; start at 0 and
   score contactability + niche token hits + location (`scoreImportedLead` for CSV).

@@ -521,7 +521,6 @@ export async function getDashboardStats(
     in_conversation: 0,
     closed: 0,
     not_interested: 0,
-    discarded: 0,
   };
   const byStatus: Record<string, number> = {};
   for (const l of allLeads) {

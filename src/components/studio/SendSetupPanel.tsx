@@ -147,42 +147,37 @@ export function SendSetupPanel({
       </div>
 
       {path === "easy" ? (
-        <div className="space-y-6">
-          <div
-            id="sending-identity"
-            className="scroll-mt-8 rounded-xl2 border border-white/10 p-5"
-            data-tour="sending-identity"
-          >
-            <h3 className="mb-4 text-sm font-semibold text-mist-100">Sending identity</h3>
-            <EmailSettingsForm
-              initial={initial}
-              defaults={defaults}
-              canEdit={canEdit}
-              variant="easy"
-              easyProvider={easyProvider}
-              onEasyProviderChange={setEasyProvider}
-            />
-          </div>
-
+        <div
+          id="sending-identity"
+          className="scroll-mt-8 rounded-xl2 border border-white/10 p-5"
+          data-tour="sending-identity"
+        >
+          <h3 className="mb-4 text-sm font-semibold text-mist-100">Sending identity</h3>
+          <EmailSettingsForm
+            initial={initial}
+            defaults={defaults}
+            canEdit={canEdit}
+            variant="easy"
+            easyProvider={easyProvider}
+            onEasyProviderChange={setEasyProvider}
+          />
           {isMaileroo ? (
-            <div className="rounded-xl2 border border-white/10 bg-ink-900/40 px-5 py-4 text-sm text-mist-300">
-              <p className="font-medium text-mist-100">Domain checklist (Maileroo)</p>
-              <p className="mt-1 text-mist-500">
-                Open your domain in the{" "}
-                <a
-                  href="https://maileroo.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-aurora-300 hover:underline"
-                >
-                  Maileroo dashboard
-                </a>
-                , copy SPF / DKIM / DMARC into your DNS host, and wait until Maileroo marks
-                the domain verified.
-              </p>
-            </div>
+            <p className="mt-4 text-xs leading-relaxed text-mist-500">
+              Domain DNS: in the{" "}
+              <a
+                href="https://maileroo.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-aurora-300 hover:underline"
+              >
+                Maileroo dashboard
+              </a>
+              , add SPF / DKIM / DMARC at your DNS host, then wait for verified.
+            </p>
           ) : (
-            <DomainHealthPanel />
+            <div className="mt-4">
+              <DomainHealthPanel compact />
+            </div>
           )}
         </div>
       ) : (
