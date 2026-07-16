@@ -9,23 +9,22 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-16 (Zeruh toggle + outreach UX)
+## ⏱️ Status — updated 2026-07-16 (draft UX + verify key)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Removed Maileroo “Domain DNS…” blurb; Easy path has Zeruh **verify emails**
-  toggle + credits bar (Leads/Sends/Verifies). Migration `0014_email_verify_enabled`.
-- Pitch preview `<br>` fix; AI personalize moved under preview; “No draft yet”
-  removed; Runs is informational only; active profile shown on Search/Outreach.
-- Drafts sync to Search’s selected profile (`setActiveOutreachProfile`).
+- Pitch preview linebreak fix (contenteditable text + `<div>` lines).
+- Sidebar **Outreach profile** dropdown (like Board); removed banner.
+- Drafts use active profile’s primary (`en`) pitch — not stale location `es`.
+- Contact Draft: unapproved stays; button `Create` → `Review`; Ready = approved.
+- Docs: `MAILEROO_VERIFY_API_KEY` on Wrangler secrets checklist.
 
 ### Next
-1. Apply D1 migration `0014` on prod (`npm run cf:migrate`) before deploy.
+1. Apply D1 migration `0014` on prod if not done (`npm run cf:migrate`).
 2. Soft-cap warning popup on send; Microsoft Graph Mail.Send.
-3. Confirm `MAILEROO_VERIFY_API_KEY` in prod Wrangler secrets.
-4. Deploy when user asks.
+3. Deploy when user asks (`MAILEROO_VERIFY_API_KEY` is now on the Worker).
 
 ---
 

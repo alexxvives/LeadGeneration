@@ -265,11 +265,12 @@ export function generateDraft(
   const copy = COPY[lang];
   const name = firstName(lead);
   const company = shortCompany(lead);
-  // Prefer explicit overrides (incl. empty string) so an updated/cleared profile
-  // never falls back to a stale run.offerNotes from search time.
+  // Prefer explicit string overrides (incl. "") so an updated/cleared profile
+  // never falls back to a stale run.offerNotes from search time. Ignore
+  // `offerNotes: undefined` from thin route spreads.
   const offerRaw =
-    overrides && "offerNotes" in overrides
-      ? (overrides.offerNotes ?? "").trim()
+    overrides && typeof overrides.offerNotes === "string"
+      ? overrides.offerNotes.trim()
       : run.offerNotes?.trim() || "";
   const nicheHint = run.niche.trim();
   // Sign-off comes from the outreach profile only — never inbox From name.

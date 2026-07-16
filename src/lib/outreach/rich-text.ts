@@ -66,6 +66,34 @@ export function sanitizePitchHtml(html: string): string {
   const root = doc.body.firstElementChild;
   if (!root) return "";
 
+  /**
+   * contenteditable often keeps the first line as a bare text node, then wraps
+   * later lines in <div>/<p>. Without a break before those blocks, the preview
+   * concatenates ("Hello!Next sentence"). Empty blocks are blank lines.
+   */
+  const walkChildren = (parent: Element): string => {
+    let out = "";
+    let prev = "";
+    for (const node of Array.from(parent.childNodes)) {
+      const chunk = walk(node);
+      if (!chunk) continue;
+      const block =
+        node.nodeType === Node.ELEMENT_NODE &&
+        ["DIV", "P"].includes((node as Element).tagName);
+      if (
+        block &&
+        prev &&
+        !/(?:<br\s*\/?>\s*)$/i.test(prev) &&
+        !/^<(?:ul|ol|li)\b/i.test(chunk)
+      ) {
+        out += "<br>";
+      }
+      out += chunk;
+      prev = chunk;
+    }
+    return out;
+  };
+
   const walk = (node: Node): string => {
     if (node.nodeType === Node.TEXT_NODE) {
       return node.textContent ?? "";
@@ -74,22 +102,23 @@ export function sanitizePitchHtml(html: string): string {
     const el = node as Element;
     const tag = el.tagName;
     if (!ALLOWED.has(tag)) {
-      return Array.from(el.childNodes).map(walk).join("");
+      return walkChildren(el);
     }
     if (tag === "BR") return "<br>";
-    const inner = Array.from(el.childNodes).map(walk).join("");
+    const inner = walkChildren(el);
     const t = tag.toLowerCase();
     if (t === "span") return inner;
-    // Preserve line breaks from pasted block containers (Word/Docs/etc.).
+    // Preserve line breaks from pasted / contenteditable block containers.
     if (t === "div" || t === "p") {
-      if (!inner.trim()) return "";
+      // Empty block = intentional blank line (Enter on empty line).
+      if (!inner.trim()) return "<br>";
       return `${inner}<br>`;
     }
     if (t === "li") return `<li>${inner}</li>`;
     return `<${t}>${inner}</${t}>`;
   };
 
-  return tidyBreaks(Array.from(root.childNodes).map(walk).join(""));
+  return tidyBreaks(walkChildren(root));
 }
 
 /**

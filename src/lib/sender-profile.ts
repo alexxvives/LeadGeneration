@@ -151,28 +151,30 @@ export function subjectForLang(
 }
 
 /**
- * Language for drafting: prefer the lead's location language when a pitch exists
- * there; otherwise follow the profile's primary pitch language so subject + body
- * stay in the same language (avoids EN subject + ES body).
+ * Language for drafting from the active profile.
+ * Prefer the profile's primary template slot (Settings defaults to English) so
+ * drafts match what the user is editing — not a stale secondary language left
+ * from an old translate (e.g. Catalonia lead → old `es` while they edit `en`).
  */
 export function resolveDraftLang(
   p: OutreachProfile,
   location: string | null | undefined,
 ): OutreachLang {
-  const locLang = outreachLangFromLocation(location ?? null);
-  if (p.pitches[locLang]?.trim()) return locLang;
-  return primaryPitchLang(p) ?? locLang;
+  return primaryPitchLang(p) ?? outreachLangFromLocation(location ?? null);
 }
 
-/** Primary pitch language (first non-empty, preferring detected). */
+/**
+ * Primary pitch language = the template slot the user is maintaining.
+ * Prefer `en` when set (Settings preview default), else first non-empty slot.
+ * Do not jump to another slot just because content language was detected
+ * (Spanish text stored under `en` must keep using `en`).
+ */
 export function primaryPitchLang(p: OutreachProfile): OutreachLang | null {
-  const entries = (Object.entries(p.pitches) as [OutreachLang, string][]).filter(
-    ([, t]) => t.trim(),
-  );
-  if (entries.length === 0) return null;
-  const detected = outreachLangFromText(entries[0]![1]);
-  if (p.pitches[detected]?.trim()) return detected;
-  return entries[0]![0];
+  const order: OutreachLang[] = ["en", "es", "fr", "it", "de", "pt", "pl"];
+  for (const lang of order) {
+    if (p.pitches[lang]?.trim()) return lang;
+  }
+  return null;
 }
 
 function migrateLegacySingle(raw: string): ProfileStore {

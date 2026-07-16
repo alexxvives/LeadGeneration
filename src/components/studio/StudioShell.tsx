@@ -18,6 +18,7 @@ import {
   loadStoredBoardFilter,
   storeBoardFilter,
 } from "@/components/studio/BoardPicker";
+import { ProfilePicker } from "@/components/studio/ProfilePicker";
 import { api } from "@/lib/client-api";
 import type { BoardSummary } from "@/lib/types";
 import {
@@ -300,13 +301,14 @@ export function StudioShell({
           ))}
         </nav>
 
-        {/* Board filter + account card */}
+        {/* Board + outreach profile filters + account card */}
         <div className="mt-auto border-t border-white/5 pt-4">
           <BoardPicker
             boards={boards}
             activeBoardId={activeBoardId}
             onChange={setBoardFilter}
           />
+          <ProfilePicker />
 
           <div className="hidden sm:block">
             <Link

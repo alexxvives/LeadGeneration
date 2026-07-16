@@ -23,18 +23,14 @@ function isContacted(lead: LeadWithOutreach): boolean {
 function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   if (isContacted(lead)) return "contacted";
   const o = lead.outreach;
-  // Drafts (and approved/retry) live in Ready to Contact.
-  if (
-    o &&
-    (o.status === "draft" ||
-      o.status === "approved" ||
-      o.status === "rejected" ||
-      o.status === "failed")
-  ) {
+  // Ready only after explicit Approve (closing the draft popup is not enough).
+  if (o?.status === "approved" || o?.status === "failed") {
     return "ready";
   }
-  // No draft yet — Contact Draft column (incl. no-email leads).
-  if (!o) return "review";
+  // No draft, unapproved draft, or rejected — stay in Contact Draft.
+  if (!o || o.status === "draft" || o.status === "rejected") {
+    return "review";
+  }
   return null;
 }
 
@@ -44,13 +40,13 @@ const BUCKET_META: Record<
 > = {
   review: {
     title: "Contact Draft",
-    hint: "Create a draft from your outreach profile",
-    empty: "All leads with email already have a draft.",
+    hint: "Create or review a draft — Approve moves it to Ready",
+    empty: "All leads here are approved or already contacted.",
   },
   ready: {
     title: "Ready to Contact",
-    hint: "Edit if needed, then send (or log a call/form)",
-    empty: "No drafts yet — create some from Contact Draft.",
+    hint: "Approved drafts — edit if needed, then send",
+    empty: "Approve a draft in Contact Draft to move it here.",
   },
   contacted: {
     title: "Contacted",
@@ -129,7 +125,7 @@ export function OutreachView({
                     </h3>
                     <p className="mt-0.5 text-[11px] text-mist-600">{meta.hint}</p>
                   </div>
-                  {key === "review" && rows.length > 0 ? (
+                  {key === "review" && rows.some((l) => !l.outreach) ? (
                     <button
                       type="button"
                       onClick={() => void onDraftAll()}
@@ -236,10 +232,16 @@ function OutreachRow({
           ? "Emailed"
           : null;
 
-  // Contact Draft: draft first, then open. Ready/Contacted: open existing.
+  const hasDraft = Boolean(lead.outreach);
+  // Contact Draft: create when missing; reopen existing unapproved drafts.
+  // Ready/Contacted: open existing.
   const openComposer = () => {
-    if (bucket === "review") void onCreateDraft();
-    else onOpenDraft();
+    if (bucket === "review") {
+      if (hasDraft) onOpenDraft();
+      else void onCreateDraft();
+      return;
+    }
+    onOpenDraft();
   };
 
   return (
@@ -287,21 +289,45 @@ function OutreachRow({
             <button
               type="button"
               disabled={busy}
-              onClick={() => void onCreateDraft()}
+              onClick={() => {
+                if (hasDraft) onOpenDraft();
+                else void onCreateDraft();
+              }}
+              aria-label={hasDraft ? "Review draft" : "Create draft"}
+              title={
+                hasDraft
+                  ? "Review draft — Approve to move to Ready"
+                  : email
+                    ? "Create draft from active profile"
+                    : "Create draft (add email in the composer if needed)"
+              }
               className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
             >
-              {busy ? <Spinner className="h-2.5 w-2.5" /> : "Create"}
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : hasDraft ? "Review" : "Create"}
             </button>
-            <button
-              type="button"
-              disabled={busy || !email}
-              onClick={() => void onDraft()}
-              aria-label="Create draft"
-              title={email ? "Create draft" : "Needs an email to draft"}
-              className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
-            >
-              {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
-            </button>
+            {!hasDraft ? (
+              <button
+                type="button"
+                disabled={busy || !email}
+                onClick={() => void onDraft()}
+                aria-label="Create draft"
+                title={email ? "Create draft" : "Needs an email to draft"}
+                className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
+              >
+                {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onOpenDraft}
+                aria-label="Open draft"
+                title="Open draft to review and approve"
+                className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
+              >
+                {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
+              </button>
+            )}
           </div>
         )}
         {bucket === "ready" && (

@@ -30,9 +30,13 @@ export async function POST(req: Request) {
   }
 
   const ctx = await getCtx();
+  // Always forward offerNotes when the client sent it (incl. "") so drafting
+  // uses the active profile pitch — never a stale run.offerNotes from search.
   const outreach = await draftOutreach(ctx, parsed.data.leadId, {
     signOff: parsed.data.signOff,
-    offerNotes: parsed.data.offerNotes,
+    ...(typeof parsed.data.offerNotes === "string"
+      ? { offerNotes: parsed.data.offerNotes }
+      : {}),
     subjectTemplate: parsed.data.subjectTemplate,
     staticBody: parsed.data.staticBody,
     aiPersonalize: parsed.data.aiPersonalize,

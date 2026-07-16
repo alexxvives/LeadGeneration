@@ -4,6 +4,19 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-16 — Draft buckets, profile picker, pitch breaks
+- Contact Draft keeps unapproved drafts (`Create` → `Review`); Ready = approved
+  only. Closing the draft drawer without Approve must not advance the column.
+- Sidebar `ProfilePicker` (next to Board) is the active outreach profile; removed
+  the “drafts use this profile’s current pitch” banner.
+- `resolveDraftLang` / `primaryPitchLang` prefer the `en` (Settings) slot — do
+  not jump to a stale `es` pitch because content was detected as Spanish or the
+  lead is in Catalonia.
+- contenteditable: first line is often a bare text node + later `<div>`s —
+  sanitize must insert `<br>` before those blocks or preview concatenates lines.
+- Mailgun Validate (and similar) are not free at volume; stick with Zeruh via
+  `MAILEROO_VERIFY_API_KEY` (already wired at send).
+
 ### 2026-07-16 — Zeruh toggle, pitch `<br>`, profile freshness
 - Zeruh verifies **emails** (deliverability), not domain DNS. Workspace
   `emailVerifyEnabled` (migration 0014) gates send-time verify; Settings → Easy

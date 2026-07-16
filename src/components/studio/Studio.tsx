@@ -23,7 +23,6 @@ import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 import {
   draftFlagsFromProfile,
-  loadOutreachProfiles,
   loadSenderProfile,
   pitchForLang,
   resolveDraftLang,
@@ -31,7 +30,6 @@ import {
   subjectForLang,
 } from "@/lib/sender-profile";
 import { ZeruhUsageBar } from "./EmailVerifySettings";
-import Link from "next/link";
 import { BoardAssignModal, type BoardDestination } from "./BoardAssignModal";
 import { DashboardView } from "./DashboardView";
 import { BoardsView } from "./BoardsView";
@@ -102,7 +100,6 @@ export function Studio() {
   const [fcBefore, setFcBefore] = useState<FirecrawlUsage | null>(null);
   const [zeruhUsageKey, setZeruhUsageKey] = useState(0);
   const [zeruhBefore, setZeruhBefore] = useState<ZeruhUsage | null>(null);
-  const [activeProfileName, setActiveProfileName] = useState<string | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<{
@@ -178,26 +175,6 @@ export function Studio() {
     if (boardParam) storeBoardFilter(boardParam);
     void refresh().catch((e) => toast("err", e.message));
   }, [filterBoardId, boardParam, refresh, toast]);
-
-  const syncActiveProfileName = useCallback(() => {
-    const { profiles, activeId } = loadOutreachProfiles();
-    const active =
-      (activeId && profiles.find((p) => p.id === activeId)) || profiles[0];
-    setActiveProfileName(active?.name?.trim() || null);
-  }, []);
-
-  useEffect(() => {
-    syncActiveProfileName();
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "leadify_sender_profiles") syncActiveProfileName();
-    };
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("focus", syncActiveProfileName);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("focus", syncActiveProfileName);
-    };
-  }, [syncActiveProfileName, view]);
 
   useEffect(() => {
     refresh()
@@ -653,13 +630,13 @@ export function Studio() {
     }
   };
 
-  /** Send every draft/approved outreach (Send click = per-lead approval — Art. I.1). */
+  /** Send every approved outreach in Ready (Send click = per-lead gate — Art. I.1). */
   const onSendAllOutreach = async () => {
     if (!board) return;
     const targets = board.leads.filter((l) => {
       const s = l.outreach?.status;
       return (
-        (s === "draft" || s === "approved" || s === "rejected" || s === "failed") &&
+        (s === "approved" || s === "failed") &&
         (l.outreach?.toEmail || l.emails[0])
       );
     });
@@ -909,23 +886,6 @@ export function Studio() {
         </div>
       </div>
 
-      {(view === "board" || view === "outreach") && activeProfileName ? (
-        <p className="mb-3 shrink-0 text-xs text-mist-500">
-          Outreach profile ·{" "}
-          <span className="font-medium text-mist-200">{activeProfileName}</span>
-          <span className="text-mist-600">
-            {" "}
-            — drafts use this profile’s current pitch
-          </span>
-          <Link
-            href="/app/settings"
-            className="ml-2 text-aurora-300/90 hover:underline"
-          >
-            Edit
-          </Link>
-        </p>
-      ) : null}
-
       {/* Dashboard */}
       {view === "dashboard" && (
         <DashboardView boardFilterId={filterBoardId} boards={boards} />
@@ -955,7 +915,6 @@ export function Studio() {
                 ? Math.max(0, board.workspace.leadsLimit - board.workspace.leadsUsed)
                 : null
             }
-            onProfileChange={syncActiveProfileName}
           />
           {running && <SearchProgress running={running} />}
           {!canSearchLive && !running && (

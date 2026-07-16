@@ -77,9 +77,11 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     cards / map) + **Export Excel**. Table shows a short city label; the drawer
     keeps the full scraped address when available.
 
-  - **Outreach** (`?view=outreach`) — send queue: needs draft → review & approve
-    → ready to send → sent. Primary place to act on email; drawer still used for
-    edits. Send remains per-lead after approve (constitution Art. I.1).
+  - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (Create /
+    Review; unapproved drafts stay here) → **Ready** (only after Approve) →
+    **Contacted**. Closing the draft drawer without Approve does not advance.
+    Active outreach profile is chosen in the sidebar (next to Board). Send
+    remains per-lead after approve (constitution Art. I.1).
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Informative only — board filter lives in

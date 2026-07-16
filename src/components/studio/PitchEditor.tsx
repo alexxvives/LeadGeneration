@@ -116,13 +116,15 @@ export function PitchEditor({
           label="Clear formatting"
           onMouseDown={(e) => {
             e.preventDefault();
-            cmd("removeFormat");
-            // Also strip leftover paste styles from the whole selection/body.
             const el = ref.current;
-            if (el) {
-              el.innerHTML = sanitizePitchHtml(el.innerHTML);
-              emit();
-            }
+            if (!el) return;
+            el.focus();
+            // Select all so removeFormat clears marks without collapsing structure.
+            document.execCommand("selectAll", false);
+            document.execCommand("removeFormat", false);
+            // Re-sanitize; linebreak-preserving sanitize keeps <br> / blank lines.
+            el.innerHTML = sanitizePitchHtml(el.innerHTML);
+            emit();
           }}
         >
           <span className="text-[10px] font-medium tracking-wide">Clear</span>
