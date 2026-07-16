@@ -25,6 +25,7 @@ import { BoardAssignModal, type BoardDestination } from "./BoardAssignModal";
 import { DashboardView } from "./DashboardView";
 import { BoardsView } from "./BoardsView";
 import { loadStoredBoardFilter, storeBoardFilter } from "./BoardPicker";
+import { LeadColumnsMenu } from "./LeadColumnsMenu";
 import type { BoardSummary, ImportLeadRow } from "@/lib/types";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
@@ -100,6 +101,7 @@ export function Studio() {
   const [pendingImport, setPendingImport] = useState<ImportLeadRow[] | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignMode, setAssignMode] = useState<"search" | "import">("search");
+  const [boardCreateReq, setBoardCreateReq] = useState(0);
   const activeRunIdRef = useRef<string | null>(null);
   const filterBoardIdRef = useRef<string | null>(filterBoardId);
   filterBoardIdRef.current = filterBoardId;
@@ -559,19 +561,28 @@ export function Studio() {
   const lockViewport =
     view === "pipeline" || view === "outreach" || view === "leads";
 
+  const onDeleteLead = async (leadId: string) => {
+    setBoard((b) =>
+      b ? { ...b, leads: b.leads.filter((l) => l.id !== leadId) } : b,
+    );
+    try {
+      await api.deleteLead(leadId);
+      toast("ok", "Lead deleted.");
+    } catch (e) {
+      await refresh();
+      toast("err", (e as Error).message);
+    }
+  };
+
   return (
     <main
       className={
         lockViewport
-          ? "mx-auto flex h-dvh max-w-7xl flex-col overflow-hidden px-5 pb-3 pt-4 sm:px-8 sm:pt-5"
-          : "mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-8"
+          ? "mx-auto flex h-dvh max-w-7xl flex-col overflow-hidden px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-8 sm:pt-8"
+          : "mx-auto flex min-h-dvh max-w-7xl flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-8 sm:pt-8"
       }
     >
-      <div
-        className={`grid shrink-0 grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_auto_1fr] ${
-          lockViewport ? "mb-3" : "mb-6"
-        }`}
-      >
+      <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[1fr_auto_1fr]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -589,17 +600,24 @@ export function Studio() {
                           ? "Search runs"
                           : "Search"}
             </h1>
+            {view === "boards" ? (
+              <button
+                type="button"
+                onClick={() => setBoardCreateReq((n) => n + 1)}
+                className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.02]"
+              >
+                Create board
+              </button>
+            ) : null}
             {view === "leads" && hasLeads ? <ExportButton /> : null}
           </div>
-          {view === "runs" || view === "board" || view === "dashboard" || view === "boards" ? (
+          {view === "runs" || view === "board" || view === "boards" ? (
             <p className="mt-1 text-sm text-mist-500">
               {view === "runs"
                 ? "History of searches in this workspace."
-                : view === "dashboard"
-                  ? "Pipeline health and send activity."
-                  : view === "boards"
-                    ? "Named lists for campaigns or niches."
-                    : "Find prospects by niche and location."}
+                : view === "boards"
+                  ? "Named lists for campaigns or niches."
+                  : "Find prospects by niche and location."}
             </p>
           ) : null}
         </div>
@@ -611,6 +629,35 @@ export function Studio() {
         </div>
 
         <div className="flex flex-wrap items-center justify-start gap-3 sm:justify-end">
+          {view === "dashboard" ? (
+            <label className="inline-flex items-center">
+              <span className="sr-only">Filter by board</span>
+              <select
+                value={filterBoardId ?? "all"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "all") {
+                    storeBoardFilter("all");
+                    router.replace("/app?view=dashboard", { scroll: false });
+                  } else {
+                    storeBoardFilter(v);
+                    router.replace(`/app?view=dashboard&board=${v}`, {
+                      scroll: false,
+                    });
+                  }
+                }}
+                className="select-glass glass rounded-xl border border-white/10 py-2 pl-4 text-sm font-medium text-mist-100 outline-none transition-colors hover:border-white/20 focus:border-aurora-400/50"
+              >
+                <option value="all">All boards</option>
+                {boards.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                    {b.isDefault ? " (Default)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {view !== "dashboard" && view !== "boards" && board?.workspace && (
             <div className="hidden min-w-[16rem] flex-col gap-1 sm:flex sm:min-w-[20rem]">
               <div className="grid grid-cols-2 gap-3">
@@ -643,6 +690,7 @@ export function Studio() {
       {/* Boards management */}
       {view === "boards" && (
         <BoardsView
+          createRequestId={boardCreateReq}
           onSelectBoard={(id) => {
             storeBoardFilter(id);
             router.replace(`/app?view=pipeline&board=${id}`, { scroll: false });
@@ -722,7 +770,9 @@ export function Studio() {
                   Map
                 </LayoutToggle>
               </div>
-              <div className="hidden sm:block" aria-hidden />
+              <div className="flex justify-start sm:justify-end">
+                {layout === "table" ? <LeadColumnsMenu /> : null}
+              </div>
             </div>
             <div
               className={`min-h-0 flex-1 ${
@@ -746,6 +796,8 @@ export function Studio() {
                   leads={board!.leads}
                   onOpen={openInfo}
                   onMoveStage={onMoveStage}
+                  onUpdateLead={onUpdateLeadCrm}
+                  onDeleteLead={(id) => void onDeleteLead(id)}
                 />
               )}
             </div>

@@ -9,13 +9,15 @@ import Link from "next/link";
 
 export function BoardsView({
   onSelectBoard,
+  createRequestId = 0,
 }: {
   onSelectBoard?: (boardId: string) => void;
+  /** Increment from parent to open the create-board prompt. */
+  createRequestId?: number;
 }) {
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -31,21 +33,24 @@ export function BoardsView({
       .finally(() => setLoading(false));
   }, [refresh]);
 
-  async function handleCreate() {
-    const name = newName.trim();
+  const handleCreate = useCallback(async () => {
+    const name = window.prompt("Board name")?.trim();
     if (!name) return;
     setBusy(true);
     setErr(null);
     try {
       await api.createBoard(name);
-      setNewName("");
       await refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Create failed");
     } finally {
       setBusy(false);
     }
-  }
+  }, [refresh]);
+
+  useEffect(() => {
+    if (createRequestId > 0) void handleCreate();
+  }, [createRequestId, handleCreate]);
 
   async function handleRename(id: string) {
     const name = editName.trim();
@@ -85,27 +90,10 @@ export function BoardsView({
 
   return (
     <div className="animate-float-up space-y-6">
-      <div className="flex flex-wrap gap-2">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void handleCreate();
-          }}
-          placeholder="New board name"
-          className="min-w-[200px] flex-1 rounded-xl border border-white/10 bg-ink-900/60 px-4 py-2.5 text-sm text-mist-100 placeholder:text-mist-600 focus:border-aurora-400/40 focus:outline-none"
-        />
-        <button
-          type="button"
-          disabled={busy || !newName.trim()}
-          onClick={() => void handleCreate()}
-          className="rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 disabled:opacity-50"
-        >
-          Create board
-        </button>
-      </div>
-
       {err && <p className="text-sm text-rose-300">{err}</p>}
+      {busy ? (
+        <p className="text-xs text-mist-500">Working…</p>
+      ) : null}
 
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {boards.map((b) => (

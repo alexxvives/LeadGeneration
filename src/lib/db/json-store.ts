@@ -47,6 +47,10 @@ function normalizeLead(l: Lead): Lead {
     contactMethod: (raw.contactMethod as Lead["contactMethod"] | undefined) ?? null,
     notes: (raw.notes as Lead["notes"] | undefined) ?? null,
     followUps: (raw.followUps as Lead["followUps"] | undefined) ?? [],
+    customFields:
+      raw.customFields && typeof raw.customFields === "object"
+        ? (raw.customFields as Record<string, string>)
+        : {},
   };
 }
 
@@ -282,6 +286,18 @@ export class JsonStore implements LeadRepository {
       return true;
     });
     return [...leads].map(normalizeLead).sort((a, b) => b.fitScore - a.fitScore);
+  }
+
+  deleteLead(id: string): Promise<boolean> {
+    return this.mutate((data) => {
+      const before = data.leads.length;
+      data.leads = data.leads.filter((l) => !(l.id === id && this.inScope(l)));
+      if (data.leads.length === before) return { data, result: false };
+      data.outreach = data.outreach.filter(
+        (o) => !(o.leadId === id && this.inScope(o)),
+      );
+      return { data, result: true };
+    });
   }
 
   // ---- Outreach ----

@@ -120,7 +120,7 @@ export const env = {
     process.env.ENABLE_CONTACT_FORM_AUTOMATION === "true",
   maxLeadsPerRun: () => {
     const n = Number(process.env.MAX_LEADS_PER_RUN);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 25;
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 500;
   },
 
   // ── Auth (Auth.js) ──

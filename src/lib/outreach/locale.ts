@@ -3,7 +3,7 @@
  * Used by template drafts (and optional LLM blurbs) so cold email matches the market.
  */
 
-export type OutreachLang = "en" | "es" | "fr" | "it" | "de" | "pt";
+export type OutreachLang = "en" | "es" | "fr" | "it" | "de" | "pt" | "pl";
 
 const COUNTRY_HINTS: Array<{ lang: OutreachLang; pattern: RegExp }> = [
   // Spanish-speaking
@@ -32,6 +32,11 @@ const COUNTRY_HINTS: Array<{ lang: OutreachLang; pattern: RegExp }> = [
   {
     lang: "de",
     pattern: /\b(germany|deutschland|austria|österreich|osterreich|liechtenstein)\b/i,
+  },
+  // Polish
+  {
+    lang: "pl",
+    pattern: /\b(poland|polska|polish)\b/i,
   },
   // English-majority (explicit — also the default)
   {
@@ -63,6 +68,10 @@ const CITY_HINTS: Array<{ lang: OutreachLang; pattern: RegExp }> = [
   {
     lang: "de",
     pattern: /\b(berlin|munich|münchen|munchen|hamburg|frankfurt|cologne|köln|koln|vienna|wien|zurich|zürich)\b/i,
+  },
+  {
+    lang: "pl",
+    pattern: /\b(warsaw|warszawa|krak[oó]w|krakow|wroc[lł]aw|wroclaw|gda[nń]sk|gdansk|pozna[nń]|poznan|[lł][oó]d[zź]|lodz)\b/i,
   },
   {
     lang: "en",
@@ -112,6 +121,8 @@ export function langLabel(lang: OutreachLang): string {
       return "German";
     case "pt":
       return "Portuguese";
+    case "pl":
+      return "Polish";
     default:
       return "English";
   }
@@ -134,6 +145,7 @@ export function outreachLangFromText(text: string | null | undefined): OutreachL
     fr: score(["les", "des", "une", "pour", "avec", "dans", "est", "vous", "nous", "être"]),
     it: score(["che", "una", "per", "con", "del", "sono", "della", "degli", "nel"]),
     de: score(["der", "die", "das", "und", "den", "mit", "für", "von", "ist", "ein", "eine"]),
+    pl: score(["nie", "się", "jest", "oraz", "przy", "dla", "tego", "może", "które", "który"]),
     en: score(["the", "and", "for", "with", "your", "you", "our", "that", "this", "from", "are", "we"]),
   };
 

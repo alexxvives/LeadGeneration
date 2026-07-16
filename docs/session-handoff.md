@@ -9,24 +9,24 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-15 (boards UX polish)
+## ⏱️ Status — updated 2026-07-15 (preview langs + search UI)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Deduped Default boards + migration `0012_boards_unique_default.sql` (unique
-  partial index); applied on remote D1.
-- Board filter persists across nav (URL + localStorage); dashboard board
-  dropdown; removed Recent runs; pipeline subtitle = website; table city/country
-  + clickable CRM status; outreach action buttons smaller; contact-method row
-  layout; settings subject template (`{lead_name}` etc.) with generate-from-
-  website prompt; unified page chrome margins/titles.
+- Outreach preview: EN default + flag language switcher (ES/FR/IT/PT/PL/DE);
+  no mixed-language bodies; subject example uses `{company}`.
+- Saved flash sits next to field titles (no layout shift).
+- Dashboard board filter: glass select, far right on title row.
+- Search: auto-growing pitch, lead counts 10/25/50/100/500 beside mode toggle,
+  shiny Find leads CTA (no arrow).
+- Email bounce verify already wired (Zeruh) — confirm verify key in prod secrets.
 
 ### Next
 1. Point Maileroo Dashboard webhook at `/api/webhooks/maileroo`.
-2. Soft-cap warning popup on send; Maileroo live DNS panel.
-3. Microsoft Graph Mail.Send.
+2. Soft-cap warning popup on send; Microsoft Graph Mail.Send.
+3. Optional: adopt `lucide-animated` selectively for nav / Find CTA.
 
 ---
 

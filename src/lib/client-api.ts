@@ -178,8 +178,12 @@ export const api = {
       contactMethod?: ContactMethod | null;
       notes?: string | null;
       followUps?: FollowUp[];
+      customFields?: Record<string, string>;
     },
   ) => jsonFetch<{ lead: Lead }>(`/api/leads/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+
+  deleteLead: (id: string) =>
+    jsonFetch<{ ok: boolean }>(`/api/leads/${id}`, { method: "DELETE" }),
 
   suggestLocations: (q: string) =>
     jsonFetch<{ suggestions: LocationSuggestion[] }>(

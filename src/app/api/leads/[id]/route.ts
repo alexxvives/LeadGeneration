@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
-import { updateLeadCrm } from "@/lib/service";
+import { deleteLead, updateLeadCrm } from "@/lib/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +29,7 @@ const PatchSchema = z.object({
       }),
     )
     .optional(),
+  customFields: z.record(z.string(), z.string()).optional(),
 });
 
 export async function PATCH(
@@ -56,4 +57,15 @@ export async function PATCH(
   const lead = await updateLeadCrm(ctx, id, parsed.data);
   if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
   return NextResponse.json({ lead });
+}
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const ctx = await getCtx();
+  const ok = await deleteLead(ctx, id);
+  if (!ok) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+  return NextResponse.json({ ok: true });
 }

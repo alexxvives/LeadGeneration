@@ -56,6 +56,8 @@ export interface LeadRepository {
   updateLead(id: string, patch: Partial<Lead>): Promise<Lead | null>;
   getLead(id: string): Promise<Lead | null>;
   listLeads(filter?: LeadListFilter): Promise<Lead[]>;
+  /** Deletes the lead and its outreach row(s). */
+  deleteLead(id: string): Promise<boolean>;
 
   // Outreach
   upsertOutreach(outreach: Outreach): Promise<Outreach>;

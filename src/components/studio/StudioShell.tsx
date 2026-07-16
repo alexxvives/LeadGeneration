@@ -23,7 +23,6 @@ import type { BoardSummary } from "@/lib/types";
 import {
   SearchIcon,
   SettingsIcon,
-  GlobeIcon,
   PipelineIcon,
   HistoryIcon,
   LogoutIcon,
@@ -243,7 +242,7 @@ export function StudioShell({
             <BrandMark />
           </span>
           <span className="sm:hidden">
-            <GlobeIcon className="h-6 w-6 text-aurora-300" />
+            <BrandMark size="sm" withWordmark={false} />
           </span>
         </Link>
 

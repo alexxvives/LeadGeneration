@@ -18,13 +18,15 @@ export interface DraftResult {
 export interface DraftOverrides {
   /** Current Settings sign-off (multi-line). Prefer over run.senderName. */
   signOff?: string | null;
-  /** Current Settings default offer / pitch notes. Prefer over run.offerNotes. */
+  /** Current Settings sales pitch. Prefer over run.offerNotes. */
   offerNotes?: string | null;
   /**
    * Subject template with `{lead_name}`, `{company}`, `{location}`.
    * Empty / unset → locale default subject.
    */
   subjectTemplate?: string | null;
+  /** Force outreach language (Settings preview). Else inferred from lead.location. */
+  forceLang?: OutreachLang;
 }
 
 function firstName(lead: Lead): string {
@@ -186,6 +188,18 @@ const COPY: Record<OutreachLang, Copy> = {
       `Trabalho com ${niche || "equipas como a vossa"} para transformar interesse em conversas concretas — sem mudar o processo todo.`,
     cta: `Faz sentido uma call curta na próxima semana, ou deixo estar?`,
   },
+  pl: {
+    subject: (c) => `Krótka wiadomość dla ${c}`,
+    greeting: (n) => (n ? `Cześć ${n},` : `Cześć,`),
+    openerBlurb: (c, b) =>
+      `Natknąłem się na ${c} przeglądając branżę — ${b}`,
+    openerSite: (c, h) =>
+      `Spędziłem chwilę na ${h} i chciałem napisać bezpośrednio do ${c}.`,
+    openerPlain: (c) => `Chciałem skontaktować się bezpośrednio z ${c}.`,
+    defaultPitch: (niche) =>
+      `Pomagam ${niche || "zespołom takim jak Wasz"} zamieniać zainteresowanie w konkretne rozmowy — bez wielkiej zmiany procesu.`,
+    cta: `Pasuje krótka rozmowa w przyszłym tygodniu, czy odpuścić?`,
+  },
 };
 
 export function generateDraft(
@@ -193,7 +207,7 @@ export function generateDraft(
   run: Run,
   overrides?: DraftOverrides,
 ): DraftResult {
-  const lang = outreachLangFromLocation(lead.location);
+  const lang = overrides?.forceLang ?? outreachLangFromLocation(lead.location);
   const copy = COPY[lang];
   const name = firstName(lead);
   const company = shortCompany(lead);

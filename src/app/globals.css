@@ -10,6 +10,7 @@
 @theme {
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-brand: var(--font-syne), var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
 
   /* Ink (background scale) */
   --color-ink-950: #060a12;
@@ -92,7 +93,22 @@
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
-  /* Native select chrome matched to ink fields */
+  .font-brand {
+    font-family: var(--font-brand);
+  }
+
+  /* Glass select — dashboard header, matches glass cards */
+  .select-glass {
+    appearance: none;
+    background-color: transparent;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%237f92b3' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 0.875rem;
+    padding-right: 2.25rem;
+  }
+
+  /* Native select chrome matched to ink fields — use via <Select /> */
   .select-ink {
     appearance: none;
     background-color: rgb(10 17 32 / 0.6);
@@ -179,6 +195,37 @@
   }
   .pulse-ring {
     animation: pulse-ring 2s infinite;
+  }
+
+  @keyframes aurora-shine {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+  .btn-aurora-shine {
+    background-image: linear-gradient(
+      110deg,
+      #0e9d74 0%,
+      #16c390 18%,
+      #43e0a8 38%,
+      #7ff2c8 50%,
+      #f7b955 62%,
+      #43e0a8 78%,
+      #16c390 100%
+    );
+    background-size: 220% 220%;
+    animation: aurora-shine 5s ease infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn-aurora-shine {
+      animation: none;
+      background-image: none;
+      background-color: #43e0a8;
+    }
   }
 
   /* Leaflet map (LeadMap) — keep tiles under app chrome / modals */

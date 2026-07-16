@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { CrmStagePill, FitMeter, crmStageLabel } from "@/components/ui";
-import { MailIcon, PhoneIcon } from "@/components/icons";
+import { Select } from "@/components/ui/Select";
+import { MailIcon, PhoneIcon, TrashIcon } from "@/components/icons";
 import { displayWebsite } from "@/lib/website";
 import { shortLocation } from "@/lib/search/enrich";
+import { useLeadColumnState } from "@/components/studio/LeadColumnsMenu";
 
 const STAGE_OPTIONS: CrmStage[] = [
   "new",
@@ -20,6 +22,8 @@ export function LeadTable({
   leads,
   onOpen,
   onMoveStage,
+  onUpdateLead,
+  onDeleteLead,
 }: {
   leads: LeadWithOutreach[];
   onOpen: (id: string) => void;
@@ -28,9 +32,16 @@ export function LeadTable({
     stage: CrmStage,
     contactMethod?: ContactMethod | null,
   ) => void;
+  onUpdateLead?: (
+    leadId: string,
+    patch: { notes?: string | null; customFields?: Record<string, string> },
+  ) => void;
+  onDeleteLead?: (leadId: string) => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const { customCols, vis } = useLeadColumnState();
+  const visibleCustom = customCols.filter((c) => !!vis.custom[c.id]);
 
   useEffect(() => {
     if (!openId) return;
@@ -54,6 +65,15 @@ export function LeadTable({
               <th className="px-5 py-3 font-medium">Contact</th>
               <th className="px-5 py-3 font-medium">Fit</th>
               <th className="px-5 py-3 font-medium">Status</th>
+              {vis.notes ? (
+                <th className="px-5 py-3 font-medium">Notes</th>
+              ) : null}
+              {visibleCustom.map((c) => (
+                <th key={c.id} className="px-5 py-3 font-medium">
+                  {c.name}
+                </th>
+              ))}
+              {onDeleteLead ? <th className="w-10 px-2 py-3" aria-label="Actions" /> : null}
             </tr>
           </thead>
           <tbody>
@@ -61,11 +81,12 @@ export function LeadTable({
               const domain = displayWebsite(l.website);
               const loc = shortLocation(l.location) ?? "—";
               const stage = l.crmStage ?? "new";
+              const fields = l.customFields ?? {};
               return (
                 <tr
                   key={l.id}
                   onClick={() => onOpen(l.id)}
-                  className="cursor-pointer border-b border-white/5 transition-colors last:border-0 hover:bg-white/5"
+                  className="group cursor-pointer border-b border-white/5 transition-colors last:border-0 hover:bg-white/5"
                 >
                   <td className="px-5 py-3.5">
                     <p className="font-medium text-mist-100">{l.company}</p>
@@ -148,6 +169,90 @@ export function LeadTable({
                       <CrmStagePill stage={stage} />
                     )}
                   </td>
+                  {vis.notes ? (
+                    <td
+                      className="max-w-[14rem] px-5 py-3.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        defaultValue={l.notes ?? ""}
+                        key={`${l.id}-notes-${l.notes ?? ""}`}
+                        onBlur={(e) => {
+                          const next = e.target.value || null;
+                          if (next !== (l.notes ?? null)) {
+                            onUpdateLead?.(l.id, { notes: next });
+                          }
+                        }}
+                        placeholder="—"
+                        className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 hover:border-white/10 focus:border-aurora-400/50 focus:bg-ink-950/40"
+                      />
+                    </td>
+                  ) : null}
+                  {visibleCustom.map((c) => (
+                    <td
+                      key={c.id}
+                      className="max-w-[12rem] px-5 py-3.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {c.type === "select" ? (
+                        <Select
+                          value={fields[c.id] ?? ""}
+                          onChange={(e) =>
+                            onUpdateLead?.(l.id, {
+                              customFields: { ...fields, [c.id]: e.target.value },
+                            })
+                          }
+                          className="w-full min-w-[6rem] py-1 text-xs"
+                        >
+                          <option value="">—</option>
+                          {(c.options ?? []).map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        <input
+                          type={c.type === "number" ? "number" : "text"}
+                          defaultValue={fields[c.id] ?? ""}
+                          key={`${l.id}-${c.id}-${fields[c.id] ?? ""}`}
+                          onBlur={(e) => {
+                            const next = e.target.value;
+                            if (next !== (fields[c.id] ?? "")) {
+                              onUpdateLead?.(l.id, {
+                                customFields: { ...fields, [c.id]: next },
+                              });
+                            }
+                          }}
+                          placeholder="—"
+                          className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 hover:border-white/10 focus:border-aurora-400/50 focus:bg-ink-950/40"
+                        />
+                      )}
+                    </td>
+                  ))}
+                  {onDeleteLead ? (
+                    <td
+                      className="px-2 py-3.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        title="Delete lead"
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Delete ${l.company}? This cannot be undone.`,
+                            )
+                          ) {
+                            onDeleteLead(l.id);
+                          }
+                        }}
+                        className="rounded-lg p-1.5 text-mist-600 opacity-0 transition-opacity hover:bg-rose-400/10 hover:text-rose-300 group-hover:opacity-100 focus:opacity-100"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}

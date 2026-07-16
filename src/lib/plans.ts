@@ -33,7 +33,7 @@ export const ANNUAL_DISCOUNT = 0.2;
 export const FREE_MAX_LEADS_PER_RUN = 10;
 
 /** Selectable lead-count options in the search UI (higher values locked on Free). */
-export const LEAD_COUNT_OPTIONS = [5, 10, 15, 25] as const;
+export const LEAD_COUNT_OPTIONS = [10, 25, 50, 100, 500] as const;
 
 export const PLANS: Record<PlanId, Plan> = {
   free: {

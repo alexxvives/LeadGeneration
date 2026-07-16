@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { CheckIcon } from "@/components/icons";
 import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
 import { loadSenderProfile, saveSenderProfile, buildSignature } from "@/lib/sender-profile";
@@ -69,12 +68,12 @@ export function EmailSettingsForm({
   );
   const [hasResendKey, setHasResendKey] = useState(!!initial.hasResendKey);
   const [hasMailerooKey, setHasMailerooKey] = useState(!!initial.hasMailerooKey);
-  const [clearResend, setClearResend] = useState(false);
-  const [clearMaileroo, setClearMaileroo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savedHint, setSavedHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastField = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -92,8 +91,6 @@ export function EmailSettingsForm({
     setHasMailerooKey(!!initial.hasMailerooKey);
     setResendDraft(initial.hasResendKey ? SAVED_KEY_MASK : "");
     setMailerooDraft(initial.hasMailerooKey ? SAVED_KEY_MASK : "");
-    setClearResend(false);
-    setClearMaileroo(false);
   }, [
     initial.fromName,
     initial.fromEmail,
@@ -109,11 +106,14 @@ export function EmailSettingsForm({
 
   const setField = (key: "fromName" | "fromEmail", v: string) => {
     setSaved(false);
+    setSavedHint(null);
+    lastField.current = key;
     setValues((prev) => ({ ...prev, [key]: v || null }));
   };
 
   const setProvider = (p: EasyEmailProvider) => {
     setSaved(false);
+    setSavedHint(null);
     setValues((prev) => ({ ...prev, easyEmailProvider: p }));
     onEasyProviderChange?.(p);
   };
@@ -121,18 +121,13 @@ export function EmailSettingsForm({
   const isNewKey = (draft: string) =>
     !!draft.trim() && draft !== SAVED_KEY_MASK;
 
-  const save = async (opts?: {
-    providerOverride?: EasyEmailProvider;
-    clearResend?: boolean;
-    clearMaileroo?: boolean;
-  }) => {
+  const save = async (opts?: { providerOverride?: EasyEmailProvider }) => {
     if (!canEdit || saving) return;
     setSaving(true);
     setSaved(false);
+    setSavedHint(null);
     setError(null);
     const activeProvider = opts?.providerOverride ?? provider;
-    const doClearResend = opts?.clearResend ?? clearResend;
-    const doClearMaileroo = opts?.clearMaileroo ?? clearMaileroo;
     try {
       const payload: Record<string, unknown> = isPro
         ? {
@@ -148,10 +143,8 @@ export function EmailSettingsForm({
           };
 
       if (!isPro) {
-        if (doClearResend) payload.clearResendApiKey = true;
-        else if (isNewKey(resendDraft)) payload.resendApiKey = resendDraft.trim();
-        if (doClearMaileroo) payload.clearMailerooApiKey = true;
-        else if (isNewKey(mailerooDraft)) payload.mailerooApiKey = mailerooDraft.trim();
+        if (isNewKey(resendDraft)) payload.resendApiKey = resendDraft.trim();
+        if (isNewKey(mailerooDraft)) payload.mailerooApiKey = mailerooDraft.trim();
       }
 
       const res = await fetch("/api/workspace/settings", {
@@ -176,22 +169,20 @@ export function EmailSettingsForm({
           saveSenderProfile(next);
         }
         if (!isPro) {
-          const nextHasResend = doClearResend
-            ? false
-            : isNewKey(resendDraft) || hasResendKey;
-          const nextHasMaileroo = doClearMaileroo
-            ? false
-            : isNewKey(mailerooDraft) || hasMailerooKey;
+          const nextHasResend = isNewKey(resendDraft) || hasResendKey;
+          const nextHasMaileroo = isNewKey(mailerooDraft) || hasMailerooKey;
           setHasResendKey(nextHasResend);
           setHasMailerooKey(nextHasMaileroo);
           setResendDraft(nextHasResend ? SAVED_KEY_MASK : "");
           setMailerooDraft(nextHasMaileroo ? SAVED_KEY_MASK : "");
-          setClearResend(false);
-          setClearMaileroo(false);
         }
         setSaved(true);
+        setSavedHint(lastField.current);
         if (savedTimer.current) clearTimeout(savedTimer.current);
-        savedTimer.current = setTimeout(() => setSaved(false), 2000);
+        savedTimer.current = setTimeout(() => {
+          setSaved(false);
+          setSavedHint(null);
+        }, 2000);
         router.refresh();
       }
     } catch {
@@ -216,6 +207,8 @@ export function EmailSettingsForm({
     raw: string,
   ) => {
     setSaved(false);
+    setSavedHint(null);
+    lastField.current = which === "resend" ? "resendKey" : "mailerooKey";
     const prev = which === "resend" ? resendDraft : mailerooDraft;
     const set = which === "resend" ? setResendDraft : setMailerooDraft;
     // First edit while masked → treat input as a fresh key, not append to bullets.
@@ -249,7 +242,11 @@ export function EmailSettingsForm({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Your name" hint="Inbox From + draft sign-off">
+        <Field
+          label="Your name"
+          hint="Inbox From + draft sign-off"
+          saved={saved && savedHint === "fromName"}
+        >
           <input
             value={values.fromName ?? ""}
             onChange={(e) => setField("fromName", e.target.value)}
@@ -262,6 +259,7 @@ export function EmailSettingsForm({
         <Field
           label="From email"
           hint={fromLocked ? "From your connected mailbox" : "Must match your verified domain"}
+          saved={saved && savedHint === "fromEmail"}
         >
           <input
             type="email"
@@ -280,168 +278,105 @@ export function EmailSettingsForm({
       {!isPro && (
         <div
           data-tour="resend-key"
-          className="space-y-4 rounded-xl border border-aurora-400/20 bg-aurora-400/[0.04] p-4"
+          className="rounded-xl border border-aurora-400/20 bg-aurora-400/[0.04] p-4"
         >
-          <div>
-            <p className="mb-2 text-sm font-medium text-mist-100">Sending provider</p>
-            <div className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1">
-              <button
-                type="button"
-                disabled={!canEdit}
-                onClick={() => setProviderAndSave("resend")}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  !isMaileroo
-                    ? "bg-aurora-400 text-ink-950"
-                    : "text-mist-300 hover:text-mist-100"
-                }`}
-              >
-                Resend
-              </button>
-              <button
-                type="button"
-                disabled={!canEdit}
-                onClick={() => setProviderAndSave("maileroo")}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  isMaileroo
-                    ? "bg-aurora-400 text-ink-950"
-                    : "text-mist-300 hover:text-mist-100"
-                }`}
-              >
-                Maileroo
-              </button>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="shrink-0">
+              <p className="mb-2 text-sm font-medium text-mist-100">Sending provider</p>
+              <div className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1">
+                <button
+                  type="button"
+                  disabled={!canEdit}
+                  onClick={() => setProviderAndSave("resend")}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    !isMaileroo
+                      ? "bg-aurora-400 text-ink-950"
+                      : "text-mist-300 hover:text-mist-100"
+                  }`}
+                >
+                  Resend
+                </button>
+                <button
+                  type="button"
+                  disabled={!canEdit}
+                  onClick={() => setProviderAndSave("maileroo")}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    isMaileroo
+                      ? "bg-aurora-400 text-ink-950"
+                      : "text-mist-300 hover:text-mist-100"
+                  }`}
+                >
+                  Maileroo
+                </button>
+              </div>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              {isMaileroo ? (
+                <Field
+                  label="Maileroo sending key"
+                  hint="Dashboard → Domains → Sending Keys"
+                  saved={saved && savedHint === "mailerooKey"}
+                >
+                  <PasswordField
+                    value={mailerooDraft}
+                    savedMask={SAVED_KEY_MASK}
+                    onChange={(e) => onKeyDraftChange("maileroo", e.target.value)}
+                    onFocus={(e) => {
+                      if (mailerooDraft === SAVED_KEY_MASK) e.target.select();
+                    }}
+                    onBlur={() => void save()}
+                    placeholder="Your Maileroo sending key"
+                    disabled={!canEdit}
+                    inputClassName={`${inputCls} pr-11`}
+                  />
+                  <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
+                    Free account at{" "}
+                    <a
+                      href="https://maileroo.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-aurora-300 hover:underline"
+                    >
+                      maileroo.com
+                    </a>
+                    → add your domain → create a Sending Key → paste here.
+                  </p>
+                </Field>
+              ) : (
+                <Field
+                  label="Resend API key"
+                  hint="BYO domain"
+                  saved={saved && savedHint === "resendKey"}
+                >
+                  <PasswordField
+                    value={resendDraft}
+                    savedMask={SAVED_KEY_MASK}
+                    onChange={(e) => onKeyDraftChange("resend", e.target.value)}
+                    onFocus={(e) => {
+                      if (resendDraft === SAVED_KEY_MASK) e.target.select();
+                    }}
+                    onBlur={() => void save()}
+                    placeholder="re_xxxxxxxxxxxx"
+                    disabled={!canEdit}
+                    inputClassName={`${inputCls} pr-11`}
+                  />
+                  <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
+                    Free account at{" "}
+                    <a
+                      href="https://resend.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-aurora-300 hover:underline"
+                    >
+                      resend.com
+                    </a>
+                    → add your domain → create an API key → paste here.
+                  </p>
+                </Field>
+              )}
             </div>
           </div>
-
-          {isMaileroo ? (
-            <Field
-              label="Maileroo sending key"
-              hint={
-                hasMailerooKey && !clearMaileroo && canEdit ? (
-                  <button
-                    type="button"
-                    className="text-mist-500 underline hover:text-mist-300"
-                    onClick={() => {
-                      setClearMaileroo(true);
-                      setMailerooDraft("");
-                      setSaved(false);
-                      void save({ clearMaileroo: true });
-                    }}
-                  >
-                    Clear key
-                  </button>
-                ) : (
-                  "Dashboard → Domains → Sending Keys"
-                )
-              }
-            >
-              {!clearMaileroo && (
-                <PasswordField
-                  autoComplete="off"
-                  value={mailerooDraft}
-                  onChange={(e) => onKeyDraftChange("maileroo", e.target.value)}
-                  onFocus={(e) => {
-                    if (mailerooDraft === SAVED_KEY_MASK) e.target.select();
-                  }}
-                  onBlur={() => void save()}
-                  placeholder="Your Maileroo sending key"
-                  disabled={!canEdit}
-                  inputClassName={`${inputCls} pr-11`}
-                />
-              )}
-              {clearMaileroo && (
-                <p className="mt-2 text-xs text-amber-200/90">
-                  Key will be cleared when you leave this section.{" "}
-                  <button
-                    type="button"
-                    className="underline"
-                    onClick={() => {
-                      setClearMaileroo(false);
-                      setMailerooDraft(SAVED_KEY_MASK);
-                    }}
-                  >
-                    Undo
-                  </button>
-                </p>
-              )}
-              <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
-                Free account at{" "}
-                <a
-                  href="https://maileroo.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-aurora-300 hover:underline"
-                >
-                  maileroo.com
-                </a>
-                → add your domain → copy DNS → create a Sending Key → paste here.
-                Same From email must be on that verified domain.
-              </p>
-            </Field>
-          ) : (
-            <Field
-              label="Resend API key"
-              hint={
-                hasResendKey && !clearResend && canEdit ? (
-                  <button
-                    type="button"
-                    className="text-mist-500 underline hover:text-mist-300"
-                    onClick={() => {
-                      setClearResend(true);
-                      setResendDraft("");
-                      setSaved(false);
-                      void save({ clearResend: true });
-                    }}
-                  >
-                    Clear key
-                  </button>
-                ) : (
-                  "BYO domain — not a shared Leadify sender"
-                )
-              }
-            >
-              {!clearResend && (
-                <PasswordField
-                  autoComplete="off"
-                  value={resendDraft}
-                  onChange={(e) => onKeyDraftChange("resend", e.target.value)}
-                  onFocus={(e) => {
-                    if (resendDraft === SAVED_KEY_MASK) e.target.select();
-                  }}
-                  onBlur={() => void save()}
-                  placeholder="re_xxxxxxxxxxxx"
-                  disabled={!canEdit}
-                  inputClassName={`${inputCls} pr-11`}
-                />
-              )}
-              {clearResend && (
-                <p className="mt-2 text-xs text-amber-200/90">
-                  Key will be cleared when you leave this section.{" "}
-                  <button
-                    type="button"
-                    className="underline"
-                    onClick={() => {
-                      setClearResend(false);
-                      setResendDraft(SAVED_KEY_MASK);
-                    }}
-                  >
-                    Undo
-                  </button>
-                </p>
-              )}
-              <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
-                Free account at{" "}
-                <a
-                  href="https://resend.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-aurora-300 hover:underline"
-                >
-                  resend.com
-                </a>
-                → add your domain → copy DNS → paste the API key here.
-              </p>
-            </Field>
-          )}
         </div>
       )}
 
@@ -452,11 +387,6 @@ export function EmailSettingsForm({
             <Spinner className="h-3.5 w-3.5" /> Saving…
           </span>
         )}
-        {!saving && saved && (
-          <span className="flex items-center gap-1.5 text-sm text-aurora-300">
-            <CheckIcon className="h-4 w-4" /> Saved
-          </span>
-        )}
       </div>
     </div>
   );
@@ -465,17 +395,31 @@ export function EmailSettingsForm({
 function Field({
   label,
   hint,
+  saved,
   children,
 }: {
   label: string;
   hint?: ReactNode;
+  saved?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-mist-100">{label}</p>
-        {hint && <div className="text-xs text-mist-500">{hint}</div>}
+      <div className="mb-1.5 flex items-center gap-2">
+        <p className="relative text-sm font-medium text-mist-100">
+          {label}
+          <span
+            aria-live="polite"
+            className={`pointer-events-none absolute left-full top-0 ml-2 whitespace-nowrap text-xs font-medium text-aurora-300 transition-opacity ${
+              saved ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            Saved
+          </span>
+        </p>
+        {hint ? (
+          <div className="ml-auto text-xs text-mist-500">{hint}</div>
+        ) : null}
       </div>
       {children}
     </div>

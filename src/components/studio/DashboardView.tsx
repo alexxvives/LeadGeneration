@@ -5,7 +5,6 @@ import { api } from "@/lib/client-api";
 import type { BoardSummary, CrmStage, DashboardStats, WorkspaceSummary } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import Link from "next/link";
-import { loadStoredBoardFilter } from "@/components/studio/BoardPicker";
 
 const STAGE_LABELS: Record<CrmStage, string> = {
   new: "New",
@@ -77,21 +76,12 @@ export function DashboardView({
   boardFilterId?: string | null;
   boards?: BoardSummary[];
 }) {
-  const [filter, setFilter] = useState<string>("all");
+  const filter = boardFilterId ?? "all";
   const [data, setData] = useState<(DashboardStats & { workspace: WorkspaceSummary }) | null>(
     null,
   );
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (boardFilterId) {
-      setFilter(boardFilterId);
-      return;
-    }
-    const stored = loadStoredBoardFilter();
-    setFilter(stored === "all" || !stored ? "all" : stored);
-  }, [boardFilterId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,29 +131,6 @@ export function DashboardView({
 
   return (
     <div className="animate-float-up space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="text-sm text-mist-400">
-          Pipeline health and sends
-          {filter === "all" ? " across all boards" : ` for ${scopeLabel}`}.
-        </p>
-        <label className="flex items-center gap-2 text-xs text-mist-400">
-          <span className="sr-only">Filter by board</span>
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="rounded-full border border-white/10 bg-ink-900/80 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/50"
-          >
-            <option value="all">All boards</option>
-            {boardOptions.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-                {b.isDefault ? " (Default)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total leads" value={data.totalLeads} />
         <StatCard label="Emails sent" value={data.sentCount} />

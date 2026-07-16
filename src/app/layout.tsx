@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Space_Grotesk } from "next/font/google";
+import { Fraunces, Space_Grotesk, Syne } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
 
@@ -16,6 +16,13 @@ const spaceGrotesk = Space_Grotesk({
   display: "swap",
 });
 
+const syne = Syne({
+  subsets: ["latin"],
+  variable: "--font-syne",
+  display: "swap",
+  weight: ["600", "700"],
+});
+
 export const metadata: Metadata = {
   title: "Leadify — Navigate to your next customer",
   description:
@@ -26,7 +33,10 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${spaceGrotesk.variable}`}>
+    <html
+      lang="en"
+      className={`${fraunces.variable} ${spaceGrotesk.variable} ${syne.variable}`}
+    >
       <body className="antialiased">
         <Providers>{children}</Providers>
       </body>

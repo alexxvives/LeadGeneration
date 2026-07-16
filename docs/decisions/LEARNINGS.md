@@ -4,6 +4,25 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-15 — Outreach preview languages + search polish
+- Settings email preview defaults to English; flag menu switches ES/FR/IT/PT/PL/DE.
+  Mixed-language previews are avoided by substituting a localized sample pitch
+  (and locale subject) when the saved pitch/template language ≠ selected lang.
+- `{lead_name}` = contact first name; `{company}` = company — use `{company}` in
+  subject templates for “Propuesta para Bright Dental” style subjects.
+- Email verify (Zeruh/Maileroo) already runs on enrich (`filterVerifiableEmails`)
+  and again at send (`verifyEmail`); needs `MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY`.
+- Animated icon libs (`lucide-animated` / `lucide-react-motion`) need `motion` and
+  are fine for client components; keep custom `icons.tsx` for now and adopt
+  selectively later (nav + Find CTA) rather than a blanket swap.
+
+### 2026-07-15 — Studio chrome + lead columns
+- Unified studio/settings top padding (`pt-6`/`sm:pt-8`) so Pipeline no longer
+  sits higher than Dashboard/Boards. Shared `<Select>` (`.select-ink`) for
+  native dropdowns. Lead delete + `customFields` (migration `0013`); column
+  defs/visibility stay in localStorage. Draft emails are template-based
+  (`generateDraft`), not LLM — Settings “Sales pitch” maps to `offerNotes`.
+
 ### 2026-07-15 — Duplicate Default boards = race without unique index
 - Concurrent `ensureDefaultBoard` calls created two `is_default=1` rows; migration
   0011 only had a non-unique index. Fix: dedupe in service + `0012` partial

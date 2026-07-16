@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { SearchIcon, ArrowIcon } from "@/components/icons";
+import { SearchIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import type { PlanId, SearchStrategy } from "@/lib/types";
 import { FREE_MAX_LEADS_PER_RUN, LEAD_COUNT_OPTIONS } from "@/lib/plans";
@@ -211,9 +211,17 @@ export function SearchPanel({
   const [icps, setIcps] = useState<SavedIcp[]>([]);
   const [saveName, setSaveName] = useState("");
   const [showSave, setShowSave] = useState(false);
+  const offerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const freeTierLocked = planId === "free";
   const planCap = freeTierLocked ? FREE_MAX_LEADS_PER_RUN : Math.max(...LEAD_COUNT_OPTIONS);
+
+  const growOffer = () => {
+    const el = offerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.max(el.scrollHeight, 52)}px`;
+  };
 
   useEffect(() => {
     const profile = loadSenderProfile();
@@ -221,6 +229,10 @@ export function SearchPanel({
     setOfferNotes(profile.defaultOffer);
     setIcps(loadSavedIcps());
   }, []);
+
+  useEffect(() => {
+    growOffer();
+  }, [offerNotes]);
 
   // Clamp selection if plan/remaining credits shrink.
   useEffect(() => {
@@ -310,11 +322,15 @@ export function SearchPanel({
       <div className="mt-4">
         <Field label="Offer / pitch notes" hint="Optional — used in drafts">
           <textarea
+            ref={offerRef}
             value={offerNotes}
-            onChange={(e) => setOfferNotes(e.target.value)}
+            onChange={(e) => {
+              setOfferNotes(e.target.value);
+              requestAnimationFrame(growOffer);
+            }}
             rows={2}
             placeholder="What you're offering and why it fits…"
-            className="w-full resize-y rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60"
+            className="w-full resize-none overflow-hidden rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-sm text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60"
           />
         </Field>
       </div>
@@ -383,12 +399,8 @@ export function SearchPanel({
         </div>
       )}
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div>
-          <span className="mb-1.5 flex items-center justify-between text-sm font-medium text-mist-100">
-            Search mode
-            <span className="text-xs font-normal text-mist-500">How hard to look</span>
-          </span>
+      <div className="mt-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div
             role="radiogroup"
             aria-label="Search mode"
@@ -415,25 +427,9 @@ export function SearchPanel({
               );
             })}
           </div>
-          <div className="mt-3 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
-            <p className="text-sm font-medium text-mist-100">{active.summary}</p>
-            <p className="mt-1.5 text-xs leading-relaxed text-mist-400">{active.detail}</p>
-            <p className="mt-2 text-[11px] uppercase tracking-wider text-mist-500">
-              Best for · {active.bestFor}
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <span className="mb-1.5 flex items-center justify-between text-sm font-medium text-mist-100">
-            Leads to find
-            <span className="text-xs font-normal text-mist-500">
-              {freeTierLocked ? `Free · up to ${FREE_MAX_LEADS_PER_RUN}/run` : "Per search"}
-            </span>
-          </span>
           <div
             role="radiogroup"
-            aria-label="Number of leads"
+            aria-label="Number of leads to find"
             className="inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-ink-900/60 p-1"
           >
             {LEAD_COUNT_OPTIONS.map((n) => {
@@ -454,10 +450,10 @@ export function SearchPanel({
                       ? "Upgrade to unlock larger batches"
                       : overCredits
                         ? `Only ${leadsRemaining} lead credit${leadsRemaining === 1 ? "" : "s"} left this month`
-                        : undefined
+                        : `Find ${n} leads`
                   }
                   onClick={() => !disabled && setMaxLeads(n)}
-                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                     isActive
                       ? "bg-aurora-400 text-ink-950"
                       : disabled
@@ -473,28 +469,32 @@ export function SearchPanel({
               );
             })}
           </div>
-          {freeTierLocked && (
-            <p className="mt-2 text-xs text-mist-500">
-              Larger batches (15+) need a paid plan. Monthly Free cap is also 50 leads.
-            </p>
-          )}
         </div>
+        <div className="mt-3 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
+          <p className="text-sm font-medium text-mist-100">{active.summary}</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-mist-400">{active.detail}</p>
+          <p className="mt-2 text-[11px] uppercase tracking-wider text-mist-500">
+            Best for · {active.bestFor}
+          </p>
+        </div>
+        {freeTierLocked && (
+          <p className="mt-2 text-xs text-mist-500">
+            Larger batches (25+) need a paid plan. Monthly Free cap is also 50 leads.
+          </p>
+        )}
       </div>
       <div className="mt-5 flex items-center justify-center gap-4">
         <button
           type="submit"
           disabled={!canSubmit}
-          className="group inline-flex items-center gap-2 rounded-full bg-aurora-400 px-6 py-3 font-medium text-ink-950 transition-all hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-aurora-shine inline-flex items-center justify-center rounded-full px-8 py-3 font-semibold text-ink-950 shadow-[0_0_24px_-6px_rgba(67,224,168,0.55)] transition-transform hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:[animation:none]"
         >
           {running ? (
             <>
-              <Spinner className="h-4 w-4" /> Charting…
+              <Spinner className="mr-2 h-4 w-4" /> Charting…
             </>
           ) : (
-            <>
-              Find leads
-              <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </>
+            "Find leads"
           )}
         </button>
       </div>

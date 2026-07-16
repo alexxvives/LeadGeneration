@@ -72,7 +72,7 @@ export default async function SettingsPage({
     /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(appUrl);
 
   return (
-    <main className="mx-auto max-w-7xl px-5 py-6 sm:px-8 sm:py-8">
+    <main className="mx-auto min-h-dvh max-w-7xl px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-8 sm:pt-8">
       <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
 
       {mailboxFlag === "connected" && (
@@ -119,24 +119,6 @@ export default async function SettingsPage({
             physicalAddress: env.physicalAddress(),
           }}
         />
-      </section>
-
-      <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Boards
-        </h2>
-        <div className="rounded-xl2 border border-white/10 p-5">
-          <p className="text-sm text-mist-300">
-            Named lists for campaigns and niches. Every workspace has a Default board;
-            search and import ask which board to use.
-          </p>
-          <Link
-            href="/app?view=boards"
-            className="mt-4 inline-flex rounded-full bg-aurora-400/15 px-4 py-2 text-sm font-medium text-aurora-300 transition-colors hover:bg-aurora-400/25"
-          >
-            Manage boards →
-          </Link>
-        </div>
       </section>
 
       <section className="mt-8">

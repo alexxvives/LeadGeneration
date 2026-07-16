@@ -350,6 +350,7 @@ export async function createAndRunSearch(
       contactMethod: null,
       notes: null,
       followUps: [],
+      customFields: {},
       createdAt: nowIso(),
     }));
     await db.createLeads(leads);
@@ -902,6 +903,13 @@ export async function updateMailboxWarmupProfile(
   return mailboxPublicStatus({ ...ws, connectedMailbox: next });
 }
 
+/** Permanently remove a lead and its outreach. */
+export async function deleteLead(ctx: Ctx, leadId: string): Promise<boolean> {
+  const lead = await ctx.db.getLead(leadId);
+  if (!lead) return false;
+  return ctx.db.deleteLead(leadId);
+}
+
 /** Update user-managed CRM fields on a lead (stage, contact method, notes, follow-ups). */
 export async function updateLeadCrm(
   ctx: Ctx,
@@ -911,6 +919,7 @@ export async function updateLeadCrm(
     contactMethod?: ContactMethod | null;
     notes?: string | null;
     followUps?: FollowUp[];
+    customFields?: Record<string, string>;
   },
 ): Promise<Lead | null> {
   const lead = await ctx.db.getLead(leadId);
@@ -1108,6 +1117,7 @@ export async function importLeads(
         contactMethod: null,
         notes: null,
         followUps: [],
+        customFields: {},
         createdAt: nowIso(),
       };
     });

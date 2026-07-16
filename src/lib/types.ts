@@ -244,7 +244,20 @@ export interface Lead {
   contactMethod: ContactMethod | null; // set when first contacted
   notes: string | null; // legacy freeform; prefer dated followUps journal
   followUps: FollowUp[]; // dated notes / follow-up journal entries
+  /** User-defined table column values (column id → string). */
+  customFields: Record<string, string>;
   createdAt: string;
+}
+
+/** Custom lead-table column (defs live in the browser; values on Lead.customFields). */
+export type LeadColumnType = "text" | "number" | "select";
+
+export interface LeadColumnDef {
+  id: string;
+  name: string;
+  type: LeadColumnType;
+  /** Options when type === "select". */
+  options?: string[];
 }
 
 /** A personalized outreach email attached to a lead. */

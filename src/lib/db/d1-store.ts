@@ -115,6 +115,7 @@ type LeadRow = {
   contact_method: string | null;
   notes: string | null;
   follow_ups: string | null; // JSON-encoded FollowUp[]
+  custom_fields: string | null; // JSON-encoded Record<string, string>
   created_at: string;
 };
 
@@ -217,6 +218,21 @@ const parseFollowUps = (s: string | null | undefined): FollowUp[] => {
   try { return JSON.parse(s ?? "[]"); } catch { return []; }
 };
 
+const parseCustomFields = (s: string | null | undefined): Record<string, string> => {
+  try {
+    const v = JSON.parse(s ?? "{}") as unknown;
+    if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (typeof val === "string") out[k] = val;
+      else if (val != null) out[k] = String(val);
+    }
+    return out;
+  } catch {
+    return {};
+  }
+};
+
 function rowToLead(r: LeadRow): Lead {
   return {
     id: r.id,
@@ -239,6 +255,7 @@ function rowToLead(r: LeadRow): Lead {
     contactMethod: (r.contact_method as ContactMethod) ?? null,
     notes: r.notes ?? null,
     followUps: parseFollowUps(r.follow_ups),
+    customFields: parseCustomFields(r.custom_fields),
     createdAt: r.created_at,
   };
 }
@@ -516,8 +533,8 @@ export class D1Store implements LeadRepository {
           `INSERT INTO leads
            (id, workspace_id, run_id, board_id, company, website, emails, phones, contact_name,
             location, about_blurb, tags, fit_score, fit_reasons, source_url,
-            status, crm_stage, contact_method, notes, follow_ups, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            status, crm_stage, contact_method, notes, follow_ups, custom_fields, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           l.id,
@@ -540,6 +557,7 @@ export class D1Store implements LeadRepository {
           l.contactMethod ?? null,
           l.notes ?? null,
           JSON.stringify(l.followUps ?? []),
+          JSON.stringify(l.customFields ?? {}),
           l.createdAt,
         ),
     );
@@ -567,6 +585,7 @@ export class D1Store implements LeadRepository {
     if ("contactMethod" in patch) row.contact_method = patch.contactMethod ?? null;
     if ("notes" in patch) row.notes = patch.notes ?? null;
     if ("followUps" in patch) row.follow_ups = JSON.stringify(patch.followUps ?? []);
+    if ("customFields" in patch) row.custom_fields = JSON.stringify(patch.customFields ?? {});
     if ("createdAt" in patch) row.created_at = patch.createdAt;
 
     if (Object.keys(row).length === 0) return this.getLead(id);
@@ -584,6 +603,18 @@ export class D1Store implements LeadRepository {
       .bind(id, this.workspaceId)
       .first<LeadRow>();
     return row ? rowToLead(row) : null;
+  }
+
+  async deleteLead(id: string): Promise<boolean> {
+    await this.db
+      .prepare(`DELETE FROM outreach WHERE lead_id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .run();
+    const result = await this.db
+      .prepare(`DELETE FROM leads WHERE id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .run();
+    return (result.meta?.changes ?? 0) > 0;
   }
 
   async listLeads(filter?: LeadListFilter): Promise<Lead[]> {

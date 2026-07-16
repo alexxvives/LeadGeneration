@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { StarIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
+import { Select } from "@/components/ui/Select";
 import { api } from "@/lib/client-api";
 import { PLAN_ORDER, PLANS } from "@/lib/plans";
 import type { PlanId } from "@/lib/types";
@@ -84,11 +85,11 @@ export function DeveloperModePanel({
         </button>
         <label className="inline-flex items-center gap-2">
           <span className="text-xs font-medium text-mist-500">Plan</span>
-          <select
+          <Select
             value={planId}
             disabled={settingPlan}
             onChange={(e) => void onPlanChange(e.target.value as PlanId)}
-            className="select-ink py-2 text-sm"
+            className="py-2 text-sm"
             aria-label="Override plan"
           >
             {PLAN_ORDER.map((id) => (
@@ -96,7 +97,7 @@ export function DeveloperModePanel({
                 {PLANS[id].name}
               </option>
             ))}
-          </select>
+          </Select>
           {settingPlan ? <Spinner className="h-3.5 w-3.5 text-mist-500" /> : null}
         </label>
       </div>

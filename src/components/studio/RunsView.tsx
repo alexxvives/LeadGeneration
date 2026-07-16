@@ -52,11 +52,11 @@ export function RunsView({
         return (
           <div
             key={r.id}
-            className={`flex flex-wrap items-center gap-4 px-5 py-4 ${
+            className={`grid grid-cols-1 items-center gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_7.5rem] sm:gap-4 ${
               i > 0 ? "border-t border-white/5" : ""
             } ${isActive ? "bg-aurora-400/5" : ""}`}
           >
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0">
               <p className="truncate font-medium">
                 {r.niche}
                 {r.location ? (
@@ -67,9 +67,11 @@ export function RunsView({
                 {new Date(r.createdAt).toLocaleString()} · {r.provider} · {r.mode}
               </p>
             </div>
-            <span className="text-sm tabular-nums text-mist-300">{r.leadCount} leads</span>
+            <span className="text-sm tabular-nums text-mist-300 sm:text-right">
+              {r.leadCount} leads
+            </span>
             <span
-              className={`text-xs font-medium uppercase tracking-wider ${
+              className={`text-xs font-medium uppercase tracking-wider sm:text-center ${
                 r.status === "complete"
                   ? "text-aurora-300"
                   : r.status === "failed"
@@ -79,12 +81,12 @@ export function RunsView({
             >
               {r.status}
             </span>
-            {isActive ? (
-              <span className="rounded-full border border-aurora-400/30 bg-aurora-400/10 px-3 py-1 text-xs font-medium text-aurora-300">
-                On board
-              </span>
-            ) : (
-              openable && (
+            <div className="sm:flex sm:justify-end">
+              {isActive ? (
+                <span className="inline-flex rounded-full border border-aurora-400/30 bg-aurora-400/10 px-3 py-1 text-xs font-medium text-aurora-300">
+                  On board
+                </span>
+              ) : openable ? (
                 <button
                   type="button"
                   onClick={() => onOpenRun(r.id)}
@@ -92,8 +94,12 @@ export function RunsView({
                 >
                   Open on board
                 </button>
-              )
-            )}
+              ) : (
+                <span className="invisible px-3 py-1 text-xs" aria-hidden>
+                  —
+                </span>
+              )}
+            </div>
           </div>
         );
       })}
