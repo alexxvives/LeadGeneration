@@ -97,6 +97,7 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
         sendsUsed: 0,
         sendsLimit: free.sendsPerMonth,
         resetsAt: null,
+        emailVerifyEnabled: true,
       };
     }
     const fresh = await ensureUsageWindow(ctx.db, ws);
@@ -110,6 +111,7 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
       sendsUsed: fresh.sendsUsedThisMonth,
       sendsLimit: plan.sendsPerMonth,
       resetsAt: fresh.resetsAt,
+      emailVerifyEnabled: fresh.emailVerifyEnabled !== false,
     };
   } catch (err) {
     console.error("[getWorkspaceSummary] failed", err);
@@ -122,6 +124,7 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
       sendsUsed: 0,
       sendsLimit: free.sendsPerMonth,
       resetsAt: null,
+      emailVerifyEnabled: true,
     };
   }
 }

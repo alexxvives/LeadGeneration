@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-16 — Zeruh toggle, pitch `<br>`, profile freshness
+- Zeruh verifies **emails** (deliverability), not domain DNS. Workspace
+  `emailVerifyEnabled` (migration 0014) gates send-time verify; Settings → Easy
+  shows the toggle + remaining-credits bar beside Leads/Sends.
+- Free Zeruh: ~250 signup + ~100/mo; paid ~$0.003–0.008/verify at peers
+  (NeverBounce/ZeroBounce). Platform key today — BYO per user is optional later.
+- Preview CSS `br { display:block; content:'' }` collapsed line breaks — removed.
+- Search profile picker must call `setActiveOutreachProfile` so Create draft uses
+  the current pitch, not a stale Settings activeId / run.offerNotes.
+
 ### 2026-07-16 — Studio UX polish + relevance-first fit
 - Discarded CRM stage removed — delete covers bad leads; `normalizeCrmStage`
   maps legacy `discarded` → `not_interested`.

@@ -23,12 +23,15 @@ import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 import {
   draftFlagsFromProfile,
+  loadOutreachProfiles,
   loadSenderProfile,
   pitchForLang,
   resolveDraftLang,
   resolveSignature,
   subjectForLang,
 } from "@/lib/sender-profile";
+import { ZeruhUsageBar } from "./EmailVerifySettings";
+import Link from "next/link";
 import { BoardAssignModal, type BoardDestination } from "./BoardAssignModal";
 import { DashboardView } from "./DashboardView";
 import { BoardsView } from "./BoardsView";
@@ -99,6 +102,7 @@ export function Studio() {
   const [fcBefore, setFcBefore] = useState<FirecrawlUsage | null>(null);
   const [zeruhUsageKey, setZeruhUsageKey] = useState(0);
   const [zeruhBefore, setZeruhBefore] = useState<ZeruhUsage | null>(null);
+  const [activeProfileName, setActiveProfileName] = useState<string | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<{
@@ -175,19 +179,25 @@ export function Studio() {
     void refresh().catch((e) => toast("err", e.message));
   }, [filterBoardId, boardParam, refresh, toast]);
 
-  const loadRunOnBoard = useCallback(
-    async (runId: string) => {
-      activeRunIdRef.current = runId;
-      setActiveRunId(runId);
-      try {
-        await refresh();
-        setView("pipeline");
-      } catch (e) {
-        handleError(e);
-      }
-    },
-    [refresh, setView, handleError],
-  );
+  const syncActiveProfileName = useCallback(() => {
+    const { profiles, activeId } = loadOutreachProfiles();
+    const active =
+      (activeId && profiles.find((p) => p.id === activeId)) || profiles[0];
+    setActiveProfileName(active?.name?.trim() || null);
+  }, []);
+
+  useEffect(() => {
+    syncActiveProfileName();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "leadify_sender_profiles") syncActiveProfileName();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", syncActiveProfileName);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", syncActiveProfileName);
+    };
+  }, [syncActiveProfileName, view]);
 
   useEffect(() => {
     refresh()
@@ -870,7 +880,11 @@ export function Studio() {
           ) : null}
           {view !== "dashboard" && view !== "boards" && board?.workspace && (
             <div className="hidden min-w-[16rem] flex-col gap-1 sm:flex sm:min-w-[20rem]">
-              <div className="grid grid-cols-2 gap-3">
+              <div
+                className={`grid gap-3 ${
+                  board.capabilities.emailVerify ? "grid-cols-3" : "grid-cols-2"
+                }`}
+              >
                 <UsageBar
                   label="Leads"
                   used={board.workspace.leadsUsed}
@@ -881,6 +895,9 @@ export function Studio() {
                   used={board.workspace.sendsUsed}
                   limit={board.workspace.sendsLimit}
                 />
+                {board.capabilities.emailVerify ? (
+                  <ZeruhUsageBar refreshKey={zeruhUsageKey} />
+                ) : null}
               </div>
               {!board.workspace.metered && (
                 <p className="text-[10px] text-mist-500">
@@ -891,6 +908,23 @@ export function Studio() {
           )}
         </div>
       </div>
+
+      {(view === "board" || view === "outreach") && activeProfileName ? (
+        <p className="mb-3 shrink-0 text-xs text-mist-500">
+          Outreach profile ·{" "}
+          <span className="font-medium text-mist-200">{activeProfileName}</span>
+          <span className="text-mist-600">
+            {" "}
+            — drafts use this profile’s current pitch
+          </span>
+          <Link
+            href="/app/settings"
+            className="ml-2 text-aurora-300/90 hover:underline"
+          >
+            Edit
+          </Link>
+        </p>
+      ) : null}
 
       {/* Dashboard */}
       {view === "dashboard" && (
@@ -921,6 +955,7 @@ export function Studio() {
                 ? Math.max(0, board.workspace.leadsLimit - board.workspace.leadsUsed)
                 : null
             }
+            onProfileChange={syncActiveProfileName}
           />
           {running && <SearchProgress running={running} />}
           {!canSearchLive && !running && (
@@ -1063,10 +1098,7 @@ export function Studio() {
 
       {/* Runs view */}
       {view === "runs" && (
-        <RunsView
-          activeRunId={activeRunId ?? board?.run?.id ?? null}
-          onOpenRun={loadRunOnBoard}
-        />
+        <RunsView activeRunId={activeRunId ?? board?.run?.id ?? null} />
       )}
 
       {selected && board && (

@@ -8,6 +8,7 @@ import {
   type EmailSettingsValues,
 } from "@/components/studio/EmailSettingsForm";
 import { DomainHealthPanel } from "@/components/studio/DomainHealthChecklist";
+import { EmailVerifySettings } from "@/components/studio/EmailVerifySettings";
 import {
   loadWarmupProfile,
   recommendedDailySoftCap,
@@ -29,6 +30,8 @@ export function SendSetupPanel({
   mailbox: mailboxInitial,
   defaultPath = "easy",
   appUrlLooksLocal = false,
+  canVerifyEmail = false,
+  emailVerifyEnabled = true,
 }: {
   initial: EmailSettingsValues;
   defaults: EmailSettingsDefaults;
@@ -38,6 +41,9 @@ export function SendSetupPanel({
   defaultPath?: PathId;
   /** True when Gmail OAuth is configured but NEXTAUTH_URL still points at localhost. */
   appUrlLooksLocal?: boolean;
+  /** Server has Zeruh / Maileroo Verify key. */
+  canVerifyEmail?: boolean;
+  emailVerifyEnabled?: boolean;
 }) {
   void _canSendEmail;
   const [path, setPath] = useState<PathId>(defaultPath);
@@ -161,24 +167,16 @@ export function SendSetupPanel({
             easyProvider={easyProvider}
             onEasyProviderChange={setEasyProvider}
           />
-          {isMaileroo ? (
-            <p className="mt-4 text-xs leading-relaxed text-mist-500">
-              Domain DNS: in the{" "}
-              <a
-                href="https://maileroo.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-aurora-300 hover:underline"
-              >
-                Maileroo dashboard
-              </a>
-              , add SPF / DKIM / DMARC at your DNS host, then wait for verified.
-            </p>
-          ) : (
+          {!isMaileroo ? (
             <div className="mt-4">
               <DomainHealthPanel compact />
             </div>
-          )}
+          ) : null}
+          <EmailVerifySettings
+            canVerify={canVerifyEmail}
+            initialEnabled={emailVerifyEnabled}
+            canEdit={canEdit}
+          />
         </div>
       ) : (
         <div className="space-y-5">

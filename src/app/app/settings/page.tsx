@@ -8,6 +8,7 @@ import { BillingActions } from "@/components/studio/BillingActions";
 import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
 import { DeveloperModePanel } from "@/components/studio/DeveloperModePanel";
 import { SendSetupPanel } from "@/components/studio/SendSetupPanel";
+import { ZeruhUsageBar } from "@/components/studio/EmailVerifySettings";
 import Link from "next/link";
 
 export const runtime = "nodejs";
@@ -102,6 +103,8 @@ export default async function SettingsPage({
           mailbox={mailbox}
           defaultPath={defaultPath}
           appUrlLooksLocal={caps.gmailOAuth && appUrlLooksLocal}
+          canVerifyEmail={caps.emailVerify}
+          emailVerifyEnabled={ws?.emailVerifyEnabled !== false}
           initial={{
             fromName: ws?.fromName ?? null,
             fromEmail: ws?.fromEmail ?? null,
@@ -180,9 +183,18 @@ export default async function SettingsPage({
           </div>
           {usage && (
             <div className="mt-5">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div
+                className={`grid gap-4 ${
+                  caps.emailVerify && usage.emailVerifyEnabled
+                    ? "sm:grid-cols-3"
+                    : "sm:grid-cols-2"
+                }`}
+              >
                 <UsageBar label="Lead credits" used={usage.leadsUsed} limit={usage.leadsLimit} />
                 <UsageBar label="Sends" used={usage.sendsUsed} limit={usage.sendsLimit} />
+                {caps.emailVerify && usage.emailVerifyEnabled ? (
+                  <ZeruhUsageBar />
+                ) : null}
               </div>
               {!usage.metered && (
                 <p className="mt-2 text-xs text-mist-500">

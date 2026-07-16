@@ -13,6 +13,7 @@ import {
   loadSenderProfile,
   pitchForLang,
   resolveSignature,
+  setActiveOutreachProfile,
   subjectForLang,
   type OutreachProfile,
 } from "@/lib/sender-profile";
@@ -209,6 +210,7 @@ export function SearchPanel({
   compact = false,
   planId = "free",
   leadsRemaining = null,
+  onProfileChange,
 }: {
   onSearch: (v: SearchValues) => void;
   running: boolean;
@@ -217,6 +219,8 @@ export function SearchPanel({
   planId?: PlanId;
   /** Remaining monthly lead credits (null = unmetered / unknown). */
   leadsRemaining?: number | null;
+  /** Fired when the Search profile picker changes the active profile. */
+  onProfileChange?: () => void;
 }) {
   const [niche, setNiche] = useState("");
   const [location, setLocation] = useState("");
@@ -495,7 +499,13 @@ export function SearchPanel({
             <Select
               id="search-outreach-profile"
               value={profileId}
-              onChange={(e) => setProfileId(e.target.value)}
+              onChange={(e) => {
+                const id = e.target.value;
+                setProfileId(id);
+                // Keep Settings / draft creation on the same active profile.
+                if (id) setActiveOutreachProfile(id);
+                onProfileChange?.();
+              }}
               title="Optional — without one, leads go to Review with no draft"
               className="w-full py-2 text-sm"
             >

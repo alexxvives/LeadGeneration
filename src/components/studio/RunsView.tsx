@@ -5,13 +5,8 @@ import { api } from "@/lib/client-api";
 import type { Run } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 
-export function RunsView({
-  activeRunId,
-  onOpenRun,
-}: {
-  activeRunId: string | null;
-  onOpenRun: (runId: string) => void;
-}) {
+/** Search history — informative only (board filter lives in Pipeline / Leads). */
+export function RunsView({ activeRunId }: { activeRunId: string | null }) {
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -48,11 +43,10 @@ export function RunsView({
     <div className="overflow-hidden rounded-xl2 border border-white/10">
       {runs.map((r, i) => {
         const isActive = r.id === activeRunId;
-        const openable = r.status === "complete" && r.leadCount > 0;
         return (
           <div
             key={r.id}
-            className={`grid grid-cols-1 items-center gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_7.5rem] sm:gap-4 ${
+            className={`grid grid-cols-1 items-center gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem] sm:gap-4 ${
               i > 0 ? "border-t border-white/5" : ""
             } ${isActive ? "bg-aurora-400/5" : ""}`}
           >
@@ -81,25 +75,6 @@ export function RunsView({
             >
               {r.status}
             </span>
-            <div className="sm:flex sm:justify-end">
-              {isActive ? (
-                <span className="inline-flex rounded-full border border-aurora-400/30 bg-aurora-400/10 px-3 py-1 text-xs font-medium text-aurora-300">
-                  On board
-                </span>
-              ) : openable ? (
-                <button
-                  type="button"
-                  onClick={() => onOpenRun(r.id)}
-                  className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-300 transition-colors hover:border-white/20 hover:text-mist-100"
-                >
-                  Open on board
-                </button>
-              ) : (
-                <span className="invisible px-3 py-1 text-xs" aria-hidden>
-                  —
-                </span>
-              )}
-            </div>
           </div>
         );
       })}

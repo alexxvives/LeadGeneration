@@ -36,6 +36,8 @@ const PatchSchema = z.object({
   mailerooApiKey: optionalKey,
   easyEmailProvider: z.enum(["resend", "maileroo"]).optional(),
   preferredSendPath: z.enum(["easy", "pro"]).nullable().optional(),
+  /** Zeruh list-hygiene at send (requires server verify key). */
+  emailVerifyEnabled: z.boolean().optional(),
   /** When true, clear Resend key (explicit wipe). */
   clearResendApiKey: z.boolean().optional(),
   /** When true, clear Maileroo key (explicit wipe). */
@@ -74,6 +76,9 @@ export async function PATCH(req: Request) {
   if (data.physicalAddress !== undefined) patch.physicalAddress = data.physicalAddress;
   if (data.easyEmailProvider !== undefined) patch.easyEmailProvider = data.easyEmailProvider;
   if (data.preferredSendPath !== undefined) patch.preferredSendPath = data.preferredSendPath;
+  if (data.emailVerifyEnabled !== undefined) {
+    patch.emailVerifyEnabled = data.emailVerifyEnabled;
+  }
 
   // Keys: only update when a new value is provided, or explicit clear flags.
   if (data.clearResendApiKey) patch.resendApiKey = null;

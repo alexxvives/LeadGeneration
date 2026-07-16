@@ -76,19 +76,47 @@ export function UsageBar({
   label,
   used,
   limit,
+  remaining,
 }: {
   label: string;
-  used: number;
-  limit: number;
+  used?: number;
+  limit?: number;
+  /** Provider credit balance (e.g. Zeruh) — bar fills toward a soft full of 250. */
+  remaining?: number;
 }) {
-  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  if (remaining != null) {
+    const softFull = 250;
+    const pct = Math.min(100, Math.round((remaining / softFull) * 100));
+    const tone =
+      remaining <= 0 ? "bg-rose-400" : remaining < 25 ? "bg-amber-400" : "bg-aurora-400";
+    return (
+      <div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-mist-300">{label}</span>
+          <span className="tabular-nums text-mist-500">
+            {remaining.toLocaleString()} left
+          </span>
+        </div>
+        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className={`h-full rounded-full ${tone} transition-all`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const u = used ?? 0;
+  const lim = limit ?? 0;
+  const pct = lim > 0 ? Math.min(100, Math.round((u / lim) * 100)) : 0;
   const tone = pct >= 100 ? "bg-rose-400" : pct >= 80 ? "bg-amber-400" : "bg-aurora-400";
   return (
     <div>
       <div className="flex items-center justify-between text-sm">
         <span className="text-mist-300">{label}</span>
         <span className="tabular-nums text-mist-500">
-          {used} / {limit}
+          {u} / {lim}
         </span>
       </div>
       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">

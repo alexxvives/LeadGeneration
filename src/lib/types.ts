@@ -174,6 +174,11 @@ export interface Workspace {
    * connected, otherwise Easy. Google send only runs when this is `"pro"`.
    */
   preferredSendPath: "easy" | "pro" | null;
+  /**
+   * When true (default) and the server has a Zeruh key, verify recipient
+   * emails at send. Off skips the check (saves credits).
+   */
+  emailVerifyEnabled: boolean;
   /** Pro path: one connected mailbox (multi-inbox deferred — ADR 0010). */
   connectedMailbox: ConnectedMailbox | null;
 }
@@ -312,6 +317,8 @@ export interface WorkspaceSummary {
   sendsUsed: number;
   sendsLimit: number;
   resetsAt: string | null;
+  /** Workspace wants Zeruh verify at send (requires server key). */
+  emailVerifyEnabled: boolean;
 }
 
 export interface CreateRunInput {

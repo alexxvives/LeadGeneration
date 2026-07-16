@@ -274,9 +274,6 @@ function OutreachRow({
         {lead.outreach?.status === "failed" && lead.outreach.error ? (
           <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
         ) : null}
-        {bucket === "review" ? (
-          <p className="mt-1 text-[10px] text-mist-600">No draft yet</p>
-        ) : null}
         {bucket === "contacted" && methodLabel ? (
           <p className="mt-1 text-[10px] text-amber-200/70">{methodLabel}</p>
         ) : null}

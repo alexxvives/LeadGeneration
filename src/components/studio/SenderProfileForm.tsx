@@ -593,43 +593,6 @@ export function SenderProfileForm() {
               onBlur={() => saveOnBlur("pitch")}
               placeholder={`Write your ${langLabel(previewLang)} email body…`}
             />
-            <button
-              type="button"
-              role="switch"
-              aria-checked={Boolean(profile.aiPersonalize)}
-              onClick={() => {
-                const on = !profile.aiPersonalize;
-                persist(
-                  { ...profile, aiPersonalize: on, staticBody: !on },
-                  null,
-                );
-              }}
-              className={`mt-2 flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors ${
-                profile.aiPersonalize
-                  ? "border-aurora-400/35 bg-aurora-400/10"
-                  : "border-white/10 bg-ink-950/40 hover:border-white/15 hover:bg-ink-950/60"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-mist-100">
-                  AI personalize each email
-                </span>
-                <span className="mt-0.5 block text-[11px] leading-snug text-mist-500">
-                  Slightly vary wording per lead from this template
-                </span>
-              </span>
-              <span
-                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                  profile.aiPersonalize ? "bg-aurora-400" : "bg-white/15"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-ink-950 shadow transition-transform ${
-                    profile.aiPersonalize ? "left-5" : "left-0.5"
-                  }`}
-                />
-              </span>
-            </button>
             {genProvider && !genError && (
               <p className="mt-1.5 text-xs text-mist-500">
                 Generated with{" "}
@@ -732,7 +695,7 @@ export function SenderProfileForm() {
             <p className="mt-0.5 font-medium text-mist-100">{preview.subject}</p>
             <div className="mt-4 border-t border-white/5 pt-4">
               <div
-                className="pitch-preview font-sans text-sm leading-relaxed text-mist-300 [&_b]:font-semibold [&_strong]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_br]:block [&_br]:content-[''] [&_br]:leading-[1.55]"
+                className="pitch-preview font-sans text-sm leading-relaxed text-mist-300 [&_b]:font-semibold [&_strong]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
                 dangerouslySetInnerHTML={{
                   __html: normalizePitchHtml(preview.body),
                 }}
@@ -744,6 +707,43 @@ export function SenderProfileForm() {
                 auto-translate from your existing version, or write it on the left.
               </p>
             ) : null}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(profile.aiPersonalize)}
+              onClick={() => {
+                const on = !profile.aiPersonalize;
+                persist(
+                  { ...profile, aiPersonalize: on, staticBody: !on },
+                  null,
+                );
+              }}
+              className={`mt-4 flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors ${
+                profile.aiPersonalize
+                  ? "border-aurora-400/35 bg-aurora-400/10"
+                  : "border-white/10 bg-ink-950/40 hover:border-white/15 hover:bg-ink-950/60"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-mist-100">
+                  AI personalize each email
+                </span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-mist-500">
+                  Slightly vary wording per lead from this template
+                </span>
+              </span>
+              <span
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                  profile.aiPersonalize ? "bg-aurora-400" : "bg-white/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-ink-950 shadow transition-transform ${
+                    profile.aiPersonalize ? "left-5" : "left-0.5"
+                  }`}
+                />
+              </span>
+            </button>
           </div>
         ) : null}
       </div>

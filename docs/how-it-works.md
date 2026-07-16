@@ -82,8 +82,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     edits. Send remains per-lead after approve (constitution Art. I.1).
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
-    mode, lead count, status). **"Open on board"** loads that run's leads into
-    Pipeline.
+    mode, lead count, status). Informative only — board filter lives in
+    Pipeline / Leads.
 
   - **Boards** (`?view=boards`) — create / rename / delete named lead
     collections. Every workspace has a non-deletable **Default** board. Also
@@ -200,8 +200,7 @@ the local JSON-store path is always unmetered/demo.
 A `Run` has many `Lead`s; each `Lead` has at most one `Outreach`. By default everything is persisted to `data/db.json` (git-ignored — delete it
 to reset); in production on Cloudflare Workers, `getDb()` receives a D1 binding
 and uses `D1Store` instead. Pipeline/Leads respect the sidebar board filter
-(**All** by default). **Runs → Open on board** still loads that run's leads.
-Each workspace has a **Default** board; see ADR 0014.
+(**All** by default). Each workspace has a **Default** board; see ADR 0014.
 
 ## 6. Guardrails baked into the flow
 

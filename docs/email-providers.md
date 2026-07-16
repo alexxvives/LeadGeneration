@@ -111,12 +111,14 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - `src/lib/email/domain-health.ts` + `POST /api/providers/resend/domain-health`:
   live SPF/DKIM rows from Resend Domains API (demo-safe when no key).
 - `src/lib/email/verify.ts`: Zeruh/Maileroo verify **at send** only
-  (`sendApprovedOutreach`). Credits badge: `GET /api/providers/zeruh/usage`.
+  (`sendApprovedOutreach`) when workspace `emailVerifyEnabled` is on.
+  Credits bar in Settings + studio; `GET /api/providers/zeruh/usage`.
 - Quotas + rate limits in `service.ts`.
-- Settings → Easy Resend **or** Maileroo wizard + Pro mailbox Connect Google
-  (`SendSetupPanel`). Workspace `preferredSendPath` chooses Easy vs Pro at send
-  time (Google does not hijack Easy). API keys are stored server-side; Settings
-  only receives `hasResendKey` / `hasMailerooKey` flags.
+- Settings → Easy: Resend **or** Maileroo + **Verify emails before send**
+  (Zeruh) toggle; Pro mailbox Connect Google (`SendSetupPanel`).
+  Workspace `preferredSendPath` chooses Easy vs Pro at send time.
+  API keys are stored server-side; Settings only receives `hasResendKey` /
+  `hasMailerooKey` flags.
 - Stay pluggable: swapping providers is config, not a rewrite.
 - **Webhooks:** `POST /api/webhooks/resend` and `POST /api/webhooks/maileroo`
   (public) — prefer tags (`leadify_ws` + `leadify_outreach`), else latest sent

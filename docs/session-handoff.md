@@ -9,23 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-16 (pitch editor + draft freshness)
+## ⏱️ Status — updated 2026-07-16 (Zeruh toggle + outreach UX)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Pitch editor: strip paste styles, Clear formatting, preserve line breaks;
-  no “Template text · placeholders OK”; unified placeholder ? help.
-- Drafts always use latest profile body (no stale run.offerNotes fallback);
-  Create drafts then opens composer; Profile 1 naming; AI toggle restyle.
-- Body↔sign-off single break; company shortens before “. ” subtitle.
+- Removed Maileroo “Domain DNS…” blurb; Easy path has Zeruh **verify emails**
+  toggle + credits bar (Leads/Sends/Verifies). Migration `0014_email_verify_enabled`.
+- Pitch preview `<br>` fix; AI personalize moved under preview; “No draft yet”
+  removed; Runs is informational only; active profile shown on Search/Outreach.
+- Drafts sync to Search’s selected profile (`setActiveOutreachProfile`).
 
 ### Next
-1. Point Maileroo/Resend dashboards at the webhook URL in Settings → Easy.
+1. Apply D1 migration `0014` on prod (`npm run cf:migrate`) before deploy.
 2. Soft-cap warning popup on send; Microsoft Graph Mail.Send.
 3. Confirm `MAILEROO_VERIFY_API_KEY` in prod Wrangler secrets.
-4. Deploy this batch when user asks.
+4. Deploy when user asks.
 
 ---
 

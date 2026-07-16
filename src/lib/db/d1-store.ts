@@ -67,6 +67,8 @@ type WorkspaceRow = {
   preferred_send_path: string | null;
   // Connected mailbox JSON (migration 0008)
   connected_mailbox_json: string | null;
+  /** Migration 0014 — 0/1; null treated as enabled. */
+  email_verify_enabled: number | null;
 };
 
 type BoardRow = {
@@ -181,6 +183,7 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
       r.preferred_send_path === "pro" || r.preferred_send_path === "easy"
         ? r.preferred_send_path
         : null,
+    emailVerifyEnabled: r.email_verify_enabled === 0 ? false : true,
     connectedMailbox: parseConnectedMailbox(r.connected_mailbox_json),
   };
 }
@@ -377,6 +380,9 @@ export class D1Store implements LeadRepository {
     if ("easyEmailProvider" in patch) row.easy_email_provider = patch.easyEmailProvider ?? "resend";
     if ("preferredSendPath" in patch) {
       row.preferred_send_path = patch.preferredSendPath ?? null;
+    }
+    if ("emailVerifyEnabled" in patch) {
+      row.email_verify_enabled = patch.emailVerifyEnabled === false ? 0 : 1;
     }
     if ("connectedMailbox" in patch) {
       row.connected_mailbox_json = patch.connectedMailbox

@@ -19,9 +19,12 @@ export async function GET(req: Request) {
     !!ws?.resendApiKey?.trim() ||
     !!ws?.mailerooApiKey?.trim() ||
     !!ws?.connectedMailbox;
+  // Effective verify = server key present AND workspace opted in.
+  const emailVerify =
+    caps.emailVerify && (ws?.emailVerifyEnabled !== false);
   return NextResponse.json({
     ...board,
-    capabilities: { ...caps, canSendEmail },
+    capabilities: { ...caps, canSendEmail, emailVerify },
     workspace,
   });
 }

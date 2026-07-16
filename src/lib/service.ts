@@ -692,13 +692,17 @@ export async function sendApprovedOutreach(
   }
 
   // List hygiene — Zeruh verify at send only (not on enrich). Blocks hard
-  // undeliverables when a verify key is configured.
-  const verified = await verifyEmail(outreach.toEmail);
-  if (!verified.okToSend) {
-    return {
-      ok: false,
-      error: `Email looks undeliverable (${verified.reason ?? verified.status}). Pick another address or discard this lead.`,
-    };
+  // undeliverables when a verify key is configured and the workspace opted in.
+  const wsForVerify = await db.getWorkspace(ctx.workspaceId);
+  const verifyOn = wsForVerify?.emailVerifyEnabled !== false;
+  if (verifyOn) {
+    const verified = await verifyEmail(outreach.toEmail);
+    if (!verified.okToSend) {
+      return {
+        ok: false,
+        error: `Email looks undeliverable (${verified.reason ?? verified.status}). Pick another address or discard this lead.`,
+      };
+    }
   }
 
   // Send quota (metered only). Throws QuotaError → the route returns 402.
@@ -904,6 +908,7 @@ export async function updateWorkspaceEmailSettings(
     mailerooApiKey?: string | null;
     easyEmailProvider?: EasyEmailProvider;
     preferredSendPath?: "easy" | "pro" | null;
+    emailVerifyEnabled?: boolean;
   },
 ): Promise<void> {
   const updated = await ctx.db.updateWorkspace(ctx.workspaceId, {
