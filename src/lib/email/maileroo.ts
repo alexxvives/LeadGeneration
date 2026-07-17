@@ -48,11 +48,16 @@ export async function sendViaMaileroo(opts: {
     }
 
     if (!res.ok) {
-      const msg =
+      const raw =
         (typeof json.message === "string" && json.message) ||
         (typeof json.error === "string" && json.error) ||
         text.slice(0, 200) ||
         `Maileroo HTTP ${res.status}`;
+      // Wrong key pasted into Settings → Maileroo (e.g. a verify key) often
+      // returns X-API-Key wording — point the user at the send key.
+      const msg = /invalid api key|x-api-key/i.test(raw)
+        ? `${raw} — Check Settings → Sending: Maileroo needs a Sending Key from your Maileroo domain (not a verify / MyEmailVerifier key).`
+        : raw;
       return { ok: false, error: msg };
     }
 

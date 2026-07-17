@@ -2,11 +2,8 @@ import { NextResponse } from "next/server";
 import { env, getCapabilities } from "@/lib/config";
 
 /**
- * Proxy Zeruh account credits. Never exposes the API key — only remaining
- * permanent + recurring credits. Demo mode (no key) returns { available: false }.
- *
- * Zeruh: 1 credit = 1 email verification. Account endpoint:
- * https://api.zeruh.com/v1/account
+ * Proxy verify-provider credit balance. Never exposes the API key.
+ * Prefer MyEmailVerifier (getcredits); else Zeruh account endpoint.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,27 +16,70 @@ type ZeruhAccountPayload = {
   };
 };
 
+function empty(provider: "myemailverifier" | "zeruh", error?: string) {
+  return NextResponse.json({
+    available: false,
+    provider,
+    remainingCredits: null,
+    permanentCredits: null,
+    recurringCredits: null,
+    dailyFreeHint: provider === "myemailverifier" ? 100 : null,
+    ...(error ? { error } : {}),
+  });
+}
+
 export async function GET() {
   const caps = getCapabilities();
   if (!caps.emailVerify) {
-    return NextResponse.json({
-      available: false,
-      provider: "zeruh" as const,
-      remainingCredits: null,
-      permanentCredits: null,
-      recurringCredits: null,
-    });
+    return empty("zeruh");
   }
 
-  const key = env.emailVerifyKey();
+  const mev = env.myEmailVerifierKey();
+  if (mev) {
+    try {
+      const res = await fetch(
+        `https://client.myemailverifier.com/verifier/getcredits/${encodeURIComponent(mev)}`,
+        {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(10_000),
+          cache: "no-store",
+        },
+      );
+      const text = await res.text().catch(() => "");
+      if (!res.ok) {
+        return empty(
+          "myemailverifier",
+          `MyEmailVerifier credits unavailable (${res.status}): ${text.slice(0, 120)}`,
+        );
+      }
+      let credits: number | null = null;
+      try {
+        const json = JSON.parse(text) as { credits?: string | number };
+        const n = Number(json.credits);
+        credits = Number.isFinite(n) ? n : null;
+      } catch {
+        return empty("myemailverifier", "Could not parse credits response");
+      }
+      return NextResponse.json({
+        available: credits != null,
+        provider: "myemailverifier" as const,
+        remainingCredits: credits,
+        permanentCredits: credits,
+        recurringCredits: null,
+        dailyFreeHint: 100,
+      });
+    } catch (e) {
+      return empty(
+        "myemailverifier",
+        e instanceof Error ? e.message : "Failed to fetch credits",
+      );
+    }
+  }
+
+  const key = env.zeruhVerifyKey();
   if (!key) {
-    return NextResponse.json({
-      available: false,
-      provider: "zeruh" as const,
-      remainingCredits: null,
-      permanentCredits: null,
-      recurringCredits: null,
-    });
+    return empty("zeruh");
   }
 
   try {
@@ -54,16 +94,9 @@ export async function GET() {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      return NextResponse.json(
-        {
-          available: false,
-          provider: "zeruh" as const,
-          remainingCredits: null,
-          permanentCredits: null,
-          recurringCredits: null,
-          error: `Zeruh usage unavailable (${res.status}): ${text.slice(0, 120)}`,
-        },
-        { status: 200 },
+      return empty(
+        "zeruh",
+        `Zeruh usage unavailable (${res.status}): ${text.slice(0, 120)}`,
       );
     }
     const json = (await res.json()) as ZeruhAccountPayload;
@@ -86,15 +119,12 @@ export async function GET() {
       remainingCredits: remaining,
       permanentCredits: permanent,
       recurringCredits: recurring,
+      dailyFreeHint: null,
     });
   } catch (e) {
-    return NextResponse.json({
-      available: false,
-      provider: "zeruh" as const,
-      remainingCredits: null,
-      permanentCredits: null,
-      recurringCredits: null,
-      error: e instanceof Error ? e.message : "Failed to fetch usage",
-    });
+    return empty(
+      "zeruh",
+      e instanceof Error ? e.message : "Failed to fetch usage",
+    );
   }
 }

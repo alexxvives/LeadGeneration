@@ -89,8 +89,9 @@ won't disturb the approval/send flow.
    rewrites lead `aboutBlurb` from scraped text after live search. Still to do:
    Firecrawl `/extract` for typed `{ company, emails[], phones[], contactName, services[] }`.
    Heuristic extract remains the zero-key fallback.
-2. **Email verification.** ✅ _Shipped (send-time)_ — Zeruh via
-   `MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY` in `sendApprovedOutreach`. Blocks
+2. **Email verification.** ✅ _Shipped (send-time)_ — MyEmailVerifier
+   (`MYEMAILVERIFIER_API_KEY`, preferred) or Zeruh
+   (`MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY`) in `sendApprovedOutreach`. Blocks
    hard undeliverables. Not run on enrich (credit cost + Excel import parity).
    Still to do: persist a `deliverable` flag on the lead for UI ranking.
 3. **Smarter query building.** ✅ _Shipped_ — `query.ts` expands the niche into

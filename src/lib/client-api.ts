@@ -240,9 +240,11 @@ export type FirecrawlUsage = {
 
 export type ZeruhUsage = {
   available: boolean;
-  provider: "zeruh";
+  provider: "zeruh" | "myemailverifier";
   remainingCredits: number | null;
   permanentCredits: number | null;
   recurringCredits: number | null;
+  /** MyEmailVerifier free tier hint (100/day) — for UI copy only. */
+  dailyFreeHint?: number | null;
   error?: string;
 };

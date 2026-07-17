@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
+import { MailboxAgePicker } from "@/components/studio/MailboxAgePicker";
 import type { EasyEmailProvider } from "@/lib/types";
 
 /** Visual stand-in when a key is saved — never the real secret (Art. III.5). */
@@ -281,24 +282,27 @@ export function EmailSettingsForm({
             className={inputCls}
           />
         </Field>
-        <Field
-          label="From email"
-          hint={fromLocked ? "From your connected mailbox" : undefined}
-          saved={saved && savedHint === "fromEmail"}
-        >
-          <input
-            type="email"
-            value={fromLocked ? lockedFromEmail! : (values.fromEmail ?? "")}
-            onChange={(e) => setField("fromEmail", e.target.value)}
-            onFocus={captureFocus}
-            onBlur={() => {
-              if (!fromLocked) void saveIfChanged();
-            }}
-            placeholder={defaults.fromEmail}
-            disabled={!canEdit || fromLocked}
-            className={inputCls}
-          />
-        </Field>
+        <div>
+          <Field
+            label="From email"
+            hint={fromLocked ? "From your connected mailbox" : undefined}
+            saved={saved && savedHint === "fromEmail"}
+          >
+            <input
+              type="email"
+              value={fromLocked ? lockedFromEmail! : (values.fromEmail ?? "")}
+              onChange={(e) => setField("fromEmail", e.target.value)}
+              onFocus={captureFocus}
+              onBlur={() => {
+                if (!fromLocked) void saveIfChanged();
+              }}
+              placeholder={defaults.fromEmail}
+              disabled={!canEdit || fromLocked}
+              className={inputCls}
+            />
+          </Field>
+          <MailboxAgePicker disabled={!canEdit} />
+        </div>
       </div>
 
       {!isPro && (

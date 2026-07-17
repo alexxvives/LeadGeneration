@@ -1,12 +1,9 @@
 /**
  * Soft warmup guidance — recommend daily send caps; never hard-block.
  *
- * We cannot know if a mailbox/domain is “warm” from providers. Heuristics:
- *  - optional self-report when linking a mailbox (age + volume)
- *  - otherwise assume cold/new and recommend a low daily ramp
- *
- * Enforcement is UI-only: warn once per send over the recommend; user can
- * continue. Plan quotas + per-minute rate limits remain hard guards.
+ * Self-report mailbox age next to From email (Settings). A timer from when
+ * that band was chosen auto-advances cold → weeks → months → years so soft
+ * caps grow with the inbox. Plan quotas + per-minute rate limits stay hard.
  */
 
 import { readMigratedKey } from "@/lib/browser-storage";
@@ -14,36 +11,81 @@ import { readMigratedKey } from "@/lib/browser-storage";
 export const WARMUP_STORAGE_KEY = "leadify_warmup_v1";
 const WARMUP_LEGACY_KEYS = ["lodestar_warmup_v1"];
 
+/** Self-reported inbox age when configuring From email. */
 export type MailboxAgeBand = "new" | "weeks" | "months" | "established";
 export type MailboxVolumeBand = "none" | "light" | "regular";
 
 export type WarmupProfile = {
   /** ISO date (YYYY-MM-DD) when we started tracking this sender. */
   startedOn: string;
-  /** Self-reported when connecting a mailbox (optional). */
+  /** Self-reported when setting From email / connecting a mailbox. */
   ageBand?: MailboxAgeBand;
+  /** ISO date when ageBand was last chosen — drives auto-advance timer. */
+  ageBandSetOn?: string;
   volumeBand?: MailboxVolumeBand;
   /** Sends counted per calendar day (local). */
   days: Record<string, number>;
 };
 
-/** Recommended soft daily cap from self-report + ramp day. */
+export const AGE_BAND_OPTIONS: {
+  id: MailboxAgeBand;
+  label: string;
+  hint: string;
+}[] = [
+  { id: "new", label: "Brand new", hint: "~15/day" },
+  { id: "weeks", label: "Weeks", hint: "~25/day" },
+  { id: "months", label: "Months", hint: "~40/day" },
+  { id: "established", label: "Years", hint: "~80/day" },
+];
+
+/**
+ * Effective age band after auto-advance from when the user last set ageBand.
+ * Brand new → weeks after 14d → months after 90d → years after 365d.
+ */
+export function effectiveAgeBand(profile: WarmupProfile): MailboxAgeBand {
+  const base = profile.ageBand ?? "new";
+  const since = daysSince(profile.ageBandSetOn || profile.startedOn);
+
+  if (base === "new") {
+    if (since >= 365) return "established";
+    if (since >= 90) return "months";
+    if (since >= 14) return "weeks";
+    return "new";
+  }
+  if (base === "weeks") {
+    if (since >= 351) return "established"; // ~12 mo from “weeks old”
+    if (since >= 76) return "months";
+    return "weeks";
+  }
+  if (base === "months") {
+    if (since >= 275) return "established";
+    return "months";
+  }
+  return "established";
+}
+
+/** Recommended soft daily cap from effective age (+ light volume override). */
 export function recommendedDailySoftCap(profile: WarmupProfile): number {
-  if (profile.ageBand === "established" && profile.volumeBand === "regular") {
+  if (profile.volumeBand === "regular" && effectiveAgeBand(profile) === "established") {
     return 80;
   }
-  if (profile.ageBand === "months" || profile.volumeBand === "light") {
-    return 40;
+  if (profile.volumeBand === "light") {
+    return Math.min(40, capForBand(effectiveAgeBand(profile)));
   }
-  if (profile.ageBand === "weeks") {
-    return 25;
+  return capForBand(effectiveAgeBand(profile));
+}
+
+function capForBand(band: MailboxAgeBand): number {
+  switch (band) {
+    case "established":
+      return 80;
+    case "months":
+      return 40;
+    case "weeks":
+      return 25;
+    default:
+      return 15;
   }
-  // Assume cold / new — ramp by week since startedOn
-  const day = daysSince(profile.startedOn);
-  if (day < 7) return 15;
-  if (day < 14) return 25;
-  if (day < 28) return 40;
-  return 60;
 }
 
 export function todayKey(d = new Date()): string {
@@ -65,6 +107,7 @@ export function loadWarmupProfile(): WarmupProfile {
     return {
       startedOn: parsed.startedOn || todayKey(),
       ageBand: parsed.ageBand,
+      ageBandSetOn: parsed.ageBandSetOn,
       volumeBand: parsed.volumeBand,
       days: parsed.days ?? {},
     };
@@ -82,6 +125,18 @@ export function saveWarmupProfile(profile: WarmupProfile): void {
   }
 }
 
+/** Persist self-reported mailbox age (resets the advance timer). */
+export function setMailboxAgeBand(ageBand: MailboxAgeBand): WarmupProfile {
+  const profile = loadWarmupProfile();
+  const next: WarmupProfile = {
+    ...profile,
+    ageBand,
+    ageBandSetOn: todayKey(),
+  };
+  saveWarmupProfile(next);
+  return next;
+}
+
 export function recordWarmupSend(): WarmupProfile {
   const profile = loadWarmupProfile();
   const key = todayKey();
@@ -94,10 +149,18 @@ export function warmupStatus(profile = loadWarmupProfile()): {
   todayCount: number;
   softCap: number;
   overSoftCap: boolean;
+  ageBand: MailboxAgeBand;
+  effectiveBand: MailboxAgeBand;
 } {
   const softCap = recommendedDailySoftCap(profile);
   const todayCount = profile.days[todayKey()] ?? 0;
-  return { todayCount, softCap, overSoftCap: todayCount >= softCap };
+  return {
+    todayCount,
+    softCap,
+    overSoftCap: todayCount >= softCap,
+    ageBand: profile.ageBand ?? "new",
+    effectiveBand: effectiveAgeBand(profile),
+  };
 }
 
 function daysSince(isoDate: string): number {

@@ -4,10 +4,18 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-17 — MyEmailVerifier wired; X-API-Key send error
+- Verify prefers `MYEMAILVERIFIER_API_KEY` (validate_single + getcredits); Zeruh
+  is fallback. Credits show on Verifies bar / badge (`100/day free` hint).
+- Exact error “invalid API key … X-API-Key header” is **Maileroo/Zeruh auth** —
+  usually a verify key pasted into Settings → Maileroo **Sending** key, or MEV
+  key put in `MAILEROO_VERIFY_API_KEY`. Verify auth failures fail-open (never
+  block send); Maileroo send errors now hint at the Sending Key mix-up.
+- Free MEV credits need phone verification on their dashboard.
+
 ### 2026-07-16 — MyEmailVerifier vs Zeruh free tier
 - MyEmailVerifier advertises **100 free API credits/day** (no card) ≈ ~3k/mo —
-  far above Zeruh’s ~100/mo. Not wired yet; park key as `MYEMAILVERIFIER_API_KEY`
-  in `.env.local`. Current verify path remains Zeruh (`MAILEROO_VERIFY_API_KEY`).
+  far above Zeruh’s ~100/mo. Now preferred via `MYEMAILVERIFIER_API_KEY`.
 
 ### 2026-07-16 — Draft buckets, profile picker, pitch breaks
 - Contact Draft keeps unapproved drafts (`Create` → `Review`); Ready = approved

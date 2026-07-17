@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
 import { CrmStagePill, FitMeter, Spinner } from "@/components/ui";
@@ -18,6 +18,17 @@ import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
+
+function sameDraft(
+  a: { subject: string; body: string; toEmail: string },
+  b: { subject: string; body: string; toEmail: string },
+): boolean {
+  return (
+    a.subject === b.subject &&
+    a.body === b.body &&
+    a.toEmail === b.toEmail
+  );
+}
 
 function todayIsoDate(): string {
   const d = new Date();
@@ -93,11 +104,16 @@ export function LeadDrawer(props: DrawerProps) {
   const mode = props.mode ?? "info";
   const outreach = lead.outreach;
 
+  const initialTo = outreach?.toEmail ?? lead.emails[0] ?? "";
   const [subject, setSubject] = useState(outreach?.subject ?? "");
   const [body, setBody] = useState(outreach?.body ?? "");
-  const [toEmail, setToEmail] = useState(outreach?.toEmail ?? lead.emails[0] ?? "");
+  const [toEmail, setToEmail] = useState(initialTo);
+  const [savedDraft, setSavedDraft] = useState({
+    subject: outreach?.subject ?? "",
+    body: outreach?.body ?? "",
+    toEmail: initialTo,
+  });
   const [busy, setBusy] = useState<null | string>(null);
-  const [dirty, setDirty] = useState(false);
 
   // CRM state (local, synced on changes)
   const [crmStage, setCrmStage] = useState<CrmStage>(lead.crmStage ?? "new");
@@ -107,20 +123,34 @@ export function LeadDrawer(props: DrawerProps) {
   const [newNoteDate, setNewNoteDate] = useState(todayIsoDate);
   const [newNoteText, setNewNoteText] = useState("");
 
-  // Reset all fields when the lead changes.
+  const dirty = useMemo(
+    () => !sameDraft({ subject, body, toEmail }, savedDraft),
+    [subject, body, toEmail, savedDraft],
+  );
+
+  // Reset composer when switching leads / server draft — never while local edits are dirty.
   useEffect(() => {
-    setSubject(outreach?.subject ?? "");
-    setBody(outreach?.body ?? "");
-    setToEmail(outreach?.toEmail ?? lead.emails[0] ?? "");
-    setDirty(false);
+    if (dirty) return;
+    const next = {
+      subject: outreach?.subject ?? "",
+      body: outreach?.body ?? "",
+      toEmail: outreach?.toEmail ?? lead.emails[0] ?? "",
+    };
+    setSubject(next.subject);
+    setBody(next.body);
+    setToEmail(next.toEmail);
+    setSavedDraft(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- skip while dirty; only sync from server ids/fields
+  }, [lead.id, outreach?.id, outreach?.subject, outreach?.body, outreach?.toEmail]);
+
+  useEffect(() => {
     setCrmStage(lead.crmStage ?? "new");
     setContactMethod(lead.contactMethod ?? null);
     setFollowUps(lead.followUps ?? []);
     setShowAddNote(false);
     setNewNoteDate(todayIsoDate());
     setNewNoteText("");
-  }, [lead.id, lead.crmStage, lead.contactMethod, lead.followUps,
-      outreach?.id, outreach?.subject, outreach?.body, outreach?.toEmail, lead.emails]);
+  }, [lead.id, lead.crmStage, lead.contactMethod, lead.followUps]);
 
   const requestClose = () => {
     if (
@@ -140,8 +170,8 @@ export function LeadDrawer(props: DrawerProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- close only needs dirty + onClose
-  }, [onClose, dirty]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onClose, dirty, subject, body, toEmail]);
 
   /** Persist composer fields before approve/send so edits aren't lost. */
   const persistIfDirty = async () => {
@@ -151,7 +181,7 @@ export function LeadDrawer(props: DrawerProps) {
       { subject, body, toEmail: toEmail || null },
       { silent: true },
     );
-    setDirty(false);
+    setSavedDraft({ subject, body, toEmail });
   };
 
   const run = async (key: string, fn: () => Promise<void | boolean>) => {
@@ -566,7 +596,7 @@ export function LeadDrawer(props: DrawerProps) {
                 <FieldMini label="To">
                   <input
                     value={toEmail}
-                    onChange={(e) => { setToEmail(e.target.value); setDirty(true); }}
+                    onChange={(e) => setToEmail(e.target.value)}
                     disabled={sent}
                     placeholder="name@company.com"
                     className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none focus:border-aurora-400/60 disabled:opacity-60"
@@ -575,7 +605,7 @@ export function LeadDrawer(props: DrawerProps) {
                 <FieldMini label="Subject">
                   <input
                     value={subject}
-                    onChange={(e) => { setSubject(e.target.value); setDirty(true); }}
+                    onChange={(e) => setSubject(e.target.value)}
                     disabled={sent}
                     className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none focus:border-aurora-400/60 disabled:opacity-60"
                   />
@@ -591,10 +621,7 @@ export function LeadDrawer(props: DrawerProps) {
                   ) : (
                     <PitchEditor
                       value={body}
-                      onChange={(html) => {
-                        setBody(html);
-                        setDirty(true);
-                      }}
+                      onChange={(html) => setBody(html)}
                       placeholder="Email body…"
                     />
                   )}
@@ -618,7 +645,7 @@ export function LeadDrawer(props: DrawerProps) {
                             body,
                             toEmail: toEmail || null,
                           });
-                          setDirty(false);
+                          setSavedDraft({ subject, body, toEmail });
                         })
                       }
                       disabled={busy === "save"}

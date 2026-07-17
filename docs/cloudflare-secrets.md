@@ -18,7 +18,8 @@ Worker name (must match): `leadgeneration` (`wrangler.jsonc` → `"name"`).
 | `GMAIL_OAUTH_CLIENT_SECRET` | Pro mailbox Connect Google |
 | `GROQ_API_KEY` | Optional pitch/blurb fallback when Workers AI fails |
 | `GEMINI_API_KEY` | Optional pitch/blurb fallback after Groq |
-| `MAILEROO_VERIFY_API_KEY` | Zeruh email verify at send (alias `ZERUH_API_KEY`) |
+| `MYEMAILVERIFIER_API_KEY` | Preferred email verify at send (100 free credits/day) |
+| `MAILEROO_VERIFY_API_KEY` | Fallback Zeruh verify (alias `ZERUH_API_KEY`) |
 
 Workers AI itself uses the `AI` binding in `wrangler.jsonc` — **no secret**.
 
@@ -35,10 +36,12 @@ npx wrangler secret put GMAIL_OAUTH_CLIENT_ID
 npx wrangler secret put GMAIL_OAUTH_CLIENT_SECRET
 npx wrangler secret put GROQ_API_KEY
 npx wrangler secret put GEMINI_API_KEY
+npx wrangler secret put MYEMAILVERIFIER_API_KEY
 npx wrangler secret put MAILEROO_VERIFY_API_KEY
 ```
 
-`MAILEROO_VERIFY_API_KEY`: create a free key at [maileroo.com](https://maileroo.com) → Email Verification / Zeruh, then paste when prompted. Same value can go in `.env.local` for `npm run dev`.
+`MYEMAILVERIFIER_API_KEY`: preferred — [myemailverifier.com](https://myemailverifier.com) dashboard (phone verify for 100 free credits/day).  
+`MAILEROO_VERIFY_API_KEY`: fallback Zeruh at [maileroo.com](https://maileroo.com) → Email Verification. Same values go in `.env.local` for `npm run dev`.
 
 Paste the value when prompted. Never commit secret values to git.
 

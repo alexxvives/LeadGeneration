@@ -9,23 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-16 (studio UX polish)
+## ⏱️ Status — updated 2026-07-17 (MEV verify + draft/warmup)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Template vars `{company}` etc. tinted green in subject / body / sign-off editors.
-- AI personalize toggle moved to top of outreach preview; sign-off labeled “template”.
-- Draft drawer ~30% wider; Save draft always active; unsaved-close confirm.
-- Sidebar Board/Profile spaced above account card; “Edit profiles…” white.
-- Search: removed “Niche / ICP” hint; usage bars wider + Verifies column reserved.
-- MyEmailVerifier: 100 free credits/**day** (better than Zeruh ~100/mo) — not wired yet; park key as `MYEMAILVERIFIER_API_KEY` in `.env.local`.
+- MyEmailVerifier wired as preferred verify + credits UI (`MYEMAILVERIFIER_API_KEY`).
+- Mailbox age picker under From email; soft-cap timer auto-advances bands.
+- Draft dirty = real field diffs only; PitchEditor no longer fights Ready edits.
+- Clearer Maileroo “X-API-Key” error when a verify key is pasted as send key.
 
 ### Next
-1. Apply D1 migration `0014` on prod if not done (`npm run cf:migrate`).
-2. Switch verify provider to MyEmailVerifier once key is confirmed working.
-3. Deploy when user asks.
+1. Deploy so prod uses MEV (secret already set) + restart local after `.env.local`.
+2. Confirm Verifies bar shows credits (phone-verify MEV account if 0).
+3. If send still fails with X-API-Key: fix Maileroo **Sending** key in Settings.
 
 ---
 

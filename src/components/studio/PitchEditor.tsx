@@ -13,6 +13,13 @@ import {
   sanitizePitchHtml,
 } from "@/lib/outreach/rich-text";
 
+function toEditorHtml(value: string): string {
+  const base = /<[a-z][\s\S]*>/i.test(value)
+    ? sanitizePitchHtml(value)
+    : plainToRich(value);
+  return highlightTemplatePlaceholders(base);
+}
+
 /**
  * Lightweight rich pitch editor (bold / italic / underline + bullets).
  * Pastes are sanitized (no white backgrounds / forced colors).
@@ -33,17 +40,17 @@ export function PitchEditor({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const lastExternal = useRef<string>("");
+  const focused = useRef(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const asHtml = highlightTemplatePlaceholders(
-      /<[a-z][\s\S]*>/i.test(value)
-        ? sanitizePitchHtml(value)
-        : plainToRich(value),
-    );
+    const asHtml = toEditorHtml(value);
     if (asHtml === lastExternal.current) return;
-    if (document.activeElement === el) return;
+    // Never clobber the DOM while the user is typing (incl. caret inside child nodes).
+    if (focused.current || (el.contains(document.activeElement) && document.activeElement !== document.body)) {
+      return;
+    }
     el.innerHTML = asHtml || "";
     lastExternal.current = asHtml;
   }, [value]);
@@ -51,7 +58,6 @@ export function PitchEditor({
   const emit = () => {
     const el = ref.current;
     if (!el) return;
-    // Persist clean HTML (no data-ph markers) so tint never leaks into sends.
     const html = sanitizePitchHtml(el.innerHTML);
     lastExternal.current = highlightTemplatePlaceholders(html);
     onChange(html);
@@ -126,10 +132,8 @@ export function PitchEditor({
             const el = ref.current;
             if (!el) return;
             el.focus();
-            // Select all so removeFormat clears marks without collapsing structure.
             document.execCommand("selectAll", false);
             document.execCommand("removeFormat", false);
-            // Re-sanitize; linebreak-preserving sanitize keeps <br> / blank lines.
             el.innerHTML = highlightTemplatePlaceholders(
               sanitizePitchHtml(el.innerHTML),
             );
@@ -144,25 +148,31 @@ export function PitchEditor({
         role="textbox"
         aria-multiline
         aria-label={placeholder ?? "Email body template"}
-        contentEditable
+        contentEditable={true}
         suppressContentEditableWarning
         data-placeholder={placeholder}
-        onFocus={onFocus}
+        onFocus={() => {
+          focused.current = true;
+          onFocus?.();
+        }}
         onInput={emit}
         onPaste={onPaste}
         onBlur={() => {
-          // Re-tint placeholders in the DOM after edit; persist clean HTML.
+          focused.current = false;
           const el = ref.current;
           if (el) {
             const clean = sanitizePitchHtml(el.innerHTML);
             const tinted = highlightTemplatePlaceholders(clean);
-            el.innerHTML = tinted;
+            // Only rewrite DOM when tint markers actually change.
+            if (el.innerHTML !== tinted) {
+              el.innerHTML = tinted;
+            }
             lastExternal.current = tinted;
-            onChange(clean);
+            if (clean !== value) onChange(clean);
           }
           onBlur?.();
         }}
-        className="pitch-editor min-h-[5.5rem] px-4 py-3 text-sm leading-relaxed text-mist-100 outline-none empty:before:pointer-events-none empty:before:text-mist-500 empty:before:content-[attr(data-placeholder)] [&_*]:!bg-transparent [&_:not([data-ph])]:!text-inherit [&_[data-ph]]:!text-aurora-300 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
+        className="pitch-editor min-h-[5.5rem] cursor-text px-4 py-3 text-sm leading-relaxed text-mist-100 outline-none empty:before:pointer-events-none empty:before:text-mist-500 empty:before:content-[attr(data-placeholder)] [&_*]:!bg-transparent [&_:not([data-ph])]:!text-inherit [&_[data-ph]]:!text-aurora-300 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
       />
     </div>
   );

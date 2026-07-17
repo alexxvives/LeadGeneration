@@ -85,7 +85,8 @@ export function UsageBar({
   remaining?: number;
 }) {
   if (remaining != null) {
-    const softFull = 250;
+    // Soft full: MyEmailVerifier free day (~100) or Zeruh signup pack (~250).
+    const softFull = remaining <= 120 ? 100 : 250;
     const pct = Math.min(100, Math.round((remaining / softFull) * 100));
     const tone =
       remaining <= 0 ? "bg-rose-400" : remaining < 25 ? "bg-amber-400" : "bg-aurora-400";
