@@ -9,20 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-17 (MEV verify + draft/warmup)
+## ⏱️ Status — updated 2026-07-17 (verify UI + send journal)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- MyEmailVerifier wired as preferred verify + credits UI (`MYEMAILVERIFIER_API_KEY`).
-- Mailbox age picker under From email; soft-cap timer auto-advances bands.
-- Draft dirty = real field diffs only; PitchEditor no longer fights Ready edits.
-- Clearer Maileroo “X-API-Key” error when a verify key is pasted as send key.
+- Removed MEV credit badge + header “Verifying…”; verify status stays on card/drawer.
+- Verifies bar counts **up** (`used / softFull`); Settings verify = toggle only.
+- Mailbox age → dropdown beside From email; no long help copy.
+- Contacted column no longer shows “Emailed”; send only journals “Email sent”
+  (no auto Sequence +3/+7 stubs).
 
 ### Next
-1. Deploy so prod uses MEV (secret already set) + restart local after `.env.local`.
-2. Confirm Verifies bar shows credits (phone-verify MEV account if 0).
+1. Deploy so prod picks up UI + send-journal fix.
+2. Optional: clear existing Sequence stubs on leads that already got them.
 3. If send still fails with X-API-Key: fix Maileroo **Sending** key in Settings.
 
 ---

@@ -4,9 +4,18 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-17 — Verify UI polish; no auto follow-up stubs on send
+- Verifies bar fills **up** with used credits (`used / softFull`), same direction
+  as Leads/Sends — not remaining-credits shrinking.
+- Drop duplicate MEV credit badge + top-of-screen “Verifying…”; keep verify
+  feedback on the outreach card / drawer only. Settings verify = toggle only.
+- Mailbox age is a compact dropdown beside From email (no long warmup blurb).
+- Send journals only “Email sent” — do **not** auto-create Day +3/+7 Sequence
+  follow-up stubs (user adds follow-ups intentionally).
+
 ### 2026-07-17 — MyEmailVerifier wired; X-API-Key send error
 - Verify prefers `MYEMAILVERIFIER_API_KEY` (validate_single + getcredits); Zeruh
-  is fallback. Credits show on Verifies bar / badge (`100/day free` hint).
+  is fallback. Credits show on the Verifies usage bar.
 - Exact error “invalid API key … X-API-Key header” is **Maileroo/Zeruh auth** —
   usually a verify key pasted into Settings → Maileroo **Sending** key, or MEV
   key put in `MAILEROO_VERIFY_API_KEY`. Verify auth failures fail-open (never

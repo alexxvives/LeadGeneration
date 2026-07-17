@@ -266,7 +266,7 @@ export function EmailSettingsForm({
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] lg:items-start">
         <Field
           label="Your name"
           hint={fromLocked ? undefined : "Shown as the inbox From name"}
@@ -282,27 +282,25 @@ export function EmailSettingsForm({
             className={inputCls}
           />
         </Field>
-        <div>
-          <Field
-            label="From email"
-            hint={fromLocked ? "From your connected mailbox" : undefined}
-            saved={saved && savedHint === "fromEmail"}
-          >
-            <input
-              type="email"
-              value={fromLocked ? lockedFromEmail! : (values.fromEmail ?? "")}
-              onChange={(e) => setField("fromEmail", e.target.value)}
-              onFocus={captureFocus}
-              onBlur={() => {
-                if (!fromLocked) void saveIfChanged();
-              }}
-              placeholder={defaults.fromEmail}
-              disabled={!canEdit || fromLocked}
-              className={inputCls}
-            />
-          </Field>
-          <MailboxAgePicker disabled={!canEdit} />
-        </div>
+        <Field
+          label="From email"
+          hint={fromLocked ? "From your connected mailbox" : undefined}
+          saved={saved && savedHint === "fromEmail"}
+        >
+          <input
+            type="email"
+            value={fromLocked ? lockedFromEmail! : (values.fromEmail ?? "")}
+            onChange={(e) => setField("fromEmail", e.target.value)}
+            onFocus={captureFocus}
+            onBlur={() => {
+              if (!fromLocked) void saveIfChanged();
+            }}
+            placeholder={defaults.fromEmail}
+            disabled={!canEdit || fromLocked}
+            className={inputCls}
+          />
+        </Field>
+        <MailboxAgePicker disabled={!canEdit} />
       </div>
 
       {!isPro && (

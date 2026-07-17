@@ -114,7 +114,7 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   (`sendApprovedOutreach`) when workspace `emailVerifyEnabled` is on.
   Credits bar in Settings + studio; `GET /api/providers/zeruh/usage`.
 - Quotas + rate limits in `service.ts`.
-- Settings → Easy: Resend **or** Maileroo + **Verify emails before send**
+- Settings → Easy: Resend **or** Maileroo + **Verify emails before sending**
   (Zeruh) toggle; Pro mailbox Connect Google (`SendSetupPanel`).
   Workspace `preferredSendPath` chooses Easy vs Pro at send time.
   API keys are stored server-side; Settings only receives `hasResendKey` /

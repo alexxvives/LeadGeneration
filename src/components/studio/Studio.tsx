@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, QuotaExceededError, type BoardResponse, type FirecrawlUsage, type ZeruhUsage } from "@/lib/client-api";
+import { api, QuotaExceededError, type BoardResponse, type FirecrawlUsage } from "@/lib/client-api";
 import type { ContactMethod, CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
@@ -11,7 +11,6 @@ import { LeadMap } from "./LeadMap";
 import { LeadDrawer } from "./LeadDrawer";
 import { UpgradeModal, UsageBar } from "./UpgradeModal";
 import { FirecrawlUsageBadge } from "./FirecrawlUsageBadge";
-import { ZeruhUsageBadge } from "./ZeruhUsageBadge";
 import { Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
@@ -99,7 +98,6 @@ export function Studio() {
   const [fcUsageKey, setFcUsageKey] = useState(0);
   const [fcBefore, setFcBefore] = useState<FirecrawlUsage | null>(null);
   const [zeruhUsageKey, setZeruhUsageKey] = useState(0);
-  const [zeruhBefore, setZeruhBefore] = useState<ZeruhUsage | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<{
@@ -108,8 +106,6 @@ export function Studio() {
   } | null>(null);
   const [deletingLeads, setDeletingLeads] = useState(false);
   const importAbortRef = useRef<AbortController | null>(null);
-  /** True while send is in flight and Zeruh verify is configured. */
-  const [sendVerifying, setSendVerifying] = useState(false);
   const [pendingSendId, setPendingSendId] = useState<string | null>(null);
   const [warmupWarn, setWarmupWarn] = useState<{
     outreachId: string;
@@ -471,15 +467,6 @@ export function Studio() {
 
   const onSend = async (outreachId: string) => {
     const verifyOn = Boolean(board?.capabilities.emailVerify);
-    let before: ZeruhUsage | null = null;
-    if (verifyOn) {
-      try {
-        before = await api.zeruhUsage();
-        setZeruhBefore(before);
-      } catch {
-        setZeruhBefore(null);
-      }
-    }
     try {
       const result = await api.send(outreachId);
       recordWarmupSend();
@@ -512,12 +499,10 @@ export function Studio() {
 
   const runSend = async (outreachId: string) => {
     setOutreachBusy(outreachId);
-    setSendVerifying(Boolean(board?.capabilities.emailVerify));
     try {
       await onSend(outreachId);
     } finally {
       setOutreachBusy(null);
-      setSendVerifying(false);
     }
   };
 
@@ -664,7 +649,6 @@ export function Studio() {
     }
 
     setOutreachBusy("send-all");
-    setSendVerifying(Boolean(board.capabilities.emailVerify));
     let sent = 0;
     let failed = 0;
     try {
@@ -693,7 +677,6 @@ export function Studio() {
       }
     } finally {
       setOutreachBusy(null);
-      setSendVerifying(false);
     }
   };
 
@@ -808,20 +791,9 @@ export function Studio() {
           ) : null}
         </div>
 
-        <div className="flex flex-col items-start gap-2 sm:items-center">
-          <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-center">
-            {view === "board" && board?.capabilities.firecrawl ? (
-              <FirecrawlUsageBadge refreshKey={fcUsageKey} before={fcBefore} />
-            ) : null}
-            {board?.capabilities.emailVerify ? (
-              <ZeruhUsageBadge refreshKey={zeruhUsageKey} before={zeruhBefore} />
-            ) : null}
-          </div>
-          {sendVerifying ? (
-            <p className="flex items-center gap-2 text-xs text-amber-200/90">
-              <Spinner className="h-3 w-3" />
-              Verifying email is deliverable…
-            </p>
+        <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-center">
+          {view === "board" && board?.capabilities.firecrawl ? (
+            <FirecrawlUsageBadge refreshKey={fcUsageKey} before={fcBefore} />
           ) : null}
         </div>
 

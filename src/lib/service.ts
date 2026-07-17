@@ -814,11 +814,6 @@ export async function sendApprovedOutreach(
           ...followUps,
         ];
       }
-      // HITL sequence stubs — Day +3 / Day +7 reminders (still require approve→send).
-      const hasSeq = followUps.some((f) => f.note.startsWith("Sequence ·"));
-      if (!hasSeq) {
-        followUps = [...followUps, sequenceFollowUp(3, 2), sequenceFollowUp(7, 3)];
-      }
       crmPatch.followUps = followUps;
     }
     await db.updateLead(outreach.leadId, crmPatch);
@@ -860,18 +855,6 @@ function domainKey(website: string | null | undefined): string | null {
   } catch {
     return website.replace(/^https?:\/\//i, "").replace(/^www\./, "").split("/")[0]?.toLowerCase() || null;
   }
-}
-
-function sequenceFollowUp(daysFromNow: number, step: number): FollowUp {
-  const d = new Date();
-  d.setDate(d.getDate() + daysFromNow);
-  const iso = d.toISOString().slice(0, 10);
-  return {
-    id: newId("fu"),
-    date: iso,
-    note: `Sequence · Follow-up #${step} (day +${daysFromNow}) — draft & approve in Outreach before sending`,
-    done: false,
-  };
 }
 
 /** Manual delivery outcome stub (bounce / reply). Webhooks can call the same path later. */

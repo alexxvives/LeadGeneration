@@ -86,8 +86,10 @@ export function UsageBar({
 }) {
   if (remaining != null) {
     // Soft full: MyEmailVerifier free day (~100) or Zeruh signup pack (~250).
+    // Fill rises with usage (same direction as Leads / Sends), not remaining credits.
     const softFull = remaining <= 120 ? 100 : 250;
-    const pct = Math.min(100, Math.round((remaining / softFull) * 100));
+    const used = Math.max(0, softFull - Math.min(remaining, softFull));
+    const pct = Math.min(100, Math.round((used / softFull) * 100));
     const tone =
       remaining <= 0 ? "bg-rose-400" : remaining < 25 ? "bg-amber-400" : "bg-aurora-400";
     return (
@@ -95,7 +97,7 @@ export function UsageBar({
         <div className="flex items-center justify-between gap-2 text-sm">
           <span className="shrink-0 text-mist-300">{label}</span>
           <span className="min-w-0 truncate tabular-nums text-mist-500">
-            {remaining.toLocaleString()} left
+            {used} / {softFull}
           </span>
         </div>
         <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">

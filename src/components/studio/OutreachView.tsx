@@ -223,14 +223,13 @@ function OutreachRow({
   const email = lead.outreach?.toEmail ?? lead.emails[0] ?? null;
   const [pickingMethod, setPickingMethod] = useState(false);
 
+  // Email is the default Contacted path — only label non-email methods.
   const methodLabel =
     lead.contactMethod === "phone"
       ? "Called"
       : lead.contactMethod === "contact_form"
         ? "Contact form"
-        : lead.outreach?.status === "sent"
-          ? "Emailed"
-          : null;
+        : null;
 
   const hasDraft = Boolean(lead.outreach);
   // Contact Draft: create when missing; reopen existing unapproved drafts.
