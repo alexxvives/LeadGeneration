@@ -67,7 +67,7 @@ export function OutreachView({
   onOpenInfo,
   onOpenDraft,
   onCreateDraft,
-  onDraft,
+  onApprove,
   onSend,
   onDraftAll,
   onSendAll,
@@ -82,7 +82,8 @@ export function OutreachView({
   onOpenDraft: (id: string) => void;
   /** Contact Draft: draft from latest profile, then open composer. */
   onCreateDraft: (id: string) => Promise<void>;
-  onDraft: (leadId: string) => Promise<void>;
+  /** Yellow arrow: approve draft → Ready (creates draft first if needed). */
+  onApprove: (leadId: string) => Promise<void>;
   onSend: (outreachId: string) => Promise<void>;
   onDraftAll: () => Promise<void>;
   onSendAll: () => Promise<void>;
@@ -174,7 +175,7 @@ export function OutreachView({
                         onOpenInfo={() => onOpenInfo(lead.id)}
                         onOpenDraft={() => onOpenDraft(lead.id)}
                         onCreateDraft={() => onCreateDraft(lead.id)}
-                        onDraft={() => onDraft(lead.id)}
+                        onApprove={() => onApprove(lead.id)}
                         onSend={() =>
                           lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
                         }
@@ -204,7 +205,7 @@ function OutreachRow({
   onOpenInfo,
   onOpenDraft,
   onCreateDraft,
-  onDraft,
+  onApprove,
   onSend,
   onMarkContacted,
 }: {
@@ -216,7 +217,7 @@ function OutreachRow({
   onOpenInfo: () => void;
   onOpenDraft: () => void;
   onCreateDraft: () => Promise<void>;
-  onDraft: () => Promise<void>;
+  onApprove: () => Promise<void>;
   onSend: () => Promise<void>;
   onMarkContacted: (method: ContactMethod) => Promise<void>;
 }) {
@@ -295,7 +296,7 @@ function OutreachRow({
               aria-label={hasDraft ? "Review draft" : "Create draft"}
               title={
                 hasDraft
-                  ? "Review draft — Approve to move to Ready"
+                  ? "Open draft to edit"
                   : email
                     ? "Create draft from active profile"
                     : "Create draft (add email in the composer if needed)"
@@ -304,29 +305,22 @@ function OutreachRow({
             >
               {busy ? <Spinner className="h-2.5 w-2.5" /> : hasDraft ? "Review" : "Create"}
             </button>
-            {!hasDraft ? (
-              <button
-                type="button"
-                disabled={busy || !email}
-                onClick={() => void onDraft()}
-                aria-label="Create draft"
-                title={email ? "Create draft" : "Needs an email to draft"}
-                className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
-              >
-                {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={onOpenDraft}
-                aria-label="Open draft"
-                title="Open draft to review and approve"
-                className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
-              >
-                {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
-              </button>
-            )}
+            <button
+              type="button"
+              disabled={busy || (!hasDraft && !email)}
+              onClick={() => void onApprove()}
+              aria-label="Approve draft"
+              title={
+                hasDraft
+                  ? "Approve — move to Ready to contact"
+                  : email
+                    ? "Create & approve — move to Ready"
+                    : "Needs an email to draft"
+              }
+              className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
+            >
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
+            </button>
           </div>
         )}
         {bucket === "ready" && (

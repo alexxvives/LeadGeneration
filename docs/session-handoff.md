@@ -9,22 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-17 (verify UI + send journal)
+## ⏱️ Status — updated 2026-07-17 (outreach UX + pitch-fit)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Removed MEV credit badge + header “Verifying…”; verify status stays on card/drawer.
-- Verifies bar counts **up** (`used / softFull`); Settings verify = toggle only.
-- Mailbox age → dropdown beside From email; no long help copy.
-- Contacted column no longer shows “Emailed”; send only journals “Email sent”
-  (no auto Sequence +3/+7 stubs).
+- Contact Draft amber arrow approves → Ready; Review still opens composer.
+- PitchEditor caret fix (`FieldMini` no longer a `<label>`).
+- Delivery UI: Delivered / Bounced only; removed helper copy.
+- Fit reasons cleaned; AI pitch-fit boost on search/import; import plain-fetches
+  website (no Firecrawl). Leads table column sort.
 
 ### Next
-1. Deploy so prod picks up UI + send-journal fix.
-2. Optional: clear existing Sequence stubs on leads that already got them.
-3. If send still fails with X-API-Key: fix Maileroo **Sending** key in Settings.
+1. Deploy + smoke approve arrow / draft body click / import fit reasons.
+2. Optional: clear old Sequence follow-up stubs on existing leads.
 
 ---
 

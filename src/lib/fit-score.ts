@@ -68,7 +68,7 @@ export function scoreLead(
     const leadLoc = lead.location?.toLowerCase() ?? "";
     if (city && leadLoc.includes(city)) {
       locationScore = 25;
-      reasons.push(`In target location (${input.location})`);
+      reasons.push("In target location");
     } else if (city && leadLoc && !leadLoc.includes(city)) {
       locationScore = -30;
       reasons.push(
@@ -144,21 +144,29 @@ export function scoreLead(
   return { score: Math.max(0, Math.min(100, Math.round(score))), reasons };
 }
 
-/** Score an imported row with the same rubric (no niche search context). */
-export function scoreImportedLead(lead: RawLead): {
+/**
+ * Score an imported row. Optional `offerNotes` (active profile pitch) is used as
+ * soft niche context so imports aren't scored as empty ICP.
+ */
+export function scoreImportedLead(
+  lead: RawLead,
+  offerNotes?: string | null,
+): {
   score: number;
   reasons: string[];
 } {
+  const nicheFromPitch = (offerNotes ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
   const { score, reasons } = scoreLead(lead, {
-    niche: "",
+    niche: nicheFromPitch,
     location: lead.location,
   });
   return {
     score,
-    reasons: [
-      "Imported from your file",
-      ...reasons.filter((r) => !r.startsWith("No email")),
-    ],
+    reasons: reasons.filter((r) => !r.startsWith("No email")),
   };
 }
 

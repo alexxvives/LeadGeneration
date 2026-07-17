@@ -148,6 +148,58 @@ export async function translateOutreachCopy(opts: {
 }
 
 /**
+ * How well a prospect matches the seller's pitch (active profile offer).
+ * Small JSON reply — cheap on free Workers AI / Groq. Returns null when AI is off.
+ */
+export async function scoreLeadPitchFit(opts: {
+  pitch: string;
+  company: string;
+  aboutBlurb: string | null;
+  location: string | null;
+  website: string | null;
+}): Promise<{ boost: number; reason: string } | null> {
+  const pitch = opts.pitch
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 1200);
+  if (pitch.length < 24) return null;
+  const prospect = [
+    `Company: ${opts.company}`,
+    opts.aboutBlurb ? `About: ${opts.aboutBlurb}` : null,
+    opts.location ? `Location: ${opts.location}` : null,
+    opts.website ? `Website: ${opts.website}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  if (prospect.length < 12) return null;
+
+  const out = await aiChat(
+    [
+      "Score how well a B2B prospect matches the seller's offer.",
+      'Return JSON only: {"boost":0-35,"reason":"max 8 words"}.',
+      "boost 0 = poor fit, 35 = excellent. Be honest. No fluff or quotes.",
+    ].join(" "),
+    `Offer:\n${pitch}\n\nProspect:\n${prospect.slice(0, 1500)}`,
+  );
+  if (!out) return null;
+  try {
+    const match = out.text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const parsed = JSON.parse(match[0]) as { boost?: number; reason?: string };
+    const boost = Math.max(0, Math.min(35, Math.round(Number(parsed.boost) || 0)));
+    const reason = String(parsed.reason ?? "")
+      .replace(/^["'\s]+|["'\s]+$/g, "")
+      .trim()
+      .slice(0, 60);
+    if (!reason || boost <= 0) return null;
+    return { boost, reason: `Pitch fit: ${reason}` };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Rewrite a template draft into a slightly different version for one lead.
  * Falls back to null when AI is unavailable (caller keeps the template).
  */

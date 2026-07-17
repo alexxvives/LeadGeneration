@@ -5,6 +5,7 @@ import { generateDraft, stripLegacyCompliance } from "@/lib/outreach/draft";
 import {
   mapPool,
   personalizeDraftForLead,
+  scoreLeadPitchFit,
 } from "@/lib/ai/generate";
 import {
   outreachLangFromLocation,
@@ -40,6 +41,9 @@ import type {
 } from "@/lib/types";
 import { mailboxPublicStatus } from "@/lib/email/mailbox";
 import { scoreImportedLead } from "@/lib/fit-score";
+import { aiAvailable } from "@/lib/ai/chat";
+import { fetchPublicPageText } from "@/lib/ai/fetch-page";
+import { extractBlurb, extractLocation, extractPhones } from "@/lib/search/enrich";
 
 /**
  * Application services. API routes stay thin and call into these functions,
@@ -1060,6 +1064,8 @@ export async function importLeads(
     runId?: string | null;
     /** Mark the run complete after this chunk (default true). */
     finalize?: boolean;
+    /** Active profile pitch — used for fit scoring (not Firecrawl-heavy). */
+    offerNotes?: string | null;
   },
 ): Promise<{
   imported: number;
@@ -1151,7 +1157,7 @@ export async function importLeads(
       boardId,
       niche: "Imported list",
       location: null,
-      offerNotes: null,
+      offerNotes: opts?.offerNotes?.trim() || null,
       senderName: null,
       status: "running",
       mode: "live",
@@ -1163,6 +1169,8 @@ export async function importLeads(
     };
     await db.createRun(run);
   }
+
+  const offerNotes = (opts?.offerNotes ?? run.offerNotes)?.trim() || "";
 
   try {
     const prior = await db.listLeads();
@@ -1239,7 +1247,10 @@ export async function importLeads(
       }
     }
 
-    const leads: Lead[] = freshRows.map((r) => {
+    // Plain website fetch (no Firecrawl) + optional AI pitch-fit. AI tokens are
+    // tiny; Firecrawl credits are the costly part — keep imports off that path.
+    const useAi = await aiAvailable();
+    const draftLeads = await mapPool(freshRows, 3, async (r) => {
       const company = (
         r.company ||
         r.emails[0]?.split("@")[1]?.split(".")[0] ||
@@ -1250,16 +1261,53 @@ export async function importLeads(
         (r.emails[0]?.includes("@")
           ? `https://${r.emails[0].split("@")[1]}`
           : null);
-      const scored = scoreImportedLead({
-        company,
-        website,
-        emails: r.emails,
-        phones: r.phones,
-        aboutBlurb: null,
-        location: r.location,
-        tags: ["imported"],
-        contactName: r.contactName,
-      });
+
+      let aboutBlurb: string | null = null;
+      let location = r.location;
+      let phones = r.phones;
+      if (website) {
+        try {
+          const pageText = await fetchPublicPageText(website, { preferPlain: true });
+          aboutBlurb = extractBlurb(pageText);
+          if (!location) location = extractLocation(pageText);
+          if (phones.length === 0) {
+            const found = extractPhones(pageText);
+            if (found.length) phones = found.slice(0, 5);
+          }
+        } catch {
+          /* best-effort enrich */
+        }
+      }
+
+      let scored = scoreImportedLead(
+        {
+          company,
+          website,
+          emails: r.emails,
+          phones,
+          aboutBlurb,
+          location,
+          tags: ["imported"],
+          contactName: r.contactName,
+        },
+        offerNotes || null,
+      );
+      if (useAi && offerNotes) {
+        const pitchFit = await scoreLeadPitchFit({
+          pitch: offerNotes,
+          company,
+          aboutBlurb,
+          location,
+          website,
+        });
+        if (pitchFit) {
+          scored = {
+            score: Math.min(100, scored.score + pitchFit.boost),
+            reasons: [...scored.reasons, pitchFit.reason],
+          };
+        }
+      }
+
       return {
         id: newId("lead"),
         workspaceId: ctx.workspaceId,
@@ -1268,16 +1316,16 @@ export async function importLeads(
         company,
         website,
         emails: r.emails,
-        phones: r.phones,
+        phones,
         contactName: r.contactName,
-        location: r.location,
-        aboutBlurb: null,
+        location,
+        aboutBlurb,
         tags: ["imported"],
         fitScore: scored.score,
         fitReasons: scored.reasons,
         sourceUrl: website || "import",
-        status: "new",
-        crmStage: "new",
+        status: "new" as const,
+        crmStage: "new" as const,
         contactMethod: null,
         notes: null,
         followUps: [],
@@ -1285,6 +1333,7 @@ export async function importLeads(
         createdAt: nowIso(),
       };
     });
+    const leads: Lead[] = draftLeads;
 
     if (leads.length > 0) await db.createLeads(leads);
     if (leads.length > 0) await recordLeadUsage(ctx, leads.length);

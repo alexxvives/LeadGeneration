@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { CrmStagePill, FitMeter, crmStageLabel } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
@@ -16,6 +16,16 @@ const STAGE_OPTIONS: CrmStage[] = [
   "closed",
   "not_interested",
 ];
+
+const STAGE_ORDER: Record<CrmStage, number> = {
+  new: 0,
+  contacted: 1,
+  in_conversation: 2,
+  closed: 3,
+  not_interested: 4,
+};
+
+type SortKey = "company" | "location" | "contact" | "fit" | "status";
 
 export function LeadTable({
   leads,
@@ -44,12 +54,60 @@ export function LeadTable({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
+    key: "fit",
+    dir: "desc",
+  });
   const menuRef = useRef<HTMLDivElement | null>(null);
   const { customCols, vis } = useLeadColumnState();
   const visibleCustom = customCols.filter((c) => !!vis.custom[c.id]);
   const canDelete = Boolean(onDeleteLead || onDeleteLeads);
-  const allSelected = leads.length > 0 && selected.size === leads.length;
+
+  const sortedLeads = useMemo(() => {
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...leads].sort((a, b) => {
+      let cmp = 0;
+      switch (sort.key) {
+        case "company":
+          cmp = a.company.localeCompare(b.company, undefined, { sensitivity: "base" });
+          break;
+        case "location":
+          cmp = (a.location ?? "").localeCompare(b.location ?? "", undefined, {
+            sensitivity: "base",
+          });
+          break;
+        case "contact":
+          cmp = (a.emails[0] ?? "").localeCompare(b.emails[0] ?? "", undefined, {
+            sensitivity: "base",
+          });
+          break;
+        case "fit":
+          cmp = a.fitScore - b.fitScore;
+          break;
+        case "status":
+          cmp =
+            (STAGE_ORDER[a.crmStage ?? "new"] ?? 0) -
+            (STAGE_ORDER[b.crmStage ?? "new"] ?? 0);
+          break;
+      }
+      return cmp * dir;
+    });
+  }, [leads, sort]);
+
+  const allSelected =
+    sortedLeads.length > 0 && selected.size === sortedLeads.length;
   const someSelected = selected.size > 0 && !allSelected;
+
+  const toggleSort = (key: SortKey) => {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "fit" ? "desc" : "asc" },
+    );
+  };
+
+  const sortMark = (key: SortKey) =>
+    sort.key === key ? (sort.dir === "asc" ? " ↑" : " ↓") : "";
 
   useEffect(() => {
     // Drop selection for leads that left the table.
@@ -87,7 +145,7 @@ export function LeadTable({
 
   const toggleAll = () => {
     if (allSelected) setSelected(new Set());
-    else setSelected(new Set(leads.map((l) => l.id)));
+    else setSelected(new Set(sortedLeads.map((l) => l.id)));
   };
 
   const runBulkDelete = async () => {
@@ -126,11 +184,51 @@ export function LeadTable({
                   />
                 </th>
               ) : null}
-              <th className="px-5 py-3 font-medium">Company</th>
-              <th className="px-5 py-3 font-medium">Location</th>
-              <th className="px-5 py-3 font-medium">Contact</th>
-              <th className="px-5 py-3 font-medium">Fit</th>
-              <th className="px-5 py-3 font-medium">Status</th>
+              <th className="px-5 py-3 font-medium">
+                <button
+                  type="button"
+                  onClick={() => toggleSort("company")}
+                  className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
+                >
+                  Company{sortMark("company")}
+                </button>
+              </th>
+              <th className="px-5 py-3 font-medium">
+                <button
+                  type="button"
+                  onClick={() => toggleSort("location")}
+                  className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
+                >
+                  Location{sortMark("location")}
+                </button>
+              </th>
+              <th className="px-5 py-3 font-medium">
+                <button
+                  type="button"
+                  onClick={() => toggleSort("contact")}
+                  className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
+                >
+                  Contact{sortMark("contact")}
+                </button>
+              </th>
+              <th className="px-5 py-3 font-medium">
+                <button
+                  type="button"
+                  onClick={() => toggleSort("fit")}
+                  className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
+                >
+                  Fit{sortMark("fit")}
+                </button>
+              </th>
+              <th className="px-5 py-3 font-medium">
+                <button
+                  type="button"
+                  onClick={() => toggleSort("status")}
+                  className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
+                >
+                  Status{sortMark("status")}
+                </button>
+              </th>
               {vis.notes ? (
                 <th className="px-5 py-3 font-medium">Notes</th>
               ) : null}
@@ -143,7 +241,7 @@ export function LeadTable({
             </tr>
           </thead>
           <tbody>
-            {leads.map((l) => {
+            {sortedLeads.map((l) => {
               const domain = displayWebsite(l.website);
               const loc = shortLocation(l.location) ?? "—";
               const stage = l.crmStage ?? "new";

@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-17 — Draft caret bug was `<label>`; pitch-fit AI scoring
+- PitchEditor “click body → Bold activates” was `FieldMini` wrapping the editor
+  in a `<label>` (browser focuses first button). Use a `<div>` wrapper.
+- Contact Draft yellow arrow = approve → Ready (creates draft first if needed).
+- Fit: drop “Imported from your file”; location reason is just “In target
+  location”. Optional AI `scoreLeadPitchFit` boosts using active profile pitch
+  + lead blurb (Workers AI/Groq — tiny tokens). Import enrich uses **plain
+  fetch** of the website (`preferPlain`), not Firecrawl — scrape credits are
+  the real cost at volume, not LLM tokens.
+
 ### 2026-07-17 — Verify UI polish; no auto follow-up stubs on send
 - Verifies bar fills **up** with used credits (`used / softFull`), same direction
   as Leads/Sends — not remaining-credits shrinking.

@@ -26,6 +26,8 @@ const BodySchema = z
     runId: z.string().min(1).max(80).optional().nullable(),
     /** When false, leave the run "running" for more chunks. Default true. */
     finalize: z.boolean().optional(),
+    /** Active profile pitch for fit scoring. */
+    offerNotes: z.string().max(12000).optional().nullable(),
   })
   .refine(
     (b) => b.leads.length > 0 || (Boolean(b.runId) && b.finalize === true),
@@ -55,6 +57,7 @@ export async function POST(req: Request) {
       newBoardName: parsed.data.newBoardName,
       runId: parsed.data.runId,
       finalize: parsed.data.finalize,
+      offerNotes: parsed.data.offerNotes,
     });
     return NextResponse.json(result);
   } catch (err) {

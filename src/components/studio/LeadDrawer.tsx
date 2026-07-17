@@ -61,7 +61,7 @@ interface DrawerProps {
   /** info = CRM/profile only; draft = outreach composer only */
   mode?: "info" | "draft";
   onClose: () => void;
-  onDraft: (leadId: string) => Promise<void | boolean>;
+  onDraft: (leadId: string) => Promise<void | boolean | string | null>;
   onSaveDraft: (
     outreachId: string,
     patch: { subject: string; body: string; toEmail: string | null },
@@ -505,7 +505,11 @@ export function LeadDrawer(props: DrawerProps) {
               <h3 className="font-display text-lg font-semibold">Email</h3>
               {outreach && !sent ? (
                 <button
-                  onClick={() => run("draft", () => props.onDraft(lead.id))}
+                  onClick={() =>
+                    run("draft", async () => {
+                      await props.onDraft(lead.id);
+                    })
+                  }
                   disabled={busy === "draft"}
                   title="Rewrite this draft"
                   className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-xs text-mist-300 transition-colors hover:bg-white/5 disabled:opacity-40"
@@ -522,7 +526,11 @@ export function LeadDrawer(props: DrawerProps) {
                   No draft yet. Generate a personalized first email for this lead.
                 </p>
                 <button
-                  onClick={() => run("draft", () => props.onDraft(lead.id))}
+                  onClick={() =>
+                    run("draft", async () => {
+                      await props.onDraft(lead.id);
+                    })
+                  }
                   disabled={busy === "draft"}
                   className="mt-4 inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
                 >
@@ -555,7 +563,6 @@ export function LeadDrawer(props: DrawerProps) {
                         {(
                           [
                             { id: "sent", label: "Delivered" },
-                            { id: "replied", label: "Replied" },
                             { id: "bounced", label: "Bounced" },
                           ] as const
                         ).map((opt) => {
@@ -574,9 +581,7 @@ export function LeadDrawer(props: DrawerProps) {
                                 active
                                   ? opt.id === "bounced"
                                     ? "bg-rose-500/15 text-rose-300 ring-rose-400/30"
-                                    : opt.id === "replied"
-                                      ? "bg-sky-400/15 text-sky-300 ring-sky-400/30"
-                                      : "bg-aurora-400/15 text-aurora-300 ring-aurora-400/30"
+                                    : "bg-aurora-400/15 text-aurora-300 ring-aurora-400/30"
                                   : "text-mist-400 ring-white/10 hover:bg-white/5 hover:text-mist-100"
                               }`}
                             >
@@ -585,10 +590,6 @@ export function LeadDrawer(props: DrawerProps) {
                           );
                         })}
                       </div>
-                      <p className="mt-2 text-center text-[11px] text-mist-600">
-                        Updates automatically via Maileroo/Resend webhooks. You can
-                        still correct it here.
-                      </p>
                     </div>
                   </div>
                 ) : null}
@@ -701,12 +702,6 @@ export function LeadDrawer(props: DrawerProps) {
                   </div>
                 )}
 
-                {!sent && busy === "send" && capabilities.emailVerify ? (
-                  <p className="text-center text-xs text-amber-200/80">
-                    Checking that this address is real before we send.
-                  </p>
-                ) : null}
-
                 {!capabilities.canSendEmail && !sent && (
                   <p className="text-xs text-mist-500">
                     No email provider configured — sending is simulated and won&apos;t
@@ -744,10 +739,12 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function FieldMini({ label, children }: { label: string; children: React.ReactNode }) {
+  // Div, not <label>: wrapping PitchEditor in a label makes clicks activate the
+  // first toolbar button (Bold) instead of placing the caret in the body.
   return (
-    <label className="block">
+    <div className="block">
       <span className="mb-1 block text-xs font-medium text-mist-500">{label}</span>
       {children}
-    </label>
+    </div>
   );
 }

@@ -274,6 +274,11 @@ export function Studio() {
         if (ac.signal.aborted) throw new Error("Import cancelled");
         const chunk = leads.slice(i, i + CHUNK);
         const isLast = i + CHUNK >= leads.length;
+        const profile = loadSenderProfile();
+        const pitch = pitchForLang(
+          profile,
+          resolveDraftLang(profile, null),
+        ).trim();
         const res = await fetch("/api/leads/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -283,6 +288,7 @@ export function Studio() {
             newBoardName: dest.newBoardName,
             runId: runId ?? null,
             finalize: isLast,
+            offerNotes: pitch || null,
           }),
           signal: ac.signal,
         });
@@ -371,7 +377,7 @@ export function Studio() {
     );
   };
 
-  const onDraft = async (leadId: string): Promise<boolean> => {
+  const onDraft = async (leadId: string): Promise<string | null> => {
     try {
       const profile = loadSenderProfile();
       const lead = board?.leads.find((l) => l.id === leadId);
@@ -390,10 +396,10 @@ export function Studio() {
       });
       patchLeadLocal(leadId, { outreach, status: "queued" });
       toast("ok", pitch ? "Draft written — ready to contact." : "Empty draft created — add your template in Settings, or edit the body.");
-      return true;
+      return outreach.id;
     } catch (e) {
       toast("err", (e as Error).message);
-      return false;
+      return null;
     }
   };
 
@@ -401,8 +407,8 @@ export function Studio() {
   const createAndOpenDraft = async (leadId: string) => {
     setOutreachBusy(leadId);
     try {
-      const ok = await onDraft(leadId);
-      if (ok) openDraft(leadId);
+      const id = await onDraft(leadId);
+      if (id) openDraft(leadId);
     } finally {
       setOutreachBusy(null);
     }
@@ -462,6 +468,23 @@ export function Studio() {
     } catch (e) {
       toast("err", (e as Error).message);
       if (opts?.silent) throw e;
+    }
+  };
+
+  /** Yellow arrow: approve (create draft first if missing) → Ready. */
+  const approveContactDraft = async (leadId: string) => {
+    setOutreachBusy(leadId);
+    try {
+      const lead = board?.leads.find((l) => l.id === leadId);
+      let outreachId = lead?.outreach?.id ?? null;
+      if (!outreachId) {
+        outreachId = await onDraft(leadId);
+        if (!outreachId) return;
+      }
+      await onDecide(outreachId, "approved", { silent: true });
+      toast("ok", "Approved — moved to Ready to contact.");
+    } finally {
+      setOutreachBusy(null);
     }
   };
 
@@ -1006,14 +1029,7 @@ export function Studio() {
               onOpenInfo={openInfo}
               onOpenDraft={openDraft}
               onCreateDraft={createAndOpenDraft}
-              onDraft={async (id) => {
-                setOutreachBusy(id);
-                try {
-                  await onDraft(id);
-                } finally {
-                  setOutreachBusy(null);
-                }
-              }}
+              onApprove={approveContactDraft}
               onSend={async (outreachId) => {
                 await requestSend(outreachId);
               }}

@@ -1,6 +1,6 @@
 import { env, getCapabilities } from "@/lib/config";
-import { generateLeadBlurb, mapPool } from "@/lib/ai/generate";
-import { workersAiAvailable } from "@/lib/ai/workers-ai";
+import { aiAvailable } from "@/lib/ai/chat";
+import { generateLeadBlurb, mapPool, scoreLeadPitchFit } from "@/lib/ai/generate";
 import { scoreLead, type RawLead } from "@/lib/fit-score";
 import type { CreateRunInput } from "@/lib/types";
 import { demoLeads } from "./demo";
@@ -183,11 +183,12 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
     });
   const ranked = candidates.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit);
 
-  const useAi = await workersAiAvailable();
+  const useAi = await aiAvailable();
+  const pitch = input.offerNotes?.trim() || "";
   const { blurbLooksLikeJunk } = await import("@/lib/outreach/draft");
 
-  // Email verify (Zeruh) runs only at send — not here — so we don't burn
-  // credits on leads that never go out, and Excel imports get the same gate.
+  // Email verify runs only at send — not here — so we don't burn credits on
+  // leads that never go out. AI blurb + pitch-fit are optional (demo-safe).
   const leads: ScoredLead[] = await mapPool(ranked, 3, async (lead) => {
     let aboutBlurb = lead.aboutBlurb;
     if (aboutBlurb && blurbLooksLikeJunk(aboutBlurb)) aboutBlurb = null;
@@ -202,7 +203,37 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
       });
       if (polished && !blurbLooksLikeJunk(polished)) aboutBlurb = polished;
     }
-    return { ...lead, aboutBlurb };
+
+    const raw: RawLead = {
+      company: lead.company,
+      website: lead.website,
+      emails: lead.emails,
+      phones: lead.phones,
+      aboutBlurb,
+      location: lead.location,
+      tags: lead.tags,
+      contactName: lead.contactName,
+    };
+    let { score, reasons } = scoreLead(raw, input);
+    if (useAi && pitch) {
+      const pitchFit = await scoreLeadPitchFit({
+        pitch,
+        company: lead.company,
+        aboutBlurb,
+        location: lead.location,
+        website: lead.website,
+      });
+      if (pitchFit) {
+        score = Math.min(100, score + pitchFit.boost);
+        reasons = [...reasons, pitchFit.reason];
+      }
+    }
+    return {
+      ...lead,
+      aboutBlurb,
+      fitScore: score,
+      fitReasons: reasons,
+    };
   });
 
   return { provider: provider.name, mode: "live", leads };
