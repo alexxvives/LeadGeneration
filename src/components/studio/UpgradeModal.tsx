@@ -60,7 +60,7 @@ export function UpgradeModal({
         <div className="mt-6 flex items-center gap-3">
           <Link
             href="/pricing"
-            className="group inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-105"
+            className="group inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-105"
           >
             See plans
             <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />

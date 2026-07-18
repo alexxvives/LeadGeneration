@@ -190,7 +190,7 @@ export function BoardAssignModal({
               type="button"
               disabled={busy}
               onClick={() => void handleCreate()}
-              className="rounded-xl bg-aurora-400 px-3 py-2 text-sm font-medium text-ink-950 disabled:opacity-50"
+              className="rounded-xl bg-aurora-400 px-3 py-2 text-sm font-medium text-on-accent disabled:opacity-50"
             >
               Add
             </button>
@@ -219,7 +219,7 @@ export function BoardAssignModal({
             type="button"
             disabled={busy || !selectedId}
             onClick={() => void handleConfirm()}
-            className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-ink-950 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-on-accent disabled:opacity-50"
           >
             {busy ? <Spinner className="h-4 w-4" /> : null}
             {confirmLabel}

@@ -68,9 +68,9 @@ ship. Details / evidence live in chat + code; this file is the task board.
 
 ## 5. Open ops (human)
 
-1. Apply D1 migration **0016** (`npm run cf:migrate`) then deploy.
+1. Apply D1 migrations through **0018** (`npm run cf:migrate`) then deploy.
 2. Optional: platform `RESEND_WEBHOOK_SECRET` only if using Worker `RESEND_API_KEY` for outreach.
-3. Optional: rotate `ADMIN_PASSWORD` via Wrangler if sharing the app widely.
+3. Delete leftover `ADMIN_EMAIL` / `ADMIN_PASSWORD` Wrangler secrets; rotate admin password hash in D1 when sharing widely.
 
 ---
 

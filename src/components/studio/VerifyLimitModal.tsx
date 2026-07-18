@@ -55,7 +55,7 @@ export function VerifyLimitModal({
         <div className="mt-6">
           <button
             onClick={onClose}
-            className="rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-105"
+            className="rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-105"
           >
             Got it
           </button>

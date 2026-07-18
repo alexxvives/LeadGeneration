@@ -5,7 +5,7 @@ production. Code is already wired (`/api/billing/checkout`, `/api/billing/portal
 `/api/webhooks/stripe`). You only need Products/Prices + secrets.
 
 Prices in the app come from [`src/lib/plans.ts`](../src/lib/plans.ts)
-(financial plan: Starter **$39**, Pro **$89**, Agency **$199** / month).
+(financial plan: Starter **$19**, Pro **$49**, Agency **$99** / month).
 
 ---
 
@@ -23,9 +23,9 @@ For each paid plan, create a **Product** with one **recurring monthly** Price:
 
 | Plan | Amount (USD) | Env var for Price ID |
 | --- | ---: | --- |
-| Starter | 39.00 | `STRIPE_STARTER_PRICE_ID` |
-| Pro | 89.00 | `STRIPE_PRO_PRICE_ID` |
-| Agency | 199.00 | `STRIPE_AGENCY_PRICE_ID` |
+| Starter | 19.00 | `STRIPE_STARTER_PRICE_ID` |
+| Pro | 49.00 | `STRIPE_PRO_PRICE_ID` |
+| Agency | 99.00 | `STRIPE_AGENCY_PRICE_ID` |
 
 **Dashboard path:** Products → Add product → Name (e.g. “HERMES mail Starter”) →
 Pricing: **Recurring / Monthly** → amount above → Save.
@@ -65,13 +65,14 @@ Checkout success alone must **not** grant the plan — the webhook does
 4. Copy the endpoint **Signing secret** (`whsec_…`).
 5. Set `STRIPE_WEBHOOK_SECRET` locally and via Wrangler secret.
 
-**Local testing:** install [Stripe CLI](https://stripe.com/docs/stripe-cli), then:
+**Two different webhook setups — don’t mix them:**
 
-```bash
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
-```
+| Where you develop | What to configure |
+| --- | --- |
+| **Local** (`npm run dev`) | Do **not** put `localhost` in the Stripe Dashboard. Install [Stripe CLI](https://stripe.com/docs/stripe-cli), then run in a **terminal**: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`. Paste the CLI’s temporary `whsec_…` into `.env.local` as `STRIPE_WEBHOOK_SECRET`. |
+| **Production** (Workers) | Stripe Dashboard → Webhooks → endpoint URL = `https://leadgeneration.alexxvives.workers.dev/api/webhooks/stripe` (correct for **prod only**). Put that endpoint’s `whsec_…` in Wrangler as `STRIPE_WEBHOOK_SECRET`. |
 
-Use the CLI’s temporary `whsec_…` as `STRIPE_WEBHOOK_SECRET` in `.env.local`.
+The Dashboard URL is right for **production**. It does **not** receive events from Checkout on `localhost` — that’s what `stripe listen` is for.
 
 ---
 

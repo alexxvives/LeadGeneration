@@ -32,7 +32,7 @@ export function BillingActions({ paid }: { paid: boolean }) {
     <div className="flex flex-wrap items-center gap-3">
       <Link
         href="/pricing"
-        className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-105"
+        className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-105"
       >
         {paid ? "Change plan" : "Upgrade"}
       </Link>

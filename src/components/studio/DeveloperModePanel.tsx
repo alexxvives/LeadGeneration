@@ -12,7 +12,7 @@ import type { PlanId } from "@/lib/types";
 
 /**
  * Admin-only tools — tour replay, credit reset, plan override.
- * APIs are gated to admin@…; this panel is only rendered for that session.
+ * APIs are gated to session.isAdmin (users.is_admin); panel only for admins.
  */
 export function DeveloperModePanel({
   metered = true,

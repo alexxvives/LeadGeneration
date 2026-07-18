@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState, type ComponentType, type SVGProps } f
 import { signOut, useSession } from "next-auth/react";
 import { BrandMark } from "@/components/BrandMark";
 import { AuthModal } from "@/components/AuthModal";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   GettingStartedWizard,
   useGettingStartedOpen,
@@ -329,6 +330,9 @@ export function StudioShell({
 
         {/* Board + outreach profile filters + account card */}
         <div className="mt-auto border-t border-white/5 pt-5">
+          <div className="mb-3 flex justify-center sm:justify-start">
+            <ThemeToggle />
+          </div>
           <div className="mb-5 space-y-2">
             <BoardPicker
               boards={boards}

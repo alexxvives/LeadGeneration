@@ -255,7 +255,7 @@ export function ImportLeadsPanel({
           type="button"
           disabled={busy}
           onClick={() => inputRef.current?.click()}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.02] disabled:opacity-50"
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
         >
           {busy ? <Spinner className="h-4 w-4" /> : null}
           {busy ? "Reading…" : "Import CSV / Excel"}

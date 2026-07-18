@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
-import { isAdminEmail } from "@/lib/admin";
-import { authRequired } from "@/lib/config";
+import { isAdminSession } from "@/lib/admin";
 import { getCtx } from "@/lib/request-context";
 import { setWorkspacePlanDev } from "@/lib/service";
 import { PLAN_ORDER } from "@/lib/plans";
@@ -16,11 +15,9 @@ const Body = z.object({
 
 /** Admin-only in production; open in local zero-key demo. */
 export async function POST(req: Request) {
-  if (authRequired()) {
-    const session = await auth();
-    if (!isAdminEmail(session?.user?.email)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+  const session = await auth().catch(() => null);
+  if (!isAdminSession(session)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const parsed = Body.safeParse(await req.json().catch(() => null));

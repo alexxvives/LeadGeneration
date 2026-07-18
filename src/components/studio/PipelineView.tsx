@@ -162,7 +162,7 @@ export function PipelineView({
                   onMoveStage(pendingRevert.leadId, "new");
                   setPendingRevert(null);
                 }}
-                className="rounded-full bg-amber-400 px-4 py-2 text-sm font-medium text-ink-950"
+                className="rounded-full bg-amber-400 px-4 py-2 text-sm font-medium text-on-accent"
               >
                 Move to New
               </button>

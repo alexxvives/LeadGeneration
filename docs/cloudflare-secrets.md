@@ -12,8 +12,12 @@ Worker name (must match): `leadgeneration` (`wrangler.jsonc` → `"name"`).
 |--------|---------|
 | `AUTH_SECRET` | Auth.js — production login |
 | `NEXTAUTH_URL` | Canonical app URL (magic links + Gmail OAuth redirect) |
-| `RESEND_API_KEY` | Magic-link + optional platform email |
-| `FIRECRAWL_API_KEY` | Live search / scrape |
+| `RESEND_API_KEY` | Forgot-password magic link + optional platform email |
+| `STRIPE_SECRET_KEY` | Billing (use `sk_live_…` in prod; `sk_test_…` only in `.env.local`) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing (`whsec_…` — live endpoint in prod) |
+| `STRIPE_*_PRICE_ID` | Live Price IDs for Starter / Pro / Agency |
+| `FIRECRAWL_API_KEY` | Live search / scrape (preferred) |
+| `EXA_API_KEY` | Search fallback when Firecrawl fails / empty |
 | `GMAIL_OAUTH_CLIENT_ID` | Pro mailbox Connect Google |
 | `GMAIL_OAUTH_CLIENT_SECRET` | Pro mailbox Connect Google |
 | `GROQ_API_KEY` | Optional pitch/blurb fallback when Workers AI fails |
@@ -22,8 +26,15 @@ Worker name (must match): `leadgeneration` (`wrangler.jsonc` → `"name"`).
 | `MAILEROO_VERIFY_API_KEY` | Fallback Zeruh verify (alias `ZERUH_API_KEY`) |
 | `RESEND_WEBHOOK_SECRET` | **Required after deploy of audit hardening** — Svix secret for bounce/reply webhooks |
 | `MAILEROO_WEBHOOK_SECRET` | Required only if you use Maileroo delivery webhooks |
-| `ADMIN_EMAIL` | Optional — code already defaults to `admin@tryhermesmail.com` |
-| `ADMIN_PASSWORD` | Optional — code already defaults to `password` |
+
+**Removed:** `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Admin is a normal hashed user with
+`users.is_admin = 1` (migration 0018). First boot creates
+`admin@tryhermesmail.com` / `password` — delete any leftover Wrangler secrets:
+
+```bash
+npx wrangler secret delete ADMIN_EMAIL
+npx wrangler secret delete ADMIN_PASSWORD
+```
 
 ### Resend delivery webhooks (bounce / reply → CRM)
 

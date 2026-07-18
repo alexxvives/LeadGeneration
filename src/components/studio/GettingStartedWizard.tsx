@@ -477,7 +477,7 @@ export function GettingStartedWizard({
                       setAnchored(false);
                       setStep((s) => s + 1);
                     }}
-                    className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.02]"
+                    className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
                   >
                     Next
                     <ArrowIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -489,7 +489,7 @@ export function GettingStartedWizard({
                       finish(true);
                       router.push("/app");
                     }}
-                    className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.02]"
+                    className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
                   >
                     Start searching
                     <ArrowIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />

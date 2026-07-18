@@ -29,7 +29,6 @@ export function PricingCards() {
       }
       setNote("Couldn't start checkout. Please try again.");
     } catch {
-      // Most commonly: not signed in, or billing not enabled in this env.
       setNote("Sign in to upgrade — redirecting…");
       router.push(`/login?callbackUrl=${encodeURIComponent("/pricing")}`);
     } finally {
@@ -39,7 +38,6 @@ export function PricingCards() {
 
   return (
     <div className="mt-10">
-      {/* Billing period toggle */}
       <div className="mb-8 flex items-center justify-center gap-3">
         <span className={annual ? "text-mist-500" : "text-mist-100"}>Monthly</span>
         <button
@@ -47,13 +45,13 @@ export function PricingCards() {
           role="switch"
           aria-checked={annual}
           onClick={() => setAnnual((a) => !a)}
-          className={`relative h-7 w-12 rounded-full border border-white/10 transition-colors ${
+          className={`relative h-7 w-12 shrink-0 overflow-hidden rounded-full border border-white/10 transition-colors ${
             annual ? "bg-aurora-400" : "bg-ink-800"
           }`}
         >
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-ink-950 transition-transform ${
-              annual ? "translate-x-6" : "translate-x-0.5"
+            className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-on-accent shadow-sm transition-transform duration-200 ease-out ${
+              annual ? "translate-x-5" : "translate-x-0"
             }`}
           />
         </button>
@@ -79,12 +77,14 @@ export function PricingCards() {
                 highlighted ? "ring-1 ring-aurora-400/40" : ""
               }`}
             >
-              {highlighted && (
-                <span className="mb-3 inline-flex w-fit rounded-full bg-aurora-400/15 px-2.5 py-0.5 text-xs font-medium text-aurora-300">
-                  Most popular
-                </span>
-              )}
-              <h3 className="font-display text-xl font-semibold">{plan.name}</h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-display text-xl font-semibold">{plan.name}</h3>
+                {highlighted ? (
+                  <span className="inline-flex rounded-full bg-aurora-400/15 px-2.5 py-0.5 text-xs font-medium text-aurora-300">
+                    Most popular
+                  </span>
+                ) : null}
+              </div>
               <div className="mt-3 flex items-baseline gap-1">
                 <span className="font-display text-4xl font-semibold tabular-nums">
                   ${price}
@@ -101,7 +101,7 @@ export function PricingCards() {
                 className={`mt-5 inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-transform hover:scale-[1.02] disabled:opacity-50 ${
                   id === "free"
                     ? "border border-white/15 text-mist-100 hover:bg-white/5"
-                    : "bg-aurora-400 text-ink-950"
+                    : "bg-aurora-400 text-on-accent"
                 }`}
               >
                 {busy === id ? (

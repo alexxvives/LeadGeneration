@@ -842,7 +842,7 @@ export function Studio() {
               <button
                 type="button"
                 onClick={() => setBoardCreateReq((n) => n + 1)}
-                className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.02]"
+                className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
               >
                 Create board
               </button>
@@ -1193,7 +1193,7 @@ export function Studio() {
               <button
                 type="button"
                 onClick={() => void confirmSimulateSend()}
-                className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.03]"
+                className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-[1.03]"
               >
                 Simulate send
               </button>
@@ -1230,7 +1230,7 @@ export function Studio() {
               <button
                 type="button"
                 onClick={() => void confirmWarmupSend()}
-                className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.03]"
+                className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-[1.03]"
               >
                 Send anyway
               </button>

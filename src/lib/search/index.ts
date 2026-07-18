@@ -41,11 +41,13 @@ export class SearchUnavailableError extends Error {
   }
 }
 
-function pickProvider(): SearchProvider | null {
+/** Prefer Firecrawl; Exa is always listed second when keyed (runtime fallback). */
+function listProviders(): SearchProvider[] {
   const caps = getCapabilities();
-  if (caps.firecrawl) return firecrawlProvider();
-  if (caps.exa) return exaProvider();
-  return null;
+  const out: SearchProvider[] = [];
+  if (caps.firecrawl) out.push(firecrawlProvider());
+  if (caps.exa) out.push(exaProvider());
+  return out;
 }
 
 function nicheTags(input: CreateRunInput): string[] {
@@ -152,18 +154,35 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
 
   const strategy = input.searchStrategy ?? "standard";
   const queries = buildQueries(input, strategy);
-  const provider = pickProvider();
+  const providers = listProviders();
 
-  if (!provider) {
+  if (providers.length === 0) {
     throw new SearchUnavailableError(
       "No search provider configured. Add FIRECRAWL_API_KEY or EXA_API_KEY, or click “Load demo data”.",
     );
   }
 
-  const pages = await collectPages(provider, queries, limit);
+  // Try Firecrawl first; if it errors or returns nothing, fall through to Exa.
+  let pages: PageResult[] = [];
+  let provider = providers[0]!;
+  for (let i = 0; i < providers.length; i++) {
+    provider = providers[i]!;
+    try {
+      pages = await collectPages(provider, queries, limit);
+    } catch (err) {
+      console.error(`[search] ${provider.name} failed:`, err);
+      pages = [];
+    }
+    if (pages.length > 0) break;
+    if (i < providers.length - 1) {
+      console.warn(
+        `[search] ${provider.name} returned no pages — trying ${providers[i + 1]!.name}`,
+      );
+    }
+  }
   if (pages.length === 0) {
     return {
-      provider: provider.name,
+      provider: providers.map((p) => p.name).join("→"),
       mode: "live",
       leads: [],
       emptyReason: "Search returned no usable pages. Try a broader niche or different location.",

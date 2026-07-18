@@ -215,7 +215,7 @@ export function LeadColumnsMenu() {
                       !newName.trim() ||
                       (newType === "select" && !newOptions.trim())
                     }
-                    className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-ink-950 disabled:opacity-40"
+                    className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent disabled:opacity-40"
                   >
                     Add
                   </button>

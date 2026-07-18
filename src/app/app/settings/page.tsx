@@ -1,4 +1,4 @@
-import { authRequired, env, getCapabilities } from "@/lib/config";
+import { env, getCapabilities } from "@/lib/config";
 import { HelpIcon, SparkIcon } from "@/components/icons";
 import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
 import { getPlan } from "@/lib/plans";
@@ -8,7 +8,7 @@ import { BillingActions } from "@/components/studio/BillingActions";
 import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
 import { DeveloperModePanel } from "@/components/studio/DeveloperModePanel";
 import { SendSetupPanel } from "@/components/studio/SendSetupPanel";
-import { isAdminEmail } from "@/lib/admin";
+import { isAdminSession } from "@/lib/admin";
 import { auth } from "@/auth";
 import Link from "next/link";
 
@@ -50,9 +50,8 @@ export default async function SettingsPage({
   const { mailboxPublicStatus } = await import("@/lib/email/mailbox");
   const mailbox = mailboxPublicStatus(ws);
   const session = await auth().catch(() => null);
-  // Local demo: tools stay available. Production: admin email only.
-  const showAdminTools =
-    !authRequired() || isAdminEmail(session?.user?.email);
+  // Local demo: tools stay available. Production: users.is_admin via JWT.
+  const showAdminTools = isAdminSession(session);
 
   const canSendEmail =
     caps.canSendEmail ||

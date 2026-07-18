@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { auth } from "@/auth";
-import { isAdminEmail } from "@/lib/admin";
+import { isAdminSession } from "@/lib/admin";
 import { authRequired, env, getCapabilities } from "@/lib/config";
 import { StudioShell } from "@/components/studio/StudioShell";
 
@@ -14,8 +14,8 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const caps = getCapabilities();
   const session = await auth().catch(() => null);
-  // Local demo: show admin nav so you can dogfood without ADMIN_EMAIL session.
-  const isAdmin = !authRequired() || isAdminEmail(session?.user?.email);
+  // Local demo: show admin nav. Production: JWT isAdmin from users.is_admin.
+  const isAdmin = isAdminSession(session);
 
   const identity = {
     fromName: env.fromName(),

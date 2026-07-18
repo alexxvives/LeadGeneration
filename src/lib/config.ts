@@ -189,16 +189,6 @@ export const env = {
   // Never set SMOKE_API_KEY in production.
   smokeApiKey: () => process.env.SMOKE_API_KEY?.trim() ?? "",
 
-  /**
-   * Platform admin (plan override / credit reset).
-   * Built-in defaults work with zero env — you do NOT need to set these.
-   * Optional Wrangler secrets only if you want a different email/password
-   * without editing code (e.g. rotate password before sharing the app).
-   */
-  adminEmail: () =>
-    process.env.ADMIN_EMAIL?.trim().toLowerCase() || "admin@tryhermesmail.com",
-  adminPassword: () => process.env.ADMIN_PASSWORD?.trim() || "password",
-
   /** Resend delivery webhooks (Svix signing secret). */
   resendWebhookSecret: () => process.env.RESEND_WEBHOOK_SECRET?.trim() ?? "",
   /** Maileroo delivery/inbound webhooks (shared header secret). */

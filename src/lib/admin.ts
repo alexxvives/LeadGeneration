@@ -1,32 +1,13 @@
-import { env } from "@/lib/config";
-
-/** Platform admin — only account that may override plan / reset usage. */
-export function adminEmail(): string {
-  return env.adminEmail();
-}
-
-export function isAdminEmail(email: string | null | undefined): boolean {
-  if (!email) return false;
-  return email.trim().toLowerCase() === adminEmail();
-}
+import type { Session } from "next-auth";
+import { authRequired } from "@/lib/config";
 
 /**
- * Admin password check. Edge-safe (no Node crypto) — fine for a temporary
- * shared secret; hash + D1 before GA.
+ * Platform admin gate — JWT `isAdmin` from `users.is_admin` (hashed account).
+ * Local demo (`!authRequired`) keeps admin chrome open for dogfooding.
  */
-export function verifyAdminPassword(password: string): boolean {
-  const expected = env.adminPassword();
-  if (!expected || password.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) {
-    diff |= password.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
-export function verifyAdminCredentials(
-  email: string,
-  password: string,
+export function isAdminSession(
+  session: Session | null | undefined,
 ): boolean {
-  return isAdminEmail(email) && verifyAdminPassword(password);
+  if (!authRequired()) return true;
+  return session?.isAdmin === true;
 }

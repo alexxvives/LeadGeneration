@@ -9,20 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-18 (password-first login + single nav CTA)
+## ⏱️ Status — updated 2026-07-18 (theme + pricing polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Deployed:** Worker `09b63d5f-ecc5-47b7-a97e-9dbaa2092e3f` (password-first login).
+**Deployed:** Version `9636c02c-a6f1-4d39-a399-011e530d74a1`
 
 ### This pass
-- Login: password primary; magic link secondary (“Email me a sign-in link”).
-- Marketing nav: one CTA — **Sign in** → `/login` (prod) or **Open studio** (local).
-- AuthModal aligned with same password-first flow. Redeployed.
+- Light/dark theme (`data-theme` + palettes in `globals.css`; `ThemeToggle`).
+- Pricing toggle overflow fix; “Most popular” beside Pro; honest plan bullets.
+- Hero/logo/preview timing; remove confirm-password on signup.
+- Admin still `users.is_admin` (0018); no `ADMIN_*` secrets.
 
 ### Next
-1. Hard-refresh; admin: `admin@tryhermesmail.com` + `ADMIN_PASSWORD`.
-2. Regular users: magic-link secondary until per-user passwords exist.
-3. Rotate `ADMIN_PASSWORD` if still default.
+1. Hard-refresh site — try theme toggle + pricing annual switch.
+2. Create Stripe test Prices at $19 / $49 / $99 if not done.
+3. Buy Firecrawl Hobby when free 1k credits/mo is the bottleneck.
 
 ---
 

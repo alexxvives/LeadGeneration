@@ -11,6 +11,10 @@ genuinely good.**
 Code: `src/lib/search/` (`index.ts`, `query.ts`, `firecrawl.ts`, `exa.ts`,
 `enrich.ts`, `demo.ts`) and `src/lib/fit-score.ts`.
 
+**Provider order:** Firecrawl first; if it errors or returns no pages, **Exa**
+runs as fallback when `EXA_API_KEY` is set. Demo is never a silent fallback for
+live searches.
+
 1. **Query building** (`query.ts` → `buildQueries`): the search hero exposes a
    **Search mode** toggle backed by `CreateRunInput.searchStrategy`:
    - `standard` — one focused query (`niche + location + "contact email"`).
@@ -22,9 +26,9 @@ Code: `src/lib/search/` (`index.ts`, `query.ts`, `firecrawl.ts`, `exa.ts`,
    For expanded modes, results are deduped by URL, enriched, deduped again by
    domain, then **ranked by fit score** and capped to the per-run limit.
    Single-query keeps the provider's native ranking.
-2. **Provider search**: calls **Firecrawl** `/v1/search` (preferred), which
-   searches the web and scrapes each result page's main content. Falls back to
-   **Exa** if only that key exists. Both degrade to demo data with no key.
+2. **Provider search**: **Firecrawl** `/v1/search` + scrape (preferred). If
+   Firecrawl fails or returns zero pages, **Exa** runs next (when keyed).
+   Live search never silently swaps in demo leads — use “Load demo data” for that.
 3. **Enrichment** (`enrich.ts`) — Phase B improvements shipped 2026-07-14:
    - **Company name**: splits the page title on common separators (` | `, ` - `,
      ` — `, `:`), skips generic segments ("Contact Us", "Home", "About", "Welcome

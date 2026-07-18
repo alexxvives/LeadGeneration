@@ -1,6 +1,4 @@
-import { SiteNav } from "@/components/SiteNav";
-import { BrandMark } from "@/components/BrandMark";
-import { authRequired } from "@/lib/config";
+import { MarketingShell } from "@/components/MarketingShell";
 import { ShieldIcon } from "@/components/icons";
 
 export const metadata = {
@@ -37,50 +35,49 @@ const DOMAIN_TIPS = [
 
 export default function DeliverabilityPage() {
   return (
-    <main className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 -z-10 aurora-glow opacity-40" />
-      <SiteNav authRequired={authRequired()} />
-      <section className="mx-auto max-w-7xl px-5 pb-24 pt-10 sm:px-8">
+    <MarketingShell footerTagline="Warm the domain. Then send.">
+      <section className="mx-auto max-w-7xl px-5 pb-24 pt-8 sm:px-8">
         <div className="mb-3 flex items-center gap-3">
-          <ShieldIcon className="h-6 w-6 text-amber-300" />
+          <ShieldIcon className="h-5 w-5 text-amber-300" />
           <span className="text-xs font-medium uppercase tracking-widest text-amber-300">
             Deliverability guide
           </span>
         </div>
-        <h1 className="font-display text-4xl font-semibold sm:text-5xl">
+        <h1 className="max-w-3xl font-display text-4xl font-semibold tracking-tight sm:text-5xl">
           How to not get your domain banned
         </h1>
-        <p className="mt-4 max-w-2xl text-lg text-mist-300">
-          Cold outreach is legal when done right. Bans come from poor hygiene — high
-          bounce rates, spam complaints, unauthenticated mail.
+        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-mist-300">
+          Cold outreach is legal when done right. Bans come from poor hygiene —
+          high bounce rates, spam complaints, unauthenticated mail.
         </p>
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+
+        <ol className="mt-14 space-y-0 border-t border-white/10">
           {DOMAIN_TIPS.map((tip, i) => (
-            <div
+            <li
               key={tip.title}
-              className="glass rounded-xl2 p-5 transition-colors hover:border-amber-400/20"
+              className="grid gap-3 border-b border-white/10 py-7 sm:grid-cols-[3rem_1fr] sm:gap-6"
             >
-              <span className="mb-3 flex h-6 w-6 items-center justify-center rounded-full bg-amber-400/10 text-xs font-bold text-amber-300">
-                {i + 1}
+              <span className="font-display text-2xl text-amber-300/70">
+                {String(i + 1).padStart(2, "0")}
               </span>
-              <h2 className="font-semibold leading-snug">{tip.title}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-mist-300">{tip.body}</p>
-            </div>
+              <div>
+                <h2 className="text-lg font-semibold text-mist-100">{tip.title}</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-mist-300">
+                  {tip.body}
+                </p>
+              </div>
+            </li>
           ))}
-        </div>
-        <div className="mt-10 rounded-xl border border-amber-400/15 bg-amber-400/5 px-6 py-4">
-          <p className="text-sm text-amber-200/80">
-            <span className="font-semibold text-amber-300">Bottom line:</span> Hermes Mail
-            handles rate limiting and approval. You handle DNS and domain hygiene.
+        </ol>
+
+        <div className="mt-12 rounded-xl border border-amber-400/15 bg-amber-400/5 px-6 py-5">
+          <p className="text-sm leading-relaxed text-amber-200/80">
+            <span className="font-semibold text-amber-300">Bottom line:</span>{" "}
+            Hermes Mail handles rate limiting and approval. You handle DNS and
+            domain hygiene.
           </p>
         </div>
       </section>
-      <footer className="border-t border-white/5 py-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 text-sm text-mist-500 sm:px-8">
-          <BrandMark size="sm" />
-          <p>Warm the domain. Then send.</p>
-        </div>
-      </footer>
-    </main>
+    </MarketingShell>
   );
 }

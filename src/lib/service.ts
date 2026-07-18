@@ -1649,7 +1649,7 @@ export async function generatePitchFromWebsite(
   );
 }
 
-/** Platform-wide admin Users table (caller must gate on isAdminEmail). */
+/** Platform-wide admin Users table (caller must gate on isAdminSession). */
 export async function listAdminUsers(ctx: Ctx): Promise<AdminUserRow[]> {
   const [workspaces, counts, authUsers] = await Promise.all([
     ctx.db.listWorkspaces(),
@@ -1689,7 +1689,7 @@ export async function listAdminUsers(ctx: Ctx): Promise<AdminUserRow[]> {
   });
 }
 
-/** Platform-wide admin overview (caller must gate on isAdminEmail). */
+/** Platform-wide admin overview (caller must gate on isAdminSession). */
 export async function getAdminPlatformStats(ctx: Ctx): Promise<AdminPlatformStats> {
   const users = await listAdminUsers(ctx);
   const authUsers = await ctx.db.listAuthUsers();

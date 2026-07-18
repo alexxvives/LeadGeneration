@@ -21,17 +21,24 @@ minimal (2–3 cues max per screen).
 
 ## Color tokens (Tailwind classes)
 
-| Role | Class | Hex |
-|------|-------|-----|
+Palettes live in `globals.css` (`:root` / `[data-theme="light"]`). Edit those
+vars to retune; classes stay the same. Theme toggle = `ThemeToggle` +
+`data-theme` on `<html>`.
+
+| Role | Class | Dark (default) |
+|------|-------|----------------|
 | Page background | `bg-ink-950` | `#050505` |
 | Card/surface bg | `bg-ink-900` → `bg-ink-800` | `#0a0e14` → `#141c28` |
 | Stroke / border | `border-ink-700` or `border-white/10` | |
-| **Primary accent** | `text-aurora-300` / `bg-aurora-400` | `#5eecd9` / `#2dd4bf` |
-| Aurora hover/pressed | `aurora-500` / `aurora-600` | `#14b8a6` / `#0d9488` |
-| **Secondary accent** | `text-amber-300` / `bg-amber-400` | `#ffd48a` / `#f7b955` |
+| **Primary accent** | `text-aurora-300` / `bg-aurora-400` | teal |
+| **On accent buttons** | `text-on-accent` | near-black (both themes) |
+| **Secondary accent** | `text-amber-300` / `bg-amber-400` | amber |
 | Body text | `text-mist-100` | `#eaf1fb` |
 | Muted text | `text-mist-300` | `#b6c4dc` |
 | Placeholder / hint | `text-mist-500` | `#7f92b3` |
+
+Use `text-on-accent` on solid aurora/amber buttons — not `text-ink-950` (that
+token becomes the page color in light mode).
 
 ## Key utility classes (globals.css)
 

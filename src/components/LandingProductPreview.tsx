@@ -56,7 +56,7 @@ export function LandingProductPreview() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 2800);
+    const id = window.setInterval(() => setTick((t) => t + 1), 1400);
     return () => window.clearInterval(id);
   }, []);
 

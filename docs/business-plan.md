@@ -90,10 +90,10 @@ per-seat).
 
 | Plan | Price | Leads/mo | Sends/mo | Verifies/day | Hook / job |
 | --- | --- | --- | --- | --- | --- |
-| **Free** | $0 | 75 | 30 | 5 | First real campaign; feel the loop |
-| **Starter** | **$39/mo** | 400 | 400 | 25 | Weekly habit for a solo |
-| **Pro** | **$89/mo** | 2,000 | 2,000 | 50 | Volume + LLM personalization |
-| **Agency** | **$199/mo** | 8,000 | 8,000 | 100 | Multi-client; verify ceiling |
+| **Free** | $0 | 50 | 20 | 5 | First real campaign; feel the loop |
+| **Starter** | **$19/mo** | 150 | 150 | 15 | Weekly habit for a solo |
+| **Pro** | **$49/mo** | 600 | 600 | 30 | Volume + LLM personalization |
+| **Agency** | **$99/mo** | 2,000 | 2,000 | 50 | Multi-client; verify ceiling |
 
 - 1 lead credit = 1 enriched lead (not per source).
 - **Per-run batch size** is limited only by monthly remaining credits (Free can
@@ -101,10 +101,10 @@ per-seat).
 - **BYO sender** on all tiers → send COGS ≈ $0 to us.
 - Annual ~20% off.
 
-### Shipped today vs proposed
+### Shipped today
 
-`src/lib/plans.ts` now matches this table (Free 75/30/5, Starter $39/400,
-Pro $89/2k, Agency $199/8k). Create matching Stripe Prices and set env Price
+`src/lib/plans.ts` matches this table (Free 50/20/5, Starter $19/150,
+Pro $49/600, Agency $99/2k). Create matching Stripe Prices and set env Price
 IDs — see [`stripe-setup.md`](stripe-setup.md).
 
 ### Why freemium

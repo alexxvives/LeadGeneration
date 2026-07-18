@@ -4,6 +4,57 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-18 — Light theme + pricing honesty + UI polish
+- Theme: `data-theme` + CSS vars in `globals.css` (edit palettes there);
+  `ThemeToggle` in SiteNav + studio. Use `text-on-accent` on solid CTAs.
+- Pricing: toggle knob clipped (`overflow-hidden` + `translate-x-5`); “Most
+  popular” inline with Pro title; plan bullets match real quotas/features
+  (no fake multi-seat / Places-only claims).
+- Hero: drop “HERMES mail” eyebrow; BrandMark `mail` uses `font-brand`;
+  preview tick 2800→1400ms; signup no longer asks confirm password.
+
+### 2026-07-18 — Admin is a hashed user + `is_admin` (no env secrets)
+- Migration `0018_user_is_admin.sql`. Admin signs in like anyone else; JWT
+  `session.isAdmin` gates layout/APIs. `ensureBootstrapAdmin()` creates
+  `admin@tryhermesmail.com` / `password` when no admin exists. Removed
+  `ADMIN_EMAIL` / `ADMIN_PASSWORD` from config + Wrangler checklist.
+- Marketing: shared `MarketingShell` + `SiteFooter`; landing/how-it-works/
+  ethics/deliverability/pricing use one chrome; SiteNav gets a mobile menu.
+- Windows deploy gotcha: `opennextjs-cloudflare deploy` can reuse a stale
+  `.open-next` — run `npm run cf:build` then deploy when code changed.
+
+### 2026-07-18 — Exa runtime fallback + admin Wrangler secrets
+- `runSearch` now tries Firecrawl then Exa (not only “Exa if no FC key”).
+- Superseded for admin: was env secrets; now hashed `is_admin` user (above).
+
+### 2026-07-18 — Appeal pricing cut ($19 / $49 / $99)
+- `plans.ts`: Free 50/20/5; Starter **$19**/150/150/15; Pro **$49**/600/600/30;
+  Agency **$99**/2k/2k/50. Recreate Stripe Prices to match before checkout.
+- Firecrawl dominates COGS; Hobby $19/5k credits ≈ $0.0038/credit (~$0.005/lead
+  with search+scrape). Avoid JSON/Enhanced scrape; keep scrape-after-search.
+
+### 2026-07-18 — Per-user passwords (+ magic = forgot)
+- `users.password_hash` (migration 0017) + `POST /api/auth/register`. Hash =
+  PBKDF2-SHA-256 via Web Crypto (`src/lib/password.ts`). Local without D1:
+  `data/auth-users.json`. Existing magic-link users with no hash can set a
+  password via Create account (same email).
+- Magic link kept as “Forgot password? Email me a sign-in link” (SMTP/Resend).
+- Stripe webhook: Dashboard URL = prod only; local needs `stripe listen` in a
+  terminal (not an endpoint URL field). Prices in `plans.ts` are SaaS list
+  prices with high gross margin at max COGS — not cost-plus on free tiers.
+
+### 2026-07-18 — Landing hero + auth/Stripe clarifications
+- Duplicate nav CTAs (“Open studio” + “Sign in”) were confusing; one CTA already
+  switches by env. Hero no longer repeats the wordmark — BrandMark in nav carries
+  brand (Article IV).
+- Magic link = Auth.js email provider: **Maileroo/SMTP (nodemailer)** when
+  `SMTP_*` set, else **Resend**. Password credentials only work for admin (+ any
+  email locally). Removing magic link would lock out non-admin prod users.
+- Stripe: app has a single `STRIPE_SECRET_KEY` (+ price IDs + webhook secret).
+  Prefer test keys locally and live keys only in prod secrets — swapping one
+  secret without matching `price_…` / `whsec_…` breaks Checkout/webhooks. Dual
+  env vars (`STRIPE_SECRET_KEY_TEST` / `_LIVE`) are optional later.
+
 ### 2026-07-18 — Password-first login; one marketing CTA
 - Prod AuthModal was magic-link-only (`credentialsMode = !authRequired`), so
   “Sign in” in the nav never showed a password. Fix: password primary on

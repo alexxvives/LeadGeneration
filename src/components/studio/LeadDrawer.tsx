@@ -454,7 +454,7 @@ export function LeadDrawer(props: DrawerProps) {
                       type="button"
                       onClick={() => void addNote()}
                       disabled={!newNoteDate || !newNoteText.trim()}
-                      className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-ink-950 disabled:opacity-40"
+                      className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent disabled:opacity-40"
                     >
                       Save
                     </button>
@@ -539,7 +539,7 @@ export function LeadDrawer(props: DrawerProps) {
                     })
                   }
                   disabled={busy === "draft"}
-                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
+                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-105 disabled:opacity-50"
                 >
                   {busy === "draft" ? <Spinner className="h-4 w-4" /> : <SparkIcon className="h-4 w-4" />}
                   Draft outreach
@@ -550,7 +550,7 @@ export function LeadDrawer(props: DrawerProps) {
                 {sent ? (
                   <div className="space-y-4">
                     <div className="animate-sent-pop flex flex-col items-center gap-2 rounded-xl2 border border-aurora-400/25 bg-gradient-to-b from-aurora-400/15 to-transparent px-4 py-5 text-center">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-aurora-400 text-ink-950 shadow-[0_0_28px_-4px_rgba(67,224,168,0.65)]">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-aurora-400 text-on-accent shadow-[0_0_28px_-4px_rgba(67,224,168,0.65)]">
                         <CheckIcon className="h-6 w-6" />
                       </span>
                       <p className="font-display text-lg font-semibold text-aurora-200">
@@ -673,7 +673,7 @@ export function LeadDrawer(props: DrawerProps) {
                           })
                         }
                         disabled={busy === "approve"}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-105 disabled:opacity-50"
                       >
                         {busy === "approve" ? (
                           <Spinner className="h-3.5 w-3.5" />
@@ -692,7 +692,7 @@ export function LeadDrawer(props: DrawerProps) {
                         }
                         disabled={!canSend || busy === "send"}
                         title={!toEmail ? "Add a recipient email first" : undefined}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-ink-950 transition-transform hover:scale-105 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-105 disabled:opacity-50"
                       >
                         {busy === "send" ? (
                           <Spinner className="h-3.5 w-3.5" />

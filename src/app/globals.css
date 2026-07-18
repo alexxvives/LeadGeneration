@@ -2,39 +2,115 @@
 
 /*
   HERMES mail design system.
-  Brand story: winged messenger — find, draft, deliver. Palette is deep ink
-  black + cyan/teal (logo) + warm amber secondary. No purple-on-white or
-  cream+terracotta clichés.
+  Brand: ink + aurora teal + amber. No purple-on-white / cream+terracotta.
+
+  Themes: edit the :root / [data-theme="light"] palettes below.
+  Toggle sets data-theme on <html>. Tailwind colors map through these vars.
 */
+
+/* ── Palette tokens (edit here) ─────────────────────────────────────────── */
+:root,
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink-950: #050505;
+  --ink-900: #0a0e14;
+  --ink-850: #0e141c;
+  --ink-800: #141c28;
+  --ink-700: #1c2838;
+  --ink-600: #2a3a52;
+
+  --aurora-300: #5eecd9;
+  --aurora-400: #2dd4bf;
+  --aurora-500: #14b8a6;
+  --aurora-600: #0d9488;
+
+  --amber-300: #ffd48a;
+  --amber-400: #f7b955;
+  --amber-500: #eb9d2f;
+
+  --mist-100: #eaf1fb;
+  --mist-300: #b6c4dc;
+  --mist-500: #7f92b3;
+
+  /* Text on solid aurora/amber buttons — stays near-black in both themes */
+  --on-accent: #050505;
+
+  --glass-top: rgba(255, 255, 255, 0.06);
+  --glass-bottom: rgba(255, 255, 255, 0.02);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --grid-line: rgba(234, 241, 251, 0.9);
+  --aurora-glow-a: rgba(45, 212, 191, 0.22);
+  --aurora-glow-b: rgba(247, 185, 85, 0.12);
+  --aurora-glow-c: rgba(20, 184, 166, 0.16);
+  --card-hover-shadow: rgba(22, 195, 144, 0.35);
+  --map-bg: #0a1120;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+
+  /* Cool paper surfaces (not cream) */
+  --ink-950: #f3f6fb;
+  --ink-900: #e8eef8;
+  --ink-850: #dce5f2;
+  --ink-800: #cfd9ea;
+  --ink-700: #b4c2d6;
+  --ink-600: #8a9bb5;
+
+  /* Slightly deeper teal for contrast on light */
+  --aurora-300: #0f9f8f;
+  --aurora-400: #0d9488;
+  --aurora-500: #0f766e;
+  --aurora-600: #115e59;
+
+  --amber-300: #c47d12;
+  --amber-400: #d97706;
+  --amber-500: #b45309;
+
+  --mist-100: #0c1524;
+  --mist-300: #3d4f6a;
+  --mist-500: #5c708c;
+
+  --on-accent: #050505;
+
+  --glass-top: rgba(12, 21, 36, 0.04);
+  --glass-bottom: rgba(12, 21, 36, 0.015);
+  --glass-border: rgba(12, 21, 36, 0.1);
+  --grid-line: rgba(12, 21, 36, 0.55);
+  --aurora-glow-a: rgba(13, 148, 136, 0.14);
+  --aurora-glow-b: rgba(217, 119, 6, 0.08);
+  --aurora-glow-c: rgba(15, 118, 110, 0.1);
+  --card-hover-shadow: rgba(13, 148, 136, 0.22);
+  --map-bg: #e2e8f0;
+}
 
 @theme {
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
   --font-brand: var(--font-syne), var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
 
-  /* Ink (background scale) — near-black to match logo plate */
-  --color-ink-950: #050505;
-  --color-ink-900: #0a0e14;
-  --color-ink-850: #0e141c;
-  --color-ink-800: #141c28;
-  --color-ink-700: #1c2838;
-  --color-ink-600: #2a3a52;
+  --color-ink-950: var(--ink-950);
+  --color-ink-900: var(--ink-900);
+  --color-ink-850: var(--ink-850);
+  --color-ink-800: var(--ink-800);
+  --color-ink-700: var(--ink-700);
+  --color-ink-600: var(--ink-600);
 
-  /* Aurora (primary accent) — logo cyan/teal */
-  --color-aurora-300: #5eecd9;
-  --color-aurora-400: #2dd4bf;
-  --color-aurora-500: #14b8a6;
-  --color-aurora-600: #0d9488;
+  --color-aurora-300: var(--aurora-300);
+  --color-aurora-400: var(--aurora-400);
+  --color-aurora-500: var(--aurora-500);
+  --color-aurora-600: var(--aurora-600);
 
-  /* Amber (secondary accent / warmth) */
-  --color-amber-300: #ffd48a;
-  --color-amber-400: #f7b955;
-  --color-amber-500: #eb9d2f;
+  --color-amber-300: var(--amber-300);
+  --color-amber-400: var(--amber-400);
+  --color-amber-500: var(--amber-500);
 
-  /* Neutral text on ink */
-  --color-mist-100: #eaf1fb;
-  --color-mist-300: #b6c4dc;
-  --color-mist-500: #7f92b3;
+  --color-mist-100: var(--mist-100);
+  --color-mist-300: var(--mist-300);
+  --color-mist-500: var(--mist-500);
+
+  --color-on-accent: var(--on-accent);
 
   --radius-xl2: 1.25rem;
 }
@@ -44,29 +120,27 @@
     scroll-behavior: smooth;
   }
   body {
-    background-color: var(--color-ink-950);
-    color: var(--color-mist-100);
+    background-color: var(--ink-950);
+    color: var(--mist-100);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
   ::selection {
-    background: var(--color-aurora-400);
-    color: var(--color-ink-950);
+    background: var(--aurora-400);
+    color: var(--on-accent);
   }
-  /* Custom scrollbar for the dark theme */
   * {
-    scrollbar-color: var(--color-ink-600) transparent;
+    scrollbar-color: var(--ink-600) transparent;
   }
 
-  /* Native <select> / <option> — match ink palette (OS menus otherwise go white). */
   select {
-    color-scheme: dark;
+    color-scheme: inherit;
   }
   select option,
   select optgroup {
-    background-color: var(--color-ink-900);
-    color: var(--color-mist-100);
+    background-color: var(--ink-900);
+    color: var(--mist-100);
   }
 }
 
@@ -77,27 +151,34 @@
   .text-balance {
     text-wrap: balance;
   }
-  /* Soft aurora glow used behind hero + brand marks */
-  .aurora-glow {
-    background:
-      radial-gradient(60% 60% at 20% 20%, rgba(45, 212, 191, 0.22), transparent 70%),
-      radial-gradient(50% 50% at 85% 15%, rgba(247, 185, 85, 0.12), transparent 70%),
-      radial-gradient(70% 70% at 60% 100%, rgba(20, 184, 166, 0.16), transparent 70%);
-  }
-  .glass {
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.06),
-      rgba(255, 255, 255, 0.02)
-    );
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
   .font-brand {
     font-family: var(--font-brand);
   }
 
-  /* Glass select — dashboard header, matches glass cards */
+  .aurora-glow {
+    background:
+      radial-gradient(60% 60% at 20% 20%, var(--aurora-glow-a), transparent 70%),
+      radial-gradient(50% 50% at 85% 15%, var(--aurora-glow-b), transparent 70%),
+      radial-gradient(70% 70% at 60% 100%, var(--aurora-glow-c), transparent 70%);
+  }
+  .hero-grid {
+    opacity: 0.035;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse at 50% 20%, black 20%, transparent 70%);
+  }
+  html[data-theme="light"] .hero-grid {
+    opacity: 0.06;
+  }
+
+  .glass {
+    background: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+  }
+
   .select-glass {
     appearance: none;
     background-color: transparent;
@@ -108,23 +189,22 @@
     padding-right: 2.25rem;
   }
 
-  /* Native select chrome matched to ink fields — use via <Select /> */
   .select-ink {
     appearance: none;
-    background-color: rgb(10 17 32 / 0.6);
+    background-color: color-mix(in srgb, var(--ink-900) 60%, transparent);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%237f92b3' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.85rem center;
     background-size: 0.875rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
     border-radius: 0.5rem;
-    color: var(--color-mist-100);
+    color: var(--mist-100);
     padding: 0.75rem 2.5rem 0.75rem 1rem;
     outline: none;
     transition: border-color 0.15s ease;
   }
   .select-ink:focus {
-    border-color: rgb(67 224 168 / 0.6);
+    border-color: color-mix(in srgb, var(--aurora-400) 60%, transparent);
   }
   .select-ink:disabled {
     opacity: 0.4;
@@ -137,7 +217,7 @@
   }
   .card-hover:hover {
     transform: translateY(-4px);
-    box-shadow: 0 18px 50px -20px rgba(22, 195, 144, 0.35);
+    box-shadow: 0 18px 50px -20px var(--card-hover-shadow);
   }
   @keyframes float-up {
     from {
@@ -187,15 +267,24 @@
     background-size: 200% 100%;
     animation: shimmer 1.4s ease infinite;
   }
+  html[data-theme="light"] .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(12, 21, 36, 0.04) 25%,
+      rgba(12, 21, 36, 0.1) 37%,
+      rgba(12, 21, 36, 0.04) 63%
+    );
+    background-size: 200% 100%;
+  }
   @keyframes pulse-ring {
     0% {
-      box-shadow: 0 0 0 0 rgba(67, 224, 168, 0.4);
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--aurora-400) 40%, transparent);
     }
     70% {
-      box-shadow: 0 0 0 10px rgba(67, 224, 168, 0);
+      box-shadow: 0 0 0 10px transparent;
     }
     100% {
-      box-shadow: 0 0 0 0 rgba(67, 224, 168, 0);
+      box-shadow: 0 0 0 0 transparent;
     }
   }
   @keyframes tour-stroke-pulse {
@@ -241,37 +330,35 @@
     .btn-aurora-shine {
       animation: none;
       background-image: none;
-      background-color: #43e0a8;
+      background-color: var(--aurora-400);
     }
   }
 
-  /* Leaflet map (LeadMap) — keep tiles under app chrome / modals */
   .leaflet-container {
     width: 100%;
     height: 100%;
-    background: #0a1120;
+    background: var(--map-bg);
     font: inherit;
   }
   .leaflet-control-attribution {
-    background: rgba(6, 10, 18, 0.75) !important;
-    color: #7f92b3 !important;
+    background: color-mix(in srgb, var(--ink-950) 75%, transparent) !important;
+    color: var(--mist-500) !important;
   }
   .leaflet-control-attribution a {
-    color: #7ff2c8 !important;
+    color: var(--aurora-300) !important;
   }
 
-  /* Landing hero map tooltips */
   .leadify-hero-tooltip {
-    background: rgba(6, 10, 18, 0.92) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    color: #eaf1fb !important;
+    background: color-mix(in srgb, var(--ink-950) 92%, transparent) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: var(--mist-100) !important;
     border-radius: 8px !important;
     padding: 4px 8px !important;
     font-size: 11px !important;
     box-shadow: none !important;
   }
   .leadify-hero-tooltip::before {
-    border-top-color: rgba(6, 10, 18, 0.92) !important;
+    border-top-color: color-mix(in srgb, var(--ink-950) 92%, transparent) !important;
   }
   .leadify-hero-pin {
     background: transparent !important;

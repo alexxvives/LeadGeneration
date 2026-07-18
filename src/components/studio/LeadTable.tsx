@@ -486,7 +486,7 @@ export function LeadTable({
                 type="button"
                 disabled={deleting}
                 onClick={() => void runBulkDelete()}
-                className="inline-flex items-center gap-1 rounded-full bg-rose-400 px-3 py-1.5 text-xs font-medium text-ink-950 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-full bg-rose-400 px-3 py-1.5 text-xs font-medium text-on-accent disabled:opacity-50"
               >
                 <CheckIcon className="h-3 w-3" />
                 {deleting ? "Deleting…" : "Confirm"}
@@ -509,7 +509,7 @@ export function LeadTable({
               <button
                 type="button"
                 onClick={() => setConfirmBulk(true)}
-                className="inline-flex items-center gap-1 rounded-full bg-rose-400/90 px-3 py-1.5 text-xs font-medium text-ink-950 hover:bg-rose-400"
+                className="inline-flex items-center gap-1 rounded-full bg-rose-400/90 px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-rose-400"
               >
                 <TrashIcon className="h-3 w-3" />
                 Delete

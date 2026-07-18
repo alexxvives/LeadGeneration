@@ -135,7 +135,7 @@ export function OutreachView({
                       type="button"
                       onClick={() => void onDraftAll()}
                       disabled={busyId === "draft-all"}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
                     >
                       {busyId === "draft-all" ? (
                         <Spinner className="h-3 w-3" />
@@ -150,7 +150,7 @@ export function OutreachView({
                       type="button"
                       onClick={() => void onSendAll()}
                       disabled={busyId === "send-all"}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-ink-950 disabled:opacity-50"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
                     >
                       {busyId === "send-all" ? (
                         <Spinner className="h-3 w-3" />
@@ -321,7 +321,7 @@ function OutreachRow({
                     ? "Create & approve — move to Ready"
                     : "Needs an email to draft"
               }
-              className={`${ACTION_BTN} bg-amber-400 text-ink-950 disabled:opacity-50`}
+              className={`${ACTION_BTN} bg-amber-400 text-on-accent disabled:opacity-50`}
             >
               {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
             </button>
@@ -356,7 +356,7 @@ function OutreachRow({
                         ? "Send"
                         : "Send (simulate)"
                   }
-                  className={`${ACTION_BTN} bg-aurora-400 text-ink-950 disabled:opacity-50`}
+                  className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
                 >
                   {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
                 </button>

@@ -388,7 +388,7 @@ export function SearchPanel({
               <button
                 type="button"
                 onClick={handleSaveIcp}
-                className="rounded-full bg-aurora-400 px-3 py-1.5 text-xs font-medium text-ink-950"
+                className="rounded-full bg-aurora-400 px-3 py-1.5 text-xs font-medium text-on-accent"
               >
                 Save
               </button>
@@ -444,7 +444,7 @@ export function SearchPanel({
                   onClick={() => setSearchStrategy(s.id)}
                   className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-aurora-400 text-ink-950"
+                      ? "bg-aurora-400 text-on-accent"
                       : "text-mist-300 hover:text-mist-100"
                   }`}
                 >
@@ -481,7 +481,7 @@ export function SearchPanel({
                   onClick={() => !disabled && setMaxLeads(n)}
                   className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-aurora-400 text-ink-950"
+                      ? "bg-aurora-400 text-on-accent"
                       : disabled
                         ? "cursor-not-allowed text-mist-600 opacity-50"
                         : "text-mist-300 hover:text-mist-100"
@@ -540,7 +540,7 @@ export function SearchPanel({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="btn-aurora-shine inline-flex items-center justify-center rounded-full px-8 py-3 font-semibold text-ink-950 shadow-[0_0_24px_-6px_rgba(67,224,168,0.55)] transition-transform hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:[animation:none]"
+          className="btn-aurora-shine inline-flex items-center justify-center rounded-full px-8 py-3 font-semibold text-on-accent shadow-[0_0_24px_-6px_rgba(67,224,168,0.55)] transition-transform hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:[animation:none]"
         >
           {running ? (
             <>

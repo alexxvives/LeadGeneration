@@ -315,7 +315,7 @@ export function EmailSettingsForm({
                   onClick={() => setProviderAndSave("resend")}
                   className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                     !isMaileroo
-                      ? "bg-aurora-400 text-ink-950"
+                      ? "bg-aurora-400 text-on-accent"
                       : "text-mist-300 hover:text-mist-100"
                   }`}
                 >
@@ -327,7 +327,7 @@ export function EmailSettingsForm({
                   onClick={() => setProviderAndSave("maileroo")}
                   className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                     isMaileroo
-                      ? "bg-aurora-400 text-ink-950"
+                      ? "bg-aurora-400 text-on-accent"
                       : "text-mist-300 hover:text-mist-100"
                   }`}
                 >

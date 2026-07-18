@@ -570,7 +570,7 @@ export function SenderProfileForm() {
                   type="button"
                   disabled={generating || websiteDraft.trim().length < 3}
                   onClick={() => void generatePitch(websiteDraft)}
-                  className="rounded-full bg-aurora-400 px-3 py-1.5 text-xs font-medium text-ink-950 disabled:opacity-50"
+                  className="rounded-full bg-aurora-400 px-3 py-1.5 text-xs font-medium text-on-accent disabled:opacity-50"
                 >
                   Generate
                 </button>

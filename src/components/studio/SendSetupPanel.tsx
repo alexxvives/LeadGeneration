@@ -132,7 +132,7 @@ export function SendSetupPanel({
             onClick={() => void selectPath("easy")}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               path === "easy"
-                ? "bg-aurora-400 text-ink-950"
+                ? "bg-aurora-400 text-on-accent"
                 : "text-mist-300 hover:text-mist-100"
             }`}
           >
@@ -143,7 +143,7 @@ export function SendSetupPanel({
             onClick={() => void selectPath("pro")}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               path === "pro"
-                ? "bg-aurora-400 text-ink-950"
+                ? "bg-aurora-400 text-on-accent"
                 : "text-mist-300 hover:text-mist-100"
             }`}
           >
@@ -231,7 +231,7 @@ export function SendSetupPanel({
                     type="button"
                     disabled={!mailbox.googleReady || !canEdit}
                     onClick={connectGoogle}
-                    className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-6 py-2.5 text-sm font-medium text-ink-950 transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+                    className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-6 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
                   >
                     <MailIcon className="h-4 w-4" />
                     Connect Google

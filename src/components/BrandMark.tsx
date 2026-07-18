@@ -32,12 +32,12 @@ export function BrandMark({
         />
       </span>
       {withWordmark && (
-        <span className={`leading-none ${text}`}>
-          <span className="font-brand font-semibold tracking-[0.04em] text-mist-100">
+        <span className={`font-brand leading-none ${text}`}>
+          <span className="font-semibold tracking-[0.04em] text-mist-100">
             HERMES
           </span>
           <span
-            className={`ml-1.5 font-medium tracking-[0.12em] text-aurora-300 ${mailText}`}
+            className={`ml-1.5 font-semibold tracking-[0.04em] text-aurora-300 ${mailText}`}
           >
             mail
           </span>

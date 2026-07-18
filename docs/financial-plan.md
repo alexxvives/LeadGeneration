@@ -65,10 +65,12 @@ From Firecrawl pricing (2026): Search = **2 credits / 10 results**; Scrape =
 | Standard (search+scrape) | ~1.2–2 | ~500–800 |
 | Smart / local (~3× calls) | ~4–6 | ~150–250 |
 
-Paid Firecrawl (Hobby ~$19 / 5,000 credits ≈ **$0.0038 / credit**):
+Paid Firecrawl (Hobby **$19**/mo / 5,000 credits ≈ **$0.0038 / credit**;
+annual Hobby **$16**/mo):
 
-- Standard lead ≈ **$0.005–$0.01**
-- Smart lead ≈ **$0.015–$0.025**
+- Standard lead (search + scrape, ~1.2 credits) ≈ **$0.005**
+- Avoid JSON/Enhanced scrape (+4 credits each) — we use markdown only
+- Smart / multi-call modes ≈ **$0.015–$0.025** (avoid as default)
 
 ### Verify unit math
 
@@ -122,39 +124,52 @@ the monthly cap matters. Enforce: `batch ≤ min(planMonthlyLeads, remaining)`.
 
 ---
 
-## 5. Recommended quotas & prices (proposed)
+## 5. Recommended quotas & prices (shipped)
 
-Sync into `src/lib/plans.ts` + Stripe when you accept this table.
+Synced in `src/lib/plans.ts`. Create matching Stripe Prices before go-live.
 
 | Plan | Price | Leads / mo | Sends / mo | Verifies / day | Job to be done |
 | --- | --- | --- | --- | --- | --- |
-| **Free** | **$0** | **75** | **30** | **5** | One solid first campaign; feel the product |
-| **Starter** | **$39** | **400** | **400** | **25** | Weekly outbound habit for a solo |
-| **Pro** | **$89** | **2,000** | **2,000** | **50** | Power user / tiny team; AI personalization |
-| **Agency** | **$199** | **8,000** | **8,000** | **100** | Multi-client; hits shared verify ceiling |
+| **Free** | **$0** | **50** | **20** | **5** | One solid first campaign; feel the product |
+| **Starter** | **$19** | **150** | **150** | **15** | Weekly habit for a solo (impulse buy) |
+| **Pro** | **$49** | **600** | **600** | **30** | Power user / tiny team; AI personalization |
+| **Agency** | **$99** | **2,000** | **2,000** | **50** | Multi-client; still under verify ceiling |
 
 Annual: **~20% off** (`ANNUAL_DISCOUNT` already in code).
 
-### Why these numbers (vs current shipped)
+### Why these numbers (2026-07 appeal cut)
 
-| Change vs current `plans.ts` | Why |
+| Change | Why |
 | --- | --- |
-| Free 50→**75** leads, 25→**30** sends | Slightly more hook room after unlocking 25/50 batches |
-| Starter $29→**$39**, 500→**400** leads | Better ARPU; still under Apollo seat; 400 is ~10/weekday |
-| Pro $79→**$89**, 2500→**2000** | Margin buffer when Firecrawl leaves free tier |
-| Agency 10k→**8k** leads | Same $199; verify day-cap already 100 |
-| Free verify **5** / 25 / 50 / 100 | Matches shipped `plans.ts`; Agency = whole shared pool |
+| Starter **$19** / 150 leads | Entry under $20; still ~5 leads/weekday |
+| Pro **$49** / 600 | Clear step up without Apollo-seat sticker shock |
+| Agency **$99** / 2k | Volume ladder; avoids COGS-negative at max paid Firecrawl |
+| Free **50** / **20** | Slightly tighter hook; protect shared FC + verify pools |
 
 ### Effective $/enriched-lead (list)
 
 | Plan | $/lead credit | $/send |
 | --- | --- | --- |
 | Free | $0 | $0 |
-| Starter | **$0.098** | $0.098 |
-| Pro | **$0.045** | $0.045 |
-| Agency | **$0.025** | $0.025 |
+| Starter | **$0.127** | $0.127 |
+| Pro | **$0.082** | $0.082 |
+| Agency | **$0.050** | $0.050 |
 
 Volume discounts pull power users up-market (classic SaaS ladder).
+
+### Max-usage COGS breakdown (paid APIs)
+
+Unit assumptions: Firecrawl **$0.02**/lead, verify **$0.003**/send, send **$0** (BYO).
+
+| Plan | Firecrawl | Verify | Send | Total COGS | Revenue | Margin |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Starter | $3.00 | $0.45 | $0 | **$3.45** | $19 | **82%** |
+| Pro | $12.00 | $1.80 | $0 | **$13.80** | $49 | **72%** |
+| Agency | $40.00 | $6.00 | $0 | **$46.00** | $99 | **54%** |
+
+Firecrawl dominates (~85–90% of variable COGS). On Firecrawl Hobby
+($19/mo → 5k credits ≈ **$0.0038**/credit; ~1.2 credits/lead ≈ **~$0.005**/lead)
+max COGS drops sharply vs the $0.02 planning rate above.
 
 ---
 
@@ -165,9 +180,9 @@ verify on most sends:
 
 | Plan | Revenue | Est. COGS (paid FC + free verify) | Gross margin |
 | --- | --- | --- | --- |
-| Starter | $39 | ~$2–6 | **>80%** |
-| Pro | $89 | ~$8–25 | **>70%** |
-| Agency | $199 | ~$30–80 | **>60%** |
+| Starter | $19 | ~$1–3 | **>80%** |
+| Pro | $49 | ~$4–10 | **>75%** |
+| Agency | $99 | ~$12–30 | **>65%** |
 
 When Firecrawl free (1k) + MEV free (100/day) cover early users, early COGS
 ≈ hosting only. **Buy Firecrawl Hobby/Standard and a paid verify pack before
@@ -178,9 +193,9 @@ paid users exceed free pools** — don’t wait for a outage to force it.
 | Concurrent users hitting daily verify cap | Drain on 100 free MEV/day |
 | --- | --- |
 | 20 Free @ 5/day | 100 (saturated) |
-| 4 Starter @ 25/day | 100 |
-| 2 Pro @ 50/day | 100 |
-| 1 Agency @ 100/day | 100 |
+| ~7 Starter @ 15/day | 100 |
+| ~3 Pro @ 30/day | 100 |
+| 2 Agency @ 50/day | 100 |
 
 **Rule:** free verifies are a **growth subsidy**, not an unlimited entitlement.
 Free is already **5/day** in `plans.ts`. If free signups explode, either (a)
@@ -221,7 +236,7 @@ meter. Per-run size is only limited by that meter.
 | Free per-run lock at 10 | **Removed** — only monthly remaining/cap |
 | Send COGS | BYO; we don’t resell sends at MVP |
 | Scarce resource | Shared verify free pool |
-| Entry paid price | **$39** Starter (proposed) |
+| Entry paid price | **$19** Starter (appeal cut 2026-07) |
 | Price in code today | Synced in `plans.ts` — create Stripe Prices to match |
 
 When accepted: update `src/lib/plans.ts`, pricing page copy, Stripe Prices,
