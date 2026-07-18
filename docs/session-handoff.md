@@ -9,19 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-18 (auto Resend webhooks + M1)
+## ⏱️ Status — updated 2026-07-18 (deployed audit + auto Resend webhooks)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Policy:** commit + `git push` after every meaningful batch (user request).
+**Deployed:** `8961d4c` · D1 migrations 0014–0016 applied remote.
 
 ### This pass
-- Resend BYO: auto-register delivery webhook when user saves API key
-  (migration `0016_resend_webhook.sql`) — no per-user Resend dashboard setup.
-- M1 layering: `draft-preview` + `format-location`; Settings copy updated.
+- Committed + pushed + `cf:migrate` + `cf:deploy`.
+- Resend: auto webhook on key save. Maileroo: optional manual webhook + UI copy.
 
 ### Next
-1. `npm run cf:migrate` (0016) + deploy this branch.
-2. Existing customers: re-save Resend key once to register the webhook.
+1. Re-save Resend key in Settings once (registers delivery webhook for existing BYO keys).
+2. Optional: Maileroo users who want bounce tracking → paste webhook URL from Settings.
 
 ---
 
