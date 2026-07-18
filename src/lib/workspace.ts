@@ -15,6 +15,13 @@ export function firstOfNextMonthIso(from: Date = new Date()): string {
   ).toISOString();
 }
 
+/** ISO timestamp for next 00:00 UTC (daily verify reset point). */
+export function nextUtcMidnightIso(from: Date = new Date()): string {
+  return new Date(
+    Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate() + 1),
+  ).toISOString();
+}
+
 export function newWorkspace(args: {
   name: string;
   ownerUserId: string | null;
@@ -32,6 +39,8 @@ export function newWorkspace(args: {
     leadsUsedThisMonth: 0,
     sendsUsedThisMonth: 0,
     resetsAt: firstOfNextMonthIso(),
+    verifiesUsedToday: 0,
+    verifiesResetsAt: nextUtcMidnightIso(),
     createdAt: now,
     updatedAt: now,
     fromName: null,
@@ -100,6 +109,32 @@ export async function ensureUsageWindow(
       leadsUsedThisMonth: 0,
       sendsUsedThisMonth: 0,
       resetsAt: firstOfNextMonthIso(),
+      updatedAt: nowIso(),
+    });
+    return updated ?? ws;
+  }
+  return ws;
+}
+
+/**
+ * Lazily reset the daily verify window at UTC midnight.
+ */
+export async function ensureVerifyWindow(
+  db: LeadRepository,
+  ws: Workspace,
+): Promise<Workspace> {
+  if (!ws.verifiesResetsAt) {
+    const updated = await db.updateWorkspace(ws.id, {
+      verifiesUsedToday: ws.verifiesUsedToday ?? 0,
+      verifiesResetsAt: nextUtcMidnightIso(),
+      updatedAt: nowIso(),
+    });
+    return updated ?? ws;
+  }
+  if (Date.now() >= Date.parse(ws.verifiesResetsAt)) {
+    const updated = await db.updateWorkspace(ws.id, {
+      verifiesUsedToday: 0,
+      verifiesResetsAt: nextUtcMidnightIso(),
       updatedAt: nowIso(),
     });
     return updated ?? ws;

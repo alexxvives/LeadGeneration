@@ -4,6 +4,24 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-18 — Plan-tiered daily verifies + undeliverable cleanup UX
+- Verifies bar is **plan daily quota** (Free 10 / Starter 25 / Pro 50 / Agency
+  100), not the raw MyEmailVerifier remaining balance. Resets midnight UTC
+  (`verifiesUsedToday` + migration 0015). Cache hits don’t bill plan or provider.
+- Undeliverable at send: strip bad email, reject outreach, friendly toast; lead
+  stays under Leads. Keep Zeruh as fallback behind MEV — don’t delete.
+- Leads table: status sort = Closed → In convo → Contacted → New → Not
+  interested; status filter; delete via checkboxes + floating bar only (no
+  per-row trash). Dev plan override uses `router.refresh()` (no manual reload).
+
+### 2026-07-17 — Webhook reply → In Conversation + Pipeline highlight
+- `setOutreachDeliveryStatus("replied")` advances CRM to `in_conversation`
+  (unless closed / not interested), sets contactMethod email, journals
+  “Reply received”. Pipeline cards with `deliveryStatus === "replied"` get a
+  sky highlight + badge; board refreshes every 15s on Pipeline view.
+- Resend: `email.received`. Maileroo inbound routing posts `envelope_sender`
+  (no `event_type`) — treat as replied and match by sender email.
+
 ### 2026-07-17 — Draft caret bug was `<label>`; pitch-fit AI scoring
 - PitchEditor “click body → Bold activates” was `FieldMini` wrapping the editor
   in a `<label>` (browser focuses first button). Use a `<div>` wrapper.

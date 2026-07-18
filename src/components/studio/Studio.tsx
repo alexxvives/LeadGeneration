@@ -10,6 +10,7 @@ import { LeadTable } from "./LeadTable";
 import { LeadMap } from "./LeadMap";
 import { LeadDrawer } from "./LeadDrawer";
 import { UpgradeModal, UsageBar } from "./UpgradeModal";
+import { VerifyLimitModal } from "./VerifyLimitModal";
 import { FirecrawlUsageBadge } from "./FirecrawlUsageBadge";
 import { Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
@@ -28,7 +29,6 @@ import {
   resolveSignature,
   subjectForLang,
 } from "@/lib/sender-profile";
-import { ZeruhUsageBar } from "./EmailVerifySettings";
 import { BoardAssignModal, type BoardDestination } from "./BoardAssignModal";
 import { DashboardView } from "./DashboardView";
 import { BoardsView } from "./BoardsView";
@@ -95,9 +95,9 @@ export function Studio() {
   const [layout, setLayout] = useState<"table" | "cards" | "map">("table");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [upgrade, setUpgrade] = useState<UpgradePrompt | null>(null);
+  const [verifyLimitPlan, setVerifyLimitPlan] = useState<PlanId | null>(null);
   const [fcUsageKey, setFcUsageKey] = useState(0);
   const [fcBefore, setFcBefore] = useState<FirecrawlUsage | null>(null);
-  const [zeruhUsageKey, setZeruhUsageKey] = useState(0);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<{
@@ -118,6 +118,7 @@ export function Studio() {
   const [assignMode, setAssignMode] = useState<"search" | "import">("search");
   const [boardCreateReq, setBoardCreateReq] = useState(0);
   const activeRunIdRef = useRef<string | null>(null);
+  const verifyLimitShownRef = useRef(false);
   const filterBoardIdRef = useRef<string | null>(filterBoardId);
   filterBoardIdRef.current = filterBoardId;
 
@@ -139,7 +140,8 @@ export function Studio() {
   const handleError = useCallback(
     (e: unknown) => {
       if (e instanceof QuotaExceededError) {
-        setUpgrade({ kind: e.kind, planId: e.planId });
+        if (e.kind === "verifies") setVerifyLimitPlan(e.planId);
+        else setUpgrade({ kind: e.kind, planId: e.planId });
       } else {
         toast("err", (e as Error).message);
       }
@@ -177,6 +179,34 @@ export function Studio() {
       .catch((e) => toast("err", e.message))
       .finally(() => setLoading(false));
   }, [refresh, toast]);
+
+  // Pipeline: pick up webhook reply → In Conversation without a manual refresh.
+  useEffect(() => {
+    if (view !== "pipeline") return;
+    const id = window.setInterval(() => {
+      void refresh().catch(() => {});
+    }, 15_000);
+    return () => window.clearInterval(id);
+  }, [view, refresh]);
+
+  // Daily verify cap hit → warn once until usage resets.
+  useEffect(() => {
+    const ws = board?.workspace;
+    if (!ws || !board?.capabilities.emailVerify || ws.emailVerifyEnabled === false) {
+      return;
+    }
+    if (ws.verifiesLimit > 0 && ws.verifiesUsed >= ws.verifiesLimit) {
+      if (!verifyLimitShownRef.current) {
+        verifyLimitShownRef.current = true;
+        setVerifyLimitPlan(ws.planId);
+      }
+    } else {
+      verifyLimitShownRef.current = false;
+    }
+  }, [
+    board?.capabilities.emailVerify,
+    board?.workspace,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -489,12 +519,10 @@ export function Studio() {
   };
 
   const onSend = async (outreachId: string) => {
-    const verifyOn = Boolean(board?.capabilities.emailVerify);
     try {
       const result = await api.send(outreachId);
       recordWarmupSend();
       await refresh();
-      if (verifyOn) setZeruhUsageKey((k) => k + 1);
       toast(
         "ok",
         result.provider === "demo"
@@ -503,12 +531,16 @@ export function Studio() {
       );
     } catch (e) {
       await refresh();
-      if (verifyOn) setZeruhUsageKey((k) => k + 1);
-      const msg = (e as Error).message;
-      if (/must be approved/i.test(msg)) {
-        toast("err", "Approve the draft first, then send. (If a prior send failed, re-approve and retry.)");
-      } else if (/undeliverable/i.test(msg)) {
+      if (e instanceof QuotaExceededError && e.kind === "verifies") {
+        setVerifyLimitPlan(e.planId);
+        return;
+      }
+      const err = e as Error & { undeliverableRemoved?: boolean };
+      const msg = err.message;
+      if (err.undeliverableRemoved || /isn.?t real|can.?t receive mail|undeliverable/i.test(msg)) {
         toast("err", msg);
+      } else if (/must be approved/i.test(msg)) {
+        toast("err", "Approve the draft first, then send. (If a prior send failed, re-approve and retry.)");
       } else if (/domain|verified|from/i.test(msg)) {
         toast(
           "err",
@@ -674,6 +706,7 @@ export function Studio() {
     setOutreachBusy("send-all");
     let sent = 0;
     let failed = 0;
+    let hitVerifyLimit = false;
     try {
       for (const l of targets) {
         if (!l.outreach) continue;
@@ -684,18 +717,22 @@ export function Studio() {
           await api.send(l.outreach.id);
           recordWarmupSend();
           sent += 1;
-        } catch {
+        } catch (e) {
+          if (e instanceof QuotaExceededError && e.kind === "verifies") {
+            hitVerifyLimit = true;
+            setVerifyLimitPlan(e.planId);
+            break;
+          }
           failed += 1;
         }
       }
       await refresh();
-      if (board.capabilities.emailVerify) setZeruhUsageKey((k) => k + 1);
       if (sent > 0) {
         toast(
           "ok",
           `Sent ${sent}${failed ? ` · ${failed} failed` : ""}.`,
         );
-      } else if (failed > 0) {
+      } else if (failed > 0 && !hitVerifyLimit) {
         toast("err", `Could not send ${failed} email${failed === 1 ? "" : "s"}.`);
       }
     } finally {
@@ -854,7 +891,10 @@ export function Studio() {
             <div className="hidden min-w-[18rem] flex-col gap-1 sm:flex sm:min-w-[26rem]">
               <div
                 className={`grid gap-4 ${
-                  board.capabilities.emailVerify ? "grid-cols-3" : "grid-cols-2"
+                  board.capabilities.emailVerify &&
+                  board.workspace.emailVerifyEnabled !== false
+                    ? "grid-cols-3"
+                    : "grid-cols-2"
                 }`}
               >
                 <UsageBar
@@ -867,8 +907,13 @@ export function Studio() {
                   used={board.workspace.sendsUsed}
                   limit={board.workspace.sendsLimit}
                 />
-                {board.capabilities.emailVerify ? (
-                  <ZeruhUsageBar refreshKey={zeruhUsageKey} />
+                {board.capabilities.emailVerify &&
+                board.workspace.emailVerifyEnabled !== false ? (
+                  <UsageBar
+                    label="Verifies"
+                    used={board.workspace.verifiesUsed}
+                    limit={board.workspace.verifiesLimit}
+                  />
                 ) : null}
               </div>
               {!board.workspace.metered && (
@@ -1186,6 +1231,13 @@ export function Studio() {
           kind={upgrade.kind}
           planId={upgrade.planId}
           onClose={() => setUpgrade(null)}
+        />
+      )}
+
+      {verifyLimitPlan && (
+        <VerifyLimitModal
+          planId={verifyLimitPlan}
+          onClose={() => setVerifyLimitPlan(null)}
         />
       )}
 

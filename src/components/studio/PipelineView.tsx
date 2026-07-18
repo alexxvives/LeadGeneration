@@ -39,7 +39,7 @@ const MAIN_COLUMNS: {
   {
     stage: "in_conversation",
     title: "In Conversation",
-    empty: "Move here when they reply.",
+    empty: "Replies land here from email webhooks.",
     color: "bg-sky-400",
   },
   {
@@ -295,14 +295,21 @@ function PipelineColumn({
             {col.empty}
           </p>
         ) : (
-          leads.map((l) => (
-            <DraggablePipelineCard
-              key={l.id}
-              lead={l}
-              onOpen={onOpen}
-              isDragging={l.id === activeId}
-            />
-          ))
+          [...leads]
+            .sort((a, b) => {
+              // Webhook replies float to the top of In Conversation.
+              const ar = a.outreach?.deliveryStatus === "replied" ? 1 : 0;
+              const br = b.outreach?.deliveryStatus === "replied" ? 1 : 0;
+              return br - ar;
+            })
+            .map((l) => (
+              <DraggablePipelineCard
+                key={l.id}
+                lead={l}
+                onOpen={onOpen}
+                isDragging={l.id === activeId}
+              />
+            ))
         )}
       </div>
     </div>
@@ -321,29 +328,47 @@ function DraggablePipelineCard({
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
   const pendingFollowUps = lead.followUps?.filter((f) => !f.done).length ?? 0;
   const subtitle = cardSubtitle(lead);
+  const replied = lead.outreach?.deliveryStatus === "replied";
   const needsMethod =
     lead.crmStage === "contacted" && !lead.contactMethod;
   // Meta only on Contacted+ — keeps New cards compact after a round-trip.
   const showMeta =
     lead.crmStage !== "new" &&
-    (pendingFollowUps > 0 || !!lead.contactMethod);
+    (pendingFollowUps > 0 || !!lead.contactMethod || replied);
 
   return (
     <div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`group flex h-auto cursor-grab touch-none items-start gap-1 rounded-xl border border-white/5 bg-ink-900/60 px-3 py-2.5 transition-all hover:bg-white/[0.03] active:cursor-grabbing ${
-        isDragging ? "opacity-30" : ""
-      }`}
+      className={`group flex h-auto cursor-grab touch-none items-start gap-1 rounded-xl px-3 py-2.5 transition-all active:cursor-grabbing ${
+        replied
+          ? "border border-sky-400/50 bg-sky-400/10 shadow-[0_0_0_1px_rgba(56,189,248,0.25)] ring-1 ring-sky-400/30 hover:bg-sky-400/15"
+          : "border border-white/5 bg-ink-900/60 hover:bg-white/[0.03]"
+      } ${isDragging ? "opacity-30" : ""}`}
     >
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium leading-snug text-mist-100">{lead.company}</p>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {replied ? (
+            <span
+              className="pulse-ring relative inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400"
+              aria-hidden
+            />
+          ) : null}
+          <p className="truncate text-sm font-medium leading-snug text-mist-100">
+            {lead.company}
+          </p>
+        </div>
         {subtitle && (
           <p className="mt-0.5 truncate text-xs leading-snug text-mist-500">{subtitle}</p>
         )}
         {showMeta && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {replied && (
+              <span className="rounded-full bg-sky-400/20 px-1.5 py-0.5 text-[10px] font-medium text-sky-200">
+                Replied
+              </span>
+            )}
             {pendingFollowUps > 0 && (
               <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
                 {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}

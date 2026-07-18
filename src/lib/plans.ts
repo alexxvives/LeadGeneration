@@ -17,6 +17,12 @@ export interface Plan {
   leadCreditsPerMonth: number;
   /** Approved sends allowed per month. */
   sendsPerMonth: number;
+  /**
+   * Email verifications allowed per day (UTC). Caps plan fairness against the
+   * shared MyEmailVerifier free pool (~100/day platform-wide). Agency matches
+   * that ceiling; lower plans get less.
+   */
+  verifiesPerDay: number;
   /** Marketing feature bullets shown on /pricing. */
   features: string[];
   /**
@@ -42,10 +48,12 @@ export const PLANS: Record<PlanId, Plan> = {
     monthlyPrice: 0,
     leadCreditsPerMonth: 50,
     sendsPerMonth: 25,
+    verifiesPerDay: 10,
     features: [
       "Demo + live search, drafting & approval",
       "50 enriched leads / month",
       "25 sends / month (bring your own sender)",
+      "10 email verifies / day",
       "1 workspace",
     ],
     stripePriceEnv: null,
@@ -56,12 +64,13 @@ export const PLANS: Record<PlanId, Plan> = {
     monthlyPrice: 29,
     leadCreditsPerMonth: 500,
     sendsPerMonth: 500,
+    verifiesPerDay: 25,
     features: [
       "Everything in Free",
       "500 enriched leads / month",
       "500 sends / month",
-      "Email verification, table + board views",
-      "Excel export",
+      "25 email verifies / day",
+      "Table + board views, Excel export",
     ],
     stripePriceEnv: "STRIPE_STARTER_PRICE_ID",
   },
@@ -71,10 +80,12 @@ export const PLANS: Record<PlanId, Plan> = {
     monthlyPrice: 79,
     leadCreditsPerMonth: 2500,
     sendsPerMonth: 2500,
+    verifiesPerDay: 50,
     features: [
       "Everything in Starter",
       "2,500 enriched leads / month",
       "2,500 sends / month",
+      "50 email verifies / day",
       "LLM personalization",
       "Places / local source, priority support",
     ],
@@ -86,10 +97,12 @@ export const PLANS: Record<PlanId, Plan> = {
     monthlyPrice: 199,
     leadCreditsPerMonth: 10000,
     sendsPerMonth: 10000,
+    verifiesPerDay: 100,
     features: [
       "Everything in Pro",
       "10,000 enriched leads / month",
       "10,000 sends / month",
+      "100 email verifies / day",
       "Multiple workspaces / seats",
       "Custom sending identity",
     ],

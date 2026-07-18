@@ -69,6 +69,9 @@ type WorkspaceRow = {
   connected_mailbox_json: string | null;
   /** Migration 0014 — 0/1; null treated as enabled. */
   email_verify_enabled: number | null;
+  /** Migration 0015 — daily verify counters. */
+  verifies_used_today: number | null;
+  verifies_resets_at: string | null;
 };
 
 type BoardRow = {
@@ -170,6 +173,8 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
     leadsUsedThisMonth: r.leads_used_this_month ?? 0,
     sendsUsedThisMonth: r.sends_used_this_month ?? 0,
     resetsAt: r.resets_at,
+    verifiesUsedToday: r.verifies_used_today ?? 0,
+    verifiesResetsAt: r.verifies_resets_at ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     fromName: r.from_name ?? null,
@@ -369,6 +374,8 @@ export class D1Store implements LeadRepository {
     if ("leadsUsedThisMonth" in patch) row.leads_used_this_month = patch.leadsUsedThisMonth;
     if ("sendsUsedThisMonth" in patch) row.sends_used_this_month = patch.sendsUsedThisMonth;
     if ("resetsAt" in patch) row.resets_at = patch.resetsAt ?? null;
+    if ("verifiesUsedToday" in patch) row.verifies_used_today = patch.verifiesUsedToday;
+    if ("verifiesResetsAt" in patch) row.verifies_resets_at = patch.verifiesResetsAt ?? null;
     if ("createdAt" in patch) row.created_at = patch.createdAt;
     if ("updatedAt" in patch) row.updated_at = patch.updatedAt;
     if ("fromName" in patch) row.from_name = patch.fromName ?? null;

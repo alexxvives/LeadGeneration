@@ -34,6 +34,10 @@ function normalizeWorkspace(w: Workspace): Workspace {
         : null,
     emailVerifyEnabled: raw.emailVerifyEnabled === false ? false : true,
     connectedMailbox: (raw.connectedMailbox as Workspace["connectedMailbox"] | undefined) ?? null,
+    verifiesUsedToday:
+      typeof raw.verifiesUsedToday === "number" ? raw.verifiesUsedToday : 0,
+    verifiesResetsAt:
+      typeof raw.verifiesResetsAt === "string" ? raw.verifiesResetsAt : null,
   };
 }
 

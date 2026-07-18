@@ -5,7 +5,6 @@ import {
   AGE_BAND_OPTIONS,
   effectiveAgeBand,
   loadWarmupProfile,
-  recommendedDailySoftCap,
   setMailboxAgeBand,
   type MailboxAgeBand,
   type WarmupProfile,
@@ -25,7 +24,6 @@ export function MailboxAgePicker({ disabled = false }: { disabled?: boolean }) {
 
   const selected = profile.ageBand ?? "new";
   const effective = effectiveAgeBand(profile);
-  const softCap = recommendedDailySoftCap(profile);
 
   const onChange = (band: MailboxAgeBand) => {
     if (disabled) return;
@@ -50,15 +48,11 @@ export function MailboxAgePicker({ disabled = false }: { disabled?: boolean }) {
           </option>
         ))}
       </select>
-      <p className="mt-1 text-[11px] text-mist-500">
-        Soft warn ~{softCap}/day
-        {effective !== selected ? (
-          <span className="text-mist-600">
-            {" "}
-            · now treating as {labelFor(effective).toLowerCase()}
-          </span>
-        ) : null}
-      </p>
+      {effective !== selected ? (
+        <p className="mt-1 text-[11px] text-mist-500">
+          Now treating as {labelFor(effective).toLowerCase()}
+        </p>
+      ) : null}
     </div>
   );
 }

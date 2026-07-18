@@ -154,6 +154,10 @@ export interface Workspace {
   leadsUsedThisMonth: number;
   sendsUsedThisMonth: number;
   resetsAt: string | null; // ISO timestamp of the first of the next month
+  /** Daily verify counter (plan verifiesPerDay); reset after `verifiesResetsAt`. */
+  verifiesUsedToday: number;
+  /** ISO timestamp of next UTC midnight when daily verifies reset. */
+  verifiesResetsAt: string | null;
   createdAt: string;
   updatedAt: string;
   // Per-workspace email sending identity (all nullable → fall back to env vars).
@@ -317,7 +321,13 @@ export interface WorkspaceSummary {
   sendsUsed: number;
   sendsLimit: number;
   resetsAt: string | null;
-  /** Workspace wants Zeruh verify at send (requires server key). */
+  /** Daily email verifies used (plan-tiered). */
+  verifiesUsed: number;
+  /** Daily verify limit for the current plan. */
+  verifiesLimit: number;
+  /** When daily verifies reset (next UTC midnight). */
+  verifiesResetsAt: string | null;
+  /** Workspace wants email verify at send (requires server key). */
   emailVerifyEnabled: boolean;
 }
 

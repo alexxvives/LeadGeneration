@@ -29,9 +29,13 @@ export interface BoardResponse {
 
 /** Error thrown when a request is rejected for exceeding a plan quota (402). */
 export class QuotaExceededError extends Error {
-  readonly kind: "leads" | "sends";
+  readonly kind: "leads" | "sends" | "verifies";
   readonly planId: PlanId;
-  constructor(message: string, kind: "leads" | "sends", planId: PlanId) {
+  constructor(
+    message: string,
+    kind: "leads" | "sends" | "verifies",
+    planId: PlanId,
+  ) {
     super(message);
     this.name = "QuotaExceededError";
     this.kind = kind;
@@ -46,7 +50,11 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = data as { error?: string; quota?: { kind: "leads" | "sends"; planId: PlanId } };
+    const err = data as {
+      error?: string;
+      quota?: { kind: "leads" | "sends" | "verifies"; planId: PlanId };
+      undeliverableRemoved?: boolean;
+    };
     if (res.status === 402 && err.quota) {
       throw new QuotaExceededError(
         err.error ?? "Plan limit reached",
@@ -54,7 +62,11 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
         err.quota.planId,
       );
     }
-    throw new Error(err.error ?? `Request failed (${res.status})`);
+    const e = new Error(err.error ?? `Request failed (${res.status})`) as Error & {
+      undeliverableRemoved?: boolean;
+    };
+    if (err.undeliverableRemoved) e.undeliverableRemoved = true;
+    throw e;
   }
   return data as T;
 }

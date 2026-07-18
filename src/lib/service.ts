@@ -14,10 +14,10 @@ import {
 import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
-import { verifyEmail } from "@/lib/email/verify";
+import { getCachedVerify, verifyEmail } from "@/lib/email/verify";
 import { FREE_MAX_LEADS_PER_RUN, getPlan } from "@/lib/plans";
 import { NotFoundError, QuotaError } from "@/lib/errors";
-import { ensureUsageWindow } from "@/lib/workspace";
+import { ensureUsageWindow, ensureVerifyWindow } from "@/lib/workspace";
 import type {
   Board,
   BoardSummary,
@@ -275,11 +275,12 @@ async function recordLeadUsage(ctx: Ctx, count: number): Promise<void> {
   });
 }
 
-/** TEMP developer helper — zero monthly lead/send counters for the workspace. */
+/** TEMP developer helper — zero monthly lead/send + daily verify counters. */
 export async function resetWorkspaceUsage(ctx: Ctx): Promise<void> {
   await ctx.db.updateWorkspace(ctx.workspaceId, {
     leadsUsedThisMonth: 0,
     sendsUsedThisMonth: 0,
+    verifiesUsedToday: 0,
     updatedAt: nowIso(),
   });
 }
@@ -667,6 +668,11 @@ export interface SendOutcome {
   error?: string;
   rateLimited?: boolean;
   retryAfterMs?: number;
+  /**
+   * True when verify failed and we stripped the bad address + rejected the
+   * outreach so the lead leaves the Outreach queue (still under Leads).
+   */
+  undeliverableRemoved?: boolean;
   /** Transport that delivered (or would have, for local demo). */
   provider?: "google" | "resend" | "maileroo" | "smtp" | "demo";
 }
@@ -695,16 +701,55 @@ export async function sendApprovedOutreach(
     return { ok: false, error: "No recipient email on this lead" };
   }
 
-  // List hygiene — Zeruh verify at send only (not on enrich). Blocks hard
+  // List hygiene — verify at send only (not on enrich). Blocks hard
   // undeliverables when a verify key is configured and the workspace opted in.
   const wsForVerify = await db.getWorkspace(ctx.workspaceId);
   const verifyOn = wsForVerify?.emailVerifyEnabled !== false;
-  if (verifyOn) {
+  if (verifyOn && wsForVerify) {
+    const verifyWs = await ensureVerifyWindow(db, wsForVerify);
+    const plan = getPlan(verifyWs.planId);
+    // Block fresh provider calls at the plan cap; cache hits + heuristic still ok.
+    const hasVerifyProvider =
+      Boolean(env.myEmailVerifierKey()) || Boolean(env.zeruhVerifyKey());
+    const cached = getCachedVerify(outreach.toEmail);
+    if (
+      hasVerifyProvider &&
+      !cached &&
+      verifyWs.verifiesUsedToday >= plan.verifiesPerDay
+    ) {
+      throw new QuotaError({
+        kind: "verifies",
+        planId: verifyWs.planId,
+        limit: plan.verifiesPerDay,
+        used: verifyWs.verifiesUsedToday,
+      });
+    }
+
     const verified = await verifyEmail(outreach.toEmail);
+    if (verified.billed) {
+      await db.updateWorkspace(ctx.workspaceId, {
+        verifiesUsedToday: verifyWs.verifiesUsedToday + 1,
+        updatedAt: nowIso(),
+      });
+    }
     if (!verified.okToSend) {
+      const lead = await db.getLead(outreach.leadId);
+      const bad = outreach.toEmail.toLowerCase();
+      if (lead) {
+        const emails = lead.emails.filter((e) => e.toLowerCase() !== bad);
+        await db.updateLead(lead.id, { emails, status: "rejected" });
+      }
+      await db.updateOutreach(outreachId, {
+        status: "rejected",
+        toEmail: null,
+        error: "invalid_email_removed",
+        updatedAt: nowIso(),
+      });
       return {
         ok: false,
-        error: `Email looks undeliverable (${verified.reason ?? verified.status}). Pick another address or discard this lead.`,
+        undeliverableRemoved: true,
+        error:
+          "That email isn't real or can't receive mail. We removed it from this lead and took them out of Outreach — they're still under Leads without that address.",
       };
     }
   }
@@ -861,7 +906,7 @@ function domainKey(website: string | null | undefined): string | null {
   }
 }
 
-/** Manual delivery outcome stub (bounce / reply). Webhooks can call the same path later. */
+/** Manual delivery outcome stub (bounce / reply). Webhooks call the same path. */
 export async function setOutreachDeliveryStatus(
   ctx: Ctx,
   outreachId: string,
@@ -873,11 +918,33 @@ export async function setOutreachDeliveryStatus(
   });
   if (!outreach) return null;
 
-  // Convenience: marking replied advances CRM into conversation when still early.
+  // Reply webhook / manual: park lead in In Conversation (Pipeline highlights these).
   if (deliveryStatus === "replied") {
     const lead = await ctx.db.getLead(outreach.leadId);
-    if (lead && (lead.crmStage === "new" || lead.crmStage === "contacted")) {
-      await ctx.db.updateLead(outreach.leadId, { crmStage: "in_conversation" });
+    if (
+      lead &&
+      lead.crmStage !== "closed" &&
+      lead.crmStage !== "not_interested"
+    ) {
+      const patch: Partial<Lead> = {};
+      if (lead.crmStage !== "in_conversation") {
+        patch.crmStage = "in_conversation";
+      }
+      if (!lead.contactMethod) patch.contactMethod = "email";
+      const today = nowIso().slice(0, 10);
+      const existing = lead.followUps ?? [];
+      const hasReplyNote = existing.some(
+        (f) => f.note.trim().toLowerCase() === "reply received" && f.date === today,
+      );
+      if (!hasReplyNote) {
+        patch.followUps = [
+          { id: newId("fu"), date: today, note: "Reply received", done: false },
+          ...existing,
+        ];
+      }
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.updateLead(outreach.leadId, patch);
+      }
     }
   }
   return outreach;

@@ -31,7 +31,14 @@ export async function POST(req: Request) {
         : result.error?.includes("approved")
           ? 409
           : 400;
-      return NextResponse.json(result, { status });
+      return NextResponse.json(
+        {
+          ...result,
+          // Surface cleanup flag so the client can show friendlier copy.
+          undeliverableRemoved: result.undeliverableRemoved === true,
+        },
+        { status },
+      );
     }
     return NextResponse.json(result);
   } catch (err) {

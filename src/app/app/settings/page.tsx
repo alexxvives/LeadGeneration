@@ -8,7 +8,6 @@ import { BillingActions } from "@/components/studio/BillingActions";
 import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
 import { DeveloperModePanel } from "@/components/studio/DeveloperModePanel";
 import { SendSetupPanel } from "@/components/studio/SendSetupPanel";
-import { ZeruhUsageBar } from "@/components/studio/EmailVerifySettings";
 import Link from "next/link";
 
 export const runtime = "nodejs";
@@ -193,9 +192,22 @@ export default async function SettingsPage({
                 <UsageBar label="Lead credits" used={usage.leadsUsed} limit={usage.leadsLimit} />
                 <UsageBar label="Sends" used={usage.sendsUsed} limit={usage.sendsLimit} />
                 {caps.emailVerify && usage.emailVerifyEnabled ? (
-                  <ZeruhUsageBar />
+                  <UsageBar
+                    label="Verifies / day"
+                    used={usage.verifiesUsed}
+                    limit={usage.verifiesLimit}
+                  />
                 ) : null}
               </div>
+              {caps.emailVerify && usage.emailVerifyEnabled ? (
+                <p className="mt-2 text-xs text-mist-500">
+                  Email checks reset daily (midnight UTC)
+                  {usage.verifiesResetsAt
+                    ? ` · next reset ${new Date(usage.verifiesResetsAt).toLocaleString()}`
+                    : ""}
+                  .
+                </p>
+              ) : null}
               {!usage.metered && (
                 <p className="mt-2 text-xs text-mist-500">
                   Local preview tracks usage for UX; hard caps apply on the live app.

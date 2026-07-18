@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { StarIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
@@ -20,11 +21,16 @@ export function DeveloperModePanel({
   metered?: boolean;
   currentPlanId?: PlanId;
 }) {
+  const router = useRouter();
   const [resetting, setResetting] = useState(false);
   const [settingPlan, setSettingPlan] = useState(false);
   const [planId, setPlanId] = useState<PlanId>(currentPlanId);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPlanId(currentPlanId);
+  }, [currentPlanId]);
 
   const resetCredits = async () => {
     setResetting(true);
@@ -32,7 +38,8 @@ export function DeveloperModePanel({
     setErr(null);
     try {
       await api.resetUsage();
-      setMsg("Credits reset to 0 used. Refresh the page to see updated bars.");
+      router.refresh();
+      setMsg("Credits reset to 0 used.");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Reset failed");
     } finally {
@@ -48,7 +55,8 @@ export function DeveloperModePanel({
     setErr(null);
     try {
       await api.setPlanDev(next);
-      setMsg(`Plan set to ${PLANS[next].name}. Refresh to see updated quotas.`);
+      router.refresh();
+      setMsg(`Plan set to ${PLANS[next].name}.`);
     } catch (e) {
       setPlanId(currentPlanId);
       setErr(e instanceof Error ? e.message : "Plan change failed");

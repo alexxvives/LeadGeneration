@@ -9,21 +9,25 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-17 (outreach UX + pitch-fit)
+## ⏱️ Status — updated 2026-07-18 (verify quotas + leads table UX)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Contact Draft amber arrow approves → Ready; Review still opens composer.
-- PitchEditor caret fix (`FieldMini` no longer a `<label>`).
-- Delivery UI: Delivered / Bounced only; removed helper copy.
-- Fit reasons cleaned; AI pitch-fit boost on search/import; import plain-fetches
-  website (no Firecrawl). Leads table column sort.
+- Removed “Soft warn ~N/day” under mailbox age dropdown.
+- Undeliverable verify → friendly copy, strip email, reject outreach (Leads keep
+  the company without that address).
+- Plan-tiered **daily** verifies: Free 10 / Starter 25 / Pro 50 / Agency 100;
+  `VerifyLimitModal` when capped; migration `0015_verify_daily_quota.sql`.
+- Dev plan/credit changes auto-refresh Settings via `router.refresh()`.
+- Leads table: status sort (pipeline order), status filter, checkbox-only delete
+  (floating bar for 1 or N). Zeruh kept as MEV fallback.
 
 ### Next
-1. Deploy + smoke approve arrow / draft body click / import fit reasons.
-2. Optional: clear old Sequence follow-up stubs on existing leads.
+1. Apply D1 migration 0015 on prod (`npm run cf:migrate`) then deploy.
+2. Confirm verify popup + undeliverable cleanup on a live send.
+3. Optional: persist verify result on the lead (skip re-verify across isolates).
 
 ---
 

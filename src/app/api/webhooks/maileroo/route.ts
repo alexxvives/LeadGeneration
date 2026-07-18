@@ -9,15 +9,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Maileroo → Leadify delivery webhooks.
+ * Maileroo → Leadify delivery + inbound webhooks.
  *
  * Configure in Maileroo Dashboard → Events / Webhooks → URL:
  *   https://<your-host>/api/webhooks/maileroo
- * Events: delivered, failed, rejected, complained (opened/clicked ignored).
+ * Delivery events: delivered, failed, rejected, complained, …
+ * Inbound routing: POST the inbound email JSON here (envelope_sender) → replied.
  *
  * Matching order:
  *   1. Tags `leadify_ws` + `leadify_outreach` (set on send; also accept legacy `lodestar_*`)
- *   2. Fallback: latest sent outreach by recipient email
+ *   2. Fallback: latest sent outreach by recipient (delivery) or sender (inbound reply)
  *
  * Optional: MAILEROO_WEBHOOK_SECRET — if set, require `X-Maileroo-Secret`
  * (or `Authorization: Bearer …`) to match. Unset = accept (demo-safe).
@@ -39,6 +40,10 @@ export async function POST(req: Request) {
     event_data?: { to?: string; reason?: string };
     tags?: Record<string, string> | null;
     message_reference_id?: string;
+    /** Inbound routing payload fields */
+    envelope_sender?: string;
+    message_id?: string;
+    recipients?: string[];
   };
   try {
     body = (await req.json()) as typeof body;
@@ -46,7 +51,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const delivery = mapEvent(body.event_type ?? "");
+  const inboundFrom = body.envelope_sender?.trim().toLowerCase() || null;
+  const isInbound = !body.event_type && !!inboundFrom;
+  const delivery: DeliveryStatus | null = isInbound
+    ? "replied"
+    : mapEvent(body.event_type ?? "");
   if (!delivery) {
     return NextResponse.json({ ok: true, ignored: body.event_type ?? null });
   }
@@ -79,12 +88,15 @@ export async function POST(req: Request) {
     }
   }
 
-  const to = body.event_data?.to?.trim().toLowerCase();
-  if (!to) {
+  // Delivery: match by recipient. Inbound reply: match by sender (lead email).
+  const matchEmail = isInbound
+    ? inboundFrom
+    : body.event_data?.to?.trim().toLowerCase() || null;
+  if (!matchEmail) {
     return NextResponse.json({ ok: true, matched: 0 });
   }
 
-  const target = await probe.findLatestSentByEmail(to);
+  const target = await probe.findLatestSentByEmail(matchEmail);
   if (!target) {
     return NextResponse.json({ ok: true, matched: 0 });
   }
@@ -98,7 +110,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     matched: 1,
-    via: "email",
+    via: isInbound ? "inbound" : "email",
     outreachId: target.id,
     delivery,
   });
@@ -114,6 +126,10 @@ function mapEvent(type: string): DeliveryStatus | null {
     case "delivered":
     case "accepted":
       return "sent";
+    case "replied":
+    case "reply":
+    case "inbound":
+      return "replied";
     default:
       // opened / clicked / deferred — ignore for deliveryStatus
       return null;

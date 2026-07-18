@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/client-api";
-import { UsageBar } from "@/components/studio/UpgradeModal";
 import { Spinner } from "@/components/ui";
 
 /**
  * Easy-path toggle: verify recipient emails before send.
  * Platform keys: MYEMAILVERIFIER_API_KEY (preferred) or MAILEROO_VERIFY_API_KEY.
+ * Daily plan caps are shown on the studio / Settings usage bars.
  */
 export function EmailVerifySettings({
   canVerify,
@@ -93,59 +92,4 @@ export function EmailVerifySettings({
       {msg ? <p className="mt-2 text-xs text-mist-400">{msg}</p> : null}
     </div>
   );
-}
-
-/** Compact bar for Settings / studio when verify is on. */
-export function ZeruhUsageBar({ refreshKey = 0 }: { refreshKey?: number }) {
-  const [remaining, setRemaining] = useState<number | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoaded(false);
-    void api
-      .zeruhUsage()
-      .then((u) => {
-        if (cancelled) return;
-        if (u.available && u.remainingCredits != null) {
-          setRemaining(u.remainingCredits);
-        } else {
-          setRemaining(null);
-        }
-        setLoaded(true);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRemaining(null);
-          setLoaded(true);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey]);
-
-  if (!loaded) {
-    return (
-      <div className="min-w-0">
-        <div className="flex items-center justify-between gap-2 text-sm">
-          <span className="shrink-0 text-mist-300">Verifies</span>
-          <span className="text-mist-600">…</span>
-        </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10" />
-      </div>
-    );
-  }
-  if (remaining == null) {
-    return (
-      <div className="min-w-0">
-        <div className="flex items-center justify-between gap-2 text-sm">
-          <span className="shrink-0 text-mist-300">Verifies</span>
-          <span className="text-mist-600">—</span>
-        </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10" />
-      </div>
-    );
-  }
-  return <UsageBar label="Verifies" remaining={remaining} />;
 }

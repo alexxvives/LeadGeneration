@@ -17,11 +17,12 @@ const STAGE_OPTIONS: CrmStage[] = [
   "not_interested",
 ];
 
+/** Pipeline priority (not alphabetical): Closed → In convo → Contacted → New → Not interested. */
 const STAGE_ORDER: Record<CrmStage, number> = {
-  new: 0,
-  contacted: 1,
-  in_conversation: 2,
-  closed: 3,
+  closed: 0,
+  in_conversation: 1,
+  contacted: 2,
+  new: 3,
   not_interested: 4,
 };
 
@@ -54,6 +55,7 @@ export function LeadTable({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<CrmStage | "all">("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
     key: "fit",
     dir: "desc",
@@ -63,9 +65,14 @@ export function LeadTable({
   const visibleCustom = customCols.filter((c) => !!vis.custom[c.id]);
   const canDelete = Boolean(onDeleteLead || onDeleteLeads);
 
+  const filteredLeads = useMemo(() => {
+    if (statusFilter === "all") return leads;
+    return leads.filter((l) => (l.crmStage ?? "new") === statusFilter);
+  }, [leads, statusFilter]);
+
   const sortedLeads = useMemo(() => {
     const dir = sort.dir === "asc" ? 1 : -1;
-    return [...leads].sort((a, b) => {
+    return [...filteredLeads].sort((a, b) => {
       let cmp = 0;
       switch (sort.key) {
         case "company":
@@ -92,18 +99,21 @@ export function LeadTable({
       }
       return cmp * dir;
     });
-  }, [leads, sort]);
+  }, [filteredLeads, sort]);
 
   const allSelected =
     sortedLeads.length > 0 && selected.size === sortedLeads.length;
   const someSelected = selected.size > 0 && !allSelected;
 
   const toggleSort = (key: SortKey) => {
-    setSort((prev) =>
-      prev.key === key
-        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: key === "fit" ? "desc" : "asc" },
-    );
+    setSort((prev) => {
+      if (prev.key === key) {
+        return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
+      }
+      // First click: Fit high→low; Status Closed-first (asc on STAGE_ORDER); else A→Z.
+      const dir = key === "fit" ? "desc" : "asc";
+      return { key, dir };
+    });
   };
 
   const sortMark = (key: SortKey) =>
@@ -166,6 +176,36 @@ export function LeadTable({
 
   return (
     <div className="relative flex max-h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-xl2 border border-white/10">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/5 px-3 py-2">
+        <label className="inline-flex items-center gap-2 text-xs text-mist-500">
+          <span className="uppercase tracking-widest">Status</span>
+          <Select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value === "all" ? "all" : (e.target.value as CrmStage))
+            }
+            className="min-w-[9rem] py-1.5 text-xs"
+            aria-label="Filter by status"
+          >
+            <option value="all">All statuses</option>
+            {STAGE_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {crmStageLabel(s)}
+              </option>
+            ))}
+          </Select>
+        </label>
+        {canDelete && selected.size === 0 ? (
+          <p className="text-[11px] text-mist-600">Select rows to delete</p>
+        ) : (
+          <p className="text-[11px] text-mist-600">
+            {filteredLeads.length === leads.length
+              ? `${leads.length} lead${leads.length === 1 ? "" : "s"}`
+              : `${filteredLeads.length} of ${leads.length}`}
+          </p>
+        )}
+      </div>
+
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="sticky top-0 z-10 bg-ink-950/95 backdrop-blur-sm">
@@ -237,7 +277,6 @@ export function LeadTable({
                   {c.name}
                 </th>
               ))}
-              {canDelete ? <th className="w-10 px-2 py-3" aria-label="Actions" /> : null}
             </tr>
           </thead>
           <tbody>
@@ -419,29 +458,6 @@ export function LeadTable({
                       )}
                     </td>
                   ))}
-                  {canDelete ? (
-                    <td
-                      className="px-2 py-3.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        title="Delete lead"
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Delete ${l.company}? This cannot be undone.`,
-                            )
-                          ) {
-                            onDeleteLead?.(l.id);
-                          }
-                        }}
-                        className="rounded-lg p-1.5 text-mist-600 opacity-0 transition-opacity hover:bg-rose-400/10 hover:text-rose-300 group-hover:opacity-100 focus:opacity-100"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </td>
-                  ) : null}
                 </tr>
               );
             })}

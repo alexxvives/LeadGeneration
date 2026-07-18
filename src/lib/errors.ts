@@ -8,13 +8,13 @@ import type { PlanId } from "@/lib/types";
  * commercialization hard-constraint 4). Never enforce quotas in UI or routes.
  */
 export class QuotaError extends Error {
-  readonly kind: "leads" | "sends";
+  readonly kind: "leads" | "sends" | "verifies";
   readonly planId: PlanId;
   readonly limit: number;
   readonly used: number;
 
   constructor(args: {
-    kind: "leads" | "sends";
+    kind: "leads" | "sends" | "verifies";
     planId: PlanId;
     limit: number;
     used: number;
@@ -22,7 +22,9 @@ export class QuotaError extends Error {
   }) {
     super(
       args.message ??
-        `Monthly ${args.kind} limit reached for the ${args.planId} plan (${args.used}/${args.limit}). Upgrade to continue.`,
+        (args.kind === "verifies"
+          ? `Daily email verification limit reached for the ${args.planId} plan (${args.used}/${args.limit}). Try again tomorrow.`
+          : `Monthly ${args.kind} limit reached for the ${args.planId} plan (${args.used}/${args.limit}). Upgrade to continue.`),
     );
     this.name = "QuotaError";
     this.kind = args.kind;

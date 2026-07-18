@@ -4,7 +4,12 @@ import { getDb, LOCAL_WORKSPACE_ID } from "@/lib/db";
 import { authRequired, env } from "@/lib/config";
 import { auth } from "@/auth";
 import { getPlan } from "@/lib/plans";
-import { ensureUsageWindow, getOrCreateWorkspaceForUser, ensureLocalWorkspace } from "@/lib/workspace";
+import {
+  ensureUsageWindow,
+  ensureVerifyWindow,
+  getOrCreateWorkspaceForUser,
+  ensureLocalWorkspace,
+} from "@/lib/workspace";
 import { AuthError } from "@/lib/errors";
 import type { Ctx } from "@/lib/service";
 import type { WorkspaceSummary } from "@/lib/types";
@@ -97,10 +102,14 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
         sendsUsed: 0,
         sendsLimit: free.sendsPerMonth,
         resetsAt: null,
+        verifiesUsed: 0,
+        verifiesLimit: free.verifiesPerDay,
+        verifiesResetsAt: null,
         emailVerifyEnabled: true,
       };
     }
-    const fresh = await ensureUsageWindow(ctx.db, ws);
+    const monthly = await ensureUsageWindow(ctx.db, ws);
+    const fresh = await ensureVerifyWindow(ctx.db, monthly);
     const plan = getPlan(fresh.planId);
     return {
       workspaceId: fresh.id,
@@ -111,6 +120,9 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
       sendsUsed: fresh.sendsUsedThisMonth,
       sendsLimit: plan.sendsPerMonth,
       resetsAt: fresh.resetsAt,
+      verifiesUsed: fresh.verifiesUsedToday,
+      verifiesLimit: plan.verifiesPerDay,
+      verifiesResetsAt: fresh.verifiesResetsAt,
       emailVerifyEnabled: fresh.emailVerifyEnabled !== false,
     };
   } catch (err) {
@@ -124,6 +136,9 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
       sendsUsed: 0,
       sendsLimit: free.sendsPerMonth,
       resetsAt: null,
+      verifiesUsed: 0,
+      verifiesLimit: free.verifiesPerDay,
+      verifiesResetsAt: null,
       emailVerifyEnabled: true,
     };
   }

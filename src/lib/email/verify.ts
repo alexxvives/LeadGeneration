@@ -25,6 +25,11 @@ export interface EmailVerifyResult {
   /** True when it is safe enough to send (or we could not verify). */
   okToSend: boolean;
   provider: EmailVerifyProvider;
+  /**
+   * True when this call hit a live provider (counts against plan + provider
+   * credits). False for cache hits and local heuristic.
+   */
+  billed: boolean;
 }
 
 const CACHE = new Map<string, EmailVerifyResult>();
@@ -40,6 +45,7 @@ function heuristic(email: string): EmailVerifyResult {
       reason: "invalid_format",
       okToSend: false,
       provider: "heuristic",
+      billed: false,
     };
   }
   const local = lower.slice(0, at);
@@ -51,6 +57,7 @@ function heuristic(email: string): EmailVerifyResult {
       reason: "no_reply",
       okToSend: false,
       provider: "heuristic",
+      billed: false,
     };
   }
   return {
@@ -60,6 +67,7 @@ function heuristic(email: string): EmailVerifyResult {
     reason: "no_verify_key",
     okToSend: true,
     provider: "heuristic",
+    billed: false,
   };
 }
 
@@ -75,6 +83,8 @@ function softUnknown(
     reason,
     okToSend: true,
     provider,
+    // Auth/HTTP failures usually did not consume a credit — don't bill plan.
+    billed: false,
   };
 }
 
@@ -136,6 +146,7 @@ async function verifyMyEmailVerifier(
     reason: data.Diagnosis ?? (raw || null),
     okToSend: !undeliverable,
     provider: "myemailverifier",
+    billed: true,
   };
 }
 
@@ -193,7 +204,15 @@ async function verifyZeruh(email: string, key: string): Promise<EmailVerifyResul
     reason: data.result?.reason ?? null,
     okToSend: !undeliverable,
     provider: "zeruh",
+    billed: true,
   };
+}
+
+/** In-process cache peek — used to allow re-sends without burning plan quota. */
+export function getCachedVerify(email: string): EmailVerifyResult | null {
+  const normalized = email.toLowerCase().trim();
+  if (!normalized) return null;
+  return CACHE.get(normalized) ?? null;
 }
 
 /**
@@ -210,11 +229,12 @@ export async function verifyEmail(email: string): Promise<EmailVerifyResult> {
       reason: "empty",
       okToSend: false,
       provider: "heuristic",
+      billed: false,
     };
   }
 
   const cached = CACHE.get(normalized);
-  if (cached) return cached;
+  if (cached) return { ...cached, billed: false };
 
   const mev = env.myEmailVerifierKey();
   const zeruh = env.zeruhVerifyKey();
@@ -228,7 +248,8 @@ export async function verifyEmail(email: string): Promise<EmailVerifyResult> {
     } else {
       result = heuristic(normalized);
     }
-    CACHE.set(normalized, result);
+    // Cache without billing flag so callers always get billed:false on hit.
+    CACHE.set(normalized, { ...result, billed: false });
     return result;
   } catch (err) {
     console.error("[email-verify] request failed:", err);

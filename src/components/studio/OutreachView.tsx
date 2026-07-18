@@ -23,6 +23,10 @@ function isContacted(lead: LeadWithOutreach): boolean {
 function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   if (isContacted(lead)) return "contacted";
   const o = lead.outreach;
+  // Verify cleanup: rejected + no emails → Leads only (out of Outreach).
+  if (o?.status === "rejected" && lead.emails.length === 0) {
+    return null;
+  }
   // Ready only after explicit Approve (closing the draft popup is not enough).
   if (o?.status === "approved" || o?.status === "failed") {
     return "ready";

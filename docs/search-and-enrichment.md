@@ -92,8 +92,9 @@ won't disturb the approval/send flow.
 2. **Email verification.** ✅ _Shipped (send-time)_ — MyEmailVerifier
    (`MYEMAILVERIFIER_API_KEY`, preferred) or Zeruh
    (`MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY`) in `sendApprovedOutreach`. Blocks
-   hard undeliverables. Not run on enrich (credit cost + Excel import parity).
-   Still to do: persist a `deliverable` flag on the lead for UI ranking.
+   hard undeliverables; strips the bad address and rejects outreach. Plan-tiered
+   daily verify caps (Free 10 → Agency 100). Not run on enrich (credit cost +
+   Excel import parity). Still to do: persist a `deliverable` flag on the lead.
 3. **Smarter query building.** ✅ _Shipped_ — `query.ts` expands the niche into
    multiple queries for the `smart`/`local` strategies and merges them. Still to
    do: LLM-driven synonym/ICP expansion and site-type hints (e.g. exclude
