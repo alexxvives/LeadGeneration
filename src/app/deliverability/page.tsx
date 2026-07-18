@@ -1,6 +1,6 @@
 import { SiteNav } from "@/components/SiteNav";
 import { BrandMark } from "@/components/BrandMark";
-import { authRequired, env, getCapabilities } from "@/lib/config";
+import { authRequired } from "@/lib/config";
 import { ShieldIcon } from "@/components/icons";
 
 export const metadata = {
@@ -36,16 +36,10 @@ const DOMAIN_TIPS = [
 ];
 
 export default function DeliverabilityPage() {
-  const caps = getCapabilities();
   return (
     <main className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10 aurora-glow opacity-40" />
-      <SiteNav
-        authRequired={authRequired()}
-        credentialsMode={!authRequired()}
-        magicLink={caps.smtp || caps.resend}
-        turnstileSiteKey={env.turnstileSiteKey() || null}
-      />
+      <SiteNav authRequired={authRequired()} />
       <section className="mx-auto max-w-7xl px-5 pb-24 pt-10 sm:px-8">
         <div className="mb-3 flex items-center gap-3">
           <ShieldIcon className="h-6 w-6 text-amber-300" />

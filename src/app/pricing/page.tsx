@@ -1,5 +1,5 @@
 import { SiteNav } from "@/components/SiteNav";
-import { authRequired, env, getCapabilities } from "@/lib/config";
+import { authRequired } from "@/lib/config";
 import { PricingCards } from "./PricingCards";
 
 export const metadata = {
@@ -9,17 +9,11 @@ export const metadata = {
 };
 
 export default function PricingPage() {
-  const caps = getCapabilities();
   return (
     <main className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10 aurora-glow opacity-40" />
 
-      <SiteNav
-        authRequired={authRequired()}
-        credentialsMode={!authRequired()}
-        magicLink={caps.smtp || caps.resend}
-        turnstileSiteKey={env.turnstileSiteKey() || null}
-      />
+      <SiteNav authRequired={authRequired()} />
 
       <section className="mx-auto max-w-7xl px-5 pb-24 pt-10 text-center sm:px-8">
         <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-widest text-aurora-300">

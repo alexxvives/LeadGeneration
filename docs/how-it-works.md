@@ -48,9 +48,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   compliance section. Brand-first marketing view. Public.
 - **`/pricing`** — the four plans (Free / Starter / Pro / Agency) with Stripe
   Checkout CTAs. Public.
-- **`/login`** — sign-in. In local dev, any email + password (Credentials
-  provider); in production, magic-link via SMTP (Nodemailer) or Resend
-  (+ Turnstile bot check). Public.
+- **`/login`** — sign-in. **Password is primary** (local: any email+password;
+  production: admin email + `ADMIN_PASSWORD`). Magic link (SMTP/Resend) is a
+  secondary “Email me a sign-in link instead” path (+ Turnstile when set).
+  Marketing nav uses one CTA: **Sign in** (prod) or **Open studio** (local).
 - **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar
   nav: **Dashboard · Search · Pipeline · Leads · Outreach · Runs · Boards**.
   Board filter (**All** or one board) sits above the account card. Settings

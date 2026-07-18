@@ -9,18 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-18 (deployed audit + auto Resend webhooks)
+## ⏱️ Status — updated 2026-07-18 (password-first login + single nav CTA)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Deployed:** `8961d4c` · D1 migrations 0014–0016 applied remote.
+**Deployed:** Worker `09b63d5f-ecc5-47b7-a97e-9dbaa2092e3f` (password-first login).
 
 ### This pass
-- Committed + pushed + `cf:migrate` + `cf:deploy`.
-- Resend: auto webhook on key save. Maileroo: optional manual webhook + UI copy.
+- Login: password primary; magic link secondary (“Email me a sign-in link”).
+- Marketing nav: one CTA — **Sign in** → `/login` (prod) or **Open studio** (local).
+- AuthModal aligned with same password-first flow. Redeployed.
 
 ### Next
-1. Re-save Resend key in Settings once (registers delivery webhook for existing BYO keys).
-2. Optional: Maileroo users who want bounce tracking → paste webhook URL from Settings.
+1. Hard-refresh; admin: `admin@tryhermesmail.com` + `ADMIN_PASSWORD`.
+2. Regular users: magic-link secondary until per-user passwords exist.
+3. Rotate `ADMIN_PASSWORD` if still default.
 
 ---
 

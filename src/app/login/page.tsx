@@ -17,25 +17,19 @@ export default async function LoginPage({
   return (
     <main className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10 aurora-glow opacity-40" />
-      <SiteNav
-        authRequired={authRequired()}
-        credentialsMode={!authRequired()}
-        magicLink={caps.smtp || caps.resend}
-        turnstileSiteKey={caps.turnstile ? env.turnstileSiteKey() : null}
-      />
+      <SiteNav authRequired={authRequired()} />
 
       <div className="mx-auto grid max-w-md place-items-center px-6 py-10">
         <div className="glass w-full rounded-xl2 p-8">
           <h1 className="font-display text-2xl font-semibold">Sign in to HERMES mail</h1>
           <p className="mt-2 text-sm text-mist-300">
             {authRequired()
-              ? "Enter your email for a magic link, or use the admin password if you have one."
-              : "Local preview — sign in with any email, or continue as guest from the studio."}
+              ? "Enter your email and password to open the studio."
+              : "Local preview — sign in with any email and password, or continue as guest from the studio."}
           </p>
 
           <LoginForm
             credentialsMode={!authRequired()}
-            allowAdminPassword
             magicLink={caps.smtp || caps.resend}
             turnstileSiteKey={caps.turnstile ? env.turnstileSiteKey() : null}
             callbackUrl={callbackUrl ?? "/app"}

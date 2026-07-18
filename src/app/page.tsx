@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SiteNav } from "@/components/SiteNav";
 import { BrandMark } from "@/components/BrandMark";
 import { LandingProductPreview } from "@/components/LandingProductPreview";
-import { authRequired, env, getCapabilities } from "@/lib/config";
+import { authRequired } from "@/lib/config";
 import {
   ArrowIcon,
   SearchIcon,
@@ -48,18 +48,12 @@ const CAPABILITIES = [
 ];
 
 export default function LandingPage() {
-  const caps = getCapabilities();
   return (
     <main className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10 aurora-glow opacity-70" />
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_transparent_0%,_#060a12_70%)]" />
 
-      <SiteNav
-        authRequired={authRequired()}
-        credentialsMode={!authRequired()}
-        magicLink={caps.smtp || caps.resend}
-        turnstileSiteKey={env.turnstileSiteKey() || null}
-      />
+      <SiteNav authRequired={authRequired()} />
 
       {/* Hero — copy left, live map preview right */}
       <section className="mx-auto flex min-h-[calc(100vh-5.5rem)] max-w-7xl items-center px-5 pb-16 pt-8 sm:px-8 sm:pb-20">

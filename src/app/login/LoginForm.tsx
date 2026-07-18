@@ -20,17 +20,16 @@ declare global {
   }
 }
 
+type SignInMethod = "password" | "magic";
+
 export function LoginForm({
   credentialsMode,
-  allowAdminPassword = false,
   magicLink,
   turnstileSiteKey,
   callbackUrl,
   preferSmtp = false,
 }: {
   credentialsMode: boolean;
-  /** Show password field so the platform admin can sign in when magic-link is default. */
-  allowAdminPassword?: boolean;
   magicLink: boolean;
   turnstileSiteKey: string | null;
   callbackUrl: string;
@@ -39,6 +38,7 @@ export function LoginForm({
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [method, setMethod] = useState<SignInMethod>("password");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -46,7 +46,6 @@ export function LoginForm({
   const widgetRef = useRef<HTMLDivElement>(null);
   const rendered = useRef(false);
 
-  // Explicitly render the Turnstile widget once its script is ready.
   const renderTurnstile = () => {
     if (!turnstileSiteKey || rendered.current || !widgetRef.current || !window.turnstile) return;
     rendered.current = true;
@@ -62,9 +61,7 @@ export function LoginForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const showPassword = credentialsMode || allowAdminPassword;
-  // Prefer password when local demo, or when the user typed one (admin path).
-  const tryCredentials = credentialsMode || (allowAdminPassword && password.length > 0);
+  const usePassword = method === "password";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,13 +73,12 @@ export function LoginForm({
       setError("Enter a valid email address.");
       return;
     }
-    if (tryCredentials && !password) {
+    if (usePassword && !password) {
       setError("Enter your password.");
       return;
     }
     setBusy(true);
     try {
-      // Turnstile bot check (production only — no-op when not configured).
       if (turnstileSiteKey) {
         if (!turnstileToken) {
           setError("Please complete the verification challenge.");
@@ -101,14 +97,18 @@ export function LoginForm({
         }
       }
 
-      if (tryCredentials) {
+      if (usePassword) {
         const result = await signIn("credentials", {
           email: trimmed,
           password,
           redirect: false,
         });
         if (result?.error) {
-          setError("Could not sign in. Check your details and try again.");
+          setError(
+            credentialsMode
+              ? "Could not sign in. Check your details and try again."
+              : "Invalid email or password.",
+          );
         } else {
           router.push(callbackUrl);
           router.refresh();
@@ -152,6 +152,16 @@ export function LoginForm({
         <p className="mt-1 text-sm text-mist-300">
           We sent a secure sign-in link to <span className="text-mist-100">{email}</span>.
         </p>
+        <button
+          type="button"
+          onClick={() => {
+            setSent(false);
+            setMethod("password");
+          }}
+          className="mt-4 text-sm text-aurora-300 hover:underline"
+        >
+          Back to password sign-in
+        </button>
       </div>
     );
   }
@@ -178,21 +188,20 @@ export function LoginForm({
         />
       </label>
 
-      {showPassword && (
+      {usePassword && (
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-mist-100">
             Password{" "}
-            <span className="font-normal text-mist-500">
-              {credentialsMode
-                ? "(any value — local only)"
-                : "(optional — admin password sign-in)"}
-            </span>
+            {credentialsMode ? (
+              <span className="font-normal text-mist-500">(any value — local only)</span>
+            ) : null}
           </span>
           <PasswordField
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             autoComplete="current-password"
+            required
           />
         </label>
       )}
@@ -203,29 +212,43 @@ export function LoginForm({
         <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>
       )}
 
-      {!tryCredentials && !magicLink && (
+      {!usePassword && !magicLink && (
         <p className="rounded-lg bg-amber-400/10 px-3 py-2 text-sm text-amber-200/80">
-          No sign-in provider is configured. Set SMTP (Maileroo recommended) or{" "}
-          <code>RESEND_API_KEY</code> to enable magic-link login.
+          No email sign-in provider is configured. Set SMTP (Maileroo) or{" "}
+          <code>RESEND_API_KEY</code>.
         </p>
       )}
 
       <button
         type="submit"
-        disabled={busy || (!tryCredentials && !magicLink)}
+        disabled={busy || (!usePassword && !magicLink)}
         className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-aurora-400 px-6 py-3 font-medium text-ink-950 transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? (
           <>
-            <Spinner className="h-4 w-4" /> Signing in…
+            <Spinner className="h-4 w-4" />{" "}
+            {usePassword ? "Signing in…" : "Sending link…"}
           </>
         ) : (
           <>
-            {tryCredentials ? "Sign in" : "Send magic link"}
+            {usePassword ? "Sign in" : "Send sign-in link"}
             <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </>
         )}
       </button>
+
+      {magicLink ? (
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setMethod(usePassword ? "magic" : "password");
+          }}
+          className="w-full text-center text-sm text-mist-400 transition-colors hover:text-aurora-300"
+        >
+          {usePassword ? "Email me a sign-in link instead" : "Sign in with password"}
+        </button>
+      ) : null}
     </form>
   );
 }

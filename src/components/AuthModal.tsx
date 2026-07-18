@@ -20,9 +20,12 @@ declare global {
   }
 }
 
+type SignInMethod = "password" | "magic";
+
 /**
  * Sign-in / sign-up gate for the studio. When auth is not enforced the
  * user can continue as a guest; when AUTH_SECRET is set, signing in is required.
+ * Password is the primary path; magic link is optional secondary.
  */
 export function AuthModal({
   open,
@@ -46,6 +49,7 @@ export function AuthModal({
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [method, setMethod] = useState<SignInMethod>("password");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -68,6 +72,7 @@ export function AuthModal({
     rendered.current = false;
     setError(null);
     setSent(false);
+    setMethod("password");
     const t = setTimeout(renderTurnstile, 50);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,7 +89,7 @@ export function AuthModal({
 
   if (!open) return null;
 
-  const useCredentials = credentialsMode;
+  const usePassword = method === "password";
 
   const goStudio = () => {
     if (typeof window !== "undefined") {
@@ -104,6 +109,10 @@ export function AuthModal({
     const trimmed = email.trim().toLowerCase();
     if (!trimmed.includes("@")) {
       setError("Enter a valid email address.");
+      return;
+    }
+    if (usePassword && !password) {
+      setError("Enter your password.");
       return;
     }
     setBusy(true);
@@ -126,14 +135,18 @@ export function AuthModal({
         }
       }
 
-      if (useCredentials) {
+      if (usePassword) {
         const result = await signIn("credentials", {
           email: trimmed,
           password,
           redirect: false,
         });
         if (result?.error) {
-          setError("Could not sign in. Check your details and try again.");
+          setError(
+            credentialsMode
+              ? "Could not sign in. Check your details and try again."
+              : "Invalid email or password.",
+          );
         } else {
           goStudio();
         }
@@ -159,7 +172,7 @@ export function AuthModal({
           );
         }
       } else {
-        setError("No sign-in provider configured. Set SMTP (Maileroo) or AUTH_RESEND_KEY.");
+        setError("No sign-in provider configured. Set SMTP (Maileroo) or RESEND_API_KEY.");
       }
     } catch {
       setError("Something went wrong. Please try again.");
@@ -201,7 +214,7 @@ export function AuthModal({
         </h2>
         <p className="mt-2 text-sm text-mist-300">
           {authRequired
-            ? "Use your email to continue. Nothing sends without your approval."
+            ? "Sign in with email and password. Nothing sends without your approval."
             : "Local studio is open — continue as a guest, or sign in to try the auth flow."}
         </p>
 
@@ -212,6 +225,16 @@ export function AuthModal({
             <p className="mt-1 text-sm text-mist-300">
               We sent a secure sign-in link to <span className="text-mist-100">{email}</span>.
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSent(false);
+                setMethod("password");
+              }}
+              className="mt-4 text-sm text-aurora-300 hover:underline"
+            >
+              Back to password sign-in
+            </button>
           </div>
         ) : (
           <form onSubmit={submit} className="mt-6 space-y-4">
@@ -235,17 +258,20 @@ export function AuthModal({
               />
             </label>
 
-            {useCredentials && (
+            {usePassword && (
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-mist-100">
                   Password{" "}
-                  <span className="font-normal text-mist-500">(any value — local only)</span>
+                  {credentialsMode ? (
+                    <span className="font-normal text-mist-500">(any value — local only)</span>
+                  ) : null}
                 </span>
                 <PasswordField
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
+                  required
                 />
               </label>
             )}
@@ -258,20 +284,34 @@ export function AuthModal({
 
             <button
               type="submit"
-              disabled={busy || (!useCredentials && !magicLink)}
+              disabled={busy || (!usePassword && !magicLink)}
               className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-aurora-400 px-6 py-3 font-medium text-ink-950 transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? (
                 <>
-                  <Spinner className="h-4 w-4" /> Signing in…
+                  <Spinner className="h-4 w-4" />{" "}
+                  {usePassword ? "Signing in…" : "Sending link…"}
                 </>
               ) : (
                 <>
-                  {useCredentials ? "Sign in" : "Send magic link"}
+                  {usePassword ? "Sign in" : "Send sign-in link"}
                   <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </>
               )}
             </button>
+
+            {magicLink ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setMethod(usePassword ? "magic" : "password");
+                }}
+                className="w-full text-center text-sm text-mist-400 transition-colors hover:text-aurora-300"
+              >
+                {usePassword ? "Email me a sign-in link instead" : "Sign in with password"}
+              </button>
+            ) : null}
           </form>
         )}
 

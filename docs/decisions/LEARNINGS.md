@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-18 — Password-first login; one marketing CTA
+- Prod AuthModal was magic-link-only (`credentialsMode = !authRequired`), so
+  “Sign in” in the nav never showed a password. Fix: password primary on
+  LoginForm + AuthModal; magic link secondary.
+- Dual nav CTAs (Sign in + Open studio) were confusing — one CTA: Sign in →
+  `/login` when auth required, else Open studio → `/app`.
+- Production credentials still only accept admin email + `ADMIN_PASSWORD`;
+  other users use the magic-link secondary until per-user passwords exist.
+
 ### 2026-07-18 — Financial plan prices live + admin platform/users
 - `plans.ts` = Free 75 leads / 30 sends / 5 verifies; Starter $39/400; Pro
   $89/2000; Agency $199/8000. Stripe Prices must be created to match
