@@ -17,7 +17,7 @@ import {
 const CAPABILITIES = [
   {
     title: "Live web search",
-    body: "Describe a niche and city. Leadify finds real businesses and enriches contact details.",
+    body: "Describe a niche and city. HERMES mail finds real businesses and enriches contact details.",
     icon: SearchIcon,
   },
   {
@@ -65,13 +65,14 @@ export default function LandingPage() {
       <section className="mx-auto flex min-h-[calc(100vh-5.5rem)] max-w-7xl items-center px-5 pb-16 pt-8 sm:px-8 sm:pb-20">
         <div className="grid w-full items-center gap-10 lg:grid-cols-2 lg:gap-12 xl:gap-16">
           <div className="max-w-xl">
-            <p className="animate-float-up font-display text-4xl font-semibold tracking-tight text-mist-100 sm:text-5xl">
-              Leadify
+            <p className="animate-float-up font-brand text-3xl font-semibold tracking-[0.06em] text-mist-100 sm:text-4xl">
+              HERMES{" "}
+              <span className="font-medium tracking-[0.14em] text-aurora-300">mail</span>
             </p>
             <h1 className="animate-float-up mt-4 font-display text-4xl font-semibold leading-[1.08] tracking-tight text-balance sm:text-5xl xl:text-6xl">
-              Navigate to your
+              Find, draft,
               <br />
-              <span className="text-aurora-300">next customer</span>
+              <span className="text-aurora-300">deliver</span>
             </h1>
             <p className="animate-float-up mt-5 text-lg leading-relaxed text-mist-300 sm:text-xl">
               Search a niche, enrich prospects on a live map, draft outreach, and

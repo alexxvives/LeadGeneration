@@ -353,6 +353,8 @@ export function EmailSettingsForm({
                         maileroo.com
                       </a>
                       → add your domain → create a Sending Key → paste here.
+                      Sending works immediately. Bounce/reply tracking needs a
+                      one-time webhook (below) — Maileroo has no auto-setup API.
                     </span>
                   }
                 >
@@ -383,6 +385,8 @@ export function EmailSettingsForm({
                         resend.com
                       </a>
                       → add your domain → create an API key → paste here.
+                      Bounce and reply tracking is set up automatically when you
+                      save the key — nothing to configure in Resend.
                     </span>
                   }
                 >
@@ -400,7 +404,7 @@ export function EmailSettingsForm({
               )}
             </div>
           </div>
-          <WebhookHint provider={isMaileroo ? "maileroo" : "resend"} liveAppUrl={liveAppUrl} />
+          {isMaileroo ? <WebhookHint liveAppUrl={liveAppUrl} /> : null}
         </div>
       )}
 
@@ -452,31 +456,23 @@ function Field({
   );
 }
 
-function WebhookHint({
-  provider,
-  liveAppUrl,
-}: {
-  provider: "maileroo" | "resend";
-  liveAppUrl?: string | null;
-}) {
+/** Maileroo-only: no create-webhook API, so users paste the URL once (optional). */
+function WebhookHint({ liveAppUrl }: { liveAppUrl?: string | null }) {
   const origin =
     (typeof window !== "undefined" ? window.location.origin : "") ||
     liveAppUrl?.replace(/\/$/, "") ||
     "https://leadgeneration.alexxvives.workers.dev";
-  const path =
-    provider === "maileroo" ? "/api/webhooks/maileroo" : "/api/webhooks/resend";
-  const url = `${origin}${path}`;
+  const url = `${origin}/api/webhooks/maileroo`;
   const [copied, setCopied] = useState(false);
 
   return (
     <div className="mt-4 rounded-lg border border-white/8 bg-ink-950/40 px-3 py-2.5">
       <p className="text-[11px] font-medium uppercase tracking-wider text-mist-500">
-        Delivery webhooks
+        Optional · bounce / reply tracking
       </p>
       <p className="mt-1 text-[11px] leading-relaxed text-mist-400">
-        Point {provider === "maileroo" ? "Maileroo" : "Resend"} at this URL
-        (delivered / bounced events) so Leadify updates delivery status
-        automatically.
+        Maileroo dashboard → Webhooks → add this URL → pick delivered / bounced
+        / failed events. Sending already works without this step.
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <code className="min-w-0 flex-1 truncate rounded-md border border-white/10 bg-ink-900/80 px-2 py-1.5 text-[11px] text-aurora-200/90">

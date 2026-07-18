@@ -48,6 +48,8 @@ export function newWorkspace(args: {
     replyTo: null,
     physicalAddress: null,
     resendApiKey: null,
+    resendWebhookId: null,
+    resendWebhookSecret: null,
     mailerooApiKey: null,
     easyEmailProvider: "resend",
     preferredSendPath: null,

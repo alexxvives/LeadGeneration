@@ -88,7 +88,8 @@ export function AuthModal({
 
   const goStudio = () => {
     if (typeof window !== "undefined") {
-      sessionStorage.setItem("leadify_guest", "1");
+      sessionStorage.setItem("hermes_guest", "1");
+      sessionStorage.removeItem("leadify_guest");
       sessionStorage.removeItem("lodestar_guest");
     }
     onClose();

@@ -93,7 +93,7 @@ won't disturb the approval/send flow.
    (`MYEMAILVERIFIER_API_KEY`, preferred) or Zeruh
    (`MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY`) in `sendApprovedOutreach`. Blocks
    hard undeliverables; strips the bad address and rejects outreach. Plan-tiered
-   daily verify caps (Free 10 → Agency 100). Not run on enrich (credit cost +
+   daily verify caps (Free 5 → Agency 100). Not run on enrich (credit cost +
    Excel import parity). Still to do: persist a `deliverable` flag on the lead.
 3. **Smarter query building.** ✅ _Shipped_ — `query.ts` expands the niche into
    multiple queries for the `smart`/`local` strategies and merges them. Still to

@@ -12,7 +12,7 @@ export async function sendViaMaileroo(opts: {
   /** Optional HTML alternative (bold/italic from pitch editor). */
   html?: string;
   replyTo?: string;
-  /** Custom tags echoed on webhooks (leadify_ws / leadify_outreach). */
+  /** Custom tags echoed on webhooks (hermes_ws / hermes_outreach; legacy leadify_*). */
   tags?: Record<string, string>;
 }): Promise<{ ok: true; id?: string } | { ok: false; error: string }> {
   try {

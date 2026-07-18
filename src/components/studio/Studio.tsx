@@ -31,6 +31,8 @@ import {
 } from "@/lib/sender-profile";
 import { BoardAssignModal, type BoardDestination } from "./BoardAssignModal";
 import { DashboardView } from "./DashboardView";
+import { AdminPlatformView } from "./AdminPlatformView";
+import { AdminUsersView } from "./AdminUsersView";
 import { BoardsView } from "./BoardsView";
 import { loadStoredBoardFilter, storeBoardFilter } from "./BoardPicker";
 import { LeadColumnsMenu } from "./LeadColumnsMenu";
@@ -45,7 +47,9 @@ type StudioView =
   | "outreach"
   | "runs"
   | "dashboard"
-  | "boards";
+  | "boards"
+  | "admin"
+  | "admin-users";
 
 function viewFromParams(view: string | null): StudioView {
   if (view === "pipeline") return "pipeline";
@@ -54,6 +58,8 @@ function viewFromParams(view: string | null): StudioView {
   if (view === "runs") return "runs";
   if (view === "dashboard") return "dashboard";
   if (view === "boards") return "boards";
+  if (view === "admin") return "admin";
+  if (view === "admin-users") return "admin-users";
   return "board";
 }
 
@@ -65,6 +71,8 @@ function queryForView(next: StudioView, boardId?: string | null): string {
   else if (next === "runs") params.set("view", "runs");
   else if (next === "dashboard") params.set("view", "dashboard");
   else if (next === "boards") params.set("view", "boards");
+  else if (next === "admin") params.set("view", "admin");
+  else if (next === "admin-users") params.set("view", "admin-users");
   if (boardId && boardId !== "all") params.set("board", boardId);
   const q = params.toString();
   return q ? `?${q}` : "";
@@ -566,6 +574,7 @@ export function Studio() {
     // Send click is the per-lead human gate — promote draft → approved first.
     const lead = findLeadByOutreach(outreachId);
     const st = lead?.outreach?.status;
+    if (st === "sending") return; // claim already in flight
     if (st === "draft" || st === "rejected" || st === "failed") {
       await onDecide(outreachId, "approved", { silent: true });
     }
@@ -930,6 +939,10 @@ export function Studio() {
       {view === "dashboard" && (
         <DashboardView boardFilterId={filterBoardId} boards={boards} />
       )}
+
+      {/* Admin (platform + users) — nav gated in StudioShell */}
+      {view === "admin" && <AdminPlatformView />}
+      {view === "admin-users" && <AdminUsersView />}
 
       {/* Boards management */}
       {view === "boards" && (

@@ -1,7 +1,13 @@
 import type { LeadColumnDef } from "@/lib/types";
+import { readMigratedKey } from "@/lib/browser-storage";
 
-const COLS_KEY = "leadify_lead_columns";
-const VIS_KEY = "leadify_lead_column_visibility";
+const COLS_KEY = "hermes_lead_columns";
+const COLS_LEGACY = ["leadify_lead_columns", "lodestar_lead_columns"];
+const VIS_KEY = "hermes_lead_column_visibility";
+const VIS_LEGACY = [
+  "leadify_lead_column_visibility",
+  "lodestar_lead_column_visibility",
+];
 
 export type ColumnVisibility = {
   notes: boolean;
@@ -14,7 +20,7 @@ const DEFAULT_VIS: ColumnVisibility = { notes: false, custom: {} };
 export function loadLeadColumns(): LeadColumnDef[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(COLS_KEY);
+    const raw = readMigratedKey(COLS_KEY, COLS_LEGACY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as LeadColumnDef[];
     return Array.isArray(parsed) ? parsed.filter((c) => c?.id && c?.name) : [];
@@ -30,7 +36,7 @@ export function saveLeadColumns(cols: LeadColumnDef[]): void {
 export function loadColumnVisibility(): ColumnVisibility {
   if (typeof window === "undefined") return DEFAULT_VIS;
   try {
-    const raw = localStorage.getItem(VIS_KEY);
+    const raw = readMigratedKey(VIS_KEY, VIS_LEGACY);
     if (!raw) return { ...DEFAULT_VIS };
     const parsed = JSON.parse(raw) as Partial<ColumnVisibility>;
     return {

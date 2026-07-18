@@ -1,5 +1,5 @@
 /**
- * Read a localStorage key, migrating from legacy Lodestar keys once.
+ * Read a localStorage key, migrating from legacy Leadify/Lodestar keys once.
  */
 export function readMigratedKey(key: string, legacyKeys: string[]): string | null {
   if (typeof window === "undefined") return null;

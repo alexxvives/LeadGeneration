@@ -7,13 +7,12 @@
  */
 
 import { readMigratedKey } from "@/lib/browser-storage";
+import type { MailboxAgeBand, MailboxVolumeBand } from "@/lib/types";
 
-export const WARMUP_STORAGE_KEY = "leadify_warmup_v1";
-const WARMUP_LEGACY_KEYS = ["lodestar_warmup_v1"];
+export type { MailboxAgeBand, MailboxVolumeBand };
 
-/** Self-reported inbox age when configuring From email. */
-export type MailboxAgeBand = "new" | "weeks" | "months" | "established";
-export type MailboxVolumeBand = "none" | "light" | "regular";
+export const WARMUP_STORAGE_KEY = "hermes_warmup_v1";
+const WARMUP_LEGACY_KEYS = ["leadify_warmup_v1", "lodestar_warmup_v1"];
 
 export type WarmupProfile = {
   /** ISO date (YYYY-MM-DD) when we started tracking this sender. */

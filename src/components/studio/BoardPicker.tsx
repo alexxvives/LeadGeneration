@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { BoardSummary } from "@/lib/types";
 import { BoardsIcon, ChevronDownIcon } from "@/components/icons";
+import { readMigratedKey } from "@/lib/browser-storage";
 
-const STORAGE_KEY = "leadify_active_board";
+const STORAGE_KEY = "hermes_active_board";
+const STORAGE_LEGACY = ["leadify_active_board", "lodestar_active_board"];
 
 export function loadStoredBoardFilter(): string {
   if (typeof window === "undefined") return "all";
-  return localStorage.getItem(STORAGE_KEY) || "all";
+  return readMigratedKey(STORAGE_KEY, STORAGE_LEGACY) || "all";
 }
 
 export function storeBoardFilter(id: string): void {
@@ -48,7 +50,7 @@ export function BoardPicker({
   }, []);
 
   return (
-    <div ref={wrapRef} className="relative mb-2 hidden sm:block">
+    <div ref={wrapRef} className="relative mb-2">
       <p className="mb-1.5 px-1 text-[10px] uppercase tracking-wider text-mist-500">
         Board
       </p>

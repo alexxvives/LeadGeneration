@@ -1,5 +1,5 @@
 /**
- * Workers AI client (Leadify's preferred LLM on Cloudflare).
+ * Workers AI client (HERMES mail's preferred LLM on Cloudflare).
  *
  * Preferred: Cloudflare Workers AI binding (`env.AI`) on the deployed Worker —
  * no API key, same account as D1. Optional REST via CLOUDFLARE_ACCOUNT_ID +

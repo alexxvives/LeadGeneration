@@ -62,6 +62,8 @@ type WorkspaceRow = {
   reply_to: string | null;
   physical_address: string | null;
   resend_api_key: string | null;
+  resend_webhook_id: string | null;
+  resend_webhook_secret: string | null;
   maileroo_api_key: string | null;
   easy_email_provider: string | null;
   preferred_send_path: string | null;
@@ -182,6 +184,8 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
     replyTo: r.reply_to ?? null,
     physicalAddress: r.physical_address ?? null,
     resendApiKey: r.resend_api_key ?? null,
+    resendWebhookId: r.resend_webhook_id ?? null,
+    resendWebhookSecret: r.resend_webhook_secret ?? null,
     mailerooApiKey: r.maileroo_api_key ?? null,
     easyEmailProvider: r.easy_email_provider === "maileroo" ? "maileroo" : "resend",
     preferredSendPath:
@@ -383,6 +387,10 @@ export class D1Store implements LeadRepository {
     if ("replyTo" in patch) row.reply_to = patch.replyTo ?? null;
     if ("physicalAddress" in patch) row.physical_address = patch.physicalAddress ?? null;
     if ("resendApiKey" in patch) row.resend_api_key = patch.resendApiKey ?? null;
+    if ("resendWebhookId" in patch) row.resend_webhook_id = patch.resendWebhookId ?? null;
+    if ("resendWebhookSecret" in patch) {
+      row.resend_webhook_secret = patch.resendWebhookSecret ?? null;
+    }
     if ("mailerooApiKey" in patch) row.maileroo_api_key = patch.mailerooApiKey ?? null;
     if ("easyEmailProvider" in patch) row.easy_email_provider = patch.easyEmailProvider ?? "resend";
     if ("preferredSendPath" in patch) {
@@ -404,6 +412,52 @@ export class D1Store implements LeadRepository {
       .bind(...values, id)
       .run();
     return this.getWorkspace(id);
+  }
+
+  async listWorkspaces(): Promise<Workspace[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM workspaces ORDER BY created_at DESC`)
+      .all<WorkspaceRow>();
+    return (results ?? []).map(rowToWorkspace);
+  }
+
+  async adminCountByWorkspace(): Promise<{
+    leads: Record<string, number>;
+    sent: Record<string, number>;
+    runs: Record<string, number>;
+  }> {
+    const toMap = (rows: Array<{ workspace_id: string; n: number }> | null | undefined) => {
+      const out: Record<string, number> = {};
+      for (const r of rows ?? []) out[r.workspace_id] = Number(r.n ?? 0);
+      return out;
+    };
+    const [leads, sent, runs] = await Promise.all([
+      this.db
+        .prepare(`SELECT workspace_id, COUNT(*) AS n FROM leads GROUP BY workspace_id`)
+        .all<{ workspace_id: string; n: number }>(),
+      this.db
+        .prepare(
+          `SELECT workspace_id, COUNT(*) AS n FROM outreach WHERE status = 'sent' GROUP BY workspace_id`,
+        )
+        .all<{ workspace_id: string; n: number }>(),
+      this.db
+        .prepare(`SELECT workspace_id, COUNT(*) AS n FROM runs GROUP BY workspace_id`)
+        .all<{ workspace_id: string; n: number }>(),
+    ]);
+    return {
+      leads: toMap(leads.results),
+      sent: toMap(sent.results),
+      runs: toMap(runs.results),
+    };
+  }
+
+  async listAuthUsers(): Promise<
+    Array<{ id: string; email: string | null; name: string | null }>
+  > {
+    const { results } = await this.db
+      .prepare(`SELECT id, email, name FROM users ORDER BY email ASC`)
+      .all<{ id: string; email: string | null; name: string | null }>();
+    return results ?? [];
   }
 
   // ---- Boards ----
@@ -814,6 +868,26 @@ export class D1Store implements LeadRepository {
     return this.getOutreach(id);
   }
 
+  async claimOutreachForSend(id: string): Promise<Outreach | null> {
+    const now = new Date().toISOString();
+    const stuckBefore = new Date(Date.now() - 2 * 60_000).toISOString();
+    const result = await this.db
+      .prepare(
+        `UPDATE outreach
+         SET status = 'sending', error = NULL, updated_at = ?
+         WHERE id = ? AND workspace_id = ?
+           AND (
+             status = 'approved'
+             OR (status = 'sending' AND updated_at < ?)
+           )`,
+      )
+      .bind(now, id, this.workspaceId, stuckBefore)
+      .run();
+    const changed = (result as { meta?: { changes?: number } }).meta?.changes ?? 0;
+    if (!changed) return null;
+    return this.getOutreach(id);
+  }
+
   async getOutreach(id: string): Promise<Outreach | null> {
     const row = await this.db
       .prepare(`SELECT * FROM outreach WHERE id = ? AND workspace_id = ?`)
@@ -852,6 +926,37 @@ export class D1Store implements LeadRepository {
       .bind(needle)
       .first<OutreachRow>();
     return row ? rowToOutreach(row) : null;
+  }
+
+  async countRecentSendActivity(
+    sinceIso: string,
+    excludeId?: string,
+  ): Promise<number> {
+    const row = excludeId
+      ? await this.db
+          .prepare(
+            `SELECT COUNT(*) AS n FROM outreach
+             WHERE workspace_id = ?
+               AND id != ?
+               AND (
+                 (status = 'sent' AND sent_at IS NOT NULL AND sent_at >= ?)
+                 OR (status = 'sending' AND updated_at >= ?)
+               )`,
+          )
+          .bind(this.workspaceId, excludeId, sinceIso, sinceIso)
+          .first<{ n: number }>()
+      : await this.db
+          .prepare(
+            `SELECT COUNT(*) AS n FROM outreach
+             WHERE workspace_id = ?
+               AND (
+                 (status = 'sent' AND sent_at IS NOT NULL AND sent_at >= ?)
+                 OR (status = 'sending' AND updated_at >= ?)
+               )`,
+          )
+          .bind(this.workspaceId, sinceIso, sinceIso)
+          .first<{ n: number }>();
+    return Number(row?.n ?? 0);
   }
 
   async clearWorkspaceData(): Promise<void> {

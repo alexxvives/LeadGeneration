@@ -11,8 +11,8 @@ import { PLAN_ORDER, PLANS } from "@/lib/plans";
 import type { PlanId } from "@/lib/types";
 
 /**
- * TEMP developer tools — tour replay, credit reset, plan override.
- * Remove this section before GA.
+ * Admin-only tools — tour replay, credit reset, plan override.
+ * APIs are gated to admin@…; this panel is only rendered for that session.
  */
 export function DeveloperModePanel({
   metered = true,
@@ -70,10 +70,10 @@ export function DeveloperModePanel({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-widest text-amber-200/70">
-            Developer mode · temporary
+            Admin · plan & usage
           </p>
           <p className="mt-1 text-sm text-mist-500">
-            Tools for testing. Will be removed before launch.
+            Override plan and reset usage for this workspace (Stripe-free).
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Link

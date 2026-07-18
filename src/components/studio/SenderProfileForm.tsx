@@ -13,7 +13,7 @@ import {
   SIGNATURE_PLACEHOLDER,
   type OutreachProfile,
 } from "@/lib/sender-profile";
-import { generateDraft } from "@/lib/outreach/draft";
+import { generateDraft } from "@/lib/outreach/draft-preview";
 import { langLabel, type OutreachLang } from "@/lib/outreach/locale";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import type { Lead, Run } from "@/lib/types";

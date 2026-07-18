@@ -29,7 +29,7 @@ const suggestCache = new Map<string, LocationSuggestion[]>();
 
 const NOMINATIM_HEADERS = {
   Accept: "application/json",
-  "User-Agent": "LeadifyLeadGen/0.1 (contact=dev@localhost)",
+  "User-Agent": "HermesMail/0.1 (contact=dev@localhost)",
 };
 
 // ─── Photon autocomplete ──────────────────────────────────────────────────────

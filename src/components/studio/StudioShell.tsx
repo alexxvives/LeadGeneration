@@ -31,27 +31,30 @@ import {
   UsersIcon,
   DashboardIcon,
   BoardsIcon,
+  ShieldIcon,
 } from "@/components/icons";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
-const GUEST_KEY = "leadify_guest";
-const GUEST_LEGACY = "lodestar_guest";
+const GUEST_KEY = "hermes_guest";
+const GUEST_LEGACY = ["leadify_guest", "lodestar_guest"];
 
 function isGuestSession(): boolean {
   if (typeof window === "undefined") return false;
   if (sessionStorage.getItem(GUEST_KEY) === "1") return true;
-  if (sessionStorage.getItem(GUEST_LEGACY) === "1") {
-    sessionStorage.setItem(GUEST_KEY, "1");
-    sessionStorage.removeItem(GUEST_LEGACY);
-    return true;
+  for (const legacy of GUEST_LEGACY) {
+    if (sessionStorage.getItem(legacy) === "1") {
+      sessionStorage.setItem(GUEST_KEY, "1");
+      sessionStorage.removeItem(legacy);
+      return true;
+    }
   }
   return false;
 }
 
 function markGuestSession(): void {
   sessionStorage.setItem(GUEST_KEY, "1");
-  sessionStorage.removeItem(GUEST_LEGACY);
+  for (const legacy of GUEST_LEGACY) sessionStorage.removeItem(legacy);
 }
 
 /**
@@ -66,6 +69,7 @@ export function StudioShell({
   turnstileSiteKey,
   caps,
   identity,
+  isAdmin = false,
 }: {
   children: React.ReactNode;
   authRequired: boolean;
@@ -74,6 +78,8 @@ export function StudioShell({
   turnstileSiteKey: string | null;
   caps: GettingStartedCaps;
   identity: GettingStartedIdentity;
+  /** Platform admin — shows Admin nav (overview + users). */
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -252,6 +258,26 @@ export function StudioShell({
       ],
     },
   ];
+
+  if (isAdmin) {
+    navSections.push({
+      label: "Admin",
+      items: [
+        {
+          href: "/app?view=admin",
+          label: "Platform",
+          icon: ShieldIcon,
+          active: pathname === "/app" && view === "admin",
+        },
+        {
+          href: "/app?view=admin-users",
+          label: "Users",
+          icon: UsersIcon,
+          active: pathname === "/app" && view === "admin-users",
+        },
+      ],
+    });
+  }
 
   return (
     <div className="relative flex min-h-screen">

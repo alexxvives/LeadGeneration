@@ -3,7 +3,7 @@ import { getDb, LOCAL_WORKSPACE_ID } from "@/lib/db";
 import { getD1Binding } from "@/lib/cf";
 import { setOutreachDeliveryStatus, type Ctx } from "@/lib/service";
 import type { DeliveryStatus } from "@/lib/types";
-import { env } from "@/lib/config";
+import { authRequired, env } from "@/lib/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,29 +11,17 @@ export const dynamic = "force-dynamic";
 type ResendTag = { name?: string; value?: string };
 
 /**
- * Resend → Leadify delivery webhooks.
+ * Resend → Hermes delivery webhooks.
  *
- * Configure in Resend Dashboard → Webhooks → URL:
- *   https://<your-host>/api/webhooks/resend
- * Events: email.bounced, email.complained, email.delivered, email.received
+ * Signing secrets:
+ *  - Per-workspace (auto-registered when the user saves a BYO Resend key)
+ *  - Platform `RESEND_WEBHOOK_SECRET` (optional fallback for platform sends)
  *
- * Optional: RESEND_WEBHOOK_SECRET (Svix signing secret). When unset we accept
- * payloads in local/demo so zero-key mode still works; production should set it.
- *
- * Matching order:
- *   1. Tags `leadify_ws` + `leadify_outreach` (set on send; also accept legacy `lodestar_*`)
- *   2. Fallback: latest sent outreach by recipient email (cross-workspace)
+ * Matching: tags `hermes_ws` / `leadify_ws` + outreach id. Email fallback only
+ * for inbound replies after a signature verifies.
  */
 export async function POST(req: Request) {
-  const secret = process.env.RESEND_WEBHOOK_SECRET?.trim();
   const raw = await req.text();
-
-  if (secret) {
-    const ok = await verifySvix(raw, req.headers, secret);
-    if (!ok) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
-  }
 
   let body: {
     type?: string;
@@ -57,18 +45,46 @@ export async function POST(req: Request) {
   }
 
   const tags = body.data?.tags ?? [];
-  const tagWs = tagValue(tags, "leadify_ws") || tagValue(tags, "lodestar_ws");
+  const tagWs =
+    tagValue(tags, "hermes_ws") ||
+    tagValue(tags, "leadify_ws") ||
+    tagValue(tags, "lodestar_ws");
   const tagOutreach =
-    tagValue(tags, "leadify_outreach") || tagValue(tags, "lodestar_outreach");
+    tagValue(tags, "hermes_outreach") ||
+    tagValue(tags, "leadify_outreach") ||
+    tagValue(tags, "lodestar_outreach");
 
   const binding = await getD1Binding();
   const probe = getDb(binding, LOCAL_WORKSPACE_ID);
+
+  // Resolve which Svix secret to use (workspace auto-webhook, else platform).
+  let verifySecret = env.resendWebhookSecret();
+  if (tagWs) {
+    const ws = await probe.getWorkspace(tagWs);
+    if (ws?.resendWebhookSecret?.trim()) {
+      verifySecret = ws.resendWebhookSecret.trim();
+    }
+  }
+
+  if (authRequired() && !verifySecret) {
+    return NextResponse.json(
+      { error: "No webhook signing secret for this event" },
+      { status: 503 },
+    );
+  }
+
+  if (verifySecret) {
+    const ok = await verifySvix(raw, req.headers, verifySecret);
+    if (!ok) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+  }
 
   if (tagWs && tagOutreach) {
     const ctx: Ctx = {
       db: getDb(binding, tagWs),
       workspaceId: tagWs,
-      metered: !!env.authSecret(),
+      metered: !!binding,
     };
     const existing = await ctx.db.getOutreach(tagOutreach);
     if (existing) {
@@ -81,6 +97,12 @@ export async function POST(req: Request) {
         delivery,
       });
     }
+  }
+
+  const allowEmailFallback =
+    delivery === "replied" && (!!verifySecret || !authRequired());
+  if (!allowEmailFallback) {
+    return NextResponse.json({ ok: true, matched: 0 });
   }
 
   const toRaw = body.data?.to;
@@ -102,7 +124,7 @@ export async function POST(req: Request) {
   const ctx: Ctx = {
     db: getDb(binding, target.workspaceId),
     workspaceId: target.workspaceId,
-    metered: !!env.authSecret(),
+    metered: !!binding,
   };
   await setOutreachDeliveryStatus(ctx, target.id, delivery);
   return NextResponse.json({
@@ -137,7 +159,6 @@ function mapEvent(type: string): DeliveryStatus | null {
   }
 }
 
-/** Minimal Svix-style verification (Resend webhooks). */
 async function verifySvix(
   raw: string,
   headers: Headers,

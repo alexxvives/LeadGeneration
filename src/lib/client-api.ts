@@ -6,6 +6,8 @@ import type {
   BoardSummary,
   ContactMethod,
   CrmStage,
+  AdminPlatformStats,
+  AdminUserRow,
   DashboardStats,
   FollowUp,
   Lead,
@@ -106,6 +108,10 @@ export const api = {
       `/api/dashboard${q}`,
     );
   },
+
+  adminOverview: () => jsonFetch<AdminPlatformStats>("/api/admin/overview"),
+
+  adminUsers: () => jsonFetch<{ users: AdminUserRow[] }>("/api/admin/users"),
 
   createRun: (input: {
     niche: string;

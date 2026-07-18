@@ -5,7 +5,7 @@ import { SearchIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import type { PlanId, SearchStrategy } from "@/lib/types";
-import { FREE_MAX_LEADS_PER_RUN, LEAD_COUNT_OPTIONS } from "@/lib/plans";
+import { getPlan, LEAD_COUNT_OPTIONS } from "@/lib/plans";
 import {
   draftFlagsFromProfile,
   getDefaultOffer,
@@ -61,7 +61,7 @@ const STRATEGIES: {
     label: "Smart",
     summary: "Expands your ICP into several queries, merges results, ranks by fit.",
     detail:
-      "Builds multiple query variants (contact email, official website, top/best lists), runs them sequentially, dedupes by domain, then sorts by Leadify's transparent fit score. Higher recall for vague or competitive niches.",
+      "Builds multiple query variants (contact email, official website, top/best lists), runs them sequentially, dedupes by domain, then sorts by Hermes Mail's transparent fit score. Higher recall for vague or competitive niches.",
     credits: "~3× credits",
     bestFor: "Competitive markets, vague ICPs, quality over speed",
   },
@@ -229,14 +229,17 @@ export function SearchPanel({
   const [profiles, setProfiles] = useState<OutreachProfile[]>([]);
   const [searchStrategy, setSearchStrategy] = useState<SearchStrategy>("standard");
   const [senderName, setSenderName] = useState("");
-  const [maxLeads, setMaxLeads] = useState(10);
+  // Default 25 — Free can use it when monthly remaining allows (no per-run lock).
+  const [maxLeads, setMaxLeads] = useState(25);
   const [open, setOpen] = useState(!compact);
   const [icps, setIcps] = useState<SavedIcp[]>([]);
   const [saveName, setSaveName] = useState("");
   const [showSave, setShowSave] = useState(false);
 
-  const freeTierLocked = planId === "free";
-  const planCap = freeTierLocked ? FREE_MAX_LEADS_PER_RUN : Math.max(...LEAD_COUNT_OPTIONS);
+  // Per-run size may be any preset that fits under the plan monthly cap and
+  // remaining credits (no Free-only lock at 10).
+  const planMonthlyCap = getPlan(planId).leadCreditsPerMonth;
+  const planCap = Math.min(Math.max(...LEAD_COUNT_OPTIONS), planMonthlyCap);
 
   useEffect(() => {
     const store = loadOutreachProfiles();
@@ -456,10 +459,10 @@ export function SearchPanel({
             className="inline-flex flex-wrap justify-self-center gap-1 rounded-full border border-white/10 bg-ink-900/60 p-1"
           >
             {LEAD_COUNT_OPTIONS.map((n) => {
-              const locked = n > planCap;
+              const overPlan = n > planCap;
               const overCredits =
-                leadsRemaining != null && leadsRemaining > 0 && n > leadsRemaining;
-              const disabled = locked || overCredits;
+                leadsRemaining != null && n > leadsRemaining;
+              const disabled = overPlan || overCredits;
               const isActive = maxLeads === n;
               return (
                 <button
@@ -469,8 +472,8 @@ export function SearchPanel({
                   aria-checked={isActive}
                   disabled={disabled}
                   title={
-                    locked
-                      ? "Upgrade to unlock larger batches"
+                    overPlan
+                      ? `Your plan includes ${planMonthlyCap} leads / month — upgrade for larger batches`
                       : overCredits
                         ? `Only ${leadsRemaining} lead credit${leadsRemaining === 1 ? "" : "s"} left this month`
                         : `Find ${n} leads`
@@ -485,8 +488,8 @@ export function SearchPanel({
                   }`}
                 >
                   {n}
-                  {locked ? (
-                    <span className="ml-1 text-[10px] opacity-70">Pro</span>
+                  {overPlan ? (
+                    <span className="ml-1 text-[10px] opacity-70">↑</span>
                   ) : null}
                 </button>
               );
@@ -526,9 +529,10 @@ export function SearchPanel({
             Best for · {active.bestFor}
           </p>
         </div>
-        {freeTierLocked && (
+        {leadsRemaining != null && leadsRemaining < planMonthlyCap && (
           <p className="mt-2 text-xs text-mist-500">
-            Larger batches (25+) need a paid plan. Monthly Free cap is also 50 leads.
+            {leadsRemaining} lead credit{leadsRemaining === 1 ? "" : "s"} left this
+            month (plan includes {planMonthlyCap}).
           </p>
         )}
       </div>

@@ -9,9 +9,10 @@ import {
   type OutreachLang,
 } from "@/lib/outreach/locale";
 
-const KEY = "leadify_sender_profiles";
-const LEGACY_SINGLE = "leadify_sender_profile";
-const LEGACY_KEYS = ["lodestar_sender_profile"];
+const KEY = "hermes_sender_profiles";
+const LEGACY_MULTI = ["leadify_sender_profiles"];
+const LEGACY_SINGLE = "hermes_sender_profile";
+const LEGACY_KEYS = ["leadify_sender_profile", "lodestar_sender_profile"];
 
 export type OutreachProfile = {
   id: string;
@@ -222,7 +223,7 @@ function readStore(): ProfileStore {
     return { profiles: [], activeId: null };
   }
   try {
-    const multi = localStorage.getItem(KEY);
+    const multi = readMigratedKey(KEY, LEGACY_MULTI);
     if (multi) {
       const parsed = JSON.parse(multi) as ProfileStore;
       const profiles = Array.isArray(parsed.profiles)

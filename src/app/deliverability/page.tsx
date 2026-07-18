@@ -4,7 +4,7 @@ import { authRequired, env, getCapabilities } from "@/lib/config";
 import { ShieldIcon } from "@/components/icons";
 
 export const metadata = {
-  title: "Deliverability — Leadify",
+  title: "Deliverability — HERMES mail",
   description: "How to send cold outreach without getting your domain banned.",
 };
 
@@ -27,7 +27,7 @@ const DOMAIN_TIPS = [
   },
   {
     title: "Keep sends intentional",
-    body: "Leadify enforces per-lead approval and a per-minute rate limit by design — guardrails for your sending reputation.",
+    body: "Hermes Mail enforces per-lead approval and a per-minute rate limit by design — guardrails for your sending reputation.",
   },
   {
     title: "Skip transactional ESPs for cold email",
@@ -76,7 +76,7 @@ export default function DeliverabilityPage() {
         </div>
         <div className="mt-10 rounded-xl border border-amber-400/15 bg-amber-400/5 px-6 py-4">
           <p className="text-sm text-amber-200/80">
-            <span className="font-semibold text-amber-300">Bottom line:</span> Leadify
+            <span className="font-semibold text-amber-300">Bottom line:</span> Hermes Mail
             handles rate limiting and approval. You handle DNS and domain hygiene.
           </p>
         </div>

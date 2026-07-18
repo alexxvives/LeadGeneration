@@ -24,9 +24,9 @@ const syne = Syne({
 });
 
 export const metadata: Metadata = {
-  title: "Leadify — Navigate to your next customer",
+  title: "HERMES mail — Find, draft, deliver",
   description:
-    "A human-in-the-loop lead generation studio. Search a niche, enrich prospects, draft outreach, approve, and send — on your terms.",
+    "A human-in-the-loop lead studio. Search a niche, enrich prospects, draft outreach, approve, and send — on your terms.",
 };
 
 export default function RootLayout({

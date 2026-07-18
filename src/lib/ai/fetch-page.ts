@@ -24,7 +24,7 @@ async function plainFetchPageText(url: string): Promise<string> {
   try {
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "LeadifyLeadGen/0.1 (+https://leadgeneration.alexxvives.workers.dev)",
+        "User-Agent": "HermesMail/0.1 (+https://leadgeneration.alexxvives.workers.dev)",
         Accept: "text/html,application/xhtml+xml",
       },
       redirect: "follow",

@@ -10,8 +10,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowIcon, XIcon } from "@/components/icons";
 import { readMigratedKey } from "@/lib/browser-storage";
 
-export const GETTING_STARTED_KEY = "leadify_getting_started_v3";
-const GETTING_STARTED_LEGACY = ["lodestar_getting_started_v3"];
+export const GETTING_STARTED_KEY = "hermes_getting_started_v3";
+const GETTING_STARTED_LEGACY = [
+  "leadify_getting_started_v3",
+  "lodestar_getting_started_v3",
+];
 
 export function isGettingStartedDone(): boolean {
   if (typeof window === "undefined") return true;
@@ -51,7 +54,7 @@ function buildSteps(): TourStep[] {
       id: "welcome",
       path: "/app",
       target: null,
-      title: "Welcome to Leadify",
+      title: "Welcome to HERMES mail",
       body: "Search a niche, review leads on the pipeline, then approve every email before it goes out. Nothing sends without you.",
     },
     {
@@ -105,7 +108,7 @@ function buildSteps(): TourStep[] {
       prefer: "left",
       pad: 14,
       title: "Bring your own sender (Resend)",
-      body: "For real inbox delivery, pick Resend or Maileroo, paste your API key, and send from your verified domain — we don’t host a shared “Leadify domain” for client outreach (that burns reputation). Platform keys are for local/dev demos only.",
+      body: "For real inbox delivery, pick Resend or Maileroo, paste your API key, and send from your verified domain — we don’t host a shared “HERMES mail domain” for client outreach (that burns reputation). Platform keys are for local/dev demos only.",
       scrollBlock: "center",
     },
     {

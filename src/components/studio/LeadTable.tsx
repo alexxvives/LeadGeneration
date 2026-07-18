@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
-import { CrmStagePill, FitMeter, crmStageLabel } from "@/components/ui";
+import { CrmStagePill, FitMeter, StatusPill, crmStageLabel } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import { CheckIcon, MailIcon, PhoneIcon, TrashIcon, XIcon } from "@/components/icons";
 import { displayWebsite } from "@/lib/website";
-import { shortLocation } from "@/lib/search/enrich";
+import { shortLocation } from "@/lib/format-location";
 import { useLeadColumnState } from "@/components/studio/LeadColumnsMenu";
 
 const STAGE_OPTIONS: CrmStage[] = [
@@ -178,16 +178,16 @@ export function LeadTable({
     <div className="relative flex max-h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-xl2 border border-white/10">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/5 px-3 py-2">
         <label className="inline-flex items-center gap-2 text-xs text-mist-500">
-          <span className="uppercase tracking-widest">Status</span>
+          <span className="uppercase tracking-widest">Pipeline</span>
           <Select
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value === "all" ? "all" : (e.target.value as CrmStage))
             }
             className="min-w-[9rem] py-1.5 text-xs"
-            aria-label="Filter by status"
+            aria-label="Filter by pipeline stage"
           >
-            <option value="all">All statuses</option>
+            <option value="all">All stages</option>
             {STAGE_OPTIONS.map((s) => (
               <option key={s} value={s}>
                 {crmStageLabel(s)}
@@ -266,8 +266,11 @@ export function LeadTable({
                   onClick={() => toggleSort("status")}
                   className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
                 >
-                  Status{sortMark("status")}
+                  Pipeline{sortMark("status")}
                 </button>
+              </th>
+              <th className="px-5 py-3 font-medium uppercase tracking-widest">
+                Email
               </th>
               {vis.notes ? (
                 <th className="px-5 py-3 font-medium">Notes</th>
@@ -396,6 +399,11 @@ export function LeadTable({
                     ) : (
                       <CrmStagePill stage={stage} />
                     )}
+                  </td>
+                  <td className="px-5 py-3.5 whitespace-nowrap">
+                    <StatusPill
+                      status={l.outreach?.status ?? l.status}
+                    />
                   </td>
                   {vis.notes ? (
                     <td

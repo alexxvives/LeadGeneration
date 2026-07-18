@@ -1,6 +1,6 @@
 /**
  * Branded Auth.js magic-link email (HTML + plain text).
- * Colors match Leadify: ink #060a12, aurora #43e0a8, mist text.
+ * Colors match HERMES mail: ink #050505, aurora #2dd4bf, mist text.
  */
 
 export function magicLinkEmail(args: {
@@ -14,16 +14,16 @@ export function magicLinkEmail(args: {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sign in to Leadify</title>
+  <title>Sign in to HERMES mail</title>
 </head>
-<body style="margin:0;padding:0;background:#060a12;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#060a12;padding:40px 16px;">
+<body style="margin:0;padding:0;background:#050505;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#050505;padding:40px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:480px;background:#0a1120;border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:480px;background:#0a0e14;border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;">
           <tr>
-            <td style="padding:28px 32px 8px;background:radial-gradient(80% 120% at 10% 0%,rgba(67,224,168,0.18),transparent 55%),radial-gradient(70% 100% at 100% 0%,rgba(247,185,85,0.12),transparent 50%);">
-              <p style="margin:0;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#7ff2c8;">Leadify</p>
+            <td style="padding:28px 32px 8px;background:radial-gradient(80% 120% at 10% 0%,rgba(45,212,191,0.18),transparent 55%),radial-gradient(70% 100% at 100% 0%,rgba(247,185,85,0.10),transparent 50%);">
+              <p style="margin:0;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#5eecd9;">HERMES mail</p>
               <h1 style="margin:12px 0 0;font-size:26px;line-height:1.2;font-weight:600;color:#eaf1fb;font-family:Georgia,'Times New Roman',serif;">
                 Sign in to your studio
               </h1>
@@ -32,16 +32,16 @@ export function magicLinkEmail(args: {
           <tr>
             <td style="padding:8px 32px 28px;">
               <p style="margin:0;font-size:15px;line-height:1.55;color:#b6c4dc;">
-                Use this secure link to open Leadify as <strong style="color:#eaf1fb;">${escapeHtml(email)}</strong>. It expires soon and can only be used once.
+                Use this secure link to open HERMES mail as <strong style="color:#eaf1fb;">${escapeHtml(email)}</strong>. It expires soon and can only be used once.
               </p>
               <p style="margin:28px 0 0;">
-                <a href="${escapeAttr(url)}" style="display:inline-block;background:#43e0a8;color:#060a12;text-decoration:none;font-weight:600;font-size:15px;padding:14px 28px;border-radius:999px;">
-                  Open Leadify
+                <a href="${escapeAttr(url)}" style="display:inline-block;background:#2dd4bf;color:#050505;text-decoration:none;font-weight:600;font-size:15px;padding:14px 28px;border-radius:999px;">
+                  Open HERMES mail
                 </a>
               </p>
               <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#7f92b3;">
                 If the button doesn’t work, paste this URL into your browser:<br />
-                <a href="${escapeAttr(url)}" style="color:#7ff2c8;word-break:break-all;">${escapeHtml(url)}</a>
+                <a href="${escapeAttr(url)}" style="color:#5eecd9;word-break:break-all;">${escapeHtml(url)}</a>
               </p>
               <p style="margin:20px 0 0;font-size:12px;color:#7f92b3;">
                 If you didn’t request this, you can ignore this email. — ${escapeHtml(host)}
@@ -55,7 +55,7 @@ export function magicLinkEmail(args: {
 </body>
 </html>`;
 
-  const text = `Sign in to Leadify
+  const text = `Sign in to HERMES mail
 
 Open this link to continue as ${email}:
 ${url}

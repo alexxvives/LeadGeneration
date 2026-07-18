@@ -9,25 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-18 (verify quotas + leads table UX)
+## ⏱️ Status — updated 2026-07-18 (auto Resend webhooks + M1)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Policy:** commit + `git push` after every meaningful batch (user request).
 
 ### This pass
-- Removed “Soft warn ~N/day” under mailbox age dropdown.
-- Undeliverable verify → friendly copy, strip email, reject outreach (Leads keep
-  the company without that address).
-- Plan-tiered **daily** verifies: Free 10 / Starter 25 / Pro 50 / Agency 100;
-  `VerifyLimitModal` when capped; migration `0015_verify_daily_quota.sql`.
-- Dev plan/credit changes auto-refresh Settings via `router.refresh()`.
-- Leads table: status sort (pipeline order), status filter, checkbox-only delete
-  (floating bar for 1 or N). Zeruh kept as MEV fallback.
+- Resend BYO: auto-register delivery webhook when user saves API key
+  (migration `0016_resend_webhook.sql`) — no per-user Resend dashboard setup.
+- M1 layering: `draft-preview` + `format-location`; Settings copy updated.
 
 ### Next
-1. Apply D1 migration 0015 on prod (`npm run cf:migrate`) then deploy.
-2. Confirm verify popup + undeliverable cleanup on a live send.
-3. Optional: persist verify result on the lead (skip re-verify across isolates).
+1. `npm run cf:migrate` (0016) + deploy this branch.
+2. Existing customers: re-save Resend key once to register the webhook.
 
 ---
 

@@ -13,7 +13,7 @@ import {
   type ColumnVisibility,
 } from "@/lib/lead-columns";
 
-const COLS_CHANGED = "leadify-lead-columns-changed";
+const COLS_CHANGED = "hermes-lead-columns-changed";
 
 export function notifyLeadColumnsChanged(): void {
   window.dispatchEvent(new Event(COLS_CHANGED));

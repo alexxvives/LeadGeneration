@@ -12,10 +12,10 @@ import {
   type OutreachLang,
 } from "@/lib/outreach/locale";
 import { sendEmail } from "@/lib/email/sender";
-import { checkSendRate, recordSend } from "@/lib/email/rate-limit";
+import { checkSendRate } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
 import { getCachedVerify, verifyEmail } from "@/lib/email/verify";
-import { FREE_MAX_LEADS_PER_RUN, getPlan } from "@/lib/plans";
+import { getPlan } from "@/lib/plans";
 import { NotFoundError, QuotaError } from "@/lib/errors";
 import { ensureUsageWindow, ensureVerifyWindow } from "@/lib/workspace";
 import type {
@@ -26,6 +26,8 @@ import type {
   CrmStage,
   EasyEmailProvider,
   CreateRunInput,
+  AdminPlatformStats,
+  AdminUserRow,
   DashboardStats,
   DeliveryStatus,
   FollowUp,
@@ -38,6 +40,7 @@ import type {
   PlanId,
   Run,
   ImportLeadRow,
+  Workspace,
 } from "@/lib/types";
 import { mailboxPublicStatus } from "@/lib/email/mailbox";
 import { scoreImportedLead } from "@/lib/fit-score";
@@ -218,15 +221,16 @@ export async function resolveBoardId(
 }
 
 /**
- * Resolve how many leads this run may return, enforcing Free-tier per-run caps
- * and remaining monthly credits. Throws QuotaError when nothing is left.
+ * Resolve how many leads this run may return. Caps by platform hard max,
+ * the plan’s monthly lead-credit quota, and remaining credits this period.
+ * Throws QuotaError when nothing is left (or request exceeds monthly cap).
  */
 async function resolveRunLeadLimit(
   ctx: Ctx,
   requested?: number | null,
 ): Promise<number> {
   const hardCap = env.maxLeadsPerRun();
-  let planCap = hardCap;
+  let planMonthlyCap = hardCap;
   let remaining = Number.POSITIVE_INFINITY;
   let planId: PlanId = "free";
 
@@ -236,7 +240,7 @@ async function resolveRunLeadLimit(
       const fresh = await ensureUsageWindow(ctx.db, ws);
       const plan = getPlan(fresh.planId);
       planId = fresh.planId;
-      planCap = plan.id === "free" ? Math.min(hardCap, FREE_MAX_LEADS_PER_RUN) : hardCap;
+      planMonthlyCap = Math.min(hardCap, plan.leadCreditsPerMonth);
       remaining = plan.leadCreditsPerMonth - fresh.leadsUsedThisMonth;
       if (remaining <= 0) {
         throw new QuotaError({
@@ -249,18 +253,19 @@ async function resolveRunLeadLimit(
     }
   }
 
-  const want = requested && requested > 0 ? Math.floor(requested) : Math.min(10, planCap);
-  if (want > planCap) {
+  const want =
+    requested && requested > 0 ? Math.floor(requested) : Math.min(10, planMonthlyCap);
+  if (want > planMonthlyCap) {
     throw new QuotaError({
       kind: "leads",
       planId,
-      limit: planCap,
+      limit: planMonthlyCap,
       used: 0,
-      message: `Free plan allows up to ${planCap} leads per search. Upgrade to request more.`,
+      message: `Your plan allows up to ${planMonthlyCap} leads per month — pick a smaller batch or upgrade.`,
     });
   }
 
-  return Math.max(1, Math.min(want, planCap, remaining, hardCap));
+  return Math.max(1, Math.min(want, planMonthlyCap, remaining, hardCap));
 }
 
 async function recordLeadUsage(ctx: Ctx, count: number): Promise<void> {
@@ -641,7 +646,28 @@ export async function editOutreach(
   outreachId: string,
   patch: { subject?: string; body?: string; toEmail?: string | null },
 ): Promise<Outreach | null> {
-  return ctx.db.updateOutreach(outreachId, { ...patch, updatedAt: nowIso() });
+  const existing = await ctx.db.getOutreach(outreachId);
+  if (!existing) return null;
+
+  const nextPatch: Parameters<typeof ctx.db.updateOutreach>[1] = {
+    ...patch,
+    updatedAt: nowIso(),
+  };
+  // Recovery after verify undeliverable: new To → back to draft + restore lead email.
+  const newTo = patch.toEmail?.trim();
+  if (newTo && existing.status === "rejected") {
+    nextPatch.status = "draft";
+    nextPatch.error = null;
+    const lead = await ctx.db.getLead(existing.leadId);
+    if (lead) {
+      const emails = lead.emails.some((e) => e.toLowerCase() === newTo.toLowerCase())
+        ? lead.emails
+        : [...lead.emails, newTo];
+      await ctx.db.updateLead(lead.id, { emails, status: "queued" });
+    }
+  }
+
+  return ctx.db.updateOutreach(outreachId, nextPatch);
 }
 
 export async function setOutreachDecision(
@@ -650,8 +676,22 @@ export async function setOutreachDecision(
   decision: "approved" | "rejected",
 ): Promise<Outreach | null> {
   const db = ctx.db;
+  const existing = await db.getOutreach(outreachId);
+  if (!existing) return null;
+  // Never reopen a sent/in-flight outreach (re-send must be a new draft path).
+  if (
+    existing.status === "sent" ||
+    existing.status === "sending"
+  ) {
+    return existing;
+  }
+  // Human approve / API reject only from draft | rejected | failed | approved.
+  const allowedFrom = new Set(["draft", "rejected", "failed", "approved"]);
+  if (!allowedFrom.has(existing.status)) return existing;
+
   const outreach = await db.updateOutreach(outreachId, {
     status: decision,
+    error: decision === "approved" ? null : existing.error,
     updatedAt: nowIso(),
   });
   if (outreach) {
@@ -679,36 +719,51 @@ export interface SendOutcome {
 
 /**
  * Send a single APPROVED outreach. Enforces (in order):
- *  - explicit per-lead approval (status must be "approved") — Art. I.1
+ *  - atomic claim approved→sending (prevents double-send)
  *  - a valid recipient
+ *  - email verify (optional) + undeliverable cleanup
  *  - monthly send quota (metered workspaces only) — throws QuotaError → 402
  *  - rate limiting
- * This is the only path that actually dispatches email. The quota check is an
- * ADDITIONAL gate; it never bypasses the approval requirement.
+ * Studio Send may auto-approve a draft first (per-lead human gate = Send click).
  */
 export async function sendApprovedOutreach(
   ctx: Ctx,
   outreachId: string,
 ): Promise<SendOutcome> {
   const db = ctx.db;
-  const outreach = await db.getOutreach(outreachId);
-  if (!outreach) return { ok: false, error: "Outreach not found" };
-
-  if (outreach.status !== "approved") {
+  const claimed = await db.claimOutreachForSend(outreachId);
+  if (!claimed) {
+    const existing = await db.getOutreach(outreachId);
+    if (!existing) return { ok: false, error: "Outreach not found" };
+    if (existing.status === "sent") {
+      return { ok: false, error: "Already sent", outreach: existing };
+    }
+    if (existing.status === "sending") {
+      return { ok: false, error: "Send already in progress", outreach: existing };
+    }
     return { ok: false, error: "Outreach must be approved before sending" };
   }
+
+  const releaseClaim = async (error?: string | null) => {
+    await db.updateOutreach(outreachId, {
+      status: "approved",
+      error: error ?? null,
+      updatedAt: nowIso(),
+    });
+  };
+
+  const outreach = claimed;
   if (!outreach.toEmail) {
+    await releaseClaim("No recipient email on this lead");
     return { ok: false, error: "No recipient email on this lead" };
   }
 
-  // List hygiene — verify at send only (not on enrich). Blocks hard
-  // undeliverables when a verify key is configured and the workspace opted in.
+  // List hygiene — verify at send only (not on enrich).
   const wsForVerify = await db.getWorkspace(ctx.workspaceId);
   const verifyOn = wsForVerify?.emailVerifyEnabled !== false;
   if (verifyOn && wsForVerify) {
     const verifyWs = await ensureVerifyWindow(db, wsForVerify);
     const plan = getPlan(verifyWs.planId);
-    // Block fresh provider calls at the plan cap; cache hits + heuristic still ok.
     const hasVerifyProvider =
       Boolean(env.myEmailVerifierKey()) || Boolean(env.zeruhVerifyKey());
     const cached = getCachedVerify(outreach.toEmail);
@@ -717,6 +772,7 @@ export async function sendApprovedOutreach(
       !cached &&
       verifyWs.verifiesUsedToday >= plan.verifiesPerDay
     ) {
+      await releaseClaim();
       throw new QuotaError({
         kind: "verifies",
         planId: verifyWs.planId,
@@ -754,13 +810,13 @@ export async function sendApprovedOutreach(
     }
   }
 
-  // Send quota (metered only). Throws QuotaError → the route returns 402.
   if (ctx.metered) {
     const ws = await db.getWorkspace(ctx.workspaceId);
     if (ws) {
       const fresh = await ensureUsageWindow(db, ws);
       const plan = getPlan(fresh.planId);
       if (fresh.sendsUsedThisMonth >= plan.sendsPerMonth) {
+        await releaseClaim();
         throw new QuotaError({
           kind: "sends",
           planId: fresh.planId,
@@ -771,8 +827,9 @@ export async function sendApprovedOutreach(
     }
   }
 
-  const rate = checkSendRate();
+  const rate = await checkSendRate(db, outreachId);
   if (!rate.allowed) {
+    await releaseClaim();
     return {
       ok: false,
       rateLimited: true,
@@ -781,9 +838,6 @@ export async function sendApprovedOutreach(
     };
   }
 
-  // Pass workspace email identity overrides so each tenant's outreach uses
-  // their own from-name, from-email etc. (configured in Settings → Sending).
-  // Always load workspace (local JSON too) so Pro mailbox + BYO Resend work in demo.
   const wsForEmail = await db.getWorkspace(ctx.workspaceId);
   const cleanBody = stripLegacyCompliance(outreach.body);
   const result = await sendEmail(
@@ -792,6 +846,9 @@ export async function sendApprovedOutreach(
       subject: outreach.subject,
       body: cleanBody,
       tags: [
+        { name: "hermes_ws", value: ctx.workspaceId.slice(0, 256) },
+        { name: "hermes_outreach", value: outreachId.slice(0, 256) },
+        // Back-compat for in-flight sends / older webhook configs
         { name: "leadify_ws", value: ctx.workspaceId.slice(0, 256) },
         { name: "leadify_outreach", value: outreachId.slice(0, 256) },
       ],
@@ -813,23 +870,22 @@ export async function sendApprovedOutreach(
 
   // Production (metered): never treat demo/no-transport as a real send.
   if (result.ok && result.provider === "demo" && ctx.metered) {
+    const msg =
+      "No email transport configured. Add a Resend/Maileroo key in Settings → Easy, or Connect Google on Pro.";
     const updated = await db.updateOutreach(outreachId, {
-      status: "approved",
-      error:
-        "No email transport configured. Add a Resend/Maileroo key in Settings → Easy, or Connect Google on Pro.",
+      status: "failed",
+      error: msg,
       updatedAt: nowIso(),
     });
     return {
       ok: false,
       outreach: updated ?? undefined,
-      error:
-        "No email transport configured. Add a Resend/Maileroo key in Settings → Easy, or Connect Google on Pro.",
+      error: msg,
       provider: "demo",
     };
   }
 
   if (result.ok) {
-    recordSend();
     if (result.connectedMailbox) {
       await db.updateWorkspace(ctx.workspaceId, {
         connectedMailbox: result.connectedMailbox,
@@ -843,7 +899,6 @@ export async function sendApprovedOutreach(
       error: null,
       updatedAt: nowIso(),
     });
-    // Auto-advance CRM stage to "contacted" via email on first send.
     const lead = await db.getLead(outreach.leadId);
     const crmPatch: Partial<Lead> = { status: "sent" };
     if (lead) {
@@ -866,7 +921,6 @@ export async function sendApprovedOutreach(
       crmPatch.followUps = followUps;
     }
     await db.updateLead(outreach.leadId, crmPatch);
-    // Track sends locally too (bars); quota enforcement stays metered-only above.
     const ws = await db.getWorkspace(ctx.workspaceId);
     if (ws) {
       await db.updateWorkspace(ctx.workspaceId, {
@@ -877,13 +931,15 @@ export async function sendApprovedOutreach(
     return { ok: true, outreach: updated ?? undefined, provider: result.provider };
   }
 
-  // Keep status "approved" so the user can fix setup and retry without re-approving.
-  // Persist the provider error for the Outreach UI.
+  // Transport error — mark failed so Email Status is honest; Send retries via approve.
   const updated = await db.updateOutreach(outreachId, {
-    status: "approved",
+    status: "failed",
     error: result.error ?? "Unknown send error",
     updatedAt: nowIso(),
   });
+  if (updated) {
+    await db.updateLead(outreach.leadId, { status: "failed" });
+  }
   return {
     ok: false,
     outreach: updated ?? undefined,
@@ -906,12 +962,34 @@ function domainKey(website: string | null | undefined): string | null {
   }
 }
 
+/** Rank delivery outcomes so webhooks don't clobber a stronger signal. */
+function deliveryRank(s: DeliveryStatus): number {
+  switch (s) {
+    case "replied":
+      return 3;
+    case "bounced":
+      return 2;
+    case "sent":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 /** Manual delivery outcome stub (bounce / reply). Webhooks call the same path. */
 export async function setOutreachDeliveryStatus(
   ctx: Ctx,
   outreachId: string,
   deliveryStatus: DeliveryStatus,
 ): Promise<Outreach | null> {
+  const existing = await ctx.db.getOutreach(outreachId);
+  if (!existing) return null;
+  const prev = existing.deliveryStatus ?? "unknown";
+  // Don't let "delivered" overwrite bounce/reply.
+  if (deliveryRank(deliveryStatus) < deliveryRank(prev)) {
+    return existing;
+  }
+
   const outreach = await ctx.db.updateOutreach(outreachId, {
     deliveryStatus,
     updatedAt: nowIso(),
@@ -965,10 +1043,38 @@ export async function updateWorkspaceEmailSettings(
     emailVerifyEnabled?: boolean;
   },
 ): Promise<void> {
-  const updated = await ctx.db.updateWorkspace(ctx.workspaceId, {
+  const existing = await ctx.db.getWorkspace(ctx.workspaceId);
+  const nextPatch: Partial<Workspace> = {
     ...patch,
     updatedAt: nowIso(),
-  });
+  };
+
+  // Clearing Resend key also drops the auto-registered webhook credentials.
+  if (patch.resendApiKey === null) {
+    nextPatch.resendWebhookId = null;
+    nextPatch.resendWebhookSecret = null;
+  }
+
+  // New/rotated BYO Resend key → register delivery webhook (no user dashboard work).
+  if (typeof patch.resendApiKey === "string" && patch.resendApiKey.trim()) {
+    try {
+      const { ensureResendDeliveryWebhook } = await import(
+        "@/lib/email/resend-webhooks"
+      );
+      const ensured = await ensureResendDeliveryWebhook(patch.resendApiKey, {
+        existingId: existing?.resendWebhookId,
+        existingSecret: existing?.resendWebhookSecret,
+      });
+      if (ensured) {
+        nextPatch.resendWebhookId = ensured.id;
+        nextPatch.resendWebhookSecret = ensured.signingSecret;
+      }
+    } catch (err) {
+      console.error("[updateWorkspaceEmailSettings] resend webhook ensure", err);
+    }
+  }
+
+  const updated = await ctx.db.updateWorkspace(ctx.workspaceId, nextPatch);
   if (!updated) {
     throw new NotFoundError(
       "Workspace not found — sign in again, then re-save Settings.",
@@ -1478,6 +1584,22 @@ export async function healStuckImportRuns(ctx: Ctx): Promise<void> {
   }
 }
 
+/** Mark abandoned search runs (worker kill / client drop) as failed. */
+export async function healStuckSearchRuns(ctx: Ctx): Promise<void> {
+  const runs = await ctx.db.listRuns();
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const r of runs) {
+    if (r.provider === "import" || r.status !== "running") continue;
+    const started = Date.parse(r.createdAt);
+    if (!Number.isFinite(started) || started > cutoff) continue;
+    await ctx.db.updateRun(r.id, {
+      status: "failed",
+      error: "Search timed out — try again.",
+      completedAt: nowIso(),
+    });
+  }
+}
+
 /**
  * Generate a default outreach pitch from the user's company website (real AI only).
  * Workers AI → Groq → Gemini. Never invents a heuristic pitch (ADR 0013).
@@ -1525,4 +1647,101 @@ export async function generatePitchFromWebsite(
   throw new Error(
     "AI could not generate a pitch from that site. Check Workers AI / Groq / Gemini credentials and try again, or write the pitch manually.",
   );
+}
+
+/** Platform-wide admin Users table (caller must gate on isAdminEmail). */
+export async function listAdminUsers(ctx: Ctx): Promise<AdminUserRow[]> {
+  const [workspaces, counts, authUsers] = await Promise.all([
+    ctx.db.listWorkspaces(),
+    ctx.db.adminCountByWorkspace(),
+    ctx.db.listAuthUsers(),
+  ]);
+  const emailByUserId = new Map(
+    authUsers.map((u) => [u.id, { email: u.email, name: u.name }] as const),
+  );
+
+  return workspaces.map((w) => {
+    const plan = getPlan(w.planId);
+    const owner = w.ownerUserId ? emailByUserId.get(w.ownerUserId) : undefined;
+    return {
+      workspaceId: w.id,
+      workspaceName: w.name,
+      ownerUserId: w.ownerUserId,
+      ownerEmail: owner?.email ?? null,
+      ownerName: owner?.name ?? null,
+      planId: w.planId,
+      leadsUsedThisMonth: w.leadsUsedThisMonth,
+      leadsLimit: plan.leadCreditsPerMonth,
+      sendsUsedThisMonth: w.sendsUsedThisMonth,
+      sendsLimit: plan.sendsPerMonth,
+      verifiesUsedToday: w.verifiesUsedToday,
+      verifiesLimit: plan.verifiesPerDay,
+      leadCount: counts.leads[w.id] ?? 0,
+      sentCount: counts.sent[w.id] ?? 0,
+      runCount: counts.runs[w.id] ?? 0,
+      stripeCustomerId: w.stripeCustomerId,
+      hasMailbox: Boolean(w.connectedMailbox),
+      hasEasySendKey: Boolean(w.resendApiKey || w.mailerooApiKey),
+      emailVerifyEnabled: w.emailVerifyEnabled !== false,
+      createdAt: w.createdAt,
+      updatedAt: w.updatedAt,
+    };
+  });
+}
+
+/** Platform-wide admin overview (caller must gate on isAdminEmail). */
+export async function getAdminPlatformStats(ctx: Ctx): Promise<AdminPlatformStats> {
+  const users = await listAdminUsers(ctx);
+  const authUsers = await ctx.db.listAuthUsers();
+  const byPlan: Record<PlanId, number> = {
+    free: 0,
+    starter: 0,
+    pro: 0,
+    agency: 0,
+  };
+  let totalLeads = 0;
+  let totalSendsLifetime = 0;
+  let totalRuns = 0;
+  let leadsUsedThisMonth = 0;
+  let sendsUsedThisMonth = 0;
+  let verifiesUsedToday = 0;
+  let paidWorkspaceCount = 0;
+  let withStripeCustomer = 0;
+  let withMailbox = 0;
+  let withEasySendKey = 0;
+
+  for (const u of users) {
+    byPlan[u.planId] = (byPlan[u.planId] ?? 0) + 1;
+    totalLeads += u.leadCount;
+    totalSendsLifetime += u.sentCount;
+    totalRuns += u.runCount;
+    leadsUsedThisMonth += u.leadsUsedThisMonth;
+    sendsUsedThisMonth += u.sendsUsedThisMonth;
+    verifiesUsedToday += u.verifiesUsedToday;
+    if (u.planId !== "free") paidWorkspaceCount += 1;
+    if (u.stripeCustomerId) withStripeCustomer += 1;
+    if (u.hasMailbox) withMailbox += 1;
+    if (u.hasEasySendKey) withEasySendKey += 1;
+  }
+
+  const recentSignups = [...users]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 8);
+
+  return {
+    workspaceCount: users.length,
+    userCount: authUsers.length || users.filter((u) => u.ownerUserId).length,
+    totalLeads,
+    totalSendsLifetime,
+    totalRuns,
+    leadsUsedThisMonth,
+    sendsUsedThisMonth,
+    verifiesUsedToday,
+    byPlan,
+    paidWorkspaceCount,
+    withStripeCustomer,
+    withMailbox,
+    withEasySendKey,
+    recentSignups,
+  };
 }

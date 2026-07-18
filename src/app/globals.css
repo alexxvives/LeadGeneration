@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 /*
-  Leadify design system.
-  Brand story: navigate to your best-fit customers. Palette is deep "ink" night
-  sky + aurora teal/green + warm amber, deliberately avoiding purple-on-white
-  and cream+terracotta clichés.
+  HERMES mail design system.
+  Brand story: winged messenger — find, draft, deliver. Palette is deep ink
+  black + cyan/teal (logo) + warm amber secondary. No purple-on-white or
+  cream+terracotta clichés.
 */
 
 @theme {
@@ -12,19 +12,19 @@
   --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
   --font-brand: var(--font-syne), var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
 
-  /* Ink (background scale) */
-  --color-ink-950: #060a12;
-  --color-ink-900: #0a1120;
-  --color-ink-850: #0e1729;
-  --color-ink-800: #131f34;
-  --color-ink-700: #1c2b45;
-  --color-ink-600: #293c5c;
+  /* Ink (background scale) — near-black to match logo plate */
+  --color-ink-950: #050505;
+  --color-ink-900: #0a0e14;
+  --color-ink-850: #0e141c;
+  --color-ink-800: #141c28;
+  --color-ink-700: #1c2838;
+  --color-ink-600: #2a3a52;
 
-  /* Aurora (primary accent) */
-  --color-aurora-300: #7ff2c8;
-  --color-aurora-400: #43e0a8;
-  --color-aurora-500: #16c390;
-  --color-aurora-600: #0e9d74;
+  /* Aurora (primary accent) — logo cyan/teal */
+  --color-aurora-300: #5eecd9;
+  --color-aurora-400: #2dd4bf;
+  --color-aurora-500: #14b8a6;
+  --color-aurora-600: #0d9488;
 
   /* Amber (secondary accent / warmth) */
   --color-amber-300: #ffd48a;
@@ -80,9 +80,9 @@
   /* Soft aurora glow used behind hero + brand marks */
   .aurora-glow {
     background:
-      radial-gradient(60% 60% at 20% 20%, rgba(67, 224, 168, 0.22), transparent 70%),
-      radial-gradient(50% 50% at 85% 15%, rgba(247, 185, 85, 0.16), transparent 70%),
-      radial-gradient(70% 70% at 60% 100%, rgba(22, 195, 144, 0.15), transparent 70%);
+      radial-gradient(60% 60% at 20% 20%, rgba(45, 212, 191, 0.22), transparent 70%),
+      radial-gradient(50% 50% at 85% 15%, rgba(247, 185, 85, 0.12), transparent 70%),
+      radial-gradient(70% 70% at 60% 100%, rgba(20, 184, 166, 0.16), transparent 70%);
   }
   .glass {
     background: linear-gradient(

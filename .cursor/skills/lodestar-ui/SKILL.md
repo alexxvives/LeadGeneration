@@ -1,18 +1,18 @@
 ---
 name: lodestar-ui
 description: >-
-  Lodestar brand design system and component patterns. Use whenever building,
+  HERMES mail brand design system and component patterns. Use whenever building,
   editing, or reviewing any UI component in this project — especially for new
   pages, cards, modals, forms, or anything visual. Encodes the exact tokens,
   CSS utilities, layout conventions, and forbidden patterns for this codebase.
 ---
 
-# Lodestar UI — Design System Reference
+# HERMES mail UI — Design System Reference
 
 ## Brand story
-Deep "ink" night-sky base + aurora teal/green primary + warm amber secondary.
-Navigation star metaphor. No purple-on-white. No cream/terracotta. Motion is
-intentional and minimal (2–3 cues max per screen).
+Near-black ink base + logo cyan/teal primary (aurora tokens) + warm amber
+secondary. No purple-on-white. No cream/terracotta. Motion is intentional and
+minimal (2–3 cues max per screen).
 
 ## Fonts
 - **Display / headings**: `font-display` → Fraunces (variable serif)
@@ -23,11 +23,11 @@ intentional and minimal (2–3 cues max per screen).
 
 | Role | Class | Hex |
 |------|-------|-----|
-| Page background | `bg-ink-950` | `#060a12` |
-| Card/surface bg | `bg-ink-900` → `bg-ink-800` | `#0a1120` → `#131f34` |
+| Page background | `bg-ink-950` | `#050505` |
+| Card/surface bg | `bg-ink-900` → `bg-ink-800` | `#0a0e14` → `#141c28` |
 | Stroke / border | `border-ink-700` or `border-white/10` | |
-| **Primary accent** | `text-aurora-300` / `bg-aurora-400` | `#7ff2c8` / `#43e0a8` |
-| Aurora hover/pressed | `aurora-500` / `aurora-600` | `#16c390` / `#0e9d74` |
+| **Primary accent** | `text-aurora-300` / `bg-aurora-400` | `#5eecd9` / `#2dd4bf` |
+| Aurora hover/pressed | `aurora-500` / `aurora-600` | `#14b8a6` / `#0d9488` |
 | **Secondary accent** | `text-amber-300` / `bg-amber-400` | `#ffd48a` / `#f7b955` |
 | Body text | `text-mist-100` | `#eaf1fb` |
 | Muted text | `text-mist-300` | `#b6c4dc` |

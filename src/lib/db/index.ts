@@ -37,6 +37,21 @@ export interface LeadRepository {
   getWorkspaceByStripeCustomer(customerId: string): Promise<Workspace | null>;
   createWorkspace(workspace: Workspace): Promise<Workspace>;
   updateWorkspace(id: string, patch: Partial<Workspace>): Promise<Workspace | null>;
+  /** All workspaces (admin). Not scoped. */
+  listWorkspaces(): Promise<Workspace[]>;
+  /**
+   * Cross-workspace counts for admin dashboards.
+   * Keys are workspace ids.
+   */
+  adminCountByWorkspace(): Promise<{
+    leads: Record<string, number>;
+    sent: Record<string, number>;
+    runs: Record<string, number>;
+  }>;
+  /** Auth.js users table (D1) or derived from workspaces (JSON). */
+  listAuthUsers(): Promise<
+    Array<{ id: string; email: string | null; name: string | null }>
+  >;
 
   // Boards (named lead collections — ADR 0014)
   createBoard(board: Board): Promise<Board>;
@@ -70,15 +85,27 @@ export interface LeadRepository {
   // Outreach
   upsertOutreach(outreach: Outreach): Promise<Outreach>;
   updateOutreach(id: string, patch: Partial<Outreach>): Promise<Outreach | null>;
+  /**
+   * Atomic send claim: `approved` → `sending` (or reclaim stuck `sending`).
+   * Returns null if another sender already claimed it.
+   */
+  claimOutreachForSend(id: string): Promise<Outreach | null>;
   getOutreach(id: string): Promise<Outreach | null>;
   getOutreachByLead(leadId: string): Promise<Outreach | null>;
   listOutreach(): Promise<Outreach[]>;
 
   /**
-   * Cross-workspace: latest sent outreach for a recipient (delivery webhooks).
-   * Prefer tag-based matching when Resend tags are present.
+   * Cross-workspace: latest sent outreach for a recipient (inbound reply match).
+   * Prefer tag-based matching when provider tags are present.
    */
   findLatestSentByEmail(email: string): Promise<Outreach | null>;
+
+  /**
+   * Sends in the last minute (workspace-scoped) for rate limiting across
+   * Worker isolates. Counts `sent` (by sent_at) and in-flight `sending`.
+   * Pass `excludeId` so the current claim doesn’t count against itself.
+   */
+  countRecentSendActivity(sinceIso: string, excludeId?: string): Promise<number>;
 
   /** Wipe runs/leads/outreach/boards for this workspace (keeps the workspace row). */
   clearWorkspaceData(): Promise<void>;

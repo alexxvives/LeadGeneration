@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
-import { createAndRunSearch, healStuckImportRuns } from "@/lib/service";
+import {
+  createAndRunSearch,
+  healStuckImportRuns,
+  healStuckSearchRuns,
+} from "@/lib/service";
 import { isQuotaError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -25,6 +29,7 @@ const CreateRunSchema = z.object({
 export async function GET() {
   const ctx = await getCtx();
   await healStuckImportRuns(ctx);
+  await healStuckSearchRuns(ctx);
   const runs = await ctx.db.listRuns();
   return NextResponse.json({ runs });
 }

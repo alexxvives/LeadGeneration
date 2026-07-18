@@ -4,12 +4,65 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-18 — Financial plan prices live + admin platform/users
+- `plans.ts` = Free 75 leads / 30 sends / 5 verifies; Starter $39/400; Pro
+  $89/2000; Agency $199/8000. Stripe Prices must be created to match
+  (`docs/stripe-setup.md`).
+- Admin-only nav: Platform overview + Users (plan, usage, leads/sends, send
+  setup). APIs `/api/admin/overview` + `/api/admin/users`.
+- Verify “ok” ≠ no bounce later — catch-all, full mailbox, policy changes.
+
+### 2026-07-18 — HERMES mail rebrand + Free verifies 5/day
+- User-facing brand: Leadify/Lodestar → **HERMES mail** (titles) / Hermes Mail
+  (prose). Keep CF ids: D1 `lodestar-prod`, worker `leadgeneration`.
+- localStorage primary `hermes_*`; still migrate/read `leadify_*` + `lodestar_*`.
+- Send tags write `hermes_ws`/`hermes_outreach` **and** `leadify_*`; webhooks
+  read hermes → leadify → lodestar.
+- **Status vocabulary (unchanged):** lead `rejected` = verify-undeliverable
+  cleanup (UI/export “Undeliverable”), **not** a human reject. `failed` = send
+  transport error. **Bounced** = `deliveryStatus` from post-send webhooks only.
+- Free plan verifies: **5/day** in `plans.ts` + financial-plan table.
+
+### 2026-07-18 — Auto Resend delivery webhooks (no user setup)
+- End users must not configure Resend webhooks. On BYO key save, call
+  `POST /webhooks` with Hermes URL; store `resend_webhook_id` + signing secret
+  on the workspace (migration 0016). Verify Svix with that secret (tags → ws).
+- Platform `RESEND_WEBHOOK_SECRET` is optional fallback for platform-key sends.
+- Maileroo still optional/manual (no create-webhook API).
+
+### 2026-07-18 — Admin gate + audit hardening
+- Admin: `admin@tryhermesmail.com` + `ADMIN_PASSWORD` (default `password`) via
+  Credentials even when magic-link is default. Only that email may call
+  set-plan / reset-usage when `AUTH_SECRET` is set (local demo stays open).
+- Send: atomic `approved`→`sending` claim; transport errors → `failed`;
+  deliveryStatus monotonic. Email webhooks fail closed without secrets in prod.
+- Tracker: `docs/AUDIT.md`.
+
+### 2026-07-18 — No UI reject; search batch = monthly remaining
+- `rejected` is **not** a human “reject draft” action (no Reject button). Only
+  verify-undeliverable cleanup sets it. UI/export label → “Undeliverable”.
+  Users edit drafts, then approve/send. Failed = send transport error; bounced =
+  deliveryStatus.
+- Removed Free `FREE_MAX_LEADS_PER_RUN` (10). Batch size options unlock up to
+  `min(plan monthly leads, remaining credits)`. Default search size 25.
+- New `docs/financial-plan.md` + refreshed `business-plan.md` with proposed
+  $0/$39/$89/$199 ladder (not yet synced into `plans.ts` / Stripe).
+
+### 2026-07-18 — Email status ≠ bounce; Excel export columns
+- Lead `status` **rejected** = verify undeliverable cleanup (not UI reject);
+  **failed** = send transport error. **Bounced** is `deliveryStatus`
+  (post-send webhook), not Email Status. UI label for failed → “Send failed”.
+- Excel export: drop Subject + Source URL (usually same as Website); black
+  table theme (`TableStyleMedium1`); auto-fit column widths to content.
+
 ### 2026-07-18 — Plan-tiered daily verifies + undeliverable cleanup UX
-- Verifies bar is **plan daily quota** (Free 10 / Starter 25 / Pro 50 / Agency
-  100), not the raw MyEmailVerifier remaining balance. Resets midnight UTC
-  (`verifiesUsedToday` + migration 0015). Cache hits don’t bill plan or provider.
-- Undeliverable at send: strip bad email, reject outreach, friendly toast; lead
-  stays under Leads. Keep Zeruh as fallback behind MEV — don’t delete.
+- Verifies bar is **plan daily quota** (Free **5** / Starter 25 / Pro 50 /
+  Agency 100), not the raw MyEmailVerifier remaining balance. Resets midnight
+  UTC (`verifiesUsedToday` + migration 0015). Cache hits don’t bill plan or
+  provider.
+- Undeliverable at send: strip bad email, set lead `rejected` (label
+  “Undeliverable”), friendly toast; lead stays under Leads. This is **not** a
+  bounce (`deliveryStatus`). Keep Zeruh as fallback behind MEV — don’t delete.
 - Leads table: status sort = Closed → In convo → Contacted → New → Not
   interested; status filter; delete via checkboxes + floating bar only (no
   per-row trash). Dev plan override uses `router.refresh()` (no manual reload).

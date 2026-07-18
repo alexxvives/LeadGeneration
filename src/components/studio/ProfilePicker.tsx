@@ -33,7 +33,11 @@ export function ProfilePicker({
   useEffect(() => {
     refresh();
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "leadify_sender_profiles") refresh();
+      if (
+        e.key === "hermes_sender_profiles" ||
+        e.key === "leadify_sender_profiles"
+      )
+        refresh();
     };
     window.addEventListener("storage", onStorage);
     window.addEventListener("focus", refresh);
@@ -58,7 +62,7 @@ export function ProfilePicker({
   const label = active?.name?.trim() || "No profile";
 
   return (
-    <div ref={wrapRef} className="relative mb-0 hidden sm:block">
+    <div ref={wrapRef} className="relative mb-0">
       <p className="mb-1.5 px-1 text-[10px] uppercase tracking-wider text-mist-500">
         Outreach profile
       </p>

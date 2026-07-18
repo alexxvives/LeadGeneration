@@ -22,12 +22,15 @@ declare global {
 
 export function LoginForm({
   credentialsMode,
+  allowAdminPassword = false,
   magicLink,
   turnstileSiteKey,
   callbackUrl,
   preferSmtp = false,
 }: {
   credentialsMode: boolean;
+  /** Show password field so the platform admin can sign in when magic-link is default. */
+  allowAdminPassword?: boolean;
   magicLink: boolean;
   turnstileSiteKey: string | null;
   callbackUrl: string;
@@ -59,7 +62,9 @@ export function LoginForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const useCredentials = credentialsMode; // dev uses password; prod uses magic link
+  const showPassword = credentialsMode || allowAdminPassword;
+  // Prefer password when local demo, or when the user typed one (admin path).
+  const tryCredentials = credentialsMode || (allowAdminPassword && password.length > 0);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +74,10 @@ export function LoginForm({
     const trimmed = email.trim().toLowerCase();
     if (!trimmed.includes("@")) {
       setError("Enter a valid email address.");
+      return;
+    }
+    if (tryCredentials && !password) {
+      setError("Enter your password.");
       return;
     }
     setBusy(true);
@@ -92,7 +101,7 @@ export function LoginForm({
         }
       }
 
-      if (useCredentials) {
+      if (tryCredentials) {
         const result = await signIn("credentials", {
           email: trimmed,
           password,
@@ -169,11 +178,15 @@ export function LoginForm({
         />
       </label>
 
-      {useCredentials && (
+      {showPassword && (
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-mist-100">
             Password{" "}
-            <span className="font-normal text-mist-500">(any value — local only)</span>
+            <span className="font-normal text-mist-500">
+              {credentialsMode
+                ? "(any value — local only)"
+                : "(optional — admin password sign-in)"}
+            </span>
           </span>
           <PasswordField
             value={password}
@@ -190,16 +203,16 @@ export function LoginForm({
         <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>
       )}
 
-      {!useCredentials && !magicLink && (
+      {!tryCredentials && !magicLink && (
         <p className="rounded-lg bg-amber-400/10 px-3 py-2 text-sm text-amber-200/80">
           No sign-in provider is configured. Set SMTP (Maileroo recommended) or{" "}
-          <code>AUTH_RESEND_KEY</code> to enable magic-link login.
+          <code>RESEND_API_KEY</code> to enable magic-link login.
         </p>
       )}
 
       <button
         type="submit"
-        disabled={busy || (!useCredentials && !magicLink)}
+        disabled={busy || (!tryCredentials && !magicLink)}
         className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-aurora-400 px-6 py-3 font-medium text-ink-950 transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? (
@@ -208,7 +221,7 @@ export function LoginForm({
           </>
         ) : (
           <>
-            {useCredentials ? "Sign in" : "Send magic link"}
+            {tryCredentials ? "Sign in" : "Send magic link"}
             <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </>
         )}

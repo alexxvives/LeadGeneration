@@ -245,8 +245,12 @@ export function LeadDrawer(props: DrawerProps) {
       <div
         className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
         onClick={requestClose}
+        aria-hidden
       />
       <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lead-drawer-title"
         className={`animate-float-up relative flex w-full flex-col overflow-hidden border border-white/10 bg-ink-900 shadow-2xl ${
           mode === "info"
             ? "max-h-[min(90dvh,720px)] max-w-[61rem] rounded-xl2"
@@ -264,6 +268,7 @@ export function LeadDrawer(props: DrawerProps) {
               </div>
             ) : null}
             <h2
+              id="lead-drawer-title"
               className={`truncate font-display text-2xl font-semibold ${
                 mode === "info" ? "mt-2" : ""
               }`}
@@ -355,7 +360,9 @@ export function LeadDrawer(props: DrawerProps) {
               {lead.emails.length ? (
                 lead.emails.join(", ")
               ) : (
-                <span className="text-mist-500">No email discovered — add one in Outreach → Edit.</span>
+                <span className="text-mist-500">
+                  No email — open Draft and set To, then Save to try again.
+                </span>
               )}
             </InfoRow>
             {lead.phones.length > 0 && (
@@ -631,7 +638,9 @@ export function LeadDrawer(props: DrawerProps) {
                 {outreach.error && (
                   <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
                     {outreach.status === "failed" ? "Send failed: " : ""}
-                    {outreach.error}
+                    {outreach.error === "invalid_email_removed"
+                      ? "That address couldn't receive mail — we removed it from this lead."
+                      : outreach.error}
                   </p>
                 )}
 

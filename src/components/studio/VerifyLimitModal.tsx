@@ -19,8 +19,13 @@ export function VerifyLimitModal({
 
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center p-6">
-      <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="glass animate-float-up relative w-full max-w-md rounded-xl2 p-8">
+      <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="verify-limit-title"
+        className="glass animate-float-up relative w-full max-w-md rounded-xl2 p-8"
+      >
         <button
           onClick={onClose}
           className="absolute right-4 top-4 rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100"
@@ -32,7 +37,7 @@ export function VerifyLimitModal({
         <div className="grid h-11 w-11 place-items-center rounded-full bg-amber-400/15 text-amber-300">
           <SparkIcon className="h-6 w-6" />
         </div>
-        <h2 className="mt-4 font-display text-2xl font-semibold">
+        <h2 id="verify-limit-title" className="mt-4 font-display text-2xl font-semibold">
           Daily verifications used up
         </h2>
         <p className="mt-2 text-sm text-mist-300">

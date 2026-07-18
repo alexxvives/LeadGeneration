@@ -174,8 +174,10 @@ export function PipelineView({
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           <div
-            className="grid min-h-0 flex-1 gap-3"
-            style={{ gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(0, 1fr))` }}
+            className="grid min-h-0 flex-1 gap-3 overflow-x-auto pb-1"
+            style={{
+              gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(11rem, 1fr))`,
+            }}
           >
             {MAIN_COLUMNS.map((col) => {
               const colLeads = leads.filter((l) => l.crmStage === col.stage);

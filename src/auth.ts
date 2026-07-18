@@ -1,4 +1,5 @@
 import NextAuth from "next-auth";
+import type { NextAuthConfig } from "next-auth";
 import Nodemailer from "next-auth/providers/nodemailer";
 import ResendProvider from "next-auth/providers/resend";
 import { D1Adapter } from "@auth/d1-adapter";
@@ -28,7 +29,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     ? D1Adapter(binding as unknown as Parameters<typeof D1Adapter>[0])
     : undefined;
 
-  const providers = [...authConfig.providers];
+  const providers: NextAuthConfig["providers"] = [...authConfig.providers];
 
   const sendVerificationRequest = async ({
     identifier,
@@ -54,7 +55,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       body: JSON.stringify({
         from,
         to: [identifier],
-        subject: `Sign in to Leadify`,
+        subject: `Sign in to HERMES mail`,
         html,
         text,
       }),
@@ -86,7 +87,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             await transport.sendMail({
               to: identifier,
               from: provider.from,
-              subject: "Sign in to Leadify",
+              subject: "Sign in to HERMES mail",
               text,
               html,
             });

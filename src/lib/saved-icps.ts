@@ -1,8 +1,8 @@
 import type { SavedIcp } from "@/lib/types";
 import { readMigratedKey } from "@/lib/browser-storage";
 
-const KEY = "leadify_saved_icps";
-const LEGACY_KEYS = ["lodestar_saved_icps"];
+const KEY = "hermes_saved_icps";
+const LEGACY_KEYS = ["leadify_saved_icps", "lodestar_saved_icps"];
 const MAX = 12;
 
 export function loadSavedIcps(): SavedIcp[] {

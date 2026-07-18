@@ -1,4 +1,4 @@
-// Core domain models for Leadify.
+// Core domain models for HERMES mail.
 // These types are storage-agnostic on purpose: the JSON file DB today and a
 // future Supabase/Postgres backend both implement the same repository shapes
 // (see src/lib/db/index.ts), so swapping persistence should not touch the UI.
@@ -20,8 +20,8 @@ export type LeadStatus =
   | "queued" // outreach drafted (batch-approve helper); not shown as "In review"
   | "approved" // human approved the draft, ready to send
   | "sent" // email dispatched
-  | "rejected" // human rejected the draft
-  | "failed"; // send attempt failed
+  | "rejected" // verify cleanup / undeliverable (no UI "reject draft" action)
+  | "failed"; // transport error after a send attempt
 
 /**
  * CRM relationship stage — separate from the email-workflow status above.
@@ -66,9 +66,11 @@ export interface FollowUp {
 export type OutreachStatus =
   | "draft"
   | "approved"
-  | "rejected"
+  /** Atomic send claim — in flight; heals back to approved if stuck. */
+  | "sending"
+  | "rejected" // verify undeliverable cleanup (not a human "reject draft")
   | "sent"
-  | "failed";
+  | "failed"; // transport error — retry via Send (re-approves)
 
 /**
  * Post-send delivery outcome. Manual stub today; Resend/SMTP webhooks can write
@@ -169,6 +171,10 @@ export interface Workspace {
   // Optional per-workspace Resend API key (user's own account → custom domain).
   // Stored as plain text for now; encrypt at rest before GA.
   resendApiKey: string | null;
+  /** Auto-registered Resend webhook id (delivery events → Hermes). */
+  resendWebhookId: string | null;
+  /** Svix signing secret for that webhook (never sent to the client). */
+  resendWebhookSecret: string | null;
   /** Optional BYO Maileroo sending key (Easy peer to Resend — ADR 0011). */
   mailerooApiKey: string | null;
   /** Which Easy transactional provider the workspace prefers. */
@@ -221,6 +227,49 @@ export interface DashboardStats {
   avgFitScore: number;
   /** When set, stats are scoped to this board; null = all boards. */
   activeBoardId: string | null;
+}
+
+/** Platform-wide admin overview (admin email only). */
+export interface AdminPlatformStats {
+  workspaceCount: number;
+  userCount: number;
+  totalLeads: number;
+  totalSendsLifetime: number;
+  totalRuns: number;
+  leadsUsedThisMonth: number;
+  sendsUsedThisMonth: number;
+  verifiesUsedToday: number;
+  byPlan: Record<PlanId, number>;
+  paidWorkspaceCount: number;
+  withStripeCustomer: number;
+  withMailbox: number;
+  withEasySendKey: number;
+  recentSignups: AdminUserRow[];
+}
+
+/** One tenant row for the admin Users table. */
+export interface AdminUserRow {
+  workspaceId: string;
+  workspaceName: string;
+  ownerUserId: string | null;
+  ownerEmail: string | null;
+  ownerName: string | null;
+  planId: PlanId;
+  leadsUsedThisMonth: number;
+  leadsLimit: number;
+  sendsUsedThisMonth: number;
+  sendsLimit: number;
+  verifiesUsedToday: number;
+  verifiesLimit: number;
+  leadCount: number;
+  sentCount: number;
+  runCount: number;
+  stripeCustomerId: string | null;
+  hasMailbox: boolean;
+  hasEasySendKey: boolean;
+  emailVerifyEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** A search + enrichment job kicked off from the search hero. */

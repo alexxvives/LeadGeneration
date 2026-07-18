@@ -1,4 +1,4 @@
-# AGENTS.md — Working in the Leadify repo
+# AGENTS.md — Working in the HERMES mail repo
 
 This file is the **entry point / index** for any AI agent (or human) working in
 this repository. Read it first. It is intentionally short: the details live in
@@ -16,7 +16,7 @@ this repository. Read it first. It is intentionally short: the details live in
 
 ## What this project is
 
-**Leadify** — a human-in-the-loop lead-generation studio. Search a niche →
+**HERMES mail** — a human-in-the-loop lead-generation studio. Search a niche →
 enrich prospects → auto-draft outreach → human approves per lead → send.
 Next.js (App Router) + TypeScript + Tailwind, local JSON file DB behind a
 repository interface, provider-agnostic search (Firecrawl/Exa) and email
@@ -27,6 +27,7 @@ repository interface, provider-agnostic search (Firecrawl/Exa) and email
 | Doc | Read it when you need to… |
 | --- | --- |
 | [`docs/session-handoff.md`](docs/session-handoff.md) | **At session start.** Current state, what's in flight, next steps. |
+| [`docs/AUDIT.md`](docs/AUDIT.md) | Full-repo audit task board (bugs/risks + fix status). |
 | [`docs/roadmap-next.md`](docs/roadmap-next.md) | Next value plan + copy-paste execution prompt for agents. |
 | [`docs/roadmap-send-paths.md`](docs/roadmap-send-paths.md) | Easy Resend vs Pro mailbox send plan + OSS backlog. |
 | [`docs/gmail-oauth-setup.md`](docs/gmail-oauth-setup.md) | Step-by-step Google Cloud OAuth client for Gmail send. |
@@ -37,6 +38,8 @@ repository interface, provider-agnostic search (Firecrawl/Exa) and email
 | [`docs/email-providers.md`](docs/email-providers.md) | Change email sending or pick/justify a provider. |
 | [`docs/commercialization.md`](docs/commercialization.md) | Work on pricing, plans, auth, or the go-to-market build. |
 | [`docs/business-plan.md`](docs/business-plan.md) | Understand the business model / market / strategy. |
+| [`docs/financial-plan.md`](docs/financial-plan.md) | Quotas, COGS, recommended prices (why behind `plans.ts`). |
+| [`docs/stripe-setup.md`](docs/stripe-setup.md) | Connect Stripe Products, Prices, webhooks, Wrangler secrets. |
 | [`docs/decisions/`](docs/decisions/) | Record or review a significant decision (ADR) or a learning. |
 
 Also see [`README.md`](README.md) for setup/run instructions.

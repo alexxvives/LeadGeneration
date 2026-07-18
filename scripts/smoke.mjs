@@ -1,4 +1,4 @@
-// Headless smoke test of the core Lodestar flow against a running dev server.
+// Headless smoke test of the core HERMES mail flow against a running dev server.
 // Usage: start `npm run dev` in one terminal, then `npm run smoke` in another.
 // Exercises: create run → draft → approve → send, plus key guardrails.
 

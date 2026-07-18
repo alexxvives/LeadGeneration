@@ -1,18 +1,21 @@
 import { Suspense } from "react";
+import { auth } from "@/auth";
+import { isAdminEmail } from "@/lib/admin";
 import { authRequired, env, getCapabilities } from "@/lib/config";
 import { StudioShell } from "@/components/studio/StudioShell";
 
 /**
- * Studio chrome must never depend on D1/session. A failed getCtx/getWorkspace
- * here used to 500 the entire /app tree after magic-link sign-in. Identity for
- * the Getting Started wizard uses env defaults; Settings loads real workspace
- * values on that page.
+ * Studio chrome must never depend on D1/workspace resolution. Auth() is safe
+ * here for admin nav gating; Settings still loads workspace values itself.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const caps = getCapabilities();
+  const session = await auth().catch(() => null);
+  // Local demo: show admin nav so you can dogfood without ADMIN_EMAIL session.
+  const isAdmin = !authRequired() || isAdminEmail(session?.user?.email);
 
   const identity = {
     fromName: env.fromName(),
@@ -31,6 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         credentialsMode={!authRequired()}
         magicLink={caps.smtp || caps.resend}
         turnstileSiteKey={env.turnstileSiteKey() || null}
+        isAdmin={isAdmin}
         caps={{
           canSearchLive: caps.canSearchLive,
           canSendEmail: caps.canSendEmail,

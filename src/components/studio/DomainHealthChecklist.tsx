@@ -6,8 +6,8 @@ import { Spinner } from "@/components/ui";
 import type { DomainDnsRecord, DomainHealthResult } from "@/lib/email/domain-health";
 import { readMigratedKey } from "@/lib/browser-storage";
 
-const MANUAL_KEY = "leadify_domain_health_v1";
-const MANUAL_LEGACY_KEYS = ["lodestar_domain_health_v1"];
+const MANUAL_KEY = "hermes_domain_health_v1";
+const MANUAL_LEGACY_KEYS = ["leadify_domain_health_v1", "lodestar_domain_health_v1"];
 
 type ManualChecks = {
   spf: boolean;

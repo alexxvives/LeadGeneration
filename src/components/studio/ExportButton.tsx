@@ -29,10 +29,41 @@ function statusLabel(s: LeadStatus): string {
     queued: "Draft ready",
     approved: "Approved",
     sent: "Sent",
-    rejected: "Rejected",
-    failed: "Failed",
+    rejected: "Undeliverable",
+    failed: "Send failed",
   };
   return map[s] ?? s;
+}
+
+function cellText(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "object" && value !== null && "text" in value) {
+    return String((value as { text: unknown }).text);
+  }
+  return String(value);
+}
+
+function autoFitColumns(
+  ws: {
+    getColumn: (n: number) => {
+      width?: number;
+      eachCell: (
+        opts: { includeEmpty: boolean },
+        cb: (cell: { value: unknown }) => void,
+      ) => void;
+    };
+  },
+  colCount: number,
+) {
+  for (let i = 1; i <= colCount; i++) {
+    const col = ws.getColumn(i);
+    let max = 10;
+    col.eachCell({ includeEmpty: false }, (cell) => {
+      const len = cellText(cell.value).length;
+      if (len > max) max = len;
+    });
+    col.width = Math.min(Math.max(max + 2, 10), 56);
+  }
 }
 
 /**
@@ -49,9 +80,10 @@ export function ExportButton() {
       const board = await api.board();
       const rows = board.leads;
       const lastRow = Math.max(rows.length + 1, 2);
+      const colCount = 8;
 
       const wb = new ExcelJS.Workbook();
-      wb.creator = "Leadify";
+      wb.creator = "HERMES mail";
       wb.created = new Date();
 
       const ws = wb.addWorksheet("Leads", {
@@ -70,18 +102,17 @@ export function ExportButton() {
           l.fitScore,
           crmStageLabel(stage),
           statusLabel(l.status),
-          l.outreach?.subject ?? "",
-          l.sourceUrl,
         ];
       });
 
       ws.addTable({
         name: "LeadsTable",
-        ref: `A1:J${lastRow}`,
+        ref: `A1:H${lastRow}`,
         headerRow: true,
         totalsRow: false,
         style: {
-          theme: "TableStyleMedium9",
+          // Medium1 = black header (not the teal Medium9 theme).
+          theme: "TableStyleMedium1",
           showRowStripes: true,
         },
         columns: [
@@ -93,22 +124,11 @@ export function ExportButton() {
           { name: "Fit Score", filterButton: true },
           { name: "Pipeline Stage", filterButton: true },
           { name: "Email Status", filterButton: true },
-          { name: "Subject", filterButton: true },
-          { name: "Source URL", filterButton: true },
         ],
-        rows: tableRows.length > 0 ? tableRows : [["", "", "", "", "", 0, "", "", "", ""]],
+        rows: tableRows.length > 0 ? tableRows : [["", "", "", "", "", 0, "", ""]],
       });
 
-      ws.getColumn(1).width = 28;
-      ws.getColumn(2).width = 32;
-      ws.getColumn(3).width = 22;
-      ws.getColumn(4).width = 36;
-      ws.getColumn(5).width = 18;
-      ws.getColumn(6).width = 12;
-      ws.getColumn(7).width = 18;
-      ws.getColumn(8).width = 14;
-      ws.getColumn(9).width = 36;
-      ws.getColumn(10).width = 40;
+      autoFitColumns(ws, colCount);
 
       // Fit score — color scale (conditional formatting, not hardcoded cells)
       ws.addConditionalFormatting({
@@ -138,7 +158,6 @@ export function ExportButton() {
         "In Conversation": "FF38BDF8",
         Closed: "FF7FF2C8",
         "Not Interested": "FFFB7185",
-        Discarded: "FF5C6B82",
       };
       let priority = 2;
       for (const [label, argb] of Object.entries(stageColors)) {
@@ -191,7 +210,7 @@ export function ExportButton() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `leadify-leads-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.download = `hermes-leads-${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
     } finally {

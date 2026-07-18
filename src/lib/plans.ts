@@ -3,10 +3,8 @@ import type { PlanId } from "@/lib/types";
 /**
  * Single source of truth for plans, quotas, and pricing.
  *
- * Prices/quotas come from docs/business-plan.md §6. Stripe Price IDs are read
- * from env (never hard-coded) so the same code works across test/live Stripe
- * accounts — see `.env.example`. Changing a number here is the only edit needed
- * to change a plan; the service layer, pricing page, and settings all read this.
+ * Numbers from docs/financial-plan.md. Stripe Price IDs are read from env
+ * (never hard-coded) — see `.env.example` and docs/stripe-setup.md.
  */
 export interface Plan {
   id: PlanId;
@@ -35,10 +33,11 @@ export interface Plan {
 /** Annual billing discount (industry norm ≈ 20%). */
 export const ANNUAL_DISCOUNT = 0.2;
 
-/** Free plan hard cap on leads returned per search run (paid uses MAX_LEADS_PER_RUN). */
-export const FREE_MAX_LEADS_PER_RUN = 10;
-
-/** Selectable lead-count options in the search UI (higher values locked on Free). */
+/**
+ * Selectable lead-count options in the search UI. An option is available when
+ * it fits under the plan’s monthly lead-credit cap *and* remaining credits
+ * this period (no separate Free per-run lock).
+ */
 export const LEAD_COUNT_OPTIONS = [10, 25, 50, 100, 500] as const;
 
 export const PLANS: Record<PlanId, Plan> = {
@@ -46,14 +45,14 @@ export const PLANS: Record<PlanId, Plan> = {
     id: "free",
     name: "Free",
     monthlyPrice: 0,
-    leadCreditsPerMonth: 50,
-    sendsPerMonth: 25,
-    verifiesPerDay: 10,
+    leadCreditsPerMonth: 75,
+    sendsPerMonth: 30,
+    verifiesPerDay: 5,
     features: [
       "Demo + live search, drafting & approval",
-      "50 enriched leads / month",
-      "25 sends / month (bring your own sender)",
-      "10 email verifies / day",
+      "75 enriched leads / month",
+      "30 sends / month (bring your own sender)",
+      "5 email verifies / day",
       "1 workspace",
     ],
     stripePriceEnv: null,
@@ -61,14 +60,14 @@ export const PLANS: Record<PlanId, Plan> = {
   starter: {
     id: "starter",
     name: "Starter",
-    monthlyPrice: 29,
-    leadCreditsPerMonth: 500,
-    sendsPerMonth: 500,
+    monthlyPrice: 39,
+    leadCreditsPerMonth: 400,
+    sendsPerMonth: 400,
     verifiesPerDay: 25,
     features: [
       "Everything in Free",
-      "500 enriched leads / month",
-      "500 sends / month",
+      "400 enriched leads / month",
+      "400 sends / month",
       "25 email verifies / day",
       "Table + board views, Excel export",
     ],
@@ -77,14 +76,14 @@ export const PLANS: Record<PlanId, Plan> = {
   pro: {
     id: "pro",
     name: "Pro",
-    monthlyPrice: 79,
-    leadCreditsPerMonth: 2500,
-    sendsPerMonth: 2500,
+    monthlyPrice: 89,
+    leadCreditsPerMonth: 2000,
+    sendsPerMonth: 2000,
     verifiesPerDay: 50,
     features: [
       "Everything in Starter",
-      "2,500 enriched leads / month",
-      "2,500 sends / month",
+      "2,000 enriched leads / month",
+      "2,000 sends / month",
       "50 email verifies / day",
       "LLM personalization",
       "Places / local source, priority support",
@@ -95,13 +94,13 @@ export const PLANS: Record<PlanId, Plan> = {
     id: "agency",
     name: "Agency",
     monthlyPrice: 199,
-    leadCreditsPerMonth: 10000,
-    sendsPerMonth: 10000,
+    leadCreditsPerMonth: 8000,
+    sendsPerMonth: 8000,
     verifiesPerDay: 100,
     features: [
       "Everything in Pro",
-      "10,000 enriched leads / month",
-      "10,000 sends / month",
+      "8,000 enriched leads / month",
+      "8,000 sends / month",
       "100 email verifies / day",
       "Multiple workspaces / seats",
       "Custom sending identity",

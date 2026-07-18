@@ -1,4 +1,4 @@
-import { env, getCapabilities } from "@/lib/config";
+import { authRequired, env, getCapabilities } from "@/lib/config";
 import { HelpIcon, SparkIcon } from "@/components/icons";
 import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
 import { getPlan } from "@/lib/plans";
@@ -8,6 +8,8 @@ import { BillingActions } from "@/components/studio/BillingActions";
 import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
 import { DeveloperModePanel } from "@/components/studio/DeveloperModePanel";
 import { SendSetupPanel } from "@/components/studio/SendSetupPanel";
+import { isAdminEmail } from "@/lib/admin";
+import { auth } from "@/auth";
 import Link from "next/link";
 
 export const runtime = "nodejs";
@@ -47,6 +49,10 @@ export default async function SettingsPage({
   const plan = getPlan(usage.planId);
   const { mailboxPublicStatus } = await import("@/lib/email/mailbox");
   const mailbox = mailboxPublicStatus(ws);
+  const session = await auth().catch(() => null);
+  // Local demo: tools stay available. Production: admin email only.
+  const showAdminTools =
+    !authRequired() || isAdminEmail(session?.user?.email);
 
   const canSendEmail =
     caps.canSendEmail ||
@@ -218,12 +224,14 @@ export default async function SettingsPage({
         </div>
       </section>
 
-      <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Developer mode
-        </h2>
-        <DeveloperModePanel metered={usage.metered} currentPlanId={usage.planId} />
-      </section>
+      {showAdminTools ? (
+        <section className="mt-8">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+            Admin tools
+          </h2>
+          <DeveloperModePanel metered={usage.metered} currentPlanId={usage.planId} />
+        </section>
+      ) : null}
     </main>
   );
 }

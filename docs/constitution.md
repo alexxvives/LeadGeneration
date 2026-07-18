@@ -1,4 +1,4 @@
-# Leadify System Constitution
+# HERMES mail System Constitution
 
 These are the **non-negotiable principles** for this codebase. They exist so the
 project stays consistent, safe, and easy to change no matter who (human or agent)

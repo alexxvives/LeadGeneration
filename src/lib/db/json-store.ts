@@ -22,6 +22,8 @@ function normalizeWorkspace(w: Workspace): Workspace {
     replyTo: (raw.replyTo as string | undefined) ?? null,
     physicalAddress: (raw.physicalAddress as string | undefined) ?? null,
     resendApiKey: (raw.resendApiKey as string | undefined) ?? null,
+    resendWebhookId: (raw.resendWebhookId as string | undefined) ?? null,
+    resendWebhookSecret: (raw.resendWebhookSecret as string | undefined) ?? null,
     mailerooApiKey: (raw.mailerooApiKey as string | undefined) ?? null,
     easyEmailProvider:
       (raw.easyEmailProvider as Workspace["easyEmailProvider"] | undefined) === "maileroo"
@@ -186,6 +188,51 @@ export class JsonStore implements LeadRepository {
       data.workspaces[idx] = { ...data.workspaces[idx], ...patch };
       return { data, result: data.workspaces[idx] };
     });
+  }
+
+  async listWorkspaces(): Promise<Workspace[]> {
+    const data = await this.read();
+    return data.workspaces
+      .map(normalizeWorkspace)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async adminCountByWorkspace(): Promise<{
+    leads: Record<string, number>;
+    sent: Record<string, number>;
+    runs: Record<string, number>;
+  }> {
+    const data = await this.read();
+    const leads: Record<string, number> = {};
+    const sent: Record<string, number> = {};
+    const runs: Record<string, number> = {};
+    for (const l of data.leads) {
+      const wid = l.workspaceId ?? this.workspaceId;
+      leads[wid] = (leads[wid] ?? 0) + 1;
+    }
+    for (const o of data.outreach) {
+      if (o.status !== "sent") continue;
+      const wid = o.workspaceId ?? this.workspaceId;
+      sent[wid] = (sent[wid] ?? 0) + 1;
+    }
+    for (const r of data.runs) {
+      const wid = r.workspaceId ?? this.workspaceId;
+      runs[wid] = (runs[wid] ?? 0) + 1;
+    }
+    return { leads, sent, runs };
+  }
+
+  async listAuthUsers(): Promise<
+    Array<{ id: string; email: string | null; name: string | null }>
+  > {
+    const workspaces = await this.listWorkspaces();
+    return workspaces
+      .filter((w) => w.ownerUserId)
+      .map((w) => ({
+        id: w.ownerUserId!,
+        email: w.fromEmail ?? (w.name.includes("@") ? w.name : null),
+        name: w.name,
+      }));
   }
 
   // ---- Boards ----
@@ -367,6 +414,28 @@ export class JsonStore implements LeadRepository {
     });
   }
 
+  claimOutreachForSend(id: string): Promise<Outreach | null> {
+    return this.mutate((data) => {
+      const idx = data.outreach.findIndex((o) => o.id === id && this.inScope(o));
+      if (idx === -1) return { data, result: null };
+      const o = data.outreach[idx];
+      const stuckBefore = Date.now() - 2 * 60_000;
+      const updatedMs = Date.parse(o.updatedAt || "") || 0;
+      const canClaim =
+        o.status === "approved" ||
+        (o.status === "sending" && updatedMs < stuckBefore);
+      if (!canClaim) return { data, result: null };
+      const now = new Date().toISOString();
+      data.outreach[idx] = {
+        ...o,
+        status: "sending",
+        error: null,
+        updatedAt: now,
+      };
+      return { data, result: data.outreach[idx] };
+    });
+  }
+
   async getOutreach(id: string): Promise<Outreach | null> {
     const data = await this.read();
     const o = data.outreach.find((x) => x.id === id && this.inScope(x));
@@ -392,6 +461,20 @@ export class JsonStore implements LeadRepository {
       .filter((o) => o.status === "sent" && o.toEmail?.toLowerCase() === needle)
       .sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
     return candidates[0] ? normalizeOutreach(candidates[0]) : null;
+  }
+
+  async countRecentSendActivity(
+    sinceIso: string,
+    excludeId?: string,
+  ): Promise<number> {
+    const data = await this.read();
+    return data.outreach.filter((o) => {
+      if (!this.inScope(o)) return false;
+      if (excludeId && o.id === excludeId) return false;
+      if (o.status === "sent" && o.sentAt && o.sentAt >= sinceIso) return true;
+      if (o.status === "sending" && o.updatedAt >= sinceIso) return true;
+      return false;
+    }).length;
   }
 
   clearWorkspaceData(): Promise<void> {

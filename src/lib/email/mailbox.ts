@@ -212,7 +212,7 @@ function encodeRawMessage(opts: {
   if (opts.replyTo) lines.push(`Reply-To: ${opts.replyTo}`);
 
   if (opts.html) {
-    const boundary = `leadify_${Date.now().toString(36)}`;
+    const boundary = `hermes_${Date.now().toString(36)}`;
     lines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`, "");
     lines.push(`--${boundary}`);
     lines.push('Content-Type: text/plain; charset="UTF-8"', "");

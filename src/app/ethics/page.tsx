@@ -4,7 +4,7 @@ import { authRequired, env, getCapabilities } from "@/lib/config";
 import { CheckIcon } from "@/components/icons";
 
 export const metadata = {
-  title: "Ethics — Leadify",
+  title: "Ethics — HERMES mail",
   description: "Human approval, rate limits, and clear from-identity.",
 };
 
@@ -40,7 +40,7 @@ export default function EthicsPage() {
           Built to keep you compliant
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-mist-300">
-          Cold outreach done wrong is spam. Leadify is designed so a human approves every
+          Cold outreach done wrong is spam. Hermes Mail is designed so a human approves every
           message, and the guardrails are on by default.
         </p>
         <div className="glass mt-12 rounded-xl2 p-8 sm:p-12">

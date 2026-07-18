@@ -5,9 +5,10 @@ const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
   // Internal queue flag — CRM "New" is what users see as "needs review".
   queued: { label: "Draft ready", cls: "bg-amber-400/15 text-amber-300 ring-amber-400/20" },
   approved: { label: "Approved", cls: "bg-aurora-400/15 text-aurora-300 ring-aurora-400/25" },
+  sending: { label: "Sending…", cls: "bg-amber-400/15 text-amber-300 ring-amber-400/20" },
   sent: { label: "Sent", cls: "bg-aurora-500/25 text-aurora-300 ring-aurora-400/30" },
-  rejected: { label: "Rejected", cls: "bg-white/5 text-mist-500 ring-white/10" },
-  failed: { label: "Failed", cls: "bg-rose-500/15 text-rose-300 ring-rose-400/25" },
+  rejected: { label: "Undeliverable", cls: "bg-white/5 text-mist-500 ring-white/10" },
+  failed: { label: "Send failed", cls: "bg-rose-500/15 text-rose-300 ring-rose-400/25" },
   draft: { label: "Draft", cls: "bg-white/8 text-mist-300 ring-white/10" },
 };
 

@@ -74,7 +74,7 @@ export const env = {
   exaKey: () => process.env.EXA_API_KEY?.trim() ?? "",
   resendKey: () => process.env.RESEND_API_KEY?.trim() ?? "",
   fromEmail: () => process.env.OUTREACH_FROM_EMAIL?.trim() || "you@example.com",
-  fromName: () => process.env.OUTREACH_FROM_NAME?.trim() || "Leadify Outreach",
+  fromName: () => process.env.OUTREACH_FROM_NAME?.trim() || "HERMES mail",
   replyTo: () => process.env.OUTREACH_REPLY_TO?.trim() || "",
   physicalAddress: () =>
     process.env.OUTREACH_PHYSICAL_ADDRESS?.trim() ||
@@ -94,9 +94,9 @@ export const env = {
       lower === "you@yourdomain.com" ||
       lower.endsWith("@example.com")
     ) {
-      return "Leadify <onboarding@resend.dev>";
+      return "HERMES mail <onboarding@resend.dev>";
     }
-    const name = process.env.OUTREACH_FROM_NAME?.trim() || "Leadify";
+    const name = process.env.OUTREACH_FROM_NAME?.trim() || "HERMES mail";
     return `${name} <${raw}>`;
   },
   // Compliance: how many sends allowed per rolling minute.
@@ -140,7 +140,7 @@ export const env = {
   // secret). authRequired() distinguishes the two.
   authSecret: () =>
     process.env.AUTH_SECRET?.trim() ||
-    "leadify-dev-insecure-secret-change-me-in-production",
+    "hermes-dev-insecure-secret-change-me-in-production",
   authResendKey: () => process.env.RESEND_API_KEY?.trim() || "",
   appUrl: () =>
     process.env.NEXTAUTH_URL?.trim() ||
@@ -186,5 +186,22 @@ export const env = {
   // ── Smoke test bypass ──
   // When set, requests carrying `x-smoke-key: <value>` skip auth enforcement so
   // the headless smoke test can exercise the API even with auth enabled.
+  // Never set SMOKE_API_KEY in production.
   smokeApiKey: () => process.env.SMOKE_API_KEY?.trim() ?? "",
+
+  /**
+   * Platform admin (plan override / credit reset).
+   * Built-in defaults work with zero env — you do NOT need to set these.
+   * Optional Wrangler secrets only if you want a different email/password
+   * without editing code (e.g. rotate password before sharing the app).
+   */
+  adminEmail: () =>
+    process.env.ADMIN_EMAIL?.trim().toLowerCase() || "admin@tryhermesmail.com",
+  adminPassword: () => process.env.ADMIN_PASSWORD?.trim() || "password",
+
+  /** Resend delivery webhooks (Svix signing secret). */
+  resendWebhookSecret: () => process.env.RESEND_WEBHOOK_SECRET?.trim() ?? "",
+  /** Maileroo delivery/inbound webhooks (shared header secret). */
+  mailerooWebhookSecret: () =>
+    process.env.MAILEROO_WEBHOOK_SECRET?.trim() ?? "",
 };

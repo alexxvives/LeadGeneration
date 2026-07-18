@@ -1,7 +1,7 @@
-# Leadify
+# HERMES mail
 
 **Navigate to your next customer.** A human-in-the-loop lead generation studio.
-Describe an ideal customer in plain English → Leadify searches the web,
+Describe an ideal customer in plain English → Hermes Mail searches the web,
 enriches each prospect, scores fit, drafts a personalized outreach email, and
 puts every message in an approval queue. **Nothing is sent without your explicit
 per-lead approval.**
@@ -42,7 +42,7 @@ Open <http://localhost:3000> for the landing page, or go straight to
 5. **Send** — Approved emails send via your provider, rate-limited, with a
    compliance footer. Status: `queued → approved → sent / failed`.
 
-After a search, Lodestar opens **Pipeline** (kanban + leads table/cards/map).
+After a search, Hermes Mail opens **Pipeline** (kanban + leads table/cards/map).
 Nothing is sent without per-lead approval.
 
 ---
@@ -200,7 +200,7 @@ service layer builds the scoped repo via `getCtx()`.
 
 ## Compliance & responsible use (please read)
 
-Lodestar is designed to keep you on the right side of anti-spam law and platform
+Hermes Mail is designed to keep you on the right side of anti-spam law and platform
 Terms of Service. The guardrails are **on by default**:
 
 - **Human-in-the-loop by design.** No email is sent without explicit per-lead

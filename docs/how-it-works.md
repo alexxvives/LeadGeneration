@@ -1,4 +1,4 @@
-# How Lodestar Works
+# How HERMES mail Works
 
 A plain-English tour of the product and the code behind it. For run/setup
 instructions see [`../README.md`](../README.md); for principles see
@@ -8,7 +8,7 @@ instructions see [`../README.md`](../README.md); for principles see
 
 ## 1. The product in one sentence
 
-You describe an ideal customer; Lodestar finds matching businesses on the web,
+You describe an ideal customer; Hermes Mail finds matching businesses on the web,
 enriches each with contact info + a fit score, writes a personalized first email
 for each, and lets you review, approve, and send — one lead at a time.
 
@@ -30,16 +30,17 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
    you move the card or a send auto-advances it to **Contacted**. Edit any draft
    in the drawer, or **Regenerate**. Sign-off uses your **sender-profile display
    name** (Settings), passed via the API — the server never reads browser storage.
-   The compliance footer keeps the env from-identity (`OUTREACH_FROM_*`).
+   Sign-off / from-identity come from Settings (and env defaults). Bodies stay
+   natural — no STOP / mailing-address auto-footer (ADR 0012).
 4. **Approve** — Open a lead (pipeline card, table row, or map pin) to see the
-   detail drawer. Edit subject/body/recipient, then **Approve** or **Reject**.
-   Nothing sends on approval alone. Pipeline can **draft all** / **approve
-   selected**; **send stays per-lead** in the drawer (constitution Art. I.1).
-   in batches (send still requires each outreach to be `approved` — Art. I.1).
-5. **Send** — Approved emails send via your provider (or simulate in demo mode),
-   **rate-limited**, with a compliance footer. Status flows
-   `queued → approved → sent` (or `failed`). Successful send advances CRM stage
-   to **Contacted**.
+   detail drawer. Edit subject/body/recipient, then **Approve**. There is no
+   Reject-draft control — bad addresses are removed automatically at verify
+   (status **Undeliverable**). Nothing sends on approval alone. **Outreach**
+   can draft-all / approve-selected; **send stays per-lead** (Art. I.1).
+5. **Send** — From the drawer, Approve then Send. From the Outreach queue,
+   Send may auto-approve the draft first (the click is the per-lead human
+   gate). Status flows `draft → approved → sending → sent` (or `failed`).
+   Successful send advances CRM stage to **Contacted**.
 
 ## 3. Screens
 
@@ -66,12 +67,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     Pipeline. Integration status lives in Settings (no mode banner).
 
   - **Pipeline** (`?view=pipeline`) — CRM kanban for the active board filter
-    (**All** = every board) across four
-    active stages (*New · Contacted · In Conversation · Closed*) plus two
-    side-by-side columns: *Not Interested* (declined) and *Discarded* (bad fit /
-    incorrect lead). Drag cards between columns, or use quick-advance.
-    Bulk bar: draft all / approve selected. CRM **New** = needs human review
-    (there is no separate “In review” tag).
+    (**All** = every board) across four active stages (*New · Contacted · In
+    Conversation · Closed*) plus *Not Interested*. Drag cards between columns,
+    or use quick-advance. Bulk draft/approve lives on **Outreach**, not here.
+    CRM **New** = needs human review (there is no separate “In review” tag).
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
     cards / map) + **Export Excel**. Table shows a short city label; the drawer
@@ -155,14 +154,13 @@ the local JSON-store path is always unmetered/demo.
   (a serialized read-modify-write JSON file store, the zero-key default) and
   `D1Store` (Cloudflare D1 / SQLite, the production backend). `getDb(binding?)`
   selects D1Store when a D1Database binding is passed (Workers runtime), else
-  JsonStore. Schema lives in `migrations/` (`0001`–`0006`, Wrangler format).
+  JsonStore. Schema lives in `migrations/` (`0001`–`0015`, Wrangler format).
 - **`src/lib/search/`** — `runSearch()` picks a provider (Firecrawl → Exa),
   scrapes/enriches to leads, and **falls back to demo data** on missing key or
   error. `enrich.ts` extracts emails/phones/blurb; `fit-score.ts` scores.
-- **`src/lib/outreach/draft.ts`** — locale-aware template personalization (language
-  from lead location) + the
-  CAN-SPAM-style compliance footer. Swap in an LLM here without touching the
-  approve/send flow.
+- **`src/lib/outreach/draft.ts`** — locale-aware template personalization
+  (language from lead location). No auto compliance footer (ADR 0012). Swap in
+  an LLM here without touching the approve/send flow.
 - **`src/lib/email/`** — `sendEmail()` (Google mailbox → Resend → SMTP → demo),
   domain health, mailbox OAuth helpers, and a rolling rate limit.
   per-minute `rate-limit.ts`.

@@ -3,28 +3,28 @@ import { getDb, LOCAL_WORKSPACE_ID } from "@/lib/db";
 import { getD1Binding } from "@/lib/cf";
 import { setOutreachDeliveryStatus, type Ctx } from "@/lib/service";
 import type { DeliveryStatus } from "@/lib/types";
-import { env } from "@/lib/config";
+import { authRequired, env } from "@/lib/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Maileroo → Leadify delivery + inbound webhooks.
+ * Maileroo → HERMES mail delivery + inbound webhooks.
  *
- * Configure in Maileroo Dashboard → Events / Webhooks → URL:
- *   https://<your-host>/api/webhooks/maileroo
- * Delivery events: delivered, failed, rejected, complained, …
- * Inbound routing: POST the inbound email JSON here (envelope_sender) → replied.
- *
- * Matching order:
- *   1. Tags `leadify_ws` + `leadify_outreach` (set on send; also accept legacy `lodestar_*`)
- *   2. Fallback: latest sent outreach by recipient (delivery) or sender (inbound reply)
- *
- * Optional: MAILEROO_WEBHOOK_SECRET — if set, require `X-Maileroo-Secret`
- * (or `Authorization: Bearer …`) to match. Unset = accept (demo-safe).
+ * Matching: tags first (`hermes_*`, then `leadify_*` / `lodestar_*`);
+ * email fallback only for inbound replies when the request is authenticated
+ * (secret) or local demo. Production requires MAILEROO_WEBHOOK_SECRET.
  */
 export async function POST(req: Request) {
-  const secret = process.env.MAILEROO_WEBHOOK_SECRET?.trim();
+  const secret = env.mailerooWebhookSecret();
+
+  if (authRequired() && !secret) {
+    return NextResponse.json(
+      { error: "MAILEROO_WEBHOOK_SECRET is required" },
+      { status: 503 },
+    );
+  }
+
   if (secret) {
     const header =
       req.headers.get("x-maileroo-secret")?.trim() ||
@@ -40,7 +40,6 @@ export async function POST(req: Request) {
     event_data?: { to?: string; reason?: string };
     tags?: Record<string, string> | null;
     message_reference_id?: string;
-    /** Inbound routing payload fields */
     envelope_sender?: string;
     message_id?: string;
     recipients?: string[];
@@ -62,18 +61,23 @@ export async function POST(req: Request) {
 
   const tags = body.tags ?? {};
   const tagWs =
-    (tags.leadify_ws ?? tags.lodestar_ws ?? "").trim() || null;
+    (tags.hermes_ws ?? tags.leadify_ws ?? tags.lodestar_ws ?? "").trim() ||
+    null;
   const tagOutreach =
-    (tags.leadify_outreach ?? tags.lodestar_outreach ?? "").trim() || null;
+    (
+      tags.hermes_outreach ??
+      tags.leadify_outreach ??
+      tags.lodestar_outreach ??
+      ""
+    ).trim() || null;
 
   const binding = await getD1Binding();
-  const probe = getDb(binding, LOCAL_WORKSPACE_ID);
 
   if (tagWs && tagOutreach) {
     const ctx: Ctx = {
       db: getDb(binding, tagWs),
       workspaceId: tagWs,
-      metered: !!env.authSecret(),
+      metered: !!binding,
     };
     const existing = await ctx.db.getOutreach(tagOutreach);
     if (existing) {
@@ -88,7 +92,12 @@ export async function POST(req: Request) {
     }
   }
 
-  // Delivery: match by recipient. Inbound reply: match by sender (lead email).
+  const allowEmailFallback =
+    (delivery === "replied" || isInbound) && (!!secret || !authRequired());
+  if (!allowEmailFallback) {
+    return NextResponse.json({ ok: true, matched: 0 });
+  }
+
   const matchEmail = isInbound
     ? inboundFrom
     : body.event_data?.to?.trim().toLowerCase() || null;
@@ -96,6 +105,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, matched: 0 });
   }
 
+  const probe = getDb(binding, LOCAL_WORKSPACE_ID);
   const target = await probe.findLatestSentByEmail(matchEmail);
   if (!target) {
     return NextResponse.json({ ok: true, matched: 0 });
@@ -104,7 +114,7 @@ export async function POST(req: Request) {
   const ctx: Ctx = {
     db: getDb(binding, target.workspaceId),
     workspaceId: target.workspaceId,
-    metered: !!env.authSecret(),
+    metered: !!binding,
   };
   await setOutreachDeliveryStatus(ctx, target.id, delivery);
   return NextResponse.json({
@@ -131,7 +141,6 @@ function mapEvent(type: string): DeliveryStatus | null {
     case "inbound":
       return "replied";
     default:
-      // opened / clicked / deferred — ignore for deliveryStatus
       return null;
   }
 }

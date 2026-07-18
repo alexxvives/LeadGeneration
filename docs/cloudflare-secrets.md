@@ -20,8 +20,34 @@ Worker name (must match): `leadgeneration` (`wrangler.jsonc` → `"name"`).
 | `GEMINI_API_KEY` | Optional pitch/blurb fallback after Groq |
 | `MYEMAILVERIFIER_API_KEY` | Preferred email verify at send (100 free credits/day) |
 | `MAILEROO_VERIFY_API_KEY` | Fallback Zeruh verify (alias `ZERUH_API_KEY`) |
+| `RESEND_WEBHOOK_SECRET` | **Required after deploy of audit hardening** — Svix secret for bounce/reply webhooks |
+| `MAILEROO_WEBHOOK_SECRET` | Required only if you use Maileroo delivery webhooks |
+| `ADMIN_EMAIL` | Optional — code already defaults to `admin@tryhermesmail.com` |
+| `ADMIN_PASSWORD` | Optional — code already defaults to `password` |
+
+### Resend delivery webhooks (bounce / reply → CRM)
+
+**End users do not configure webhooks.** When someone pastes their Resend API
+key in Settings → Easy, Hermes calls Resend’s API to register
+`/api/webhooks/resend` and stores that account’s signing secret on the
+workspace (migration 0016).
+
+Optional platform fallback (only if you send with the Worker’s
+`RESEND_API_KEY` rather than a BYO key):
+
+```bash
+npx wrangler secret put RESEND_WEBHOOK_SECRET
+```
+
+Apply migration 0016 before relying on auto-register in prod:
+
+```bash
+npm run cf:migrate
+```
 
 Workers AI itself uses the `AI` binding in `wrangler.jsonc` — **no secret**.
+
+**Do not set `SMOKE_API_KEY` in production** — it bypasses auth for the smoke harness.
 
 ## Verify (safe — names only)
 
