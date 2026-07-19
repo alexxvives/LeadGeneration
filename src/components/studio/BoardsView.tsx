@@ -151,7 +151,7 @@ export function BoardsView({
                 type="button"
                 aria-label={`Delete ${b.name}`}
                 title="Delete"
-                className="absolute -right-2 -top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-ink-900 text-mist-500 opacity-0 shadow-sm transition-opacity hover:border-rose-400/40 hover:bg-rose-400/10 hover:text-rose-300 group-hover:opacity-100 focus-visible:opacity-100"
+                className="absolute -right-2 -top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border border-ink-700 bg-ink-850 text-mist-400 opacity-0 shadow-sm transition-opacity hover:border-rose-400/50 hover:bg-rose-500/15 hover:text-rose-500 group-hover:opacity-100 focus-visible:opacity-100"
                 onClick={(e) => {
                   e.stopPropagation();
                   void handleDelete(b.id);

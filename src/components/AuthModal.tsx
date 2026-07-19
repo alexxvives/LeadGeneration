@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
-import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { ArrowIcon, MailIcon, XIcon } from "@/components/icons";
 import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
+import { goAfterSignIn, signInWithPassword } from "@/lib/client-sign-in";
 
 interface TurnstileApi {
   render: (
@@ -49,7 +49,6 @@ export function AuthModal({
   dismissible?: boolean;
 }) {
   const canDismiss = dismissible ?? !authRequired;
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<FormMode>("signin");
@@ -99,12 +98,8 @@ export function AuthModal({
       sessionStorage.setItem("hermes_guest", "1");
       sessionStorage.removeItem("leadify_guest");
       sessionStorage.removeItem("lodestar_guest");
-      // Full navigation so SessionProvider cannot keep the previous account.
-      window.location.assign(callbackUrl);
-      return;
     }
-    onClose();
-    router.push(callbackUrl);
+    goAfterSignIn(callbackUrl);
   };
 
   const ensureTurnstile = async (): Promise<boolean> => {
@@ -193,18 +188,16 @@ export function AuthModal({
         return;
       }
 
-      const result = await signIn("credentials", {
-        email: trimmed,
-        password,
-        redirect: false,
-      });
-      if (result?.error) {
+      const result = await signInWithPassword({ email: trimmed, password });
+      if (!result.ok) {
         setError(
-          credentialsMode
-            ? "Could not sign in. Check your details and try again."
-            : mode === "signup"
-              ? "Account created, but sign-in failed. Try signing in."
-              : "Invalid email or password.",
+          mode === "signup"
+            ? "Account created, but sign-in failed. Try signing in."
+            : credentialsMode
+              ? result.error === "Invalid email or password."
+                ? "Could not sign in. Check your details and try again."
+                : result.error
+              : result.error,
         );
       } else {
         goStudio();

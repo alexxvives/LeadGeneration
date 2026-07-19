@@ -193,16 +193,6 @@ export function LeadTable({
 
   return (
     <div className="relative flex max-h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-xl2 border border-white/10">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/5 px-3 py-2">
-        <p className="text-[11px] text-mist-500">
-          {leads.length} lead{leads.length === 1 ? "" : "s"}
-          {statusFilter !== "all" ? ` · ${crmStageLabel(statusFilter)}` : ""}
-          {canDelete && selected.size > 0
-            ? ` · ${selected.size} selected`
-            : ""}
-        </p>
-      </div>
-
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="sticky top-0 z-10 bg-ink-950/95 backdrop-blur-sm">

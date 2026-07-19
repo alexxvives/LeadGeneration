@@ -9,25 +9,22 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-19 (logo/search/boards + account switch)
+## ⏱️ Status — updated 2026-07-19 (account-switch fix + studio polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Deployed:** D1 migrations `0019` + `0020` on prod. Redeploy for latest UI/auth.
+**Deployed:** Redeploy required for signOut-first account switch.
 
 ### This pass
-- BrandMark: `mail` same size/family as `HERMES` (aurora color only).
-- Search: Standard also ranks by fit; Smart copy includes ~3× credits; Best for
-  trimmed; credits line shown under strategy blurb.
-- Boards: delete control outside card (top-right); stats = Leads row +
-  Contacted/Sent/Closed row; Invite keeps header space.
-- Auth: hard `location.assign` after credentials sign-in; JWT clears prior
-  workspace and always overwrites email/name on account switch.
+- Auth: `signInWithPassword` signs out first, verifies session email, then hard
+  navigates — fixes admin login sticking on alexxvives while already signed in.
+- Boards delete chip: ink-700 / ink-850 (light-theme safe).
+- Leads table: removed top count strip.
+- Search copy tightened; sidebar `sm:w-[18.4rem]` (+15%).
 
 ### Next
-1. Redeploy; set verified `OUTREACH_FROM_EMAIL` (+ optional `MAILEROO_API_KEY`)
-   so board-invite mail reaches arbitrary addresses (not only Resend onboarding).
-2. Soft-lock banner + 423 on concurrent edit.
-3. Optional: Firecrawl/LLM company-type extract.
+1. Redeploy (critical for admin account switch).
+2. Verified `OUTREACH_FROM_EMAIL` (+ optional `MAILEROO_API_KEY`) for invites.
+3. Soft-lock banner + 423 on concurrent edit.
 
 ---
 

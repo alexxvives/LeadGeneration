@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-19 — Account switch: must signOut first
+- Auth.js credentials `signIn` **does not replace** an existing JWT. Switching
+  admin ↔ personal while already signed in kept the old cookie even after
+  `location.assign`. Fix: `signOut({ redirect: false })` → `signIn` → verify
+  `/api/auth/session` email → hard navigate (`src/lib/client-sign-in.ts`).
+- D1: `admin@tryhermesmail.com` is a separate user/workspace from
+  `alexxvives@gmail.com` (magic-link, no password hash).
+
 ### 2026-07-19 — Account switch needs hard navigation
 - JWT overwrite alone is not enough: after `signIn({ redirect: false })`,
   `router.push` + `router.refresh` leaves NextAuth `SessionProvider` on the

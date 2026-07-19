@@ -50,20 +50,20 @@ const STRATEGIES: {
   {
     id: "standard",
     label: "Standard",
-    summary: "One focused query — fastest path from ICP to a shortlist.",
+    summary: "One query → dedupe → rank by fit.",
     detail:
-      'Runs a single search like "[niche] [location] contact email", dedupes by domain, then sorts by Hermes Mail\'s transparent fit score. Best when you already know the niche and want a first pass. Uses ~1× provider credits vs Smart.',
+      "Fast first pass for a clear niche. Lowest provider cost (~1×).",
     credits: "~1× credits",
     bestFor: "Quick tests, narrow niches",
   },
   {
     id: "smart",
     label: "Smart",
-    summary: "Expands your ICP into several queries, merges results, ranks by fit.",
+    summary: "Several query variants, merged and ranked by fit.",
     detail:
-      "Builds multiple query variants (contact email, official website, top/best lists), runs them sequentially, dedupes by domain, then sorts by Hermes Mail's transparent fit score. Higher recall for vague or competitive niches. Uses ~3× provider credits vs Standard.",
+      "Broader recall when the niche is vague or crowded. Costs ~3× Standard.",
     credits: "~3× credits",
-    bestFor: "Competitive markets, vague ICPs, quality over speed",
+    bestFor: "Competitive or vague ICPs",
   },
 ];
 
@@ -525,9 +525,11 @@ export function SearchPanel({
         <div className="mt-3 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
           <p className="text-sm font-medium text-mist-100">{active.summary}</p>
           <p className="mt-1.5 text-xs leading-relaxed text-mist-400">{active.detail}</p>
-          <p className="mt-2 text-[11px] uppercase tracking-wider text-mist-500">
-            Best for · {active.bestFor}
-            <span className="mx-2 text-mist-600">·</span>
+          <p className="mt-2 text-[11px] tracking-wide text-mist-500">
+            <span className="uppercase tracking-wider">Best for</span>
+            {" · "}
+            {active.bestFor}
+            {" · "}
             {active.credits}
           </p>
         </div>

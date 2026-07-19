@@ -23,9 +23,9 @@ live searches.
      site, "top … in …") that are run and merged. Higher recall, ~3× credits.
    - `local` — phrasings tuned for brick-and-mortar / near-me businesses
      (directory-style, reviews, phone/address). Best when Location is filled in.
-   For expanded modes, results are deduped by URL, enriched, deduped again by
-   domain, then **ranked by fit score** and capped to the per-run limit.
-   Single-query keeps the provider's native ranking.
+   All modes enrich, dedupe by domain, then **rank by fit score** and cap to
+   the per-run limit. Smart/local mainly buy recall (more queries), not a
+   different scorer.
 2. **Provider search**: **Firecrawl** `/v1/search` + scrape (preferred). If
    Firecrawl fails or returns zero pages, **Exa** runs next (when keyed).
    Live search never silently swaps in demo leads — use “Load demo data” for that.

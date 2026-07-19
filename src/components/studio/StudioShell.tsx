@@ -290,7 +290,7 @@ export function StudioShell({
         </div>
       </div>
 
-      <aside className="sticky top-0 z-30 flex h-screen w-16 flex-col border-r border-white/5 bg-ink-950/90 py-5 backdrop-blur-xl sm:w-64 sm:px-4">
+      <aside className="sticky top-0 z-30 flex h-screen w-16 flex-col border-r border-white/5 bg-ink-950/90 py-5 backdrop-blur-xl sm:w-[18.4rem] sm:px-4">
         <Link
           href="/"
           className="mb-8 flex justify-center px-1 transition-opacity hover:opacity-80 sm:justify-start"

@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
-import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { ArrowIcon, MailIcon } from "@/components/icons";
 import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
+import { goAfterSignIn, signInWithPassword } from "@/lib/client-sign-in";
 
 interface TurnstileApi {
   render: (
@@ -35,7 +35,6 @@ export function LoginForm({
   callbackUrl: string;
   preferSmtp?: boolean;
 }) {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<FormMode>("signin");
@@ -151,24 +150,19 @@ export function LoginForm({
         return;
       }
 
-      const result = await signIn("credentials", {
-        email: trimmed,
-        password,
-        redirect: false,
-      });
-      if (result?.error) {
+      const result = await signInWithPassword({ email: trimmed, password });
+      if (!result.ok) {
         setError(
-          credentialsMode
-            ? "Could not sign in. Check your details and try again."
-            : mode === "signup"
-              ? "Account created, but sign-in failed. Try signing in."
-              : "Invalid email or password.",
+          mode === "signup"
+            ? "Account created, but sign-in failed. Try signing in."
+            : credentialsMode
+              ? result.error === "Invalid email or password."
+                ? "Could not sign in. Check your details and try again."
+                : result.error
+              : result.error,
         );
-      } else if (typeof window !== "undefined") {
-        // Full navigation so SessionProvider cannot keep the previous account.
-        window.location.assign(callbackUrl);
       } else {
-        router.push(callbackUrl);
+        goAfterSignIn(callbackUrl);
       }
     } catch {
       setError("Something went wrong. Please try again.");
