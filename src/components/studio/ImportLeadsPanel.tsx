@@ -50,6 +50,16 @@ const CONTACT_PREFER = [
   "owner",
   "lead",
 ];
+const TYPE_PREFER = [
+  "companytype",
+  "type",
+  "category",
+  "industry",
+  "segment",
+  "vertical",
+  "businesstype",
+  "venue",
+];
 
 function pickColPreferred(headers: string[], preferred: string[]): number {
   const norms = headers.map(normHeader);
@@ -115,6 +125,7 @@ function rowsFromMatrix(matrix: string[][]): ImportLeadRow[] {
   const phoneI = pickColPreferred(headers, PHONE_PREFER);
   const locationI = pickColPreferred(headers, LOCATION_PREFER);
   const contactI = pickColPreferred(headers, CONTACT_PREFER);
+  const typeI = pickColPreferred(headers, TYPE_PREFER);
 
   if (companyI < 0 && emailI < 0) {
     throw new Error(
@@ -142,6 +153,7 @@ function rowsFromMatrix(matrix: string[][]): ImportLeadRow[] {
       // Keep full street addresses from the file (better for outreach than city-only).
       location: locationI >= 0 ? cellStr(row[locationI]) || null : null,
       contactName: contactI >= 0 ? cellStr(row[contactI]) || null : null,
+      companyType: typeI >= 0 ? cellStr(row[typeI]) || null : null,
     });
   }
   return out;

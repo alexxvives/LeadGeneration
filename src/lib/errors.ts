@@ -53,6 +53,27 @@ export function isAuthError(err: unknown): err is AuthError {
   return err instanceof AuthError;
 }
 
+/** Soft board lock held by another user — routes map to 423 Locked. */
+export class BoardLockedError extends Error {
+  readonly holderName: string | null;
+  readonly holderUserId: string;
+
+  constructor(holderUserId: string, holderName: string | null) {
+    super(
+      holderName
+        ? `${holderName} is working on this board. Edits are paused until they leave.`
+        : "Someone else is working on this board. Edits are paused until they leave.",
+    );
+    this.name = "BoardLockedError";
+    this.holderUserId = holderUserId;
+    this.holderName = holderName;
+  }
+}
+
+export function isBoardLockedError(err: unknown): err is BoardLockedError {
+  return err instanceof BoardLockedError;
+}
+
 /** Thrown when a workspace row is missing for an update that must persist. */
 export class NotFoundError extends Error {
   constructor(message = "Not found.") {

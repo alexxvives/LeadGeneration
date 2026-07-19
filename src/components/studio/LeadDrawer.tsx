@@ -76,6 +76,7 @@ interface DrawerProps {
       crmStage?: CrmStage;
       contactMethod?: ContactMethod | null;
       notes?: string | null;
+      companyType?: string | null;
       followUps?: FollowUp[];
     },
   ) => Promise<void>;
@@ -349,13 +350,50 @@ export function LeadDrawer(props: DrawerProps) {
 
           {/* Contact info */}
           <section className="grid gap-3">
-            {isUsableWebsite(lead.website) && (
+            {isUsableWebsite(lead.website) ? (
               <InfoRow icon={<GlobeIcon className="h-4 w-4" />}>
                 <a href={lead.website!} target="_blank" rel="noreferrer" className="text-aurora-300 hover:underline">
                   {displayWebsite(lead.website)}
                 </a>
               </InfoRow>
+            ) : (
+              <InfoRow icon={<GlobeIcon className="h-4 w-4" />}>
+                <div className="min-w-0">
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(
+                      [lead.company, lead.location].filter(Boolean).join(" "),
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-aurora-300 hover:underline"
+                  >
+                    Search the web
+                  </a>
+                  <p className="mt-0.5 text-[11px] text-mist-500">
+                    No website on file — Google search for this lead (plan B).
+                  </p>
+                </div>
+              </InfoRow>
             )}
+            <div className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
+              <p className="text-[10px] uppercase tracking-wider text-mist-500">
+                Company type
+              </p>
+              <input
+                defaultValue={lead.companyType ?? ""}
+                key={`${lead.id}-ctype-${lead.companyType ?? ""}`}
+                onBlur={(e) => {
+                  const next = e.target.value.trim();
+                  if (next !== (lead.companyType ?? "")) {
+                    void props.onUpdateCrm(lead.id, {
+                      companyType: next || null,
+                    });
+                  }
+                }}
+                placeholder="e.g. Pharmacy, Aesthetic Clinic"
+                className="mt-1 w-full bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-600"
+              />
+            </div>
             <InfoRow icon={<MailIcon className="h-4 w-4" />}>
               {lead.emails.length ? (
                 lead.emails.join(", ")

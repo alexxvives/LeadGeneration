@@ -22,8 +22,9 @@ minimal (2–3 cues max per screen).
 ## Color tokens (Tailwind classes)
 
 Palettes live in `globals.css` (`:root` / `[data-theme="light"]`). Edit those
-vars to retune; classes stay the same. Theme toggle = `ThemeToggle` +
-`data-theme` on `<html>`.
+vars to retune; classes stay the same. Theme toggle = `ThemeToggle` (studio
+top-right only) + `data-theme` on `<html>`. Light theme applies only on `/app`;
+marketing pages always stay dark.
 
 | Role | Class | Dark (default) |
 |------|-------|----------------|

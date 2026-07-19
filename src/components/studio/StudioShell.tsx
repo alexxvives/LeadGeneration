@@ -284,6 +284,12 @@ export function StudioShell({
     <div className="relative flex min-h-screen">
       <div className="pointer-events-none fixed inset-0 -z-10 aurora-glow opacity-40" />
 
+      <div className="pointer-events-none fixed right-3 top-3 z-50 sm:right-5 sm:top-4">
+        <div className="pointer-events-auto">
+          <ThemeToggle />
+        </div>
+      </div>
+
       <aside className="sticky top-0 z-30 flex h-screen w-16 flex-col border-r border-white/5 bg-ink-950/90 py-5 backdrop-blur-xl sm:w-64 sm:px-4">
         <Link
           href="/"
@@ -330,9 +336,6 @@ export function StudioShell({
 
         {/* Board + outreach profile filters + account card */}
         <div className="mt-auto border-t border-white/5 pt-5">
-          <div className="mb-3 flex justify-center sm:justify-start">
-            <ThemeToggle />
-          </div>
           <div className="mb-5 space-y-2">
             <BoardPicker
               boards={boards}

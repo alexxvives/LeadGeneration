@@ -9,21 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-18 (theme + pricing polish)
+## ⏱️ Status — updated 2026-07-19 (studio UX + sharing)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Deployed:** Version `9636c02c-a6f1-4d39-a399-011e530d74a1`
+**Deployed:** (redeploy after this pass for D1 migrations 0019–0020)
 
 ### This pass
-- Light/dark theme (`data-theme` + palettes in `globals.css`; `ThemeToggle`).
-- Pricing toggle overflow fix; “Most popular” beside Pro; honest plan bullets.
-- Hero/logo/preview timing; remove confirm-password on signup.
-- Admin still `users.is_admin` (0018); no `ADMIN_*` secrets.
+- Theme: light palette **studio-only** (`/app`); toggle top-right; marketing dark.
+- Leads: shared pipeline filter (table/cards/map); Notes always on; Pipeline
+  header sort/filter menu; Columns button removed.
+- `companyType` on leads + Excel aliases + keyword suggest; drawer Google
+  search plan-B when no website.
+- Board invite/accept + soft lock (ADR 0015). Migrations `0019`, `0020`.
 
 ### Next
-1. Hard-refresh site — try theme toggle + pricing annual switch.
-2. Create Stripe test Prices at $19 / $49 / $99 if not done.
-3. Buy Firecrawl Hobby when free 1k credits/mo is the bottleneck.
+1. `npm run cf:migrate` then redeploy Worker so prod gets company_type + sharing tables.
+2. Smoke: invite a second user to a board; confirm soft-lock banner + 423 on edit.
+3. Optional: email delivery for invites; Firecrawl/LLM company-type extract.
 
 ---
 

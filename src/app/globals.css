@@ -50,39 +50,39 @@ html[data-theme="dark"] {
 html[data-theme="light"] {
   color-scheme: light;
 
-  /* Cool paper surfaces (not cream) */
-  --ink-950: #f3f6fb;
-  --ink-900: #e8eef8;
-  --ink-850: #dce5f2;
-  --ink-800: #cfd9ea;
-  --ink-700: #b4c2d6;
-  --ink-600: #8a9bb5;
+  /* Cool paper surfaces — clearer separation between page / panel / chrome */
+  --ink-950: #eef2f8;
+  --ink-900: #ffffff;
+  --ink-850: #f4f7fc;
+  --ink-800: #e4ebf5;
+  --ink-700: #c5d0e0;
+  --ink-600: #8b9bb3;
 
-  /* Slightly deeper teal for contrast on light */
-  --aurora-300: #0f9f8f;
+  /* Deeper teal for contrast on light */
+  --aurora-300: #0d8f80;
   --aurora-400: #0d9488;
   --aurora-500: #0f766e;
   --aurora-600: #115e59;
 
-  --amber-300: #c47d12;
+  --amber-300: #b45309;
   --amber-400: #d97706;
-  --amber-500: #b45309;
+  --amber-500: #92400e;
 
   --mist-100: #0c1524;
-  --mist-300: #3d4f6a;
-  --mist-500: #5c708c;
+  --mist-300: #334155;
+  --mist-500: #64748b;
 
   --on-accent: #050505;
 
-  --glass-top: rgba(12, 21, 36, 0.04);
-  --glass-bottom: rgba(12, 21, 36, 0.015);
-  --glass-border: rgba(12, 21, 36, 0.1);
-  --grid-line: rgba(12, 21, 36, 0.55);
-  --aurora-glow-a: rgba(13, 148, 136, 0.14);
-  --aurora-glow-b: rgba(217, 119, 6, 0.08);
-  --aurora-glow-c: rgba(15, 118, 110, 0.1);
-  --card-hover-shadow: rgba(13, 148, 136, 0.22);
-  --map-bg: #e2e8f0;
+  --glass-top: rgba(255, 255, 255, 0.72);
+  --glass-bottom: rgba(238, 242, 248, 0.85);
+  --glass-border: rgba(12, 21, 36, 0.12);
+  --grid-line: rgba(12, 21, 36, 0.45);
+  --aurora-glow-a: rgba(13, 148, 136, 0.1);
+  --aurora-glow-b: rgba(217, 119, 6, 0.06);
+  --aurora-glow-c: rgba(15, 118, 110, 0.08);
+  --card-hover-shadow: rgba(13, 148, 136, 0.18);
+  --map-bg: #dde5f0;
 }
 
 @theme {
@@ -171,6 +171,17 @@ html[data-theme="light"] {
   }
   html[data-theme="light"] .hero-grid {
     opacity: 0.06;
+  }
+  /* Light studio: white/opacity borders read muddy — tighten chrome */
+  html[data-theme="light"] aside.sticky {
+    background-color: color-mix(in srgb, var(--ink-900) 92%, transparent);
+    border-color: var(--glass-border);
+  }
+  html[data-theme="light"] .border-white\/5,
+  html[data-theme="light"] .border-white\/8,
+  html[data-theme="light"] .border-white\/10,
+  html[data-theme="light"] .border-white\/15 {
+    border-color: var(--glass-border);
   }
 
   .glass {

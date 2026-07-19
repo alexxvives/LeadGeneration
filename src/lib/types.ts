@@ -102,6 +102,8 @@ export interface ImportLeadRow {
   phones?: string[];
   contactName?: string | null;
   location?: string | null;
+  /** Venue / business category (Pharmacy, SPA, …). */
+  companyType?: string | null;
 }
 
 /**
@@ -207,12 +209,50 @@ export interface Board {
   updatedAt: string;
 }
 
+/** Access role for a board (owner workspace or invited member). */
+export type BoardMemberRole = "owner" | "editor";
+
+/** Soft presence lock — blocks edits while another user holds the board. */
+export interface BoardLock {
+  boardId: string;
+  userId: string;
+  userName: string | null;
+  lockedAt: string;
+  expiresAt: string;
+}
+
+export interface BoardInvite {
+  id: string;
+  boardId: string;
+  boardName: string;
+  email: string;
+  role: BoardMemberRole;
+  invitedByUserId: string;
+  status: "pending" | "accepted" | "revoked";
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface BoardMember {
+  boardId: string;
+  userId: string;
+  email: string | null;
+  role: BoardMemberRole;
+  createdAt: string;
+}
+
 /** Client-safe board row with aggregate counts for sidebar / Boards view. */
 export interface BoardSummary extends Board {
   leadCount: number;
   contactedCount: number;
   sentCount: number;
   closedCount: number;
+  /** How the current user accesses this board. */
+  access: BoardMemberRole;
+  /** True when board.workspaceId !== caller's workspace. */
+  shared: boolean;
+  /** Active soft lock held by someone else (if any). */
+  lock: BoardLock | null;
 }
 
 /** Aggregate workspace stats for the Dashboard view. */
@@ -308,6 +348,8 @@ export interface Lead {
   contactName: string | null;
   location: string | null; // full scraped address when available (street + city)
   aboutBlurb: string | null; // short summary used for personalization
+  /** Business category (Pharmacy, Aesthetic Clinic, …) — Excel or suggested. */
+  companyType: string | null;
   tags: string[];
   fitScore: number; // 0-100 heuristic fit score
   fitReasons: string[]; // human-readable "why this scored" notes

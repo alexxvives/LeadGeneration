@@ -1,4 +1,18 @@
-import type { Board, Lead, Outreach, Run, Workspace, PlanId, ContactMethod, FollowUp, DeliveryStatus } from "@/lib/types";
+import type {
+  Board,
+  BoardInvite,
+  BoardLock,
+  BoardMember,
+  BoardMemberRole,
+  Lead,
+  Outreach,
+  Run,
+  Workspace,
+  PlanId,
+  ContactMethod,
+  FollowUp,
+  DeliveryStatus,
+} from "@/lib/types";
 import { normalizeCrmStage } from "@/lib/types";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
@@ -114,6 +128,7 @@ type LeadRow = {
   contact_name: string | null;
   location: string | null;
   about_blurb: string | null;
+  company_type: string | null;
   tags: string;
   fit_score: number;
   fit_reasons: string;
@@ -259,6 +274,7 @@ function rowToLead(r: LeadRow): Lead {
     contactName: r.contact_name,
     location: r.location,
     aboutBlurb: r.about_blurb,
+    companyType: r.company_type ?? null,
     tags: arr(r.tags),
     fitScore: r.fit_score,
     fitReasons: arr(r.fit_reasons),
@@ -502,6 +518,14 @@ export class D1Store implements LeadRepository {
     return row ? rowToBoard(row) : null;
   }
 
+  async getBoardAnywhere(id: string): Promise<Board | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM boards WHERE id = ?`)
+      .bind(id)
+      .first<BoardRow>();
+    return row ? rowToBoard(row) : null;
+  }
+
   async listBoards(): Promise<Board[]> {
     const { results } = await this.db
       .prepare(
@@ -518,7 +542,279 @@ export class D1Store implements LeadRepository {
       .prepare(`DELETE FROM boards WHERE id = ? AND workspace_id = ? AND is_default = 0`)
       .bind(id, this.workspaceId)
       .run();
+    if (result.meta.changes > 0) {
+      await this.db.batch([
+        this.db.prepare(`DELETE FROM board_members WHERE board_id = ?`).bind(id),
+        this.db.prepare(`DELETE FROM board_invites WHERE board_id = ?`).bind(id),
+        this.db.prepare(`DELETE FROM board_locks WHERE board_id = ?`).bind(id),
+      ]);
+    }
     return result.meta.changes > 0;
+  }
+
+  async listBoardMembers(boardId: string): Promise<BoardMember[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM board_members WHERE board_id = ?`)
+      .bind(boardId)
+      .all<{
+        board_id: string;
+        user_id: string;
+        email: string | null;
+        role: string;
+        created_at: string;
+      }>();
+    return (results ?? []).map((r) => ({
+      boardId: r.board_id,
+      userId: r.user_id,
+      email: r.email,
+      role: r.role as BoardMemberRole,
+      createdAt: r.created_at,
+    }));
+  }
+
+  async upsertBoardMember(member: BoardMember): Promise<BoardMember> {
+    await this.db
+      .prepare(
+        `INSERT INTO board_members (board_id, user_id, email, role, created_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(board_id, user_id) DO UPDATE SET
+           email = excluded.email,
+           role = excluded.role`,
+      )
+      .bind(
+        member.boardId,
+        member.userId,
+        member.email,
+        member.role,
+        member.createdAt,
+      )
+      .run();
+    return member;
+  }
+
+  async removeBoardMember(boardId: string, userId: string): Promise<boolean> {
+    const result = await this.db
+      .prepare(`DELETE FROM board_members WHERE board_id = ? AND user_id = ?`)
+      .bind(boardId, userId)
+      .run();
+    return result.meta.changes > 0;
+  }
+
+  async listBoardIdsForMember(userId: string): Promise<string[]> {
+    const { results } = await this.db
+      .prepare(`SELECT board_id FROM board_members WHERE user_id = ?`)
+      .bind(userId)
+      .all<{ board_id: string }>();
+    return (results ?? []).map((r) => r.board_id);
+  }
+
+  async createBoardInvite(invite: BoardInvite): Promise<BoardInvite> {
+    await this.db
+      .prepare(
+        `INSERT INTO board_invites
+         (id, board_id, email, role, invited_by_user_id, status, created_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        invite.id,
+        invite.boardId,
+        invite.email,
+        invite.role,
+        invite.invitedByUserId,
+        invite.status,
+        invite.createdAt,
+        invite.expiresAt,
+      )
+      .run();
+    return invite;
+  }
+
+  async updateBoardInvite(
+    id: string,
+    patch: Partial<BoardInvite>,
+  ): Promise<BoardInvite | null> {
+    const row: Record<string, unknown> = {};
+    if ("status" in patch) row.status = patch.status;
+    if ("role" in patch) row.role = patch.role;
+    if ("expiresAt" in patch) row.expires_at = patch.expiresAt;
+    if (Object.keys(row).length === 0) return this.getBoardInvite(id);
+    const { clause, values } = buildSet(row);
+    await this.db
+      .prepare(`UPDATE board_invites SET ${clause} WHERE id = ?`)
+      .bind(...values, id)
+      .run();
+    return this.getBoardInvite(id);
+  }
+
+  async getBoardInvite(id: string): Promise<BoardInvite | null> {
+    const r = await this.db
+      .prepare(`SELECT * FROM board_invites WHERE id = ?`)
+      .bind(id)
+      .first<{
+        id: string;
+        board_id: string;
+        email: string;
+        role: string;
+        invited_by_user_id: string;
+        status: string;
+        created_at: string;
+        expires_at: string;
+      }>();
+    if (!r) return null;
+    const board = await this.getBoardAnywhere(r.board_id);
+    return {
+      id: r.id,
+      boardId: r.board_id,
+      boardName: board?.name ?? "Board",
+      email: r.email,
+      role: r.role as BoardMemberRole,
+      invitedByUserId: r.invited_by_user_id,
+      status: r.status as BoardInvite["status"],
+      createdAt: r.created_at,
+      expiresAt: r.expires_at,
+    };
+  }
+
+  async listPendingInvitesForEmail(email: string): Promise<BoardInvite[]> {
+    const key = email.trim().toLowerCase();
+    const now = new Date().toISOString();
+    const { results } = await this.db
+      .prepare(
+        `SELECT * FROM board_invites
+         WHERE lower(email) = ? AND status = 'pending' AND expires_at > ?`,
+      )
+      .bind(key, now)
+      .all<{
+        id: string;
+        board_id: string;
+        email: string;
+        role: string;
+        invited_by_user_id: string;
+        status: string;
+        created_at: string;
+        expires_at: string;
+      }>();
+    const out: BoardInvite[] = [];
+    for (const r of results ?? []) {
+      const board = await this.getBoardAnywhere(r.board_id);
+      out.push({
+        id: r.id,
+        boardId: r.board_id,
+        boardName: board?.name ?? "Board",
+        email: r.email,
+        role: r.role as BoardMemberRole,
+        invitedByUserId: r.invited_by_user_id,
+        status: r.status as BoardInvite["status"],
+        createdAt: r.created_at,
+        expiresAt: r.expires_at,
+      });
+    }
+    return out;
+  }
+
+  async listPendingInvitesForBoard(boardId: string): Promise<BoardInvite[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT * FROM board_invites WHERE board_id = ? AND status = 'pending'`,
+      )
+      .bind(boardId)
+      .all<{
+        id: string;
+        board_id: string;
+        email: string;
+        role: string;
+        invited_by_user_id: string;
+        status: string;
+        created_at: string;
+        expires_at: string;
+      }>();
+    const board = await this.getBoardAnywhere(boardId);
+    return (results ?? []).map((r) => ({
+      id: r.id,
+      boardId: r.board_id,
+      boardName: board?.name ?? "Board",
+      email: r.email,
+      role: r.role as BoardMemberRole,
+      invitedByUserId: r.invited_by_user_id,
+      status: r.status as BoardInvite["status"],
+      createdAt: r.created_at,
+      expiresAt: r.expires_at,
+    }));
+  }
+
+  async getBoardLock(boardId: string): Promise<BoardLock | null> {
+    const r = await this.db
+      .prepare(`SELECT * FROM board_locks WHERE board_id = ?`)
+      .bind(boardId)
+      .first<{
+        board_id: string;
+        user_id: string;
+        user_name: string | null;
+        locked_at: string;
+        expires_at: string;
+      }>();
+    if (!r) return null;
+    if (r.expires_at <= new Date().toISOString()) {
+      await this.clearBoardLock(boardId);
+      return null;
+    }
+    return {
+      boardId: r.board_id,
+      userId: r.user_id,
+      userName: r.user_name,
+      lockedAt: r.locked_at,
+      expiresAt: r.expires_at,
+    };
+  }
+
+  async upsertBoardLock(lock: BoardLock): Promise<BoardLock> {
+    await this.db
+      .prepare(
+        `INSERT INTO board_locks (board_id, user_id, user_name, locked_at, expires_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(board_id) DO UPDATE SET
+           user_id = excluded.user_id,
+           user_name = excluded.user_name,
+           locked_at = excluded.locked_at,
+           expires_at = excluded.expires_at`,
+      )
+      .bind(
+        lock.boardId,
+        lock.userId,
+        lock.userName,
+        lock.lockedAt,
+        lock.expiresAt,
+      )
+      .run();
+    return lock;
+  }
+
+  async clearBoardLock(boardId: string, userId?: string): Promise<boolean> {
+    const result = userId
+      ? await this.db
+          .prepare(
+            `DELETE FROM board_locks WHERE board_id = ? AND user_id = ?`,
+          )
+          .bind(boardId, userId)
+          .run()
+      : await this.db
+          .prepare(`DELETE FROM board_locks WHERE board_id = ?`)
+          .bind(boardId)
+          .run();
+    return result.meta.changes > 0;
+  }
+
+  async getMemberRole(
+    boardId: string,
+    userId: string,
+  ): Promise<BoardMemberRole | null> {
+    const r = await this.db
+      .prepare(
+        `SELECT role FROM board_members WHERE board_id = ? AND user_id = ?`,
+      )
+      .bind(boardId, userId)
+      .first<{ role: string }>();
+    return (r?.role as BoardMemberRole) ?? null;
   }
 
   // ---- Runs ----
@@ -600,9 +896,9 @@ export class D1Store implements LeadRepository {
         .prepare(
           `INSERT INTO leads
            (id, workspace_id, run_id, board_id, company, website, emails, phones, contact_name,
-            location, about_blurb, tags, fit_score, fit_reasons, source_url,
+            location, about_blurb, company_type, tags, fit_score, fit_reasons, source_url,
             status, crm_stage, contact_method, notes, follow_ups, custom_fields, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           l.id,
@@ -616,6 +912,7 @@ export class D1Store implements LeadRepository {
           l.contactName,
           l.location,
           l.aboutBlurb,
+          l.companyType ?? null,
           str(l.tags),
           l.fitScore,
           str(l.fitReasons),
@@ -644,6 +941,7 @@ export class D1Store implements LeadRepository {
     if ("contactName" in patch) row.contact_name = patch.contactName ?? null;
     if ("location" in patch) row.location = patch.location ?? null;
     if ("aboutBlurb" in patch) row.about_blurb = patch.aboutBlurb ?? null;
+    if ("companyType" in patch) row.company_type = patch.companyType ?? null;
     if ("tags" in patch) row.tags = str(patch.tags!);
     if ("fitScore" in patch) row.fit_score = patch.fitScore;
     if ("fitReasons" in patch) row.fit_reasons = str(patch.fitReasons!);

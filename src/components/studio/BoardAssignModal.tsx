@@ -78,6 +78,9 @@ export function BoardAssignModal({
         contactedCount: 0,
         sentCount: 0,
         closedCount: 0,
+        access: "owner",
+        shared: false,
+        lock: null,
       };
       setLocalBoards((prev) => [...prev, summary]);
       setSelectedId(board.id);

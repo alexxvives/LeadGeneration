@@ -3,6 +3,9 @@ import type {
 } from "@/lib/config";
 import type {
   Board,
+  BoardInvite,
+  BoardLock,
+  BoardMember,
   BoardSummary,
   ContactMethod,
   CrmStage,
@@ -25,6 +28,7 @@ export interface BoardResponse {
   leads: LeadWithOutreach[];
   boards: BoardSummary[];
   activeBoardId: string | null;
+  boardLock: BoardLock | null;
   capabilities: Capabilities;
   workspace: WorkspaceSummary;
 }
@@ -66,8 +70,10 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
     }
     const e = new Error(err.error ?? `Request failed (${res.status})`) as Error & {
       undeliverableRemoved?: boolean;
+      locked?: boolean;
     };
     if (err.undeliverableRemoved) e.undeliverableRemoved = true;
+    if (res.status === 423) e.locked = true;
     throw e;
   }
   return data as T;
@@ -98,6 +104,38 @@ export const api = {
 
   deleteBoard: (id: string) =>
     jsonFetch<{ ok: boolean }>(`/api/boards/${id}`, { method: "DELETE" }),
+
+  inviteToBoard: (boardId: string, email: string) =>
+    jsonFetch<{ invite: BoardInvite }>(`/api/boards/${boardId}/invites`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  listBoardInvites: (boardId: string) =>
+    jsonFetch<{ invites: BoardInvite[]; members: BoardMember[] }>(
+      `/api/boards/${boardId}/invites`,
+    ),
+
+  listMyInvites: () => jsonFetch<{ invites: BoardInvite[] }>("/api/invites"),
+
+  acceptInvite: (inviteId: string) =>
+    jsonFetch<{ member: BoardMember }>("/api/invites", {
+      method: "POST",
+      body: JSON.stringify({ inviteId }),
+    }),
+
+  heartbeatBoardLock: (boardId: string) =>
+    jsonFetch<{ lock: BoardLock }>(`/api/boards/${boardId}/lock`, {
+      method: "POST",
+    }),
+
+  releaseBoardLock: (boardId: string) =>
+    jsonFetch<{ ok: boolean }>(`/api/boards/${boardId}/lock`, {
+      method: "DELETE",
+    }),
+
+  getBoardLock: (boardId: string) =>
+    jsonFetch<{ lock: BoardLock | null }>(`/api/boards/${boardId}/lock`),
 
   dashboard: (boardId?: string | null) => {
     const q =
@@ -214,6 +252,7 @@ export const api = {
       crmStage?: CrmStage;
       contactMethod?: ContactMethod | null;
       notes?: string | null;
+      companyType?: string | null;
       followUps?: FollowUp[];
       customFields?: Record<string, string>;
     },

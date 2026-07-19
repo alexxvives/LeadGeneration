@@ -113,6 +113,9 @@ export function BoardPicker({
                   {b.isDefault ? (
                     <span className="ml-1.5 text-[10px] text-mist-500">Default</span>
                   ) : null}
+                  {b.shared ? (
+                    <span className="ml-1.5 text-[10px] text-amber-400">Shared</span>
+                  ) : null}
                 </span>
                 <span className="shrink-0 text-xs text-mist-500">{b.leadCount}</span>
               </button>

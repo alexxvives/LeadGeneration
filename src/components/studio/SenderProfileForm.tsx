@@ -67,6 +67,7 @@ const PREVIEW_LEAD: Lead = {
   phones: [],
   location: "Austin, TX",
   aboutBlurb: null,
+  companyType: null,
   tags: [],
   fitScore: 80,
   fitReasons: [],

@@ -75,8 +75,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     CRM **New** = needs human review (there is no separate “In review” tag).
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
-    cards / map) + **Export Excel**. Table shows a short city label; the drawer
-    keeps the full scraped address when available.
+    cards / map) with a shared **Pipeline** stage filter; Notes + Type columns
+    always on. Pipeline header menu sorts or filters by stage. **Export Excel**.
+    Table shows a short city label; the drawer keeps the full scraped address
+    when available (or a Google search plan-B when no website).
 
   - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (Create /
     Review; unapproved drafts stay here) → **Ready** (only after Approve) →
@@ -89,8 +91,9 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     Pipeline / Leads.
 
   - **Boards** (`?view=boards`) — create / rename / delete named lead
-    collections. Every workspace has a non-deletable **Default** board. Also
-    linked from Settings → Boards.
+    collections; invite collaborators by email (in-app accept). Soft lock when
+    someone else is editing. Every workspace has a non-deletable **Default**
+    board. Also linked from Settings → Boards.
 
   - **Lead detail drawer** — opens from any lead card/row/pin. Contact info
     (incl. full address), about blurb, fit-score reasons, CRM stage, dated notes

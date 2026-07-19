@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-19 — Studio-only theme, company type, board sharing
+- Light theme applies only on `/app` (boot script + `ThemeProvider`); marketing
+  stays dark. Toggle lives top-right in `StudioShell`, not SiteNav.
+- Excel import maps headers via alias lists in `ImportLeadsPanel` (`normHeader` +
+  first-match). New `companyType` aliases: type/category/industry/…. Firecrawl
+  does not classify today; keyword `suggestCompanyType` fills gaps from blurb.
+- Leads pipeline filter lives in Studio toolbar (Table/Cards/Map); Pipeline
+  column header menu = sort + filter. Notes column always visible.
+- Board sharing: invite/accept + soft lock (ADR 0015). Migrations 0019–0020.
+
 ### 2026-07-18 — Light theme + pricing honesty + UI polish
 - Theme: `data-theme` + CSS vars in `globals.css` (edit palettes there);
   `ThemeToggle` in SiteNav + studio. Use `text-on-accent` on solid CTAs.

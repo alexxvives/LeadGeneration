@@ -1,4 +1,14 @@
-import type { Board, Lead, Outreach, Run, Workspace } from "@/lib/types";
+import type {
+  Board,
+  BoardInvite,
+  BoardLock,
+  BoardMember,
+  BoardMemberRole,
+  Lead,
+  Outreach,
+  Run,
+  Workspace,
+} from "@/lib/types";
 import { JsonStore } from "./json-store";
 import { D1Store, type D1Database } from "./d1-store";
 
@@ -57,8 +67,29 @@ export interface LeadRepository {
   createBoard(board: Board): Promise<Board>;
   updateBoard(id: string, patch: Partial<Board>): Promise<Board | null>;
   getBoard(id: string): Promise<Board | null>;
+  /** Cross-workspace board lookup (sharing). */
+  getBoardAnywhere(id: string): Promise<Board | null>;
   listBoards(): Promise<Board[]>;
   deleteBoard(id: string): Promise<boolean>;
+
+  // Board sharing (ADR 0015) — not workspace-scoped
+  listBoardMembers(boardId: string): Promise<BoardMember[]>;
+  upsertBoardMember(member: BoardMember): Promise<BoardMember>;
+  removeBoardMember(boardId: string, userId: string): Promise<boolean>;
+  listBoardIdsForMember(userId: string): Promise<string[]>;
+  createBoardInvite(invite: BoardInvite): Promise<BoardInvite>;
+  updateBoardInvite(
+    id: string,
+    patch: Partial<BoardInvite>,
+  ): Promise<BoardInvite | null>;
+  getBoardInvite(id: string): Promise<BoardInvite | null>;
+  listPendingInvitesForEmail(email: string): Promise<BoardInvite[]>;
+  listPendingInvitesForBoard(boardId: string): Promise<BoardInvite[]>;
+  getBoardLock(boardId: string): Promise<BoardLock | null>;
+  upsertBoardLock(lock: BoardLock): Promise<BoardLock>;
+  clearBoardLock(boardId: string, userId?: string): Promise<boolean>;
+  /** Role when user is a member; null if not. */
+  getMemberRole(boardId: string, userId: string): Promise<BoardMemberRole | null>;
 
   // Runs
   createRun(run: Run): Promise<Run>;

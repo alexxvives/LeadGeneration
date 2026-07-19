@@ -16,10 +16,14 @@ import { checkSendRate } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
 import { getCachedVerify, verifyEmail } from "@/lib/email/verify";
 import { getPlan } from "@/lib/plans";
-import { NotFoundError, QuotaError } from "@/lib/errors";
+import { BoardLockedError, NotFoundError, QuotaError } from "@/lib/errors";
 import { ensureUsageWindow, ensureVerifyWindow } from "@/lib/workspace";
 import type {
   Board,
+  BoardInvite,
+  BoardLock,
+  BoardMember,
+  BoardMemberRole,
   BoardSummary,
   ContactMethod,
   ConnectedMailbox,
@@ -42,6 +46,8 @@ import type {
   ImportLeadRow,
   Workspace,
 } from "@/lib/types";
+
+const LOCK_TTL_MS = 150_000; // 2.5 minutes
 import { mailboxPublicStatus } from "@/lib/email/mailbox";
 import { scoreImportedLead } from "@/lib/fit-score";
 import { aiAvailable } from "@/lib/ai/chat";
@@ -63,6 +69,12 @@ export interface Ctx {
   db: LeadRepository;
   workspaceId: string;
   metered: boolean;
+  /** Auth.js user id (null in anonymous local/smoke). */
+  userId: string | null;
+  userEmail: string | null;
+  userName: string | null;
+  /** Re-scope the repository to another workspace (shared board access). */
+  scopeToWorkspace: (workspaceId: string) => LeadRepository;
 }
 
 /**
@@ -127,26 +139,105 @@ export async function ensureDefaultBoard(ctx: Ctx): Promise<Board> {
   return def;
 }
 
+function summarizeLeads(
+  b: Board,
+  mine: Lead[],
+  access: BoardMemberRole,
+  shared: boolean,
+  foreignLock: BoardLock | null,
+): BoardSummary {
+  return {
+    ...b,
+    leadCount: mine.length,
+    contactedCount: mine.filter(
+      (l) =>
+        l.crmStage === "contacted" ||
+        l.crmStage === "in_conversation" ||
+        l.crmStage === "closed",
+    ).length,
+    sentCount: mine.filter((l) => l.status === "sent").length,
+    closedCount: mine.filter((l) => l.crmStage === "closed").length,
+    access,
+    shared,
+    lock: foreignLock,
+  };
+}
+
+/** Resolve owned or shared board access; returns owner-scoped db when shared. */
+export async function resolveBoardAccess(
+  ctx: Ctx,
+  boardId: string,
+): Promise<{
+  board: Board;
+  db: LeadRepository;
+  access: BoardMemberRole;
+  shared: boolean;
+} | null> {
+  const owned = await ctx.db.getBoard(boardId);
+  if (owned) {
+    return { board: owned, db: ctx.db, access: "owner", shared: false };
+  }
+  if (!ctx.userId) return null;
+  const role = await ctx.db.getMemberRole(boardId, ctx.userId);
+  if (!role) return null;
+  const board = await ctx.db.getBoardAnywhere(boardId);
+  if (!board) return null;
+  return {
+    board,
+    db: ctx.scopeToWorkspace(board.workspaceId),
+    access: role,
+    shared: true,
+  };
+}
+
 export async function listBoardSummaries(ctx: Ctx): Promise<BoardSummary[]> {
   await ensureDefaultBoard(ctx);
   const [boards, leads] = await Promise.all([
     ctx.db.listBoards(),
     ctx.db.listLeads(),
   ]);
-  return boards.map((b) => {
-    const mine = leads.filter((l) => l.boardId === b.id);
-    return {
-      ...b,
-      leadCount: mine.length,
-      contactedCount: mine.filter(
-        (l) =>
-          l.crmStage === "contacted" ||
-          l.crmStage === "in_conversation" ||
-          l.crmStage === "closed",
-      ).length,
-      sentCount: mine.filter((l) => l.status === "sent").length,
-      closedCount: mine.filter((l) => l.crmStage === "closed").length,
-    };
+  const summaries: BoardSummary[] = [];
+  for (const b of boards) {
+    const lock = await ctx.db.getBoardLock(b.id);
+    const foreignLock =
+      lock && ctx.userId && lock.userId !== ctx.userId ? lock : null;
+    summaries.push(
+      summarizeLeads(
+        b,
+        leads.filter((l) => l.boardId === b.id),
+        "owner",
+        false,
+        foreignLock,
+      ),
+    );
+  }
+
+  if (ctx.userId) {
+    const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
+    for (const id of sharedIds) {
+      if (summaries.some((s) => s.id === id)) continue;
+      const access = await resolveBoardAccess(ctx, id);
+      if (!access) continue;
+      const sharedLeads = await access.db.listLeads({ boardId: id });
+      const lock = await ctx.db.getBoardLock(id);
+      const foreignLock =
+        lock && ctx.userId && lock.userId !== ctx.userId ? lock : null;
+      summaries.push(
+        summarizeLeads(
+          access.board,
+          sharedLeads,
+          access.access,
+          true,
+          foreignLock,
+        ),
+      );
+    }
+  }
+
+  return summaries.sort((a, b) => {
+    if (a.shared !== b.shared) return a.shared ? 1 : -1;
+    if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+    return a.name.localeCompare(b.name);
   });
 }
 
@@ -176,9 +267,11 @@ export async function renameBoard(
 ): Promise<Board> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Board name is required");
-  const existing = await ctx.db.getBoard(id);
-  if (!existing) throw new NotFoundError("Board not found");
-  const updated = await ctx.db.updateBoard(id, {
+  const access = await resolveBoardAccess(ctx, id);
+  if (!access || access.access !== "owner" || access.shared) {
+    throw new NotFoundError("Board not found");
+  }
+  const updated = await access.db.updateBoard(id, {
     name: trimmed,
     updatedAt: nowIso(),
   });
@@ -201,6 +294,144 @@ export async function deleteBoard(ctx: Ctx, id: string): Promise<void> {
     ...runs.map((r) => ctx.db.updateRun(r.id, { boardId: def.id })),
   ]);
   await ctx.db.deleteBoard(id);
+}
+
+export async function inviteToBoard(
+  ctx: Ctx,
+  boardId: string,
+  emailRaw: string,
+): Promise<BoardInvite> {
+  if (!ctx.userId) throw new Error("Sign in required to invite");
+  const access = await resolveBoardAccess(ctx, boardId);
+  if (!access || access.shared || access.access !== "owner") {
+    throw new Error("Only the board owner can invite");
+  }
+  const email = emailRaw.trim().toLowerCase();
+  if (!email || !email.includes("@")) throw new Error("Valid email required");
+  if (ctx.userEmail && email === ctx.userEmail.toLowerCase()) {
+    throw new Error("You already own this board");
+  }
+  const existing = await ctx.db.listPendingInvitesForBoard(boardId);
+  const dup = existing.find((i) => i.email.toLowerCase() === email);
+  if (dup) return dup;
+
+  const now = nowIso();
+  const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  return ctx.db.createBoardInvite({
+    id: newId("binv"),
+    boardId,
+    boardName: access.board.name,
+    email,
+    role: "editor",
+    invitedByUserId: ctx.userId,
+    status: "pending",
+    createdAt: now,
+    expiresAt: expires,
+  });
+}
+
+export async function listMyPendingInvites(ctx: Ctx): Promise<BoardInvite[]> {
+  if (!ctx.userEmail) return [];
+  return ctx.db.listPendingInvitesForEmail(ctx.userEmail);
+}
+
+export async function acceptBoardInvite(
+  ctx: Ctx,
+  inviteId: string,
+): Promise<BoardMember> {
+  if (!ctx.userId || !ctx.userEmail) {
+    throw new Error("Sign in required to accept an invite");
+  }
+  const invite = await ctx.db.getBoardInvite(inviteId);
+  if (!invite || invite.status !== "pending") {
+    throw new NotFoundError("Invite not found");
+  }
+  if (invite.expiresAt <= nowIso()) {
+    await ctx.db.updateBoardInvite(inviteId, { status: "revoked" });
+    throw new Error("Invite expired");
+  }
+  if (invite.email.toLowerCase() !== ctx.userEmail.toLowerCase()) {
+    throw new Error("This invite was sent to a different email");
+  }
+  const member: BoardMember = {
+    boardId: invite.boardId,
+    userId: ctx.userId,
+    email: ctx.userEmail,
+    role: invite.role === "owner" ? "editor" : invite.role,
+    createdAt: nowIso(),
+  };
+  await ctx.db.upsertBoardMember(member);
+  await ctx.db.updateBoardInvite(inviteId, { status: "accepted" });
+  return member;
+}
+
+export async function listBoardInvites(
+  ctx: Ctx,
+  boardId: string,
+): Promise<BoardInvite[]> {
+  const access = await resolveBoardAccess(ctx, boardId);
+  if (!access || access.shared) throw new NotFoundError("Board not found");
+  return ctx.db.listPendingInvitesForBoard(boardId);
+}
+
+export async function listBoardMembersForUi(
+  ctx: Ctx,
+  boardId: string,
+): Promise<BoardMember[]> {
+  const access = await resolveBoardAccess(ctx, boardId);
+  if (!access) throw new NotFoundError("Board not found");
+  return ctx.db.listBoardMembers(boardId);
+}
+
+/** Heartbeat: claim or refresh soft lock. Fails if another user holds it. */
+export async function heartbeatBoardLock(
+  ctx: Ctx,
+  boardId: string,
+): Promise<BoardLock> {
+  if (!ctx.userId) throw new Error("Sign in required");
+  const access = await resolveBoardAccess(ctx, boardId);
+  if (!access) throw new NotFoundError("Board not found");
+
+  const existing = await ctx.db.getBoardLock(boardId);
+  if (existing && existing.userId !== ctx.userId) {
+    throw new BoardLockedError(existing.userId, existing.userName);
+  }
+  const now = nowIso();
+  const lock: BoardLock = {
+    boardId,
+    userId: ctx.userId,
+    userName: ctx.userName,
+    lockedAt: existing?.lockedAt ?? now,
+    expiresAt: new Date(Date.now() + LOCK_TTL_MS).toISOString(),
+  };
+  return ctx.db.upsertBoardLock(lock);
+}
+
+export async function releaseBoardLock(
+  ctx: Ctx,
+  boardId: string,
+): Promise<void> {
+  if (!ctx.userId) return;
+  await ctx.db.clearBoardLock(boardId, ctx.userId);
+}
+
+export async function getBoardLockStatus(
+  ctx: Ctx,
+  boardId: string,
+): Promise<BoardLock | null> {
+  const access = await resolveBoardAccess(ctx, boardId);
+  if (!access) return null;
+  const lock = await ctx.db.getBoardLock(boardId);
+  if (!lock) return null;
+  if (ctx.userId && lock.userId === ctx.userId) return null;
+  return lock;
+}
+
+async function assertBoardEditable(ctx: Ctx, boardId: string): Promise<void> {
+  const lock = await ctx.db.getBoardLock(boardId);
+  if (lock && ctx.userId && lock.userId !== ctx.userId) {
+    throw new BoardLockedError(lock.userId, lock.userName);
+  }
 }
 
 /** Resolve a boardId or fall back to Default (optionally create by name). */
@@ -348,6 +579,7 @@ export async function createAndRunSearch(
     });
     const dropped = outcome.leads.length - fresh.length;
 
+    const { suggestCompanyType } = await import("@/lib/company-type");
     const leads: Lead[] = fresh.map((l) => ({
       id: newId("lead"),
       workspaceId: ctx.workspaceId,
@@ -360,6 +592,11 @@ export async function createAndRunSearch(
       contactName: l.contactName,
       location: l.location,
       aboutBlurb: l.aboutBlurb,
+      companyType: suggestCompanyType(
+        l.company,
+        l.aboutBlurb,
+        ...(l.tags ?? []),
+      ),
       tags: l.tags,
       fitScore: l.fitScore,
       fitReasons: l.fitReasons,
@@ -480,6 +717,7 @@ export async function getLatestBoard(
   leads: LeadWithOutreach[];
   boards: BoardSummary[];
   activeBoardId: string | null;
+  boardLock: BoardLock | null;
 }> {
   await ensureDefaultBoard(ctx);
   const boards = await listBoardSummaries(ctx);
@@ -488,7 +726,15 @@ export async function getLatestBoard(
       ? boardId
       : null;
 
-  const runs = await ctx.db.listRuns();
+  let leadDb = ctx.db;
+  let boardLock: BoardLock | null = null;
+  if (active) {
+    const access = await resolveBoardAccess(ctx, active);
+    if (access) leadDb = access.db;
+    boardLock = await getBoardLockStatus(ctx, active);
+  }
+
+  const runs = await leadDb.listRuns();
   const run =
     (active
       ? runs.find((r) => r.boardId === active && r.status === "complete")
@@ -497,12 +743,13 @@ export async function getLatestBoard(
     runs[0] ??
     null;
 
-  const leads = await ctx.db.listLeads(active ? { boardId: active } : undefined);
+  const leads = await leadDb.listLeads(active ? { boardId: active } : undefined);
   return {
     run,
-    leads: await attachOutreach(ctx.db, leads),
+    leads: await attachOutreach(leadDb, leads),
     boards,
     activeBoardId: active,
+    boardLock,
   };
 }
 
@@ -1179,12 +1426,29 @@ export async function updateLeadCrm(
     crmStage?: CrmStage;
     contactMethod?: ContactMethod | null;
     notes?: string | null;
+    companyType?: string | null;
     followUps?: FollowUp[];
     customFields?: Record<string, string>;
   },
 ): Promise<Lead | null> {
-  const lead = await ctx.db.getLead(leadId);
+  let lead = await ctx.db.getLead(leadId);
+  let db = ctx.db;
+  if (!lead && ctx.userId) {
+    // Shared-board lead: find via membership boards.
+    const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
+    for (const bid of sharedIds) {
+      const access = await resolveBoardAccess(ctx, bid);
+      if (!access) continue;
+      const found = await access.db.getLead(leadId);
+      if (found) {
+        lead = found;
+        db = access.db;
+        break;
+      }
+    }
+  }
   if (!lead) return null;
+  await assertBoardEditable(ctx, lead.boardId);
 
   const next: typeof patch = { ...patch };
 
@@ -1210,7 +1474,7 @@ export async function updateLeadCrm(
     }
   }
 
-  return ctx.db.updateLead(leadId, next);
+  return db.updateLead(leadId, next);
 }
 
 function contactMethodFollowUpNote(method: ContactMethod): string {
@@ -1270,6 +1534,7 @@ export async function importLeads(
       phones: (r.phones ?? []).map((p) => p.trim()).filter(Boolean),
       contactName: r.contactName?.trim() || null,
       location: r.location?.trim() || null,
+      companyType: r.companyType?.trim() || null,
     }))
     .filter((r) => r.company.length > 0 || r.emails.length > 0);
 
@@ -1423,6 +1688,7 @@ export async function importLeads(
     // Plain website fetch (no Firecrawl) + optional AI pitch-fit. AI tokens are
     // tiny; Firecrawl credits are the costly part — keep imports off that path.
     const useAi = await aiAvailable();
+    const { suggestCompanyType } = await import("@/lib/company-type");
     const draftLeads = await mapPool(freshRows, 3, async (r) => {
       const company = (
         r.company ||
@@ -1451,6 +1717,11 @@ export async function importLeads(
           /* best-effort enrich */
         }
       }
+
+      const companyType =
+        r.companyType ||
+        suggestCompanyType(company, aboutBlurb, r.location) ||
+        null;
 
       let scored = scoreImportedLead(
         {
@@ -1493,6 +1764,7 @@ export async function importLeads(
         contactName: r.contactName,
         location,
         aboutBlurb,
+        companyType,
         tags: ["imported"],
         fitScore: scored.score,
         fitReasons: scored.reasons,

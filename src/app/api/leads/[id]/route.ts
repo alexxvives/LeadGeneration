@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { deleteLead, updateLeadCrm } from "@/lib/service";
+import { isBoardLockedError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ const PatchSchema = z.object({
     .optional(),
   contactMethod: z.enum(["email", "phone", "contact_form"]).nullable().optional(),
   notes: z.string().nullable().optional(),
+  companyType: z.string().max(120).nullable().optional(),
   followUps: z
     .array(
       z.object({
@@ -52,10 +54,17 @@ export async function PATCH(
     );
   }
 
-  const ctx = await getCtx();
-  const lead = await updateLeadCrm(ctx, id, parsed.data);
-  if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
-  return NextResponse.json({ lead });
+  try {
+    const ctx = await getCtx();
+    const lead = await updateLeadCrm(ctx, id, parsed.data);
+    if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    return NextResponse.json({ lead });
+  } catch (err) {
+    if (isBoardLockedError(err)) {
+      return NextResponse.json({ error: err.message }, { status: 423 });
+    }
+    throw err;
+  }
 }
 
 export async function DELETE(

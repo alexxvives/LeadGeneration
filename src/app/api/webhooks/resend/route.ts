@@ -85,6 +85,10 @@ export async function POST(req: Request) {
       db: getDb(binding, tagWs),
       workspaceId: tagWs,
       metered: !!binding,
+      userId: null,
+      userEmail: null,
+      userName: null,
+      scopeToWorkspace: (wsId) => getDb(binding, wsId),
     };
     const existing = await ctx.db.getOutreach(tagOutreach);
     if (existing) {
@@ -125,6 +129,10 @@ export async function POST(req: Request) {
     db: getDb(binding, target.workspaceId),
     workspaceId: target.workspaceId,
     metered: !!binding,
+    userId: null,
+    userEmail: null,
+    userName: null,
+    scopeToWorkspace: (wsId) => getDb(binding, wsId),
   };
   await setOutreachDeliveryStatus(ctx, target.id, delivery);
   return NextResponse.json({

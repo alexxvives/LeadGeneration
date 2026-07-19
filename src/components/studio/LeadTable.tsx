@@ -26,17 +26,23 @@ const STAGE_ORDER: Record<CrmStage, number> = {
   not_interested: 4,
 };
 
-type SortKey = "company" | "location" | "contact" | "fit" | "status";
+type SortKey = "company" | "location" | "contact" | "fit" | "status" | "companyType";
 
 export function LeadTable({
   leads,
+  statusFilter,
+  onStatusFilterChange,
   onOpen,
   onMoveStage,
   onUpdateLead,
   onDeleteLead,
   onDeleteLeads,
+  editLocked = false,
 }: {
   leads: LeadWithOutreach[];
+  /** Already filtered by Studio; used for header filter menu sync. */
+  statusFilter: CrmStage | "all";
+  onStatusFilterChange: (v: CrmStage | "all") => void;
   onOpen: (id: string) => void;
   onMoveStage?: (
     leadId: string,
@@ -45,34 +51,36 @@ export function LeadTable({
   ) => void;
   onUpdateLead?: (
     leadId: string,
-    patch: { notes?: string | null; customFields?: Record<string, string> },
+    patch: {
+      notes?: string | null;
+      companyType?: string | null;
+      customFields?: Record<string, string>;
+    },
   ) => void;
   onDeleteLead?: (leadId: string) => void;
   /** Bulk delete — preferred when selecting multiple. */
   onDeleteLeads?: (leadIds: string[]) => void | Promise<void>;
+  /** Soft lock — view OK, edits disabled. */
+  editLocked?: boolean;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [pipelineMenuOpen, setPipelineMenuOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<CrmStage | "all">("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
     key: "fit",
     dir: "desc",
   });
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const pipelineMenuRef = useRef<HTMLDivElement | null>(null);
   const { customCols, vis } = useLeadColumnState();
   const visibleCustom = customCols.filter((c) => !!vis.custom[c.id]);
-  const canDelete = Boolean(onDeleteLead || onDeleteLeads);
-
-  const filteredLeads = useMemo(() => {
-    if (statusFilter === "all") return leads;
-    return leads.filter((l) => (l.crmStage ?? "new") === statusFilter);
-  }, [leads, statusFilter]);
+  const canDelete = Boolean(onDeleteLead || onDeleteLeads) && !editLocked;
 
   const sortedLeads = useMemo(() => {
     const dir = sort.dir === "asc" ? 1 : -1;
-    return [...filteredLeads].sort((a, b) => {
+    return [...leads].sort((a, b) => {
       let cmp = 0;
       switch (sort.key) {
         case "company":
@@ -91,6 +99,11 @@ export function LeadTable({
         case "fit":
           cmp = a.fitScore - b.fitScore;
           break;
+        case "companyType":
+          cmp = (a.companyType ?? "").localeCompare(b.companyType ?? "", undefined, {
+            sensitivity: "base",
+          });
+          break;
         case "status":
           cmp =
             (STAGE_ORDER[a.crmStage ?? "new"] ?? 0) -
@@ -99,7 +112,7 @@ export function LeadTable({
       }
       return cmp * dir;
     });
-  }, [filteredLeads, sort]);
+  }, [leads, sort]);
 
   const allSelected =
     sortedLeads.length > 0 && selected.size === sortedLeads.length;
@@ -110,7 +123,6 @@ export function LeadTable({
       if (prev.key === key) {
         return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
       }
-      // First click: Fit high→low; Status Closed-first (asc on STAGE_ORDER); else A→Z.
       const dir = key === "fit" ? "desc" : "asc";
       return { key, dir };
     });
@@ -120,7 +132,6 @@ export function LeadTable({
     sort.key === key ? (sort.dir === "asc" ? " ↑" : " ↓") : "";
 
   useEffect(() => {
-    // Drop selection for leads that left the table.
     setSelected((prev) => {
       const ids = new Set(leads.map((l) => l.id));
       let changed = false;
@@ -134,15 +145,21 @@ export function LeadTable({
   }, [leads]);
 
   useEffect(() => {
-    if (!openId) return;
+    if (!openId && !pipelineMenuOpen) return;
     const onDoc = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpenId(null);
       }
+      if (
+        pipelineMenuRef.current &&
+        !pipelineMenuRef.current.contains(e.target as Node)
+      ) {
+        setPipelineMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [openId]);
+  }, [openId, pipelineMenuOpen]);
 
   const toggleOne = (id: string) => {
     setSelected((prev) => {
@@ -177,37 +194,18 @@ export function LeadTable({
   return (
     <div className="relative flex max-h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-xl2 border border-white/10">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/5 px-3 py-2">
-        <label className="inline-flex items-center gap-2 text-xs text-mist-500">
-          <span className="uppercase tracking-widest">Pipeline</span>
-          <Select
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value === "all" ? "all" : (e.target.value as CrmStage))
-            }
-            className="min-w-[9rem] py-1.5 text-xs"
-            aria-label="Filter by pipeline stage"
-          >
-            <option value="all">All stages</option>
-            {STAGE_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {crmStageLabel(s)}
-              </option>
-            ))}
-          </Select>
-        </label>
         {canDelete && selected.size === 0 ? (
-          <p className="text-[11px] text-mist-600">Select rows to delete</p>
+          <p className="text-[11px] text-mist-500">Select rows to delete</p>
         ) : (
-          <p className="text-[11px] text-mist-600">
-            {filteredLeads.length === leads.length
-              ? `${leads.length} lead${leads.length === 1 ? "" : "s"}`
-              : `${filteredLeads.length} of ${leads.length}`}
+          <p className="text-[11px] text-mist-500">
+            {leads.length} lead{leads.length === 1 ? "" : "s"}
+            {statusFilter !== "all" ? ` · ${crmStageLabel(statusFilter)}` : ""}
           </p>
         )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="sticky top-0 z-10 bg-ink-950/95 backdrop-blur-sm">
             <tr className="border-b border-white/10 text-left text-xs uppercase tracking-widest text-mist-500">
               {canDelete ? (
@@ -231,6 +229,15 @@ export function LeadTable({
                   className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
                 >
                   Company{sortMark("company")}
+                </button>
+              </th>
+              <th className="px-5 py-3 font-medium">
+                <button
+                  type="button"
+                  onClick={() => toggleSort("companyType")}
+                  className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
+                >
+                  Type{sortMark("companyType")}
                 </button>
               </th>
               <th className="px-5 py-3 font-medium">
@@ -260,21 +267,94 @@ export function LeadTable({
                   Fit{sortMark("fit")}
                 </button>
               </th>
-              <th className="px-5 py-3 font-medium">
-                <button
-                  type="button"
-                  onClick={() => toggleSort("status")}
-                  className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
-                >
-                  Pipeline{sortMark("status")}
-                </button>
+              <th className="relative px-5 py-3 font-medium">
+                <div ref={pipelineMenuRef} className="relative inline-block">
+                  <button
+                    type="button"
+                    onClick={() => setPipelineMenuOpen((o) => !o)}
+                    className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
+                    aria-haspopup="menu"
+                    aria-expanded={pipelineMenuOpen}
+                    title="Sort or filter by pipeline"
+                  >
+                    Pipeline{sortMark("status")}
+                    <span className="ml-0.5 text-[10px] opacity-70">▾</span>
+                  </button>
+                  {pipelineMenuOpen ? (
+                    <div
+                      role="menu"
+                      className="absolute left-0 z-30 mt-1 min-w-[11rem] overflow-hidden rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
+                    >
+                      <p className="px-3 py-1 text-[10px] uppercase tracking-wider text-mist-500">
+                        Sort
+                      </p>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="block w-full px-3 py-1.5 text-left text-xs text-mist-200 hover:bg-white/5"
+                        onClick={() => {
+                          setSort({ key: "status", dir: "asc" });
+                          setPipelineMenuOpen(false);
+                        }}
+                      >
+                        Closed → New
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="block w-full px-3 py-1.5 text-left text-xs text-mist-200 hover:bg-white/5"
+                        onClick={() => {
+                          setSort({ key: "status", dir: "desc" });
+                          setPipelineMenuOpen(false);
+                        }}
+                      >
+                        New → Closed
+                      </button>
+                      <div className="my-1 border-t border-white/5" />
+                      <p className="px-3 py-1 text-[10px] uppercase tracking-wider text-mist-500">
+                        Filter
+                      </p>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={`block w-full px-3 py-1.5 text-left text-xs hover:bg-white/5 ${
+                          statusFilter === "all"
+                            ? "font-medium text-aurora-300"
+                            : "text-mist-200"
+                        }`}
+                        onClick={() => {
+                          onStatusFilterChange("all");
+                          setPipelineMenuOpen(false);
+                        }}
+                      >
+                        All stages
+                      </button>
+                      {STAGE_OPTIONS.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          role="menuitem"
+                          className={`block w-full px-3 py-1.5 text-left text-xs hover:bg-white/5 ${
+                            statusFilter === s
+                              ? "font-medium text-aurora-300"
+                              : "text-mist-200"
+                          }`}
+                          onClick={() => {
+                            onStatusFilterChange(s);
+                            setPipelineMenuOpen(false);
+                          }}
+                        >
+                          {crmStageLabel(s)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </th>
               <th className="px-5 py-3 font-medium uppercase tracking-widest">
                 Email
               </th>
-              {vis.notes ? (
-                <th className="px-5 py-3 font-medium">Notes</th>
-              ) : null}
+              <th className="px-5 py-3 font-medium">Notes</th>
               {visibleCustom.map((c) => (
                 <th key={c.id} className="px-5 py-3 font-medium">
                   {c.name}
@@ -321,6 +401,29 @@ export function LeadTable({
                       </p>
                     )}
                   </td>
+                  <td
+                    className="max-w-[8rem] px-5 py-3.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {editLocked ? (
+                      <span className="truncate text-xs text-mist-300" title={l.companyType ?? undefined}>
+                        {l.companyType?.trim() || "—"}
+                      </span>
+                    ) : (
+                      <input
+                        defaultValue={l.companyType ?? ""}
+                        key={`${l.id}-type-${l.companyType ?? ""}`}
+                        onBlur={(e) => {
+                          const next = e.target.value.trim();
+                          if (next !== (l.companyType ?? "")) {
+                            onUpdateLead?.(l.id, { companyType: next || null });
+                          }
+                        }}
+                        placeholder="—"
+                        className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs text-mist-200 outline-none placeholder:text-mist-600 hover:border-white/10 focus:border-aurora-400/50 focus:bg-ink-950/40"
+                      />
+                    )}
+                  </td>
                   <td className="max-w-[12rem] px-5 py-3.5 text-mist-300">
                     <span className="line-clamp-1" title={l.location ?? undefined}>
                       {loc}
@@ -350,7 +453,7 @@ export function LeadTable({
                     <FitMeter score={l.fitScore} />
                   </td>
                   <td className="relative px-5 py-3.5 whitespace-nowrap">
-                    {onMoveStage ? (
+                    {onMoveStage && !editLocked ? (
                       <div
                         ref={openId === l.id ? menuRef : undefined}
                         className="relative inline-block"
@@ -405,11 +508,15 @@ export function LeadTable({
                       status={l.outreach?.status ?? l.status}
                     />
                   </td>
-                  {vis.notes ? (
-                    <td
-                      className="max-w-[12rem] px-5 py-3.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                  <td
+                    className="max-w-[12rem] px-5 py-3.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {editLocked ? (
+                      <span className="truncate text-sm text-mist-300">
+                        {l.notes?.trim() || "—"}
+                      </span>
+                    ) : (
                       <input
                         defaultValue={l.notes ?? ""}
                         key={`${l.id}-notes-${l.notes ?? ""}`}
@@ -422,15 +529,19 @@ export function LeadTable({
                         placeholder="—"
                         className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 hover:border-white/10 focus:border-aurora-400/50 focus:bg-ink-950/40"
                       />
-                    </td>
-                  ) : null}
+                    )}
+                  </td>
                   {visibleCustom.map((c) => (
                     <td
                       key={c.id}
                       className="px-5 py-3.5"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {c.type === "select" ? (
+                      {editLocked ? (
+                        <span className="text-sm text-mist-300">
+                          {fields[c.id] || "—"}
+                        </span>
+                      ) : c.type === "select" ? (
                         <Select
                           value={fields[c.id] ?? ""}
                           onChange={(e) =>

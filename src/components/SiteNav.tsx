@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { XIcon } from "@/components/icons";
 
 const LINKS = [
@@ -45,7 +44,6 @@ export function SiteNav({ authRequired = false }: { authRequired?: boolean }) {
               {l.label}
             </Link>
           ))}
-          <ThemeToggle />
           {!onLogin ? (
             <Link
               href={ctaHref}
@@ -57,7 +55,6 @@ export function SiteNav({ authRequired = false }: { authRequired?: boolean }) {
         </nav>
 
         <div className="flex items-center gap-3 md:hidden">
-          <ThemeToggle />
           {!onLogin ? (
             <Link
               href={ctaHref}

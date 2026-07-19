@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, QuotaExceededError, type BoardResponse, type FirecrawlUsage } from "@/lib/client-api";
 import type { ContactMethod, CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
@@ -12,7 +12,7 @@ import { LeadDrawer } from "./LeadDrawer";
 import { UpgradeModal, UsageBar } from "./UpgradeModal";
 import { VerifyLimitModal } from "./VerifyLimitModal";
 import { FirecrawlUsageBadge } from "./FirecrawlUsageBadge";
-import { Spinner } from "@/components/ui";
+import { Spinner, crmStageLabel } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
 import { PipelineView } from "./PipelineView";
@@ -35,8 +35,16 @@ import { AdminPlatformView } from "./AdminPlatformView";
 import { AdminUsersView } from "./AdminUsersView";
 import { BoardsView } from "./BoardsView";
 import { loadStoredBoardFilter, storeBoardFilter } from "./BoardPicker";
-import { LeadColumnsMenu } from "./LeadColumnsMenu";
+import { Select } from "@/components/ui/Select";
 import type { BoardSummary, ImportLeadRow } from "@/lib/types";
+
+const CRM_STAGE_FILTERS: CrmStage[] = [
+  "new",
+  "contacted",
+  "in_conversation",
+  "closed",
+  "not_interested",
+];
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
 type UpgradePrompt = { kind: "leads" | "sends"; planId: PlanId };
@@ -101,6 +109,9 @@ export function Studio() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
   const [layout, setLayout] = useState<"table" | "cards" | "map">("table");
+  const [pipelineFilter, setPipelineFilter] = useState<CrmStage | "all">("all");
+  const [editLocked, setEditLocked] = useState(false);
+  const [lockHolder, setLockHolder] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [upgrade, setUpgrade] = useState<UpgradePrompt | null>(null);
   const [verifyLimitPlan, setVerifyLimitPlan] = useState<PlanId | null>(null);
@@ -196,6 +207,55 @@ export function Studio() {
     }, 15_000);
     return () => window.clearInterval(id);
   }, [view, refresh]);
+
+  // Soft lock heartbeat when a specific board is selected.
+  useEffect(() => {
+    const bid = filterBoardId;
+    if (!bid) {
+      setEditLocked(false);
+      setLockHolder(null);
+      return;
+    }
+    let cancelled = false;
+    const beat = async () => {
+      try {
+        await api.heartbeatBoardLock(bid);
+        if (!cancelled) {
+          setEditLocked(false);
+          setLockHolder(null);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "";
+        const locked =
+          (e as Error & { locked?: boolean }).locked ||
+          /working on this board|paused/i.test(msg);
+        if (locked) {
+          setEditLocked(true);
+          setLockHolder(
+            msg.split(" is working")[0] ||
+              board?.boardLock?.userName ||
+              "Someone else",
+          );
+        }
+      }
+    };
+    void beat();
+    const id = window.setInterval(() => void beat(), 45_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      void api.releaseBoardLock(bid).catch(() => undefined);
+    };
+  }, [filterBoardId, board?.boardLock]);
+
+  useEffect(() => {
+    const lock = board?.boardLock;
+    if (lock) {
+      setEditLocked(true);
+      setLockHolder(lock.userName ?? "Someone else");
+    }
+  }, [board?.boardLock]);
 
   // Daily verify cap hit → warn once until usage resets.
   useEffect(() => {
@@ -760,6 +820,12 @@ export function Studio() {
 
   const selected = board?.leads.find((l) => l.id === selectedId) ?? null;
 
+  const filteredLeads = useMemo(() => {
+    const all = board?.leads ?? [];
+    if (pipelineFilter === "all") return all;
+    return all.filter((l) => (l.crmStage ?? "new") === pipelineFilter);
+  }, [board?.leads, pipelineFilter]);
+
   if (loading) {
     return (
       <div className="grid min-h-[60vh] place-items-center">
@@ -854,8 +920,13 @@ export function Studio() {
               {view === "runs"
                 ? "History of searches in this workspace."
                 : view === "boards"
-                  ? "Named lists for campaigns or niches."
+                  ? "Named lists for campaigns or niches. Invite collaborators; only one person edits at a time."
                   : "Find prospects by niche and location."}
+            </p>
+          ) : null}
+          {editLocked && filterBoardId ? (
+            <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200">
+              {lockHolder ?? "Someone else"} is editing this board — view only until they leave.
             </p>
           ) : null}
         </div>
@@ -1012,8 +1083,19 @@ export function Studio() {
           <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
             <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
               <p className="text-xs uppercase tracking-widest text-mist-500">
-                <span className="font-semibold text-mist-200">{board!.leads.length}</span> lead
-                {board!.leads.length === 1 ? "" : "s"} · table, cards, or map
+                <span className="font-semibold text-mist-200">{filteredLeads.length}</span>
+                {pipelineFilter !== "all" ? (
+                  <>
+                    {" "}
+                    of{" "}
+                    <span className="font-semibold text-mist-200">{board!.leads.length}</span>
+                  </>
+                ) : null}{" "}
+                lead
+                {(pipelineFilter === "all" ? board!.leads.length : filteredLeads.length) === 1
+                  ? ""
+                  : "s"}{" "}
+                · table, cards, or map
               </p>
               <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
                 <LayoutToggle active={layout === "table"} onClick={() => setLayout("table")}>
@@ -1026,8 +1108,27 @@ export function Studio() {
                   Map
                 </LayoutToggle>
               </div>
-              <div className="flex justify-start sm:justify-end">
-                {layout === "table" ? <LeadColumnsMenu /> : null}
+              <div className="flex items-center justify-start gap-2 sm:justify-end">
+                <label className="inline-flex items-center gap-2 text-xs text-mist-500">
+                  <span className="hidden uppercase tracking-widest sm:inline">Pipeline</span>
+                  <Select
+                    value={pipelineFilter}
+                    onChange={(e) =>
+                      setPipelineFilter(
+                        e.target.value === "all" ? "all" : (e.target.value as CrmStage),
+                      )
+                    }
+                    className="min-w-[9rem] py-1.5 text-xs"
+                    aria-label="Filter by pipeline stage"
+                  >
+                    <option value="all">All stages</option>
+                    {CRM_STAGE_FILTERS.map((s) => (
+                      <option key={s} value={s}>
+                        {crmStageLabel(s)}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
               </div>
             </div>
             <div
@@ -1045,25 +1146,34 @@ export function Studio() {
                 aria-hidden={layout !== "map"}
               >
                 <LeadMap
-                  leads={board!.leads}
+                  leads={filteredLeads}
                   locationHint={board!.run?.location ?? null}
                   onOpen={openInfo}
                 />
               </div>
               {layout === "cards" ? (
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {board!.leads.map((lead, i) => (
-                    <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => openInfo(lead.id)} />
-                  ))}
-                </div>
+                filteredLeads.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-mist-500">
+                    No leads in this pipeline stage.
+                  </p>
+                ) : (
+                  <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    {filteredLeads.map((lead, i) => (
+                      <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => openInfo(lead.id)} />
+                    ))}
+                  </div>
+                )
               ) : layout === "table" ? (
                 <LeadTable
-                  leads={board!.leads}
+                  leads={filteredLeads}
+                  statusFilter={pipelineFilter}
+                  onStatusFilterChange={setPipelineFilter}
                   onOpen={openInfo}
-                  onMoveStage={onMoveStage}
-                  onUpdateLead={onUpdateLeadCrm}
-                  onDeleteLead={(id) => void onDeleteLead(id)}
-                  onDeleteLeads={onDeleteLeads}
+                  onMoveStage={editLocked ? undefined : onMoveStage}
+                  onUpdateLead={editLocked ? undefined : onUpdateLeadCrm}
+                  onDeleteLead={editLocked ? undefined : (id) => void onDeleteLead(id)}
+                  onDeleteLeads={editLocked ? undefined : onDeleteLeads}
+                  editLocked={editLocked}
                 />
               ) : null}
             </div>

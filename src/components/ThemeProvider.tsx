@@ -8,9 +8,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import {
   THEME_STORAGE_KEY,
   isThemeId,
+  isStudioPath,
   type ThemeId,
 } from "@/lib/theme";
 
@@ -26,25 +28,39 @@ function applyTheme(theme: ThemeId) {
   document.documentElement.setAttribute("data-theme", theme);
 }
 
+/**
+ * Theme preference is stored globally, but light palette only applies inside
+ * the studio (`/app`). Marketing pages always render dark.
+ */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeId>("dark");
+  const pathname = usePathname() ?? "/";
+  const onStudio = isStudioPath(pathname);
+  const [pref, setPref] = useState<ThemeId>("dark");
 
   useEffect(() => {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
     const initial: ThemeId = isThemeId(stored) ? stored : "dark";
-    setThemeState(initial);
-    applyTheme(initial);
+    setPref(initial);
   }, []);
 
-  const setTheme = useCallback((t: ThemeId) => {
-    setThemeState(t);
-    applyTheme(t);
-    localStorage.setItem(THEME_STORAGE_KEY, t);
-  }, []);
+  useEffect(() => {
+    applyTheme(onStudio ? pref : "dark");
+  }, [onStudio, pref]);
+
+  const setTheme = useCallback(
+    (t: ThemeId) => {
+      setPref(t);
+      localStorage.setItem(THEME_STORAGE_KEY, t);
+      if (onStudio) applyTheme(t);
+    },
+    [onStudio],
+  );
 
   const toggleTheme = useCallback(() => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  }, [setTheme, theme]);
+    setTheme(pref === "dark" ? "light" : "dark");
+  }, [setTheme, pref]);
+
+  const theme: ThemeId = onStudio ? pref : "dark";
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>

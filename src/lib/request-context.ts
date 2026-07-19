@@ -29,22 +29,32 @@ export async function getCtx(): Promise<Ctx> {
   const binding = await getD1Binding();
   let workspaceId = LOCAL_WORKSPACE_ID;
   let resolved = !authRequired();
+  let userId: string | null = null;
+  let userEmail: string | null = null;
+  let userName: string | null = null;
 
   if (authRequired()) {
     try {
       const session = await auth();
+      userEmail = session?.user?.email ?? null;
+      userName = session?.user?.name ?? null;
+      userId =
+        session?.userId ??
+        session?.user?.id ??
+        (session?.user?.email ? `user_${session.user.email}` : null);
+
       if (session?.workspaceId) {
         workspaceId = session.workspaceId;
         resolved = true;
       } else if (session?.user?.email || session?.userId || session?.user?.id) {
         const db = getDb(binding);
-        const userId =
-          session.userId ??
-          session.user?.id ??
+        const uid =
+          userId ??
           (session.user?.email ? `user_${session.user.email}` : "unknown");
+        userId = uid;
         const ws = await getOrCreateWorkspaceForUser(
           db,
-          userId,
+          uid,
           session.user?.email ?? null,
         );
         workspaceId = ws.id;
@@ -73,6 +83,11 @@ export async function getCtx(): Promise<Ctx> {
     if (!resolved) {
       throw new AuthError("Sign in required to use this workspace.");
     }
+  } else {
+    // Local demo — stable synthetic identity so invites/locks still work.
+    userId = "local";
+    userEmail = "local@demo.hermes";
+    userName = "Local";
   }
 
   const db = getDb(binding, workspaceId);
@@ -80,7 +95,15 @@ export async function getCtx(): Promise<Ctx> {
     // Local JSON always; smoke-on-D1 needs a concrete "local" row too.
     await ensureLocalWorkspace(db);
   }
-  return { db, workspaceId, metered: !!binding };
+  return {
+    db,
+    workspaceId,
+    metered: !!binding,
+    userId,
+    userEmail,
+    userName,
+    scopeToWorkspace: (wsId: string) => getDb(binding, wsId),
+  };
 }
 
 /**

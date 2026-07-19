@@ -42,6 +42,10 @@ export default async function SettingsPage({
       db: getDb(undefined, LOCAL_WORKSPACE_ID),
       workspaceId: LOCAL_WORKSPACE_ID,
       metered: false,
+      userId: "local",
+      userEmail: "local@demo.hermes",
+      userName: "Local",
+      scopeToWorkspace: (wsId) => getDb(undefined, wsId),
     };
     usage = await getWorkspaceSummary(ctx);
     ws = await ctx.db.getWorkspace(ctx.workspaceId);

@@ -53,5 +53,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0012 — Natural email bodies — no STOP footer](0012-natural-email-bodies-no-stop-footer.md) _(amends constitution Art. I.3)_
 - [0013 — Pitch AI: no heuristic fallback](0013-pitch-ai-no-heuristic-fallback.md)
 - [0014 — First-class Boards for lead collections](0014-boards.md)
+- [0015 — Board sharing with soft presence lock](0015-board-sharing-soft-lock.md)
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

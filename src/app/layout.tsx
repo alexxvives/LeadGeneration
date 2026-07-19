@@ -30,13 +30,15 @@ export const metadata: Metadata = {
     "A human-in-the-loop lead studio. Search a niche, enrich prospects, draft outreach, approve, and send — on your terms.",
 };
 
-/** Prevent theme flash before React hydrates (reads localStorage). */
+/** Prevent theme flash before React hydrates. Light only on /app (studio). */
 const themeBootScript = `
 (function(){
   try {
+    var path=location.pathname||"";
+    var onApp=path==="/app"||path.indexOf("/app/")===0;
     var k=${JSON.stringify(THEME_STORAGE_KEY)};
     var t=localStorage.getItem(k);
-    if(t==="light"||t==="dark") document.documentElement.setAttribute("data-theme",t);
+    if(onApp&&(t==="light"||t==="dark")) document.documentElement.setAttribute("data-theme",t);
     else document.documentElement.setAttribute("data-theme","dark");
   } catch(e) {
     document.documentElement.setAttribute("data-theme","dark");

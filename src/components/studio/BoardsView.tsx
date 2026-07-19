@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
-import type { BoardSummary } from "@/lib/types";
+import type { BoardInvite, BoardSummary } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import { BoardsIcon, PencilIcon, XIcon } from "@/components/icons";
 
@@ -15,6 +15,7 @@ export function BoardsView({
   createRequestId?: number;
 }) {
   const [boards, setBoards] = useState<BoardSummary[]>([]);
+  const [invites, setInvites] = useState<BoardInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -22,8 +23,12 @@ export function BoardsView({
   const [editName, setEditName] = useState("");
 
   const refresh = useCallback(async () => {
-    const { boards: list } = await api.listBoards();
+    const [{ boards: list }, { invites: pending }] = await Promise.all([
+      api.listBoards(),
+      api.listMyInvites().catch(() => ({ invites: [] as BoardInvite[] })),
+    ]);
     setBoards(list);
+    setInvites(pending);
   }, []);
 
   useEffect(() => {
@@ -79,6 +84,34 @@ export function BoardsView({
     }
   }
 
+  async function handleInvite(boardId: string) {
+    const email = window.prompt("Invite by email")?.trim();
+    if (!email) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.inviteToBoard(boardId, email);
+      await refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Invite failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAccept(inviteId: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.acceptInvite(inviteId);
+      await refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Accept failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-24">
@@ -92,6 +125,34 @@ export function BoardsView({
       {err && <p className="text-sm text-rose-300">{err}</p>}
       {busy ? (
         <p className="text-xs text-mist-500">Working…</p>
+      ) : null}
+
+      {invites.length > 0 ? (
+        <section className="rounded-xl2 border border-amber-400/25 bg-amber-400/5 p-4">
+          <h2 className="text-sm font-medium text-amber-200">
+            Board invites
+          </h2>
+          <ul className="mt-3 space-y-2">
+            {invites.map((inv) => (
+              <li
+                key={inv.id}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+              >
+                <span className="text-mist-200">
+                  <span className="font-medium text-mist-100">{inv.boardName}</span>
+                  <span className="text-mist-500"> · editor</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handleAccept(inv.id)}
+                  className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent"
+                >
+                  Accept
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -152,7 +213,13 @@ export function BoardsView({
                         <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-mist-500">
                           Default
                         </span>
-                      ) : (
+                      ) : null}
+                      {b.shared ? (
+                        <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-amber-400">
+                          Shared
+                        </span>
+                      ) : null}
+                      {!b.isDefault && !b.shared ? (
                         <button
                           type="button"
                           aria-label={`Rename ${b.name}`}
@@ -166,7 +233,7 @@ export function BoardsView({
                         >
                           <PencilIcon className="h-3.5 w-3.5" />
                         </button>
-                      )}
+                      ) : null}
                     </h3>
                   )}
                   <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-mist-400">
@@ -189,10 +256,22 @@ export function BoardsView({
                       <dd className="font-display text-lg text-mist-100">{b.closedCount}</dd>
                     </div>
                   </dl>
+                  {!b.shared ? (
+                    <button
+                      type="button"
+                      className="mt-3 text-xs font-medium text-aurora-300 hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleInvite(b.id);
+                      }}
+                    >
+                      Invite collaborator
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
-            {!b.isDefault ? (
+            {!b.isDefault && !b.shared ? (
               <button
                 type="button"
                 aria-label={`Delete ${b.name}`}

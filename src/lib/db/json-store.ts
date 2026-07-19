@@ -1,6 +1,17 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { normalizeCrmStage, type Board, type Lead, type Outreach, type Run, type Workspace } from "@/lib/types";
+import {
+  normalizeCrmStage,
+  type Board,
+  type BoardInvite,
+  type BoardLock,
+  type BoardMember,
+  type BoardMemberRole,
+  type Lead,
+  type Outreach,
+  type Run,
+  type Workspace,
+} from "@/lib/types";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -10,6 +21,9 @@ interface DbShape {
   runs: Run[];
   leads: Lead[];
   outreach: Outreach[];
+  boardMembers: BoardMember[];
+  boardInvites: BoardInvite[];
+  boardLocks: BoardLock[];
 }
 
 /** Back-fills email setting fields added in migration 0006 to workspace rows from older JSON files. */
@@ -50,6 +64,8 @@ function normalizeLead(l: Lead): Lead {
   return {
     ...l,
     boardId: typeof raw.boardId === "string" ? raw.boardId : "",
+    companyType:
+      typeof raw.companyType === "string" ? raw.companyType : null,
     crmStage: normalizeCrmStage(raw.crmStage),
     contactMethod: (raw.contactMethod as Lead["contactMethod"] | undefined) ?? null,
     notes: (raw.notes as Lead["notes"] | undefined) ?? null,
@@ -93,6 +109,9 @@ const EMPTY: DbShape = {
   runs: [],
   leads: [],
   outreach: [],
+  boardMembers: [],
+  boardInvites: [],
+  boardLocks: [],
 };
 
 // A single, process-wide write chain shared by ALL JsonStore instances. Stores
@@ -126,6 +145,9 @@ export class JsonStore implements LeadRepository {
         runs: parsed.runs ?? [],
         leads: parsed.leads ?? [],
         outreach: parsed.outreach ?? [],
+        boardMembers: parsed.boardMembers ?? [],
+        boardInvites: parsed.boardInvites ?? [],
+        boardLocks: parsed.boardLocks ?? [],
       };
     } catch {
       return structuredClone(EMPTY);
@@ -258,6 +280,12 @@ export class JsonStore implements LeadRepository {
     return b ? normalizeBoard(b) : null;
   }
 
+  async getBoardAnywhere(id: string): Promise<Board | null> {
+    const data = await this.read();
+    const b = data.boards.find((b) => b.id === id);
+    return b ? normalizeBoard(b) : null;
+  }
+
   async listBoards(): Promise<Board[]> {
     const data = await this.read();
     return data.boards
@@ -273,8 +301,130 @@ export class JsonStore implements LeadRepository {
     return this.mutate((data) => {
       const before = data.boards.length;
       data.boards = data.boards.filter((b) => !(b.id === id && this.inScope(b)));
+      data.boardMembers = data.boardMembers.filter((m) => m.boardId !== id);
+      data.boardInvites = data.boardInvites.filter((i) => i.boardId !== id);
+      data.boardLocks = data.boardLocks.filter((l) => l.boardId !== id);
       return { data, result: data.boards.length < before };
     });
+  }
+
+  async listBoardMembers(boardId: string): Promise<BoardMember[]> {
+    const data = await this.read();
+    return data.boardMembers.filter((m) => m.boardId === boardId);
+  }
+
+  upsertBoardMember(member: BoardMember): Promise<BoardMember> {
+    return this.mutate((data) => {
+      const idx = data.boardMembers.findIndex(
+        (m) => m.boardId === member.boardId && m.userId === member.userId,
+      );
+      if (idx === -1) data.boardMembers.push(member);
+      else data.boardMembers[idx] = member;
+      return { data, result: member };
+    });
+  }
+
+  removeBoardMember(boardId: string, userId: string): Promise<boolean> {
+    return this.mutate((data) => {
+      const before = data.boardMembers.length;
+      data.boardMembers = data.boardMembers.filter(
+        (m) => !(m.boardId === boardId && m.userId === userId),
+      );
+      return { data, result: data.boardMembers.length < before };
+    });
+  }
+
+  async listBoardIdsForMember(userId: string): Promise<string[]> {
+    const data = await this.read();
+    return data.boardMembers
+      .filter((m) => m.userId === userId)
+      .map((m) => m.boardId);
+  }
+
+  createBoardInvite(invite: BoardInvite): Promise<BoardInvite> {
+    return this.mutate((data) => {
+      data.boardInvites.push(invite);
+      return { data, result: invite };
+    });
+  }
+
+  updateBoardInvite(
+    id: string,
+    patch: Partial<BoardInvite>,
+  ): Promise<BoardInvite | null> {
+    return this.mutate((data) => {
+      const idx = data.boardInvites.findIndex((i) => i.id === id);
+      if (idx === -1) return { data, result: null };
+      data.boardInvites[idx] = { ...data.boardInvites[idx], ...patch };
+      return { data, result: data.boardInvites[idx] };
+    });
+  }
+
+  async getBoardInvite(id: string): Promise<BoardInvite | null> {
+    const data = await this.read();
+    return data.boardInvites.find((i) => i.id === id) ?? null;
+  }
+
+  async listPendingInvitesForEmail(email: string): Promise<BoardInvite[]> {
+    const data = await this.read();
+    const key = email.trim().toLowerCase();
+    const now = new Date().toISOString();
+    return data.boardInvites.filter(
+      (i) =>
+        i.status === "pending" &&
+        i.email.toLowerCase() === key &&
+        i.expiresAt > now,
+    );
+  }
+
+  async listPendingInvitesForBoard(boardId: string): Promise<BoardInvite[]> {
+    const data = await this.read();
+    return data.boardInvites.filter(
+      (i) => i.boardId === boardId && i.status === "pending",
+    );
+  }
+
+  async getBoardLock(boardId: string): Promise<BoardLock | null> {
+    const data = await this.read();
+    const lock = data.boardLocks.find((l) => l.boardId === boardId) ?? null;
+    if (!lock) return null;
+    if (lock.expiresAt <= new Date().toISOString()) {
+      await this.clearBoardLock(boardId);
+      return null;
+    }
+    return lock;
+  }
+
+  upsertBoardLock(lock: BoardLock): Promise<BoardLock> {
+    return this.mutate((data) => {
+      const idx = data.boardLocks.findIndex((l) => l.boardId === lock.boardId);
+      if (idx === -1) data.boardLocks.push(lock);
+      else data.boardLocks[idx] = lock;
+      return { data, result: lock };
+    });
+  }
+
+  clearBoardLock(boardId: string, userId?: string): Promise<boolean> {
+    return this.mutate((data) => {
+      const before = data.boardLocks.length;
+      data.boardLocks = data.boardLocks.filter((l) => {
+        if (l.boardId !== boardId) return true;
+        if (userId && l.userId !== userId) return true;
+        return false;
+      });
+      return { data, result: data.boardLocks.length < before };
+    });
+  }
+
+  async getMemberRole(
+    boardId: string,
+    userId: string,
+  ): Promise<BoardMemberRole | null> {
+    const data = await this.read();
+    return (
+      data.boardMembers.find((m) => m.boardId === boardId && m.userId === userId)
+        ?.role ?? null
+    );
   }
 
   // ---- Runs ----
