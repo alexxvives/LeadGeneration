@@ -244,11 +244,6 @@ export function LandingProductPreview() {
                 </div>
               ))}
             </div>
-            <div className="rounded-xl border border-aurora-400/20 bg-aurora-400/5 px-3 py-2.5">
-              <p className="text-[11px] leading-relaxed text-aurora-200/90">
-                Human approval on every send.
-              </p>
-            </div>
           </div>
         </div>
       </div>

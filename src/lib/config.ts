@@ -142,6 +142,12 @@ export const env = {
     process.env.AUTH_SECRET?.trim() ||
     "hermes-dev-insecure-secret-change-me-in-production",
   authResendKey: () => process.env.RESEND_API_KEY?.trim() || "",
+  /**
+   * Platform Maileroo *sending* key for transactional product mail
+   * (board invites, etc.). Distinct from MAILEROO_VERIFY_API_KEY and from
+   * workspace BYO keys in Settings.
+   */
+  platformMailerooKey: () => process.env.MAILEROO_API_KEY?.trim() || "",
   appUrl: () =>
     process.env.NEXTAUTH_URL?.trim() ||
     process.env.AUTH_URL?.trim() ||

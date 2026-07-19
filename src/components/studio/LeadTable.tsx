@@ -204,7 +204,7 @@ export function LeadTable({
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="sticky top-0 z-10 bg-ink-950/95 backdrop-blur-sm">
             <tr className="border-b border-white/10 text-left text-xs uppercase tracking-widest text-mist-500">
               {canDelete ? (
@@ -401,7 +401,7 @@ export function LeadTable({
                     )}
                   </td>
                   <td
-                    className="max-w-[8rem] px-5 py-3.5"
+                    className="min-w-[7rem] max-w-[11rem] px-3 py-3.5 sm:px-5"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {editLocked ? (
@@ -423,13 +423,34 @@ export function LeadTable({
                       />
                     )}
                   </td>
-                  <td className="max-w-[12rem] px-5 py-3.5 text-mist-300">
+                  <td className="min-w-[8rem] max-w-[14rem] px-3 py-3.5 text-mist-300 sm:px-5">
                     <span className="line-clamp-1" title={l.location ?? undefined}>
                       {loc}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex flex-col gap-1 text-xs">
+                  <td className="px-3 py-3.5 sm:px-5">
+                    {/* Tight viewports: icon + counts. Wider: full contact values. */}
+                    <div className="flex items-center gap-2.5 text-xs xl:hidden">
+                      <span
+                        className={`inline-flex items-center gap-1 tabular-nums ${
+                          l.emails.length ? "text-aurora-300" : "text-mist-500"
+                        }`}
+                        title={l.emails[0] ?? "No email"}
+                      >
+                        <MailIcon className="h-3.5 w-3.5 shrink-0" />
+                        {l.emails.length || "—"}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 tabular-nums ${
+                          l.phones.length ? "text-mist-300" : "text-mist-500"
+                        }`}
+                        title={l.phones[0] ?? "No phone"}
+                      >
+                        <PhoneIcon className="h-3.5 w-3.5 shrink-0" />
+                        {l.phones.length || "—"}
+                      </span>
+                    </div>
+                    <div className="hidden flex-col gap-1 text-xs xl:flex">
                       <span
                         className={`inline-flex min-w-0 items-center gap-1 ${
                           l.emails.length ? "text-aurora-300" : "text-mist-500"

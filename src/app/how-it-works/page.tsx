@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MarketingShell } from "@/components/MarketingShell";
+import { SignInCta } from "@/components/MarketingSignIn";
 import { authRequired } from "@/lib/config";
 import {
   SearchIcon,
@@ -43,7 +44,7 @@ const STEPS = [
 ];
 
 export default function HowItWorksPage() {
-  const studioHref = authRequired() ? "/login" : "/app";
+  const required = authRequired();
   return (
     <MarketingShell footerTagline="Four steps. One steady hand.">
       <section className="mx-auto max-w-7xl px-5 pb-24 pt-8 sm:px-8">
@@ -82,13 +83,13 @@ export default function HowItWorksPage() {
         </ol>
 
         <div className="mt-14 flex flex-wrap items-center gap-4">
-          <Link
-            href={studioHref}
+          <SignInCta
+            authRequired={required}
             className="group inline-flex items-center gap-2 rounded-full bg-aurora-400 px-6 py-3 font-medium text-on-accent transition-transform hover:scale-105"
           >
-            {authRequired() ? "Sign in" : "Open the studio"}
+            {required ? "Sign in" : "Open the studio"}
             <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-          </Link>
+          </SignInCta>
           <Link
             href="/pricing"
             className="glass inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-medium text-mist-100 transition-transform hover:scale-[1.02]"

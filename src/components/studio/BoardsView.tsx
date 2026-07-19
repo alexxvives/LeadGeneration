@@ -23,6 +23,7 @@ export function BoardsView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [inviteBoard, setInviteBoard] = useState<BoardSummary | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const [{ boards: list }, { invites: pending }] = await Promise.all([
@@ -39,24 +40,24 @@ export function BoardsView({
       .finally(() => setLoading(false));
   }, [refresh]);
 
-  const handleCreate = useCallback(async () => {
-    const name = window.prompt("Board name")?.trim();
-    if (!name) return;
+  useEffect(() => {
+    if (createRequestId > 0) setCreateOpen(true);
+  }, [createRequestId]);
+
+  async function handleCreate(name: string) {
     setBusy(true);
     setErr(null);
     try {
       await api.createBoard(name);
+      setCreateOpen(false);
       await refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Create failed");
+      throw e;
     } finally {
       setBusy(false);
     }
-  }, [refresh]);
-
-  useEffect(() => {
-    if (createRequestId > 0) void handleCreate();
-  }, [createRequestId, handleCreate]);
+  }
 
   async function handleRename(id: string) {
     const name = editName.trim();
@@ -161,86 +162,68 @@ export function BoardsView({
               }}
               className="glass card-hover w-full cursor-pointer rounded-xl2 p-5 text-left outline-none focus-visible:ring-1 focus-visible:ring-aurora-400/50"
             >
-              <div className={`min-w-0 ${!b.isDefault && !b.shared ? "pr-6" : ""}`}>
-                {editingId === b.id ? (
-                  <div
-                    className="flex gap-2"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
-                    <input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="min-w-0 flex-1 rounded-lg border border-white/10 bg-ink-950 px-2 py-1 text-sm"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          void handleRename(b.id);
-                        }
-                        if (e.key === "Escape") setEditingId(null);
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="text-xs text-aurora-300"
-                      onClick={() => void handleRename(b.id)}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1 pr-1">
+                  {editingId === b.id ? (
+                    <div
+                      className="flex gap-2"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
                     >
-                      Save
-                    </button>
-                  </div>
-                ) : (
-                  <h3 className="flex min-w-0 items-center gap-1.5 font-display text-lg font-semibold text-mist-100">
-                    <span className="truncate">{b.name}</span>
-                    {b.shared ? (
-                      <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-amber-400">
-                        Shared
-                      </span>
-                    ) : null}
-                    {!b.shared ? (
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-white/10 bg-ink-950 px-2 py-1 text-sm"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void handleRename(b.id);
+                          }
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                      />
                       <button
                         type="button"
-                        aria-label={`Rename ${b.name}`}
-                        title="Rename"
-                        className="inline-flex shrink-0 rounded-md p-1 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingId(b.id);
-                          setEditName(b.name);
-                        }}
+                        className="text-xs text-aurora-300"
+                        onClick={() => void handleRename(b.id)}
                       >
-                        <PencilIcon className="h-3.5 w-3.5" />
+                        Save
                       </button>
-                    ) : null}
-                  </h3>
-                )}
-                <div className="mt-3 flex items-center gap-3">
-                  <dl className="grid min-w-0 flex-1 grid-cols-2 gap-2 text-xs text-mist-400">
-                    <div>
-                      <dt className="text-mist-500">Leads</dt>
-                      <dd className="font-display text-lg text-mist-100">{b.leadCount}</dd>
                     </div>
-                    <div>
-                      <dt className="text-mist-500">Contacted</dt>
-                      <dd className="font-display text-lg text-mist-100">
-                        {b.contactedCount}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-mist-500">Sent</dt>
-                      <dd className="font-display text-lg text-mist-100">{b.sentCount}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-mist-500">Closed</dt>
-                      <dd className="font-display text-lg text-mist-100">{b.closedCount}</dd>
-                    </div>
-                  </dl>
+                  ) : (
+                    <h3 className="flex min-w-0 items-center gap-1.5 font-display text-lg font-semibold text-mist-100">
+                      <span className="truncate">{b.name}</span>
+                      {b.shared ? (
+                        <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-amber-400">
+                          Shared
+                        </span>
+                      ) : null}
+                      {!b.shared ? (
+                        <button
+                          type="button"
+                          aria-label={`Rename ${b.name}`}
+                          title="Rename"
+                          className="inline-flex shrink-0 rounded-md p-1 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingId(b.id);
+                            setEditName(b.name);
+                          }}
+                        >
+                          <PencilIcon className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                    </h3>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
                   {!b.shared ? (
                     <button
                       type="button"
                       title="Invite collaborator"
                       aria-label={`Invite collaborator to ${b.name}`}
-                      className="inline-flex shrink-0 items-center gap-1 self-center rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-medium text-aurora-300 transition-colors hover:border-aurora-400/40 hover:bg-aurora-400/10"
+                      className="inline-flex h-7 items-center gap-1 rounded-full border border-white/10 px-2.5 text-[11px] font-medium text-aurora-300 transition-colors hover:border-aurora-400/40 hover:bg-aurora-400/10"
                       onClick={(e) => {
                         e.stopPropagation();
                         setInviteBoard(b);
@@ -250,23 +233,54 @@ export function BoardsView({
                       Invite
                     </button>
                   ) : null}
+                  {!b.isDefault && !b.shared ? (
+                    <button
+                      type="button"
+                      aria-label={`Delete ${b.name}`}
+                      title="Delete"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-mist-500 opacity-0 transition-opacity hover:bg-rose-400/10 hover:text-rose-300 group-hover:opacity-100 focus-visible:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleDelete(b.id);
+                      }}
+                    >
+                      <XIcon className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
+
+              <dl className="mt-4 grid grid-cols-2 gap-2 text-xs text-mist-400 sm:grid-cols-4">
+                <div>
+                  <dt className="text-mist-500">Leads</dt>
+                  <dd className="font-display text-lg text-mist-100">{b.leadCount}</dd>
+                </div>
+                <div>
+                  <dt className="text-mist-500">Contacted</dt>
+                  <dd className="font-display text-lg text-mist-100">
+                    {b.contactedCount}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-mist-500">Sent</dt>
+                  <dd className="font-display text-lg text-mist-100">{b.sentCount}</dd>
+                </div>
+                <div>
+                  <dt className="text-mist-500">Closed</dt>
+                  <dd className="font-display text-lg text-mist-100">{b.closedCount}</dd>
+                </div>
+              </dl>
             </div>
-            {!b.isDefault && !b.shared ? (
-              <button
-                type="button"
-                aria-label={`Delete ${b.name}`}
-                title="Delete"
-                className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg text-mist-500 opacity-0 transition-opacity hover:bg-rose-400/10 hover:text-rose-300 group-hover:opacity-100"
-                onClick={() => void handleDelete(b.id)}
-              >
-                <XIcon className="h-3.5 w-3.5" />
-              </button>
-            ) : null}
           </li>
         ))}
       </ul>
+
+      {createOpen ? (
+        <CreateBoardModal
+          onClose={() => setCreateOpen(false)}
+          onCreate={handleCreate}
+        />
+      ) : null}
 
       {inviteBoard ? (
         <BoardInviteModal
@@ -276,6 +290,143 @@ export function BoardsView({
         />
       ) : null}
     </div>
+  );
+}
+
+function CreateBoardModal({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (name: string) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  async function submit() {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setErr("Enter a board name");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await onCreate(trimmed);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Create failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-board-title"
+    >
+      <button
+        type="button"
+        aria-label="Close dialog"
+        className="absolute inset-0 bg-ink-950/80"
+        onClick={onClose}
+      />
+      <div
+        className="relative z-10 w-full max-w-md rounded-xl2 border border-white/10 bg-ink-900 p-5 shadow-2xl sm:p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2
+              id="create-board-title"
+              className="font-display text-xl font-semibold text-mist-100"
+            >
+              New board
+            </h2>
+            <p className="mt-1 text-sm text-mist-500">
+              A board holds a search niche, pipeline, and outreach queue.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-mist-500 hover:bg-white/5 hover:text-mist-200"
+            aria-label="Close"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+
+        <label className="mt-5 block">
+          <span className="mb-1.5 block text-xs font-medium text-mist-500">
+            Board name
+          </span>
+          <input
+            type="text"
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+            placeholder="e.g. Barcelona spas"
+            className="w-full rounded-xl border border-white/10 bg-ink-950 px-3 py-2.5 text-sm text-mist-100 placeholder:text-mist-500 focus:border-aurora-400/50 focus:outline-none"
+          />
+        </label>
+
+        {err ? (
+          <p className="mt-3 rounded-lg border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+            {err}
+          </p>
+        ) : null}
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full px-4 py-2 text-sm font-medium text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void submit()}
+            className="inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
+          >
+            {busy ? <Spinner className="h-4 w-4" /> : null}
+            Create board
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -341,7 +492,7 @@ function BoardInviteModal({
       setOkMsg(
         emailSent
           ? `Invite emailed to ${trimmed}. They can also accept under Boards when signed in.`
-          : `Invite saved for ${trimmed}. They’ll see it under Boards when signed in with that email (outbound invite mail isn’t configured on this workspace).`,
+          : `Invite saved for ${trimmed}. They’ll see it under Boards when signed in — notification email couldn’t be sent (check platform Resend/Maileroo).`,
       );
       await loadPeople();
       onInvited();

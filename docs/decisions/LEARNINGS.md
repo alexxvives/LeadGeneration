@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-19 — Account switch JWT + platform invite mail
+- Custom `jwt` callback must set `token.email` / `token.name` on every
+  credentials sign-in; otherwise switching to `admin@…` kept the previous
+  session email (e.g. alexxvives@gmail.com) in the UI.
+- Board-invite mail is **platform** Resend → optional `MAILEROO_API_KEY` →
+  SMTP — never workspace BYO keys. Resend `onboarding@resend.dev` only
+  delivers to the Resend account owner; production needs a verified from-domain.
+- Marketing Sign in opens `AuthModal` overlay (`dismissible`); `/login` remains
+  for middleware redirects.
+
 ### 2026-07-19 — Invite modal + light pills + info card
 - Board Collaborate modal portals to `document.body` (parent `animate-float-up`
   transform broke `fixed` centering) and uses opaque `bg-ink-900`, not `.glass`.

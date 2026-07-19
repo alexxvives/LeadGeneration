@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MarketingShell } from "@/components/MarketingShell";
 import { LandingProductPreview } from "@/components/LandingProductPreview";
+import { SignInCta } from "@/components/MarketingSignIn";
 import { authRequired } from "@/lib/config";
 import {
   ArrowIcon,
@@ -74,8 +75,7 @@ const CAPABILITIES = [
 ];
 
 export default function LandingPage() {
-  const studioHref = authRequired() ? "/login" : "/app";
-  const studioLabel = authRequired() ? "Sign in" : "Open the studio";
+  const required = authRequired();
 
   return (
     <MarketingShell glow="lg" footerTagline="You approve every send.">
@@ -101,13 +101,13 @@ export default function LandingPage() {
               className="animate-float-up mt-9 flex flex-wrap items-center gap-4"
               style={{ animationDelay: "160ms" }}
             >
-              <Link
-                href={studioHref}
+              <SignInCta
+                authRequired={required}
                 className="group inline-flex items-center gap-2 rounded-full bg-aurora-400 px-7 py-3.5 font-medium text-on-accent shadow-lg shadow-aurora-500/25 transition-transform hover:scale-105"
               >
-                {studioLabel}
+                {required ? "Sign in" : "Open the studio"}
                 <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
+              </SignInCta>
               <Link
                 href="/how-it-works"
                 className="glass inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-medium text-mist-100 transition-transform hover:scale-[1.02]"
@@ -258,13 +258,13 @@ export default function LandingPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-4">
-                <Link
-                  href={studioHref}
+                <SignInCta
+                  authRequired={required}
                   className="group inline-flex items-center gap-2 rounded-full bg-aurora-400 px-6 py-3 font-medium text-on-accent transition-transform hover:scale-[1.03]"
                 >
-                  {studioLabel}
+                  {required ? "Sign in" : "Open the studio"}
                   <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
+                </SignInCta>
                 <Link
                   href="/pricing"
                   className="glass inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-medium text-mist-100 transition-transform hover:scale-[1.02]"

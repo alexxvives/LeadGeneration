@@ -30,7 +30,7 @@ export function PricingCards() {
       setNote("Couldn't start checkout. Please try again.");
     } catch {
       setNote("Sign in to upgrade — redirecting…");
-      router.push(`/login?callbackUrl=${encodeURIComponent("/pricing")}`);
+      router.push(`/?signin=1`);
     } finally {
       setBusy(null);
     }

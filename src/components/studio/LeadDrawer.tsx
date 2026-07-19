@@ -273,8 +273,8 @@ export function LeadDrawer(props: DrawerProps) {
       >
 
         {/* Header */}
-        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-4 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
-          <div className="min-w-0">
+        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
+          <div className="min-w-0 flex-1 pr-2">
             {mode === "info" ? (
               <div className="flex items-center gap-2">
                 <CrmStagePill stage={lead.crmStage ?? "new"} />
@@ -292,7 +292,7 @@ export function LeadDrawer(props: DrawerProps) {
                 <p className="mt-1 truncate text-sm text-mist-500">{lead.company}</p>
               </>
             ) : (
-              <div className={`flex min-w-0 items-center gap-2.5 ${mode === "info" ? "mt-3" : ""}`}>
+              <div className={`min-w-0 ${mode === "info" ? "mt-3" : ""}`}>
                 <input
                   id="lead-drawer-title"
                   key={`${lead.id}-company-${lead.company}`}
@@ -304,9 +304,8 @@ export function LeadDrawer(props: DrawerProps) {
                     }
                   }}
                   aria-label="Company name"
-                  className="min-w-0 flex-1 truncate rounded-md bg-transparent py-0.5 pl-1 font-display text-2xl font-semibold tracking-tight text-mist-100 outline-none placeholder:text-mist-500 focus:bg-ink-950/40 focus:underline focus:decoration-aurora-400/50"
+                  className="w-full min-w-0 rounded-md bg-transparent py-0.5 font-display text-xl font-semibold tracking-tight text-mist-100 outline-none placeholder:text-mist-500 focus:bg-ink-950/40 focus:underline focus:decoration-aurora-400/50 sm:text-2xl"
                 />
-                <PencilIcon className="h-4 w-4 shrink-0 text-mist-500" aria-hidden />
               </div>
             )}
           </div>

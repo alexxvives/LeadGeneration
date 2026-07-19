@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { XIcon } from "@/components/icons";
+import { useMarketingSignIn } from "@/components/MarketingSignIn";
 
 const LINKS = [
   { href: "/how-it-works", label: "How it works" },
@@ -15,21 +16,40 @@ const LINKS = [
 
 /**
  * Shared marketing header — one primary CTA:
- *  - production (auth required): Sign in → /login
+ *  - production (auth required): Sign in → overlay modal
  *  - local demo: Open studio → /app
  */
 export function SiteNav({ authRequired = false }: { authRequired?: boolean }) {
   const pathname = usePathname();
   const onLogin = pathname === "/login";
   const [open, setOpen] = useState(false);
+  const { openSignIn } = useMarketingSignIn();
 
   const linkClass = (href: string) =>
     `transition-colors hover:text-mist-100 ${
       pathname === href ? "text-mist-100" : "text-mist-300"
     }`;
 
-  const ctaHref = authRequired ? "/login" : "/app";
-  const ctaLabel = authRequired ? "Sign in" : "Open studio";
+  const ctaClass =
+    "rounded-full bg-aurora-400 px-4 py-2 font-medium text-on-accent transition-transform hover:scale-105";
+  const ctaClassMobile =
+    "rounded-full bg-aurora-400 px-3.5 py-1.5 text-sm font-medium text-on-accent";
+
+  function renderCta(mobile: boolean) {
+    const cls = mobile ? ctaClassMobile : ctaClass;
+    if (!authRequired) {
+      return (
+        <Link href="/app" className={cls}>
+          Open studio
+        </Link>
+      );
+    }
+    return (
+      <button type="button" onClick={openSignIn} className={cls}>
+        Sign in
+      </button>
+    );
+  }
 
   return (
     <header className="relative z-20 mx-auto w-full max-w-7xl px-5 py-5 sm:px-8">
@@ -44,25 +64,11 @@ export function SiteNav({ authRequired = false }: { authRequired?: boolean }) {
               {l.label}
             </Link>
           ))}
-          {!onLogin ? (
-            <Link
-              href={ctaHref}
-              className="rounded-full bg-aurora-400 px-4 py-2 font-medium text-on-accent transition-transform hover:scale-105"
-            >
-              {ctaLabel}
-            </Link>
-          ) : null}
+          {!onLogin ? renderCta(false) : null}
         </nav>
 
         <div className="flex items-center gap-3 md:hidden">
-          {!onLogin ? (
-            <Link
-              href={ctaHref}
-              className="rounded-full bg-aurora-400 px-3.5 py-1.5 text-sm font-medium text-on-accent"
-            >
-              {ctaLabel}
-            </Link>
-          ) : null}
+          {!onLogin ? renderCta(true) : null}
           <button
             type="button"
             aria-expanded={open}

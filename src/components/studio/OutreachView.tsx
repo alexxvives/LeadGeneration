@@ -162,13 +162,13 @@ export function OutreachView({
                   ) : null}
                 </div>
 
-                <ul className="min-h-0 flex-1 divide-y divide-white/10 overflow-y-auto overscroll-contain">
+                <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                   {rows.length === 0 ? (
                     <li className="px-3 py-6 text-center text-[11px] text-mist-600">
                       {meta.empty}
                     </li>
                   ) : (
-                    rows.map((lead) => (
+                    rows.map((lead, i) => (
                       <OutreachRow
                         key={lead.id}
                         lead={lead}
@@ -176,6 +176,7 @@ export function OutreachView({
                         busy={busyId === lead.id || busyId === lead.outreach?.id}
                         canSendEmail={canSendEmail}
                         emailVerify={emailVerify}
+                        showDivider={i > 0}
                         onOpenInfo={() => onOpenInfo(lead.id)}
                         onOpenDraft={() => onOpenDraft(lead.id)}
                         onCreateDraft={() => onCreateDraft(lead.id)}
@@ -206,6 +207,7 @@ function OutreachRow({
   busy,
   canSendEmail,
   emailVerify,
+  showDivider,
   onOpenInfo,
   onOpenDraft,
   onCreateDraft,
@@ -218,6 +220,7 @@ function OutreachRow({
   busy: boolean;
   canSendEmail: boolean;
   emailVerify: boolean;
+  showDivider: boolean;
   onOpenInfo: () => void;
   onOpenDraft: () => void;
   onCreateDraft: () => Promise<void>;
@@ -241,7 +244,11 @@ function OutreachRow({
   };
 
   return (
-    <li className="flex items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03]">
+    <li
+      className={`flex items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03] ${
+        showDivider ? "border-t border-white/10" : ""
+      }`}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1">
           <button

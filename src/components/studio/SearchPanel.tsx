@@ -529,12 +529,6 @@ export function SearchPanel({
             Best for · {active.bestFor}
           </p>
         </div>
-        {leadsRemaining != null && leadsRemaining < planMonthlyCap && (
-          <p className="mt-2 text-xs text-mist-500">
-            {leadsRemaining} lead credit{leadsRemaining === 1 ? "" : "s"} left this
-            month (plan includes {planMonthlyCap}).
-          </p>
-        )}
       </div>
       <div className="mt-5 flex items-center justify-center gap-4">
         <button

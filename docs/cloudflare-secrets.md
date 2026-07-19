@@ -12,7 +12,8 @@ Worker name (must match): `leadgeneration` (`wrangler.jsonc` → `"name"`).
 |--------|---------|
 | `AUTH_SECRET` | Auth.js — production login |
 | `NEXTAUTH_URL` | Canonical app URL (magic links + Gmail OAuth redirect) |
-| `RESEND_API_KEY` | Forgot-password magic link + optional platform email |
+| `RESEND_API_KEY` | Magic link + board-invite / platform transactional email |
+| `MAILEROO_API_KEY` | Optional platform Maileroo *sending* key (board invites fallback) |
 | `STRIPE_SECRET_KEY` | Billing (use `sk_live_…` in prod; `sk_test_…` only in `.env.local`) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing (`whsec_…` — live endpoint in prod) |
 | `STRIPE_*_PRICE_ID` | Live Price IDs for Starter / Pro / Agency |

@@ -35,6 +35,8 @@ export function AuthModal({
   turnstileSiteKey,
   callbackUrl = "/app",
   allowGuest = true,
+  /** When true, backdrop / Esc / X always dismiss (marketing overlay). */
+  dismissible,
 }: {
   open: boolean;
   onClose: () => void;
@@ -44,7 +46,9 @@ export function AuthModal({
   turnstileSiteKey: string | null;
   callbackUrl?: string;
   allowGuest?: boolean;
+  dismissible?: boolean;
 }) {
+  const canDismiss = dismissible ?? !authRequired;
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -80,11 +84,11 @@ export function AuthModal({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !authRequired) onClose();
+      if (e.key === "Escape" && canDismiss) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, authRequired, onClose]);
+  }, [open, canDismiss, onClose]);
 
   if (!open) return null;
 
@@ -222,11 +226,11 @@ export function AuthModal({
         aria-label="Close"
         className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
         onClick={() => {
-          if (!authRequired) onClose();
+          if (canDismiss) onClose();
         }}
       />
       <div className="relative w-full max-w-md animate-float-up rounded-xl2 border border-white/10 bg-ink-900 p-6 shadow-2xl shadow-black/40 sm:p-8">
-        {!authRequired && (
+        {canDismiss && (
           <button
             type="button"
             onClick={onClose}
