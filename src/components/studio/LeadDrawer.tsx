@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
 import { CrmStagePill, FitMeter, Spinner } from "@/components/ui";
@@ -97,14 +97,23 @@ function parseList(raw: string): string[] {
     .filter(Boolean);
 }
 
+/** Normalize legacy fit-reason strings for display. */
+function formatFitReason(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  if (/^imported from your file$/i.test(t)) return null;
+  if (/^in target location\b/i.test(t)) return "In target location";
+  return t;
+}
+
 // ─── CRM stage config ─────────────────────────────────────────────────────────
 
 const CRM_STAGES: { stage: CrmStage; label: string; color: string }[] = [
-  { stage: "new",             label: "New",             color: "bg-ink-800/80 text-mist-300 ring-ink-600/40" },
-  { stage: "contacted",       label: "Contacted",       color: "bg-amber-400/15 text-amber-300 ring-amber-400/35" },
-  { stage: "in_conversation", label: "In Conversation", color: "bg-sky-400/15 text-sky-300 ring-sky-400/35" },
-  { stage: "closed",          label: "Closed",          color: "bg-aurora-400/20 text-aurora-300 ring-aurora-400/40" },
-  { stage: "not_interested",  label: "Not Interested",  color: "bg-rose-500/15 text-rose-300 ring-rose-400/35" },
+  { stage: "new",             label: "New",             color: "pill-neutral" },
+  { stage: "contacted",       label: "Contacted",       color: "pill-amber" },
+  { stage: "in_conversation", label: "In Conversation", color: "pill-sky" },
+  { stage: "closed",          label: "Closed",          color: "pill-aurora" },
+  { stage: "not_interested",  label: "Not Interested",  color: "pill-rose" },
 ];
 
 const CONTACT_METHODS: { method: ContactMethod; label: string }[] = [
@@ -283,7 +292,7 @@ export function LeadDrawer(props: DrawerProps) {
                 <p className="mt-1 truncate text-sm text-mist-500">{lead.company}</p>
               </>
             ) : (
-              <div className={`flex min-w-0 items-center gap-2 ${mode === "info" ? "mt-2" : ""}`}>
+              <div className={`flex min-w-0 items-center gap-2.5 ${mode === "info" ? "mt-3" : ""}`}>
                 <input
                   id="lead-drawer-title"
                   key={`${lead.id}-company-${lead.company}`}
@@ -295,7 +304,7 @@ export function LeadDrawer(props: DrawerProps) {
                     }
                   }}
                   aria-label="Company name"
-                  className="min-w-0 flex-1 truncate bg-transparent font-display text-2xl font-semibold text-mist-100 outline-none placeholder:text-mist-500 focus:underline focus:decoration-aurora-400/50"
+                  className="min-w-0 flex-1 truncate rounded-md bg-transparent py-0.5 pl-1 font-display text-2xl font-semibold tracking-tight text-mist-100 outline-none placeholder:text-mist-500 focus:bg-ink-950/40 focus:underline focus:decoration-aurora-400/50"
                 />
                 <PencilIcon className="h-4 w-4 shrink-0 text-mist-500" aria-hidden />
               </div>
@@ -371,45 +380,44 @@ export function LeadDrawer(props: DrawerProps) {
 
           {/* Contact info — all fields editable */}
           <section className="grid gap-2.5">
-            <EditableInfoRow
-              icon={<GlobeIcon className="h-4 w-4" />}
-              label="Website"
-              defaultValue={lead.website ?? ""}
-              fieldKey={`${lead.id}-website-${lead.website ?? ""}`}
-              placeholder="https://…"
-              onSave={(raw) => {
-                const next = raw.trim() || null;
-                if (next !== (lead.website ?? null)) {
-                  void props.onUpdateCrm(lead.id, { website: next });
-                }
-              }}
-            />
-            {!isUsableWebsite(lead.website) ? (
-              <p className="pl-7 text-[11px] text-mist-500">
-                No website on file —{" "}
-                <a
-                  href={`https://www.google.com/search?q=${encodeURIComponent(
-                    [lead.company, lead.location].filter(Boolean).join(" "),
-                  )}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-aurora-300 hover:underline"
-                >
-                  Google search for this lead
-                </a>
-              </p>
-            ) : (
-              <p className="pl-7 text-[11px] text-mist-500">
-                <a
-                  href={lead.website!}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-aurora-300 hover:underline"
-                >
-                  Open {displayWebsite(lead.website)}
-                </a>
-              </p>
-            )}
+            <div className="grid gap-1">
+              <div className="flex items-center justify-end gap-2 pl-7">
+                {isUsableWebsite(lead.website) ? (
+                  <a
+                    href={lead.website!}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-aurora-300 hover:underline"
+                  >
+                    Open {displayWebsite(lead.website)}
+                  </a>
+                ) : (
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(
+                      [lead.company, lead.location].filter(Boolean).join(" "),
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-aurora-300 hover:underline"
+                  >
+                    No website on file — Google search for this lead
+                  </a>
+                )}
+              </div>
+              <EditableInfoRow
+                icon={<GlobeIcon className="h-4 w-4" />}
+                label="Website"
+                defaultValue={lead.website ?? ""}
+                fieldKey={`${lead.id}-website-${lead.website ?? ""}`}
+                placeholder="https://…"
+                onSave={(raw) => {
+                  const next = raw.trim() || null;
+                  if (next !== (lead.website ?? null)) {
+                    void props.onUpdateCrm(lead.id, { website: next });
+                  }
+                }}
+              />
+            </div>
             <EditableInfoRow
               icon={<BuildingIcon className="h-4 w-4" />}
               label="Company type"
@@ -466,23 +474,16 @@ export function LeadDrawer(props: DrawerProps) {
 
           <section>
             <SectionLabel>About</SectionLabel>
-            <div className="flex items-start gap-2 rounded-lg border border-white/10 bg-ink-950/40 px-2.5 py-2 focus-within:border-aurora-400/50">
-              <textarea
-                key={`${lead.id}-about-${lead.aboutBlurb ?? ""}`}
-                defaultValue={lead.aboutBlurb ?? ""}
-                rows={3}
-                onBlur={(e) => {
-                  const next = e.target.value.trim() || null;
-                  if (next !== (lead.aboutBlurb ?? null)) {
-                    void props.onUpdateCrm(lead.id, { aboutBlurb: next });
-                  }
-                }}
-                placeholder="Short blurb about this lead…"
-                aria-label="About"
-                className="min-w-0 flex-1 resize-y bg-transparent text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-500"
-              />
-              <PencilIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mist-500" aria-hidden />
-            </div>
+            <AutoGrowAbout
+              key={`${lead.id}-about-${lead.aboutBlurb ?? ""}`}
+              defaultValue={lead.aboutBlurb ?? ""}
+              onSave={(raw) => {
+                const next = raw.trim() || null;
+                if (next !== (lead.aboutBlurb ?? null)) {
+                  void props.onUpdateCrm(lead.id, { aboutBlurb: next });
+                }
+              }}
+            />
           </section>
 
           {/* Fit score reasoning */}
@@ -504,13 +505,16 @@ export function LeadDrawer(props: DrawerProps) {
                 </span>
               </div>
             </div>
-            <ul className="grid gap-1.5">
-              {lead.fitReasons.map((r) => (
-                <li key={r} className="flex items-start gap-2 text-sm text-mist-300">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-aurora-400" />
-                  {r}
-                </li>
-              ))}
+            <ul className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
+              {lead.fitReasons
+                .map(formatFitReason)
+                .filter((r): r is string => Boolean(r))
+                .map((r) => (
+                  <li key={r} className="flex items-start gap-2 text-sm text-mist-300">
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-aurora-400" />
+                    {r}
+                  </li>
+                ))}
             </ul>
           </section>
           </div>
@@ -865,6 +869,43 @@ function EditableInfoRow({
         />
         <PencilIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" aria-hidden />
       </div>
+    </div>
+  );
+}
+
+function AutoGrowAbout({
+  defaultValue,
+  onSave,
+}: {
+  defaultValue: string;
+  onSave: (raw: string) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const resize = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.max(el.scrollHeight, 36)}px`;
+  };
+
+  useEffect(() => {
+    resize();
+  }, [defaultValue]);
+
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-white/10 bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50">
+      <textarea
+        ref={ref}
+        defaultValue={defaultValue}
+        rows={1}
+        onInput={resize}
+        onBlur={(e) => onSave(e.target.value)}
+        placeholder="Short blurb about this lead…"
+        aria-label="About"
+        className="min-h-[1.5rem] min-w-0 flex-1 resize-none overflow-hidden bg-transparent py-0.5 text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-500"
+      />
+      <PencilIcon className="mt-1 h-3.5 w-3.5 shrink-0 text-mist-500" aria-hidden />
     </div>
   );
 }

@@ -46,7 +46,7 @@ export function LeadCard({
         {lead.tags.slice(0, 3).map((t) => (
           <span
             key={t}
-            className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-mist-300 ring-1 ring-inset ring-white/10"
+            className="rounded-full px-2 py-0.5 text-[11px] ring-1 ring-inset pill-neutral"
           >
             {t}
           </span>

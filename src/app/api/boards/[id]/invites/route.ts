@@ -53,8 +53,8 @@ export async function POST(
   }
   try {
     const ctx = await getCtx();
-    const invite = await inviteToBoard(ctx, id, parsed.data.email);
-    return NextResponse.json({ invite });
+    const { invite, emailSent } = await inviteToBoard(ctx, id, parsed.data.email);
+    return NextResponse.json({ invite, emailSent });
   } catch (err) {
     if (isNotFoundError(err)) {
       return NextResponse.json({ error: err.message }, { status: 404 });

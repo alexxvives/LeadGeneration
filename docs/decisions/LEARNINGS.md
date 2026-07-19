@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-19 — Invite modal + light pills + info card
+- Board Collaborate modal portals to `document.body` (parent `animate-float-up`
+  transform broke `fixed` centering) and uses opaque `bg-ink-900`, not `.glass`.
+- Invite API returns `emailSent`; UI message reflects whether Resend/SMTP actually
+  sent (invite always works in-app under Boards).
+- Stage/status chips use `.pill-*` utilities with light-theme colors for paper bg.
+- Fit reasons: display strips legacy “Imported…” and “In target location (…)”;
+  two-column list. About field auto-grows from one line.
+
 ### 2026-07-19 — Studio polish: gutters, editable leads, boards
 - Side gutters again ~25% tighter: `px-3 sm:px-5` (Studio + Settings).
 - Lead info fields (company, website, emails, phones, location, type, about)

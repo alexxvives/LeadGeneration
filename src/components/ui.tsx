@@ -1,30 +1,24 @@
 import type { CrmStage, LeadStatus, OutreachStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
-  new: { label: "New", cls: "bg-ink-800/80 text-mist-300 ring-ink-600/40" },
+  new: { label: "New", cls: "pill-neutral" },
   // Internal queue flag — CRM "New" is what users see as "needs review".
-  queued: { label: "Draft ready", cls: "bg-amber-400/15 text-amber-300 ring-amber-400/35" },
-  approved: { label: "Approved", cls: "bg-aurora-400/15 text-aurora-300 ring-aurora-400/35" },
-  sending: { label: "Sending…", cls: "bg-amber-400/15 text-amber-300 ring-amber-400/35" },
-  sent: { label: "Sent", cls: "bg-aurora-500/20 text-aurora-300 ring-aurora-400/40" },
-  rejected: { label: "Undeliverable", cls: "bg-ink-800/60 text-mist-500 ring-ink-600/35" },
-  failed: { label: "Send failed", cls: "bg-rose-500/15 text-rose-300 ring-rose-400/35" },
-  draft: { label: "Draft", cls: "bg-ink-800/80 text-mist-300 ring-ink-600/40" },
+  queued: { label: "Draft ready", cls: "pill-amber" },
+  approved: { label: "Approved", cls: "pill-aurora" },
+  sending: { label: "Sending…", cls: "pill-amber" },
+  sent: { label: "Sent", cls: "pill-aurora" },
+  rejected: { label: "Undeliverable", cls: "pill-neutral" },
+  failed: { label: "Send failed", cls: "pill-rose" },
+  draft: { label: "Draft", cls: "pill-neutral" },
 };
 
 /** Pipeline-funnel labels — keep in sync with PipelineView column titles. */
 const CRM_STAGE_STYLES: Record<CrmStage, { label: string; cls: string }> = {
-  new: { label: "New", cls: "bg-ink-800/80 text-mist-300 ring-ink-600/40" },
-  contacted: { label: "Contacted", cls: "bg-amber-400/15 text-amber-300 ring-amber-400/35" },
-  in_conversation: {
-    label: "In Conversation",
-    cls: "bg-sky-400/15 text-sky-300 ring-sky-400/35",
-  },
-  closed: { label: "Closed", cls: "bg-aurora-500/20 text-aurora-300 ring-aurora-400/40" },
-  not_interested: {
-    label: "Not Interested",
-    cls: "bg-rose-500/15 text-rose-300 ring-rose-400/35",
-  },
+  new: { label: "New", cls: "pill-neutral" },
+  contacted: { label: "Contacted", cls: "pill-amber" },
+  in_conversation: { label: "In Conversation", cls: "pill-sky" },
+  closed: { label: "Closed", cls: "pill-aurora" },
+  not_interested: { label: "Not Interested", cls: "pill-rose" },
 };
 
 export function StatusPill({ status }: { status: LeadStatus | OutreachStatus }) {

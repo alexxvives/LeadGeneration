@@ -9,24 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-19 (studio UX polish batch)
+## ⏱️ Status — updated 2026-07-19 (invite modal + light pills)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Deployed:** D1 migrations `0019` + `0020` on prod. Redeploy needed for this
-UI/API polish (editable lead fields + layout).
+**Deployed:** D1 migrations `0019` + `0020` on prod. Redeploy for latest UI.
 
 ### This pass
-- Gutters `px-3 sm:px-5`; subtitles on all studio views + Settings.
-- Lead drawer: editable contact fields; sent/delivery below email body;
-  no “move to New” confirm; plan-B copy trimmed.
-- Outreach: drop Emailed/Called chips; leads table drops “Select rows…” hint.
-- Boards: remove Default label + card icon; always-visible rename; Invite
-  aligned with Contacted/Closed stats.
+- Collaborate modal: portal + opaque panel; honest `emailSent` toast copy.
+- Light-theme `.pill-*` for stage/status tags; info card website link above
+  input; fit reasons 2-col + sanitized location text; About auto-grow.
 
 ### Next
-1. Redeploy Worker; smoke lead edit PATCH + board rename/invite layout.
+1. Redeploy; confirm invite email when Resend platform key is set.
 2. Soft-lock banner + 423 on concurrent edit.
-3. Optional: Firecrawl/LLM company-type extract; re-auth Wrangler locally.
+3. Optional: Firecrawl/LLM company-type extract.
 
 ---
 

@@ -106,10 +106,13 @@ export const api = {
     jsonFetch<{ ok: boolean }>(`/api/boards/${id}`, { method: "DELETE" }),
 
   inviteToBoard: (boardId: string, email: string) =>
-    jsonFetch<{ invite: BoardInvite }>(`/api/boards/${boardId}/invites`, {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    }),
+    jsonFetch<{ invite: BoardInvite; emailSent: boolean }>(
+      `/api/boards/${boardId}/invites`,
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      },
+    ),
 
   listBoardInvites: (boardId: string) =>
     jsonFetch<{ invites: BoardInvite[]; members: BoardMember[] }>(

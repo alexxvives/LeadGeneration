@@ -241,6 +241,58 @@ html[data-theme="light"] {
     color: var(--aurora-500);
   }
 
+  /* Status / stage pills — theme-aware (table tags, drawer chips) */
+  .pill-neutral {
+    background-color: rgba(127, 146, 179, 0.14);
+    color: var(--mist-300);
+    --tw-ring-color: rgba(127, 146, 179, 0.35);
+  }
+  .pill-amber {
+    background-color: rgba(251, 191, 36, 0.14);
+    color: var(--amber-300);
+    --tw-ring-color: rgba(251, 191, 36, 0.35);
+  }
+  .pill-sky {
+    background-color: rgba(56, 189, 248, 0.14);
+    color: #7dd3fc;
+    --tw-ring-color: rgba(56, 189, 248, 0.35);
+  }
+  .pill-aurora {
+    background-color: rgba(67, 224, 168, 0.14);
+    color: var(--aurora-300);
+    --tw-ring-color: rgba(67, 224, 168, 0.4);
+  }
+  .pill-rose {
+    background-color: rgba(244, 63, 94, 0.14);
+    color: #fda4af;
+    --tw-ring-color: rgba(244, 63, 94, 0.35);
+  }
+  html[data-theme="light"] .pill-neutral {
+    background-color: rgba(12, 21, 36, 0.06);
+    color: #334155;
+    --tw-ring-color: rgba(12, 21, 36, 0.16);
+  }
+  html[data-theme="light"] .pill-amber {
+    background-color: rgba(180, 83, 9, 0.12);
+    color: #92400e;
+    --tw-ring-color: rgba(180, 83, 9, 0.28);
+  }
+  html[data-theme="light"] .pill-sky {
+    background-color: rgba(3, 105, 161, 0.1);
+    color: #0369a1;
+    --tw-ring-color: rgba(3, 105, 161, 0.28);
+  }
+  html[data-theme="light"] .pill-aurora {
+    background-color: rgba(13, 148, 136, 0.12);
+    color: #0f766e;
+    --tw-ring-color: rgba(13, 148, 136, 0.3);
+  }
+  html[data-theme="light"] .pill-rose {
+    background-color: rgba(190, 18, 60, 0.1);
+    color: #be123c;
+    --tw-ring-color: rgba(190, 18, 60, 0.28);
+  }
+
   .glass {
     background: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
     backdrop-filter: blur(12px);

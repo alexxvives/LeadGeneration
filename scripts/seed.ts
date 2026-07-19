@@ -53,7 +53,7 @@ const leads = seeds.map(([company, domain, mailbox, hasEmail, fit]) => ({
     "Matched your search query",
     hasEmail ? "Direct email contact found" : "No email yet — needs manual lookup",
     "Has a live website",
-    `In target location (${location})`,
+    "In target location",
   ],
   sourceUrl: `https://${domain}/contact`,
   // Leads arrive already drafted + in the approval queue (mirrors the live flow).

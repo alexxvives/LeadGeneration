@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { api } from "@/lib/client-api";
 import type { BoardInvite, BoardMember, BoardSummary } from "@/lib/types";
 import { Spinner } from "@/components/ui";
@@ -294,12 +295,17 @@ function BoardInviteModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const loadPeople = useCallback(async () => {
     const { invites, members: m } = await api.listBoardInvites(board.id);
     setMembers(m);
     setPending(invites);
   }, [board.id]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     loadPeople()
@@ -311,8 +317,13 @@ function BoardInviteModal({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
   }, [onClose]);
 
   async function handleInvite() {
@@ -325,10 +336,12 @@ function BoardInviteModal({
     setErr(null);
     setOkMsg(null);
     try {
-      await api.inviteToBoard(board.id, trimmed);
+      const { emailSent } = await api.inviteToBoard(board.id, trimmed);
       setEmail("");
       setOkMsg(
-        `Invite created for ${trimmed}. We’ll email them when mail is configured; they can also accept under Boards when signed in.`,
+        emailSent
+          ? `Invite emailed to ${trimmed}. They can also accept under Boards when signed in.`
+          : `Invite saved for ${trimmed}. They’ll see it under Boards when signed in with that email (outbound invite mail isn’t configured on this workspace).`,
       );
       await loadPeople();
       onInvited();
@@ -339,16 +352,23 @@ function BoardInviteModal({
     }
   }
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="board-invite-title"
-      onClick={onClose}
     >
+      <button
+        type="button"
+        aria-label="Close dialog"
+        className="absolute inset-0 bg-ink-950/80"
+        onClick={onClose}
+      />
       <div
-        className="glass w-full max-w-md rounded-xl2 p-5 shadow-2xl sm:p-6"
+        className="relative z-10 w-full max-w-md rounded-xl2 border border-white/10 bg-ink-900 p-5 shadow-2xl sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
@@ -359,7 +379,7 @@ function BoardInviteModal({
             >
               Collaborate
             </h2>
-            <p className="mt-1 truncate text-sm text-mist-500">{board.name}</p>
+            <p className="mt-0.5 truncate text-sm text-mist-500">{board.name}</p>
           </div>
           <button
             type="button"
@@ -388,13 +408,13 @@ function BoardInviteModal({
                 }
               }}
               placeholder="colleague@company.com"
-              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-ink-950/60 px-3 py-2 text-sm text-mist-100 placeholder:text-mist-500 focus:border-aurora-400/40 focus:outline-none"
+              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-ink-950 px-3 py-2.5 text-sm text-mist-100 placeholder:text-mist-500 focus:border-aurora-400/50 focus:outline-none"
             />
             <button
               type="button"
               disabled={busy}
               onClick={() => void handleInvite()}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent disabled:opacity-50"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
             >
               {busy ? <Spinner className="h-4 w-4" /> : <UsersIcon className="h-4 w-4" />}
               Invite
@@ -402,8 +422,16 @@ function BoardInviteModal({
           </div>
         </label>
 
-        {err ? <p className="mt-3 text-sm text-rose-300">{err}</p> : null}
-        {okMsg ? <p className="mt-3 text-sm text-aurora-300">{okMsg}</p> : null}
+        {err ? (
+          <p className="mt-3 rounded-lg border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+            {err}
+          </p>
+        ) : null}
+        {okMsg ? (
+          <p className="mt-3 rounded-lg border border-aurora-400/25 bg-aurora-400/10 px-3 py-2 text-sm text-aurora-200">
+            {okMsg}
+          </p>
+        ) : null}
 
         <div className="mt-5 border-t border-white/10 pt-4">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-mist-500">
@@ -414,22 +442,22 @@ function BoardInviteModal({
               <Spinner className="h-5 w-5 text-aurora-300" />
             </div>
           ) : (
-            <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto">
-              <li className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm">
+            <ul className="mt-3 max-h-52 space-y-2 overflow-y-auto">
+              <li className="flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-ink-950/60 px-3 py-2.5 text-sm">
                 <span className="truncate text-mist-100">You</span>
-                <span className="shrink-0 text-[10px] uppercase tracking-wider text-mist-500">
+                <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-mist-500">
                   Owner
                 </span>
               </li>
               {members.map((m) => (
                 <li
                   key={m.userId}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-ink-950/60 px-3 py-2.5 text-sm"
                 >
                   <span className="truncate text-mist-100">
                     {m.email ?? m.userId}
                   </span>
-                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-mist-500">
+                  <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-mist-500">
                     {m.role}
                   </span>
                 </li>
@@ -437,10 +465,10 @@ function BoardInviteModal({
               {pending.map((inv) => (
                 <li
                   key={inv.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-amber-400/25 bg-amber-400/5 px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-sm"
                 >
-                  <span className="truncate text-mist-200">{inv.email}</span>
-                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-amber-300">
+                  <span className="truncate text-mist-100">{inv.email}</span>
+                  <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-300">
                     Pending
                   </span>
                 </li>
@@ -454,6 +482,7 @@ function BoardInviteModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
