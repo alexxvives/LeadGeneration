@@ -378,7 +378,7 @@ function DraggablePipelineCard({
             )}
             {lead.contactMethod && (
               <span
-                className="inline-flex items-center gap-1 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] text-mist-500"
+                className="inline-flex items-center gap-1 rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-300 ring-1 ring-ink-600/40"
                 title={
                   lead.contactMethod === "email"
                     ? "Contacted by email"
@@ -411,8 +411,8 @@ function DraggablePipelineCard({
         title={needsMethod ? "How contacted? Open to set method" : "Lead info"}
         className={`shrink-0 rounded-md p-1 transition-colors ${
           needsMethod
-            ? "bg-amber-400/20 text-amber-200 ring-1 ring-amber-400/40 hover:bg-amber-400/30"
-            : "text-mist-600 hover:bg-white/10 hover:text-mist-200"
+            ? "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40 hover:bg-amber-400/30"
+            : "text-mist-500 hover:bg-white/10 hover:text-mist-100"
         }`}
       >
         <InfoIcon className="h-3.5 w-3.5" />

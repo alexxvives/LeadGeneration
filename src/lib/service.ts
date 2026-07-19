@@ -317,7 +317,7 @@ export async function inviteToBoard(
 
   const now = nowIso();
   const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-  return ctx.db.createBoardInvite({
+  const invite = await ctx.db.createBoardInvite({
     id: newId("binv"),
     boardId,
     boardName: access.board.name,
@@ -328,6 +328,18 @@ export async function inviteToBoard(
     createdAt: now,
     expiresAt: expires,
   });
+  // Best-effort email — invite is valid in-app even if mail fails.
+  try {
+    const { sendBoardInviteEmail } = await import("@/lib/email/board-invite");
+    await sendBoardInviteEmail({
+      to: email,
+      boardName: access.board.name,
+      inviterName: ctx.userName ?? ctx.userEmail,
+    });
+  } catch (err) {
+    console.error("[inviteToBoard] email delivery failed", err);
+  }
+  return invite;
 }
 
 export async function listMyPendingInvites(ctx: Ctx): Promise<BoardInvite[]> {

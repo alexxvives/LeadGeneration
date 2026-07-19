@@ -105,7 +105,7 @@ export function UsageBar({
             {used} / {softFull}
           </span>
         </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="meter-track mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
           <div
             className={`h-full rounded-full ${tone} transition-all`}
             style={{ width: `${pct}%` }}
@@ -127,7 +127,7 @@ export function UsageBar({
           {u} / {lim}
         </span>
       </div>
-      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+      <div className="meter-track mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
         <div className={`h-full rounded-full ${tone} transition-all`} style={{ width: `${pct}%` }} />
       </div>
     </div>

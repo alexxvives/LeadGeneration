@@ -238,6 +238,19 @@ export function UsersIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Building / venue — company type and similar meta. */
+export function BuildingIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path
+        d="M4 20V6.5A1.5 1.5 0 0 1 5.5 5H12v15H4Zm8 0h6.5A1.5 1.5 0 0 0 20 18.5V10h-8v10Z"
+        strokeLinejoin="round"
+      />
+      <path d="M7 9h2M7 12h2M7 15h2M14.5 13h2M14.5 16h2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function PinIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>

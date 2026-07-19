@@ -87,7 +87,7 @@ export function SearchProgress({ running }: { running: boolean }) {
         <p className="text-sm font-medium text-aurora-200">{SEARCH_PHASES[phase]}</p>
         <Spinner className="h-4 w-4 text-aurora-300" />
       </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-950/60">
+      <div className="meter-track mt-3 h-1.5 overflow-hidden rounded-full">
         <div
           className="h-full rounded-full bg-aurora-400 transition-[width] duration-700 ease-out"
           style={{ width: `${pct}%` }}

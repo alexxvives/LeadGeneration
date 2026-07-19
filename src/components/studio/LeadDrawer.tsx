@@ -7,6 +7,7 @@ import { CrmStagePill, FitMeter, Spinner } from "@/components/ui";
 import {
   ArrowIcon,
   CheckIcon,
+  BuildingIcon,
   GlobeIcon,
   MailIcon,
   PhoneIcon,
@@ -85,11 +86,11 @@ interface DrawerProps {
 // ─── CRM stage config ─────────────────────────────────────────────────────────
 
 const CRM_STAGES: { stage: CrmStage; label: string; color: string }[] = [
-  { stage: "new",             label: "New",             color: "bg-mist-500/20 text-mist-300 ring-mist-500/20" },
-  { stage: "contacted",       label: "Contacted",       color: "bg-amber-400/15 text-amber-300 ring-amber-400/20" },
-  { stage: "in_conversation", label: "In Conversation", color: "bg-sky-400/15 text-sky-300 ring-sky-400/25" },
-  { stage: "closed",          label: "Closed",          color: "bg-aurora-300/20 text-aurora-200 ring-aurora-300/25" },
-  { stage: "not_interested",  label: "Not Interested",  color: "bg-rose-500/10 text-rose-300 ring-rose-500/20" },
+  { stage: "new",             label: "New",             color: "bg-ink-800/80 text-mist-300 ring-ink-600/40" },
+  { stage: "contacted",       label: "Contacted",       color: "bg-amber-400/15 text-amber-300 ring-amber-400/35" },
+  { stage: "in_conversation", label: "In Conversation", color: "bg-sky-400/15 text-sky-300 ring-sky-400/35" },
+  { stage: "closed",          label: "Closed",          color: "bg-aurora-400/20 text-aurora-300 ring-aurora-400/40" },
+  { stage: "not_interested",  label: "Not Interested",  color: "bg-rose-500/15 text-rose-300 ring-rose-400/35" },
 ];
 
 const CONTACT_METHODS: { method: ContactMethod; label: string }[] = [
@@ -375,10 +376,7 @@ export function LeadDrawer(props: DrawerProps) {
                 </div>
               </InfoRow>
             )}
-            <div className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
-              <p className="text-[10px] uppercase tracking-wider text-mist-500">
-                Company type
-              </p>
+            <InfoRow icon={<BuildingIcon className="h-4 w-4" />}>
               <input
                 defaultValue={lead.companyType ?? ""}
                 key={`${lead.id}-ctype-${lead.companyType ?? ""}`}
@@ -390,10 +388,11 @@ export function LeadDrawer(props: DrawerProps) {
                     });
                   }
                 }}
-                placeholder="e.g. Pharmacy, Aesthetic Clinic"
-                className="mt-1 w-full bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-600"
+                placeholder="Company type — e.g. Pharmacy"
+                aria-label="Company type"
+                className="w-full min-w-0 bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-500"
               />
-            </div>
+            </InfoRow>
             <InfoRow icon={<MailIcon className="h-4 w-4" />}>
               {lead.emails.length ? (
                 lead.emails.join(", ")

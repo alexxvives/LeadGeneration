@@ -9,23 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-19 (studio UX + sharing)
+## ⏱️ Status — updated 2026-07-19 (invite UX + light polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Deployed:** (redeploy after this pass for D1 migrations 0019–0020)
+**Deployed:** D1 migrations `0019` + `0020` on prod. Redeploy needed for invite
+modal / contrast / gutter changes in this pass.
 
 ### This pass
-- Theme: light palette **studio-only** (`/app`); toggle top-right; marketing dark.
-- Leads: shared pipeline filter (table/cards/map); Notes always on; Pipeline
-  header sort/filter menu; Columns button removed.
-- `companyType` on leads + Excel aliases + keyword suggest; drawer Google
-  search plan-B when no website.
-- Board invite/accept + soft lock (ADR 0015). Migrations `0019`, `0020`.
+- Board Invite: custom modal + collaborators list (owner / members / pending);
+  best-effort invite email via Resend/SMTP (`board-invite.ts`).
+- Light/dark contrast: meter tracks, row dividers, status tags, info icons,
+  `--on-accent` white in light (search/CTA on teal).
+- Content gutters ~15% tighter; company type as icon+input InfoRow.
 
 ### Next
-1. `npm run cf:migrate` then redeploy Worker so prod gets company_type + sharing tables.
-2. Smoke: invite a second user to a board; confirm soft-lock banner + 423 on edit.
-3. Optional: email delivery for invites; Firecrawl/LLM company-type extract.
+1. Redeploy Worker; smoke invite email + collaborator list.
+2. Soft-lock banner + 423 on concurrent edit.
+3. Optional: Firecrawl/LLM company-type extract; re-auth Wrangler locally.
 
 ---
 

@@ -162,7 +162,7 @@ export function OutreachView({
                   ) : null}
                 </div>
 
-                <ul className="min-h-0 flex-1 divide-y divide-white/5 overflow-y-auto overscroll-contain">
+                <ul className="min-h-0 flex-1 divide-y divide-white/10 overflow-y-auto overscroll-contain">
                   {rows.length === 0 ? (
                     <li className="px-3 py-6 text-center text-[11px] text-mist-600">
                       {meta.empty}
@@ -262,7 +262,7 @@ function OutreachRow({
           <button
             type="button"
             onClick={onOpenInfo}
-            className="shrink-0 rounded p-0.5 text-mist-600 outline-none hover:bg-white/5 hover:text-mist-300 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
+            className="shrink-0 rounded p-0.5 text-mist-500 outline-none hover:bg-white/10 hover:text-mist-100 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
             aria-label={`Lead info for ${lead.company}`}
             title="Lead info"
           >
@@ -281,7 +281,14 @@ function OutreachRow({
           <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
         ) : null}
         {bucket === "contacted" && methodLabel ? (
-          <p className="mt-1 text-[10px] text-amber-200/70">{methodLabel}</p>
+          <span className="mt-1 inline-flex rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 ring-1 ring-inset ring-amber-400/30">
+            {methodLabel}
+          </span>
+        ) : null}
+        {bucket === "contacted" && lead.contactMethod === "email" ? (
+          <span className="mt-1 inline-flex rounded-full bg-aurora-400/15 px-1.5 py-0.5 text-[10px] font-medium text-aurora-300 ring-1 ring-inset ring-aurora-400/30">
+            Emailed
+          </span>
         ) : null}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">

@@ -882,8 +882,8 @@ export function Studio() {
     <main
       className={
         lockViewport
-          ? "mx-auto flex h-dvh max-w-7xl flex-col overflow-hidden px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-8 sm:pt-8"
-          : "mx-auto flex min-h-dvh max-w-7xl flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-8 sm:pt-8"
+          ? "mx-auto flex h-dvh max-w-7xl flex-col overflow-hidden px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-7 sm:pt-8"
+          : "mx-auto flex min-h-dvh max-w-7xl flex-col px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-7 sm:pt-8"
       }
     >
       <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[1fr_auto_1fr]">

@@ -2,9 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
-import type { BoardInvite, BoardSummary } from "@/lib/types";
+import type { BoardInvite, BoardMember, BoardSummary } from "@/lib/types";
 import { Spinner } from "@/components/ui";
-import { BoardsIcon, PencilIcon, XIcon } from "@/components/icons";
+import {
+  BoardsIcon,
+  PencilIcon,
+  UsersIcon,
+  XIcon,
+} from "@/components/icons";
 
 export function BoardsView({
   onSelectBoard,
@@ -21,6 +26,7 @@ export function BoardsView({
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [inviteBoard, setInviteBoard] = useState<BoardSummary | null>(null);
 
   const refresh = useCallback(async () => {
     const [{ boards: list }, { invites: pending }] = await Promise.all([
@@ -79,21 +85,6 @@ export function BoardsView({
       await refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Delete failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleInvite(boardId: string) {
-    const email = window.prompt("Invite by email")?.trim();
-    if (!email) return;
-    setBusy(true);
-    setErr(null);
-    try {
-      await api.inviteToBoard(boardId, email);
-      await refresh();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Invite failed");
     } finally {
       setBusy(false);
     }
@@ -207,34 +198,55 @@ export function BoardsView({
                       </button>
                     </div>
                   ) : (
-                    <h3 className="flex min-w-0 items-center gap-1.5 font-display text-lg font-semibold text-mist-100">
-                      <span className="truncate">{b.name}</span>
-                      {b.isDefault ? (
-                        <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-mist-500">
-                          Default
-                        </span>
-                      ) : null}
-                      {b.shared ? (
-                        <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-amber-400">
-                          Shared
-                        </span>
-                      ) : null}
-                      {!b.isDefault && !b.shared ? (
+                    <div
+                      className={`flex min-w-0 items-center gap-2 ${
+                        !b.isDefault && !b.shared ? "pr-6" : ""
+                      }`}
+                    >
+                      <h3 className="flex min-w-0 flex-1 items-center gap-1.5 font-display text-lg font-semibold text-mist-100">
+                        <span className="truncate">{b.name}</span>
+                        {b.isDefault ? (
+                          <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-mist-500">
+                            Default
+                          </span>
+                        ) : null}
+                        {b.shared ? (
+                          <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-amber-400">
+                            Shared
+                          </span>
+                        ) : null}
+                        {!b.isDefault && !b.shared ? (
+                          <button
+                            type="button"
+                            aria-label={`Rename ${b.name}`}
+                            title="Rename"
+                            className="inline-flex shrink-0 rounded-md p-1 text-mist-500 opacity-0 transition-opacity hover:bg-white/5 hover:text-mist-200 group-hover:opacity-100"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingId(b.id);
+                              setEditName(b.name);
+                            }}
+                          >
+                            <PencilIcon className="h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
+                      </h3>
+                      {!b.shared ? (
                         <button
                           type="button"
-                          aria-label={`Rename ${b.name}`}
-                          title="Rename"
-                          className="inline-flex shrink-0 rounded-md p-1 text-mist-500 opacity-0 transition-opacity hover:bg-white/5 hover:text-mist-200 group-hover:opacity-100"
+                          title="Invite collaborator"
+                          aria-label={`Invite collaborator to ${b.name}`}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-medium text-aurora-300 transition-colors hover:border-aurora-400/40 hover:bg-aurora-400/10"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setEditingId(b.id);
-                            setEditName(b.name);
+                            setInviteBoard(b);
                           }}
                         >
-                          <PencilIcon className="h-3.5 w-3.5" />
+                          <UsersIcon className="h-3.5 w-3.5" />
+                          Invite
                         </button>
                       ) : null}
-                    </h3>
+                    </div>
                   )}
                   <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-mist-400">
                     <div>
@@ -256,18 +268,6 @@ export function BoardsView({
                       <dd className="font-display text-lg text-mist-100">{b.closedCount}</dd>
                     </div>
                   </dl>
-                  {!b.shared ? (
-                    <button
-                      type="button"
-                      className="mt-3 text-xs font-medium text-aurora-300 hover:underline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleInvite(b.id);
-                      }}
-                    >
-                      Invite collaborator
-                    </button>
-                  ) : null}
                 </div>
               </div>
             </div>
@@ -285,6 +285,194 @@ export function BoardsView({
           </li>
         ))}
       </ul>
+
+      {inviteBoard ? (
+        <BoardInviteModal
+          board={inviteBoard}
+          onClose={() => setInviteBoard(null)}
+          onInvited={() => void refresh()}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function BoardInviteModal({
+  board,
+  onClose,
+  onInvited,
+}: {
+  board: BoardSummary;
+  onClose: () => void;
+  onInvited: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [members, setMembers] = useState<BoardMember[]>([]);
+  const [pending, setPending] = useState<BoardInvite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+
+  const loadPeople = useCallback(async () => {
+    const { invites, members: m } = await api.listBoardInvites(board.id);
+    setMembers(m);
+    setPending(invites);
+  }, [board.id]);
+
+  useEffect(() => {
+    loadPeople()
+      .catch((e) => setErr(e instanceof Error ? e.message : "Failed to load"))
+      .finally(() => setLoading(false));
+  }, [loadPeople]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function handleInvite() {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setErr("Enter an email address");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    setOkMsg(null);
+    try {
+      await api.inviteToBoard(board.id, trimmed);
+      setEmail("");
+      setOkMsg(
+        `Invite created for ${trimmed}. We’ll email them when mail is configured; they can also accept under Boards when signed in.`,
+      );
+      await loadPeople();
+      onInvited();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Invite failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="board-invite-title"
+      onClick={onClose}
+    >
+      <div
+        className="glass w-full max-w-md rounded-xl2 p-5 shadow-2xl sm:p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2
+              id="board-invite-title"
+              className="font-display text-xl font-semibold text-mist-100"
+            >
+              Collaborate
+            </h2>
+            <p className="mt-1 truncate text-sm text-mist-500">{board.name}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-mist-500 hover:bg-white/5 hover:text-mist-200"
+            aria-label="Close"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+
+        <label className="mt-5 block">
+          <span className="mb-1.5 block text-xs font-medium text-mist-500">
+            Invite by email
+          </span>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              autoFocus
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void handleInvite();
+                }
+              }}
+              placeholder="colleague@company.com"
+              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-ink-950/60 px-3 py-2 text-sm text-mist-100 placeholder:text-mist-500 focus:border-aurora-400/40 focus:outline-none"
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleInvite()}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent disabled:opacity-50"
+            >
+              {busy ? <Spinner className="h-4 w-4" /> : <UsersIcon className="h-4 w-4" />}
+              Invite
+            </button>
+          </div>
+        </label>
+
+        {err ? <p className="mt-3 text-sm text-rose-300">{err}</p> : null}
+        {okMsg ? <p className="mt-3 text-sm text-aurora-300">{okMsg}</p> : null}
+
+        <div className="mt-5 border-t border-white/10 pt-4">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-mist-500">
+            People on this board
+          </h3>
+          {loading ? (
+            <div className="flex justify-center py-6">
+              <Spinner className="h-5 w-5 text-aurora-300" />
+            </div>
+          ) : (
+            <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto">
+              <li className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm">
+                <span className="truncate text-mist-100">You</span>
+                <span className="shrink-0 text-[10px] uppercase tracking-wider text-mist-500">
+                  Owner
+                </span>
+              </li>
+              {members.map((m) => (
+                <li
+                  key={m.userId}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm"
+                >
+                  <span className="truncate text-mist-100">
+                    {m.email ?? m.userId}
+                  </span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-mist-500">
+                    {m.role}
+                  </span>
+                </li>
+              ))}
+              {pending.map((inv) => (
+                <li
+                  key={inv.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-amber-400/25 bg-amber-400/5 px-3 py-2 text-sm"
+                >
+                  <span className="truncate text-mist-200">{inv.email}</span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-amber-300">
+                    Pending
+                  </span>
+                </li>
+              ))}
+              {members.length === 0 && pending.length === 0 ? (
+                <li className="px-1 py-2 text-xs text-mist-500">
+                  No collaborators yet — invite someone by email.
+                </li>
+              ) : null}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

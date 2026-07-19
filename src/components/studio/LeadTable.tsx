@@ -373,7 +373,7 @@ export function LeadTable({
                 <tr
                   key={l.id}
                   onClick={() => onOpen(l.id)}
-                  className={`group cursor-pointer border-b border-white/5 transition-colors last:border-0 hover:bg-white/5 ${
+                  className={`group cursor-pointer border-b border-white/10 transition-colors last:border-0 hover:bg-white/5 ${
                     isChecked ? "bg-aurora-400/[0.04]" : ""
                   }`}
                 >

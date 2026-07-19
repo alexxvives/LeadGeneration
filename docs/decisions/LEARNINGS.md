@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-19 — Invite modal, light contrast, content gutters
+- Board invite uses a custom modal (not `prompt`) with members + pending list;
+  `sendBoardInviteEmail` best-effort via platform Resend/SMTP after invite row.
+- Light theme: `--on-accent` white; `.meter-track` outlined bars; divide/border
+  white/opacity remapped; soft sky/amber/rose label colors darkened.
+- Studio content gutters `px-5/sm:px-8` → `px-4/sm:px-7` (~15% less).
+- Company type in drawer is an `InfoRow` + `BuildingIcon` like other contact fields.
+- Sequence Day+3/+7 notes are still not auto-created (only legacy rows remain).
+
 ### 2026-07-19 — Studio-only theme, company type, board sharing
 - Light theme applies only on `/app` (boot script + `ThemeProvider`); marketing
   stays dark. Toggle lives top-right in `StudioShell`, not SiteNav.

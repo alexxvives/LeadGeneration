@@ -30,11 +30,17 @@ html[data-theme="dark"] {
   --amber-500: #eb9d2f;
 
   --mist-100: #eaf1fb;
+  --mist-200: #d5e0f0;
   --mist-300: #b6c4dc;
+  --mist-400: #9aadc8;
   --mist-500: #7f92b3;
+  --mist-600: #5a6f8f;
 
-  /* Text on solid aurora/amber buttons — stays near-black in both themes */
+  /* Text on solid aurora/amber buttons */
   --on-accent: #050505;
+  --meter-track: rgba(255, 255, 255, 0.12);
+  --meter-track-border: rgba(255, 255, 255, 0.14);
+  --row-divider: rgba(255, 255, 255, 0.08);
 
   --glass-top: rgba(255, 255, 255, 0.06);
   --glass-bottom: rgba(255, 255, 255, 0.02);
@@ -69,10 +75,17 @@ html[data-theme="light"] {
   --amber-500: #92400e;
 
   --mist-100: #0c1524;
+  --mist-200: #1e293b;
   --mist-300: #334155;
+  --mist-400: #475569;
   --mist-500: #64748b;
+  --mist-600: #94a3b8;
 
-  --on-accent: #050505;
+  /* Deep teal buttons need white labels in light mode */
+  --on-accent: #ffffff;
+  --meter-track: rgba(12, 21, 36, 0.08);
+  --meter-track-border: rgba(12, 21, 36, 0.18);
+  --row-divider: rgba(12, 21, 36, 0.12);
 
   --glass-top: rgba(255, 255, 255, 0.72);
   --glass-bottom: rgba(238, 242, 248, 0.85);
@@ -107,8 +120,11 @@ html[data-theme="light"] {
   --color-amber-500: var(--amber-500);
 
   --color-mist-100: var(--mist-100);
+  --color-mist-200: var(--mist-200);
   --color-mist-300: var(--mist-300);
+  --color-mist-400: var(--mist-400);
   --color-mist-500: var(--mist-500);
+  --color-mist-600: var(--mist-600);
 
   --color-on-accent: var(--on-accent);
 
@@ -172,7 +188,13 @@ html[data-theme="light"] {
   html[data-theme="light"] .hero-grid {
     opacity: 0.06;
   }
-  /* Light studio: white/opacity borders read muddy — tighten chrome */
+  /* Progress / fit meter tracks — visible in both themes */
+  .meter-track {
+    background-color: var(--meter-track);
+    box-shadow: inset 0 0 0 1px var(--meter-track-border);
+  }
+
+  /* Light studio: white/opacity chrome reads muddy — retarget to ink strokes */
   html[data-theme="light"] aside.sticky {
     background-color: color-mix(in srgb, var(--ink-900) 92%, transparent);
     border-color: var(--glass-border);
@@ -182,6 +204,41 @@ html[data-theme="light"] {
   html[data-theme="light"] .border-white\/10,
   html[data-theme="light"] .border-white\/15 {
     border-color: var(--glass-border);
+  }
+  html[data-theme="light"] .divide-white\/5 > :not([hidden]) ~ :not([hidden]),
+  html[data-theme="light"] .divide-white\/8 > :not([hidden]) ~ :not([hidden]),
+  html[data-theme="light"] .divide-white\/10 > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--row-divider);
+  }
+  html[data-theme="light"] .bg-white\/5,
+  html[data-theme="light"] .bg-white\/8,
+  html[data-theme="light"] .bg-white\/\[0\.03\],
+  html[data-theme="light"] .bg-white\/\[0\.02\] {
+    background-color: rgba(12, 21, 36, 0.04);
+  }
+  html[data-theme="light"] .bg-white\/10 {
+    background-color: var(--meter-track);
+  }
+  html[data-theme="light"] .hover\:bg-white\/5:hover,
+  html[data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover,
+  html[data-theme="light"] .hover\:bg-white\/10:hover {
+    background-color: rgba(12, 21, 36, 0.06);
+  }
+  /* Soft accent labels (sky/amber/rose) need darker text on paper */
+  html[data-theme="light"] .text-sky-200,
+  html[data-theme="light"] .text-sky-300 {
+    color: #0369a1;
+  }
+  html[data-theme="light"] .text-amber-200,
+  html[data-theme="light"] .text-amber-200\/70,
+  html[data-theme="light"] .text-amber-100 {
+    color: #b45309;
+  }
+  html[data-theme="light"] .text-rose-300 {
+    color: #be123c;
+  }
+  html[data-theme="light"] .text-aurora-200 {
+    color: var(--aurora-500);
   }
 
   .glass {
