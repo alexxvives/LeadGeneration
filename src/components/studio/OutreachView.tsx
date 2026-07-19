@@ -54,7 +54,7 @@ const BUCKET_META: Record<
   },
   contacted: {
     title: "Contacted",
-    hint: "Emailed, called, or reached via form",
+    hint: "Prospects you have already reached",
     empty: "No contacts logged yet.",
   },
 };
@@ -228,14 +228,6 @@ function OutreachRow({
   const email = lead.outreach?.toEmail ?? lead.emails[0] ?? null;
   const [pickingMethod, setPickingMethod] = useState(false);
 
-  // Email is the default Contacted path — only label non-email methods.
-  const methodLabel =
-    lead.contactMethod === "phone"
-      ? "Called"
-      : lead.contactMethod === "contact_form"
-        ? "Contact form"
-        : null;
-
   const hasDraft = Boolean(lead.outreach);
   // Contact Draft: create when missing; reopen existing unapproved drafts.
   // Ready/Contacted: open existing.
@@ -279,16 +271,6 @@ function OutreachRow({
         </button>
         {lead.outreach?.status === "failed" && lead.outreach.error ? (
           <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
-        ) : null}
-        {bucket === "contacted" && methodLabel ? (
-          <span className="mt-1 inline-flex rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 ring-1 ring-inset ring-amber-400/30">
-            {methodLabel}
-          </span>
-        ) : null}
-        {bucket === "contacted" && lead.contactMethod === "email" ? (
-          <span className="mt-1 inline-flex rounded-full bg-aurora-400/15 px-1.5 py-0.5 text-[10px] font-medium text-aurora-300 ring-1 ring-inset ring-aurora-400/30">
-            Emailed
-          </span>
         ) : null}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">

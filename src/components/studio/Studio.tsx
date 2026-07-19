@@ -882,8 +882,8 @@ export function Studio() {
     <main
       className={
         lockViewport
-          ? "mx-auto flex h-dvh max-w-7xl flex-col overflow-hidden px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-7 sm:pt-8"
-          : "mx-auto flex min-h-dvh max-w-7xl flex-col px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-7 sm:pt-8"
+          ? "mx-auto flex h-dvh max-w-7xl flex-col overflow-hidden px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8"
+          : "mx-auto flex min-h-dvh max-w-7xl flex-col px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8"
       }
     >
       <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[1fr_auto_1fr]">
@@ -915,15 +915,21 @@ export function Studio() {
             ) : null}
             {view === "leads" && hasLeads ? <ExportButton /> : null}
           </div>
-          {view === "runs" || view === "board" || view === "boards" ? (
-            <p className="mt-1 text-sm text-mist-500">
-              {view === "runs"
-                ? "History of searches in this workspace."
-                : view === "boards"
-                  ? "Named lists for campaigns or niches. Invite collaborators; only one person edits at a time."
-                  : "Find prospects by niche and location."}
-            </p>
-          ) : null}
+          <p className="mt-0.5 text-sm text-mist-500">
+            {view === "dashboard"
+              ? "Overview of leads and activity across your boards."
+              : view === "boards"
+                ? "Named lists for campaigns or niches. Invite collaborators; only one person edits at a time."
+                : view === "pipeline"
+                  ? "Drag leads between stages as conversations progress."
+                  : view === "leads"
+                    ? "All prospects on this board — filter, edit, and export."
+                    : view === "outreach"
+                      ? "Draft, approve, and send outreach one lead at a time."
+                      : view === "runs"
+                        ? "History of searches in this workspace."
+                        : "Find prospects by niche and location."}
+          </p>
           {editLocked && filterBoardId ? (
             <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200">
               {lockHolder ?? "Someone else"} is editing this board — view only until they leave.

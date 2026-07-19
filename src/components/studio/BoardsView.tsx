@@ -4,12 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { BoardInvite, BoardMember, BoardSummary } from "@/lib/types";
 import { Spinner } from "@/components/ui";
-import {
-  BoardsIcon,
-  PencilIcon,
-  UsersIcon,
-  XIcon,
-} from "@/components/icons";
+import { PencilIcon, UsersIcon, XIcon } from "@/components/icons";
 
 export function BoardsView({
   onSelectBoard,
@@ -165,90 +160,61 @@ export function BoardsView({
               }}
               className="glass card-hover w-full cursor-pointer rounded-xl2 p-5 text-left outline-none focus-visible:ring-1 focus-visible:ring-aurora-400/50"
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-aurora-400/10">
-                  <BoardsIcon className="h-5 w-5 text-aurora-300" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  {editingId === b.id ? (
-                    <div
-                      className="flex gap-2"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
+              <div className={`min-w-0 ${!b.isDefault && !b.shared ? "pr-6" : ""}`}>
+                {editingId === b.id ? (
+                  <div
+                    className="flex gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="min-w-0 flex-1 rounded-lg border border-white/10 bg-ink-950 px-2 py-1 text-sm"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void handleRename(b.id);
+                        }
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="text-xs text-aurora-300"
+                      onClick={() => void handleRename(b.id)}
                     >
-                      <input
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="min-w-0 flex-1 rounded-lg border border-white/10 bg-ink-950 px-2 py-1 text-sm"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void handleRename(b.id);
-                          }
-                          if (e.key === "Escape") setEditingId(null);
-                        }}
-                      />
+                      Save
+                    </button>
+                  </div>
+                ) : (
+                  <h3 className="flex min-w-0 items-center gap-1.5 font-display text-lg font-semibold text-mist-100">
+                    <span className="truncate">{b.name}</span>
+                    {b.shared ? (
+                      <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-amber-400">
+                        Shared
+                      </span>
+                    ) : null}
+                    {!b.shared ? (
                       <button
                         type="button"
-                        className="text-xs text-aurora-300"
-                        onClick={() => void handleRename(b.id)}
+                        aria-label={`Rename ${b.name}`}
+                        title="Rename"
+                        className="inline-flex shrink-0 rounded-md p-1 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingId(b.id);
+                          setEditName(b.name);
+                        }}
                       >
-                        Save
+                        <PencilIcon className="h-3.5 w-3.5" />
                       </button>
-                    </div>
-                  ) : (
-                    <div
-                      className={`flex min-w-0 items-center gap-2 ${
-                        !b.isDefault && !b.shared ? "pr-6" : ""
-                      }`}
-                    >
-                      <h3 className="flex min-w-0 flex-1 items-center gap-1.5 font-display text-lg font-semibold text-mist-100">
-                        <span className="truncate">{b.name}</span>
-                        {b.isDefault ? (
-                          <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-mist-500">
-                            Default
-                          </span>
-                        ) : null}
-                        {b.shared ? (
-                          <span className="shrink-0 text-[10px] font-sans uppercase tracking-wider text-amber-400">
-                            Shared
-                          </span>
-                        ) : null}
-                        {!b.isDefault && !b.shared ? (
-                          <button
-                            type="button"
-                            aria-label={`Rename ${b.name}`}
-                            title="Rename"
-                            className="inline-flex shrink-0 rounded-md p-1 text-mist-500 opacity-0 transition-opacity hover:bg-white/5 hover:text-mist-200 group-hover:opacity-100"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingId(b.id);
-                              setEditName(b.name);
-                            }}
-                          >
-                            <PencilIcon className="h-3.5 w-3.5" />
-                          </button>
-                        ) : null}
-                      </h3>
-                      {!b.shared ? (
-                        <button
-                          type="button"
-                          title="Invite collaborator"
-                          aria-label={`Invite collaborator to ${b.name}`}
-                          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-medium text-aurora-300 transition-colors hover:border-aurora-400/40 hover:bg-aurora-400/10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setInviteBoard(b);
-                          }}
-                        >
-                          <UsersIcon className="h-3.5 w-3.5" />
-                          Invite
-                        </button>
-                      ) : null}
-                    </div>
-                  )}
-                  <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-mist-400">
+                    ) : null}
+                  </h3>
+                )}
+                <div className="mt-3 flex items-center gap-3">
+                  <dl className="grid min-w-0 flex-1 grid-cols-2 gap-2 text-xs text-mist-400">
                     <div>
                       <dt className="text-mist-500">Leads</dt>
                       <dd className="font-display text-lg text-mist-100">{b.leadCount}</dd>
@@ -268,6 +234,21 @@ export function BoardsView({
                       <dd className="font-display text-lg text-mist-100">{b.closedCount}</dd>
                     </div>
                   </dl>
+                  {!b.shared ? (
+                    <button
+                      type="button"
+                      title="Invite collaborator"
+                      aria-label={`Invite collaborator to ${b.name}`}
+                      className="inline-flex shrink-0 items-center gap-1 self-center rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-medium text-aurora-300 transition-colors hover:border-aurora-400/40 hover:bg-aurora-400/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInviteBoard(b);
+                      }}
+                    >
+                      <UsersIcon className="h-3.5 w-3.5" />
+                      Invite
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>

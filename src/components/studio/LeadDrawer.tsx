@@ -10,6 +10,7 @@ import {
   BuildingIcon,
   GlobeIcon,
   MailIcon,
+  PencilIcon,
   PhoneIcon,
   PinIcon,
   SparkIcon,
@@ -78,9 +79,22 @@ interface DrawerProps {
       contactMethod?: ContactMethod | null;
       notes?: string | null;
       companyType?: string | null;
+      company?: string;
+      website?: string | null;
+      emails?: string[];
+      phones?: string[];
+      location?: string | null;
+      aboutBlurb?: string | null;
       followUps?: FollowUp[];
     },
   ) => Promise<void>;
+}
+
+function parseList(raw: string): string[] {
+  return raw
+    .split(/[,;\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 // ─── CRM stage config ─────────────────────────────────────────────────────────
@@ -193,17 +207,6 @@ export function LeadDrawer(props: DrawerProps) {
 
   // ── CRM stage change ──
   const handleStageClick = (stage: CrmStage) => {
-    const emailed =
-      crmStage === "contacted" ||
-      lead.status === "sent" ||
-      outreach?.status === "sent" ||
-      contactMethod === "email";
-    if (stage === "new" && emailed && crmStage !== "new") {
-      const ok = window.confirm(
-        `${lead.company} already has outreach history. Move back to New anyway? (Does not unsend the email.)`,
-      );
-      if (!ok) return;
-    }
     // Moving to New clears method; Contacted no longer forces a method popup.
     const nextMethod = stage === "new" ? null : contactMethod;
     void commitStage(stage, nextMethod);
@@ -269,17 +272,34 @@ export function LeadDrawer(props: DrawerProps) {
                 <FitMeter score={lead.fitScore} />
               </div>
             ) : null}
-            <h2
-              id="lead-drawer-title"
-              className={`truncate font-display text-2xl font-semibold ${
-                mode === "info" ? "mt-2" : ""
-              }`}
-            >
-              {mode === "draft" ? "Draft" : lead.company}
-            </h2>
             {mode === "draft" ? (
-              <p className="mt-1 truncate text-sm text-mist-500">{lead.company}</p>
-            ) : null}
+              <>
+                <h2
+                  id="lead-drawer-title"
+                  className="truncate font-display text-2xl font-semibold"
+                >
+                  Draft
+                </h2>
+                <p className="mt-1 truncate text-sm text-mist-500">{lead.company}</p>
+              </>
+            ) : (
+              <div className={`flex min-w-0 items-center gap-2 ${mode === "info" ? "mt-2" : ""}`}>
+                <input
+                  id="lead-drawer-title"
+                  key={`${lead.id}-company-${lead.company}`}
+                  defaultValue={lead.company}
+                  onBlur={(e) => {
+                    const next = e.target.value.trim();
+                    if (next && next !== lead.company) {
+                      void props.onUpdateCrm(lead.id, { company: next });
+                    }
+                  }}
+                  aria-label="Company name"
+                  className="min-w-0 flex-1 truncate bg-transparent font-display text-2xl font-semibold text-mist-100 outline-none placeholder:text-mist-500 focus:underline focus:decoration-aurora-400/50"
+                />
+                <PencilIcon className="h-4 w-4 shrink-0 text-mist-500" aria-hidden />
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -349,74 +369,121 @@ export function LeadDrawer(props: DrawerProps) {
             )}
           </section>
 
-          {/* Contact info */}
-          <section className="grid gap-3">
-            {isUsableWebsite(lead.website) ? (
-              <InfoRow icon={<GlobeIcon className="h-4 w-4" />}>
-                <a href={lead.website!} target="_blank" rel="noreferrer" className="text-aurora-300 hover:underline">
-                  {displayWebsite(lead.website)}
+          {/* Contact info — all fields editable */}
+          <section className="grid gap-2.5">
+            <EditableInfoRow
+              icon={<GlobeIcon className="h-4 w-4" />}
+              label="Website"
+              defaultValue={lead.website ?? ""}
+              fieldKey={`${lead.id}-website-${lead.website ?? ""}`}
+              placeholder="https://…"
+              onSave={(raw) => {
+                const next = raw.trim() || null;
+                if (next !== (lead.website ?? null)) {
+                  void props.onUpdateCrm(lead.id, { website: next });
+                }
+              }}
+            />
+            {!isUsableWebsite(lead.website) ? (
+              <p className="pl-7 text-[11px] text-mist-500">
+                No website on file —{" "}
+                <a
+                  href={`https://www.google.com/search?q=${encodeURIComponent(
+                    [lead.company, lead.location].filter(Boolean).join(" "),
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-aurora-300 hover:underline"
+                >
+                  Google search for this lead
                 </a>
-              </InfoRow>
+              </p>
             ) : (
-              <InfoRow icon={<GlobeIcon className="h-4 w-4" />}>
-                <div className="min-w-0">
-                  <a
-                    href={`https://www.google.com/search?q=${encodeURIComponent(
-                      [lead.company, lead.location].filter(Boolean).join(" "),
-                    )}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-aurora-300 hover:underline"
-                  >
-                    Search the web
-                  </a>
-                  <p className="mt-0.5 text-[11px] text-mist-500">
-                    No website on file — Google search for this lead (plan B).
-                  </p>
-                </div>
-              </InfoRow>
+              <p className="pl-7 text-[11px] text-mist-500">
+                <a
+                  href={lead.website!}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-aurora-300 hover:underline"
+                >
+                  Open {displayWebsite(lead.website)}
+                </a>
+              </p>
             )}
-            <InfoRow icon={<BuildingIcon className="h-4 w-4" />}>
-              <input
-                defaultValue={lead.companyType ?? ""}
-                key={`${lead.id}-ctype-${lead.companyType ?? ""}`}
-                onBlur={(e) => {
-                  const next = e.target.value.trim();
-                  if (next !== (lead.companyType ?? "")) {
-                    void props.onUpdateCrm(lead.id, {
-                      companyType: next || null,
-                    });
-                  }
-                }}
-                placeholder="Company type — e.g. Pharmacy"
-                aria-label="Company type"
-                className="w-full min-w-0 bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-500"
-              />
-            </InfoRow>
-            <InfoRow icon={<MailIcon className="h-4 w-4" />}>
-              {lead.emails.length ? (
-                lead.emails.join(", ")
-              ) : (
-                <span className="text-mist-500">
-                  No email — open Draft and set To, then Save to try again.
-                </span>
-              )}
-            </InfoRow>
-            {lead.phones.length > 0 && (
-              <InfoRow icon={<PhoneIcon className="h-4 w-4" />}>{lead.phones.join(", ")}</InfoRow>
-            )}
-            {lead.location && (
-              <InfoRow icon={<PinIcon className="h-4 w-4" />}>{lead.location}</InfoRow>
-            )}
+            <EditableInfoRow
+              icon={<BuildingIcon className="h-4 w-4" />}
+              label="Company type"
+              defaultValue={lead.companyType ?? ""}
+              fieldKey={`${lead.id}-ctype-${lead.companyType ?? ""}`}
+              placeholder="Company type — e.g. Pharmacy"
+              onSave={(raw) => {
+                const next = raw.trim() || null;
+                if (next !== (lead.companyType ?? null)) {
+                  void props.onUpdateCrm(lead.id, { companyType: next });
+                }
+              }}
+            />
+            <EditableInfoRow
+              icon={<MailIcon className="h-4 w-4" />}
+              label="Emails"
+              defaultValue={lead.emails.join(", ")}
+              fieldKey={`${lead.id}-emails-${lead.emails.join(",")}`}
+              placeholder="name@company.com"
+              onSave={(raw) => {
+                const next = parseList(raw);
+                if (next.join("\0") !== lead.emails.join("\0")) {
+                  void props.onUpdateCrm(lead.id, { emails: next });
+                }
+              }}
+            />
+            <EditableInfoRow
+              icon={<PhoneIcon className="h-4 w-4" />}
+              label="Phones"
+              defaultValue={lead.phones.join(", ")}
+              fieldKey={`${lead.id}-phones-${lead.phones.join(",")}`}
+              placeholder="Phone number"
+              onSave={(raw) => {
+                const next = parseList(raw);
+                if (next.join("\0") !== lead.phones.join("\0")) {
+                  void props.onUpdateCrm(lead.id, { phones: next });
+                }
+              }}
+            />
+            <EditableInfoRow
+              icon={<PinIcon className="h-4 w-4" />}
+              label="Location"
+              defaultValue={lead.location ?? ""}
+              fieldKey={`${lead.id}-loc-${lead.location ?? ""}`}
+              placeholder="City, region"
+              onSave={(raw) => {
+                const next = raw.trim() || null;
+                if (next !== (lead.location ?? null)) {
+                  void props.onUpdateCrm(lead.id, { location: next });
+                }
+              }}
+            />
           </section>
 
-          {/* About */}
-          {lead.aboutBlurb && (
-            <section>
-              <SectionLabel>About</SectionLabel>
-              <p className="text-sm leading-relaxed text-mist-300">{lead.aboutBlurb}</p>
-            </section>
-          )}
+          <section>
+            <SectionLabel>About</SectionLabel>
+            <div className="flex items-start gap-2 rounded-lg border border-white/10 bg-ink-950/40 px-2.5 py-2 focus-within:border-aurora-400/50">
+              <textarea
+                key={`${lead.id}-about-${lead.aboutBlurb ?? ""}`}
+                defaultValue={lead.aboutBlurb ?? ""}
+                rows={3}
+                onBlur={(e) => {
+                  const next = e.target.value.trim() || null;
+                  if (next !== (lead.aboutBlurb ?? null)) {
+                    void props.onUpdateCrm(lead.id, { aboutBlurb: next });
+                  }
+                }}
+                placeholder="Short blurb about this lead…"
+                aria-label="About"
+                className="min-w-0 flex-1 resize-y bg-transparent text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-500"
+              />
+              <PencilIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mist-500" aria-hidden />
+            </div>
+          </section>
 
           {/* Fit score reasoning */}
           <section>
@@ -584,8 +651,42 @@ export function LeadDrawer(props: DrawerProps) {
               </div>
             ) : (
               <div className="space-y-3">
+                <FieldMini label="To">
+                  <input
+                    value={toEmail}
+                    onChange={(e) => setToEmail(e.target.value)}
+                    disabled={sent}
+                    placeholder="name@company.com"
+                    className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none focus:border-aurora-400/60 disabled:opacity-60"
+                  />
+                </FieldMini>
+                <FieldMini label="Subject">
+                  <input
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    disabled={sent}
+                    className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none focus:border-aurora-400/60 disabled:opacity-60"
+                  />
+                </FieldMini>
+                <FieldMini label="Body">
+                  {sent ? (
+                    <div
+                      className="min-h-[6rem] rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 font-sans text-sm leading-relaxed text-mist-200 opacity-60 [&_b]:font-semibold [&_strong]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
+                      dangerouslySetInnerHTML={{
+                        __html: normalizePitchHtml(body),
+                      }}
+                    />
+                  ) : (
+                    <PitchEditor
+                      value={body}
+                      onChange={(html) => setBody(html)}
+                      placeholder="Email body…"
+                    />
+                  )}
+                </FieldMini>
+
                 {sent ? (
-                  <div className="space-y-4">
+                  <div className="space-y-4 pt-1">
                     <div className="animate-sent-pop flex flex-col items-center gap-2 rounded-xl2 border border-aurora-400/25 bg-gradient-to-b from-aurora-400/15 to-transparent px-4 py-5 text-center">
                       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-aurora-400 text-on-accent shadow-[0_0_28px_-4px_rgba(67,224,168,0.65)]">
                         <CheckIcon className="h-6 w-6" />
@@ -637,40 +738,6 @@ export function LeadDrawer(props: DrawerProps) {
                     </div>
                   </div>
                 ) : null}
-
-                <FieldMini label="To">
-                  <input
-                    value={toEmail}
-                    onChange={(e) => setToEmail(e.target.value)}
-                    disabled={sent}
-                    placeholder="name@company.com"
-                    className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none focus:border-aurora-400/60 disabled:opacity-60"
-                  />
-                </FieldMini>
-                <FieldMini label="Subject">
-                  <input
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    disabled={sent}
-                    className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none focus:border-aurora-400/60 disabled:opacity-60"
-                  />
-                </FieldMini>
-                <FieldMini label="Body">
-                  {sent ? (
-                    <div
-                      className="min-h-[6rem] rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 font-sans text-sm leading-relaxed text-mist-200 opacity-60 [&_b]:font-semibold [&_strong]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
-                      dangerouslySetInnerHTML={{
-                        __html: normalizePitchHtml(body),
-                      }}
-                    />
-                  ) : (
-                    <PitchEditor
-                      value={body}
-                      onChange={(html) => setBody(html)}
-                      placeholder="Email body…"
-                    />
-                  )}
-                </FieldMini>
 
                 {outreach.error && (
                   <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
@@ -767,11 +834,37 @@ export function LeadDrawer(props: DrawerProps) {
 
 // ─── Small helpers ────────────────────────────────────────────────────────────
 
-function InfoRow({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+function EditableInfoRow({
+  icon,
+  label,
+  defaultValue,
+  fieldKey,
+  placeholder,
+  onSave,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  defaultValue: string;
+  fieldKey: string;
+  placeholder: string;
+  onSave: (raw: string) => void;
+}) {
   return (
     <div className="flex items-center gap-3 text-sm text-mist-100">
-      <span className="text-mist-500">{icon}</span>
-      <span className="min-w-0 break-words">{children}</span>
+      <span className="shrink-0 text-mist-500" aria-hidden>
+        {icon}
+      </span>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-white/10 bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50">
+        <input
+          key={fieldKey}
+          defaultValue={defaultValue}
+          onBlur={(e) => onSave(e.target.value)}
+          placeholder={placeholder}
+          aria-label={label}
+          className="min-w-0 flex-1 bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-500"
+        />
+        <PencilIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" aria-hidden />
+      </div>
     </div>
   );
 }

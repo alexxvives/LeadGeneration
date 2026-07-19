@@ -85,10 +85,6 @@ export function PipelineView({
   ) => void;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [pendingRevert, setPendingRevert] = useState<{
-    leadId: string;
-    company: string;
-  } | null>(null);
   const [parkedOpen, setParkedOpen] = useState<Record<string, boolean>>({
     not_interested: false,
   });
@@ -103,15 +99,6 @@ export function PipelineView({
     setActiveId(String(event.active.id));
   }
 
-  function wasEmailed(lead: LeadWithOutreach): boolean {
-    return (
-      lead.crmStage === "contacted" ||
-      lead.status === "sent" ||
-      lead.outreach?.status === "sent" ||
-      lead.contactMethod === "email"
-    );
-  }
-
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
     const { active, over } = event;
@@ -119,13 +106,6 @@ export function PipelineView({
     const lead = leads.find((l) => l.id === active.id);
     const newStage = over.id as CrmStage;
     if (!lead || lead.crmStage === newStage) return;
-
-    // Moving a previously emailed lead back to New — confirm first.
-    if (newStage === "new" && wasEmailed(lead)) {
-      setPendingRevert({ leadId: lead.id, company: lead.company });
-      return;
-    }
-
     onMoveStage(String(active.id), newStage);
   }
 
@@ -135,41 +115,6 @@ export function PipelineView({
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
         {leads.length === 1 ? "" : "s"} · drag to move between stages
       </p>
-
-      {pendingRevert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
-            onClick={() => setPendingRevert(null)}
-          />
-          <div className="animate-float-up relative w-full max-w-md rounded-xl2 border border-amber-400/20 bg-ink-900 p-6 shadow-2xl">
-            <p className="font-display text-lg font-semibold text-mist-100">Move back to New?</p>
-            <p className="mt-2 text-sm text-mist-300">
-              <span className="text-mist-100">{pendingRevert.company}</span> already has outreach
-              history. Moving to New clears the stage only — it doesn&apos;t unsend the email.
-            </p>
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setPendingRevert(null)}
-                className="rounded-full border border-white/15 px-4 py-2 text-sm text-mist-300 hover:bg-white/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onMoveStage(pendingRevert.leadId, "new");
-                  setPendingRevert(null);
-                }}
-                className="rounded-full bg-amber-400 px-4 py-2 text-sm font-medium text-on-accent"
-              >
-                Move to New
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex min-h-0 flex-1 flex-col gap-3">

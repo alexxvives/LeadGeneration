@@ -20,6 +20,12 @@ const PatchSchema = z.object({
   contactMethod: z.enum(["email", "phone", "contact_form"]).nullable().optional(),
   notes: z.string().nullable().optional(),
   companyType: z.string().max(120).nullable().optional(),
+  company: z.string().min(1).max(200).optional(),
+  website: z.string().max(500).nullable().optional(),
+  emails: z.array(z.string().min(3).max(200)).max(10).optional(),
+  phones: z.array(z.string().max(40)).max(5).optional(),
+  location: z.string().max(400).nullable().optional(),
+  aboutBlurb: z.string().max(2000).nullable().optional(),
   followUps: z
     .array(
       z.object({

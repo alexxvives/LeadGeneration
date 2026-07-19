@@ -81,8 +81,11 @@ export default async function SettingsPage({
     /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(appUrl);
 
   return (
-    <main className="mx-auto min-h-dvh max-w-7xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-7 sm:pt-8">
+    <main className="mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8">
       <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
+      <p className="mt-0.5 text-sm text-mist-500">
+        Profiles, sending setup, and workspace preferences.
+      </p>
 
       {mailboxFlag === "connected" && (
         <p className="mt-4 rounded-lg border border-aurora-400/30 bg-aurora-400/10 px-4 py-3 text-sm text-mist-100">

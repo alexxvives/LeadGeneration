@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-19 — Studio polish: gutters, editable leads, boards
+- Side gutters again ~25% tighter: `px-3 sm:px-5` (Studio + Settings).
+- Lead info fields (company, website, emails, phones, location, type, about)
+  are editable via bordered inputs + pencil; PATCH `/api/leads/[id]` accepts them.
+- Sent/delivery UI sits below To/Subject/Body in the draft drawer.
+- No confirm when moving a contacted lead back to New (pipeline + info drawer).
+- Board cards: no Default badge / aurora icon; rename pencil on all owned boards
+  (incl. default); Invite vertically centered beside Contacted/Closed stats.
+- Page subtitles on every studio view + Settings; title→subtitle gap `mt-0.5`.
+
 ### 2026-07-19 — Invite modal, light contrast, content gutters
 - Board invite uses a custom modal (not `prompt`) with members + pending list;
   `sendBoardInviteEmail` best-effort via platform Resend/SMTP after invite row.

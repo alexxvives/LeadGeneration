@@ -1439,6 +1439,12 @@ export async function updateLeadCrm(
     contactMethod?: ContactMethod | null;
     notes?: string | null;
     companyType?: string | null;
+    company?: string;
+    website?: string | null;
+    emails?: string[];
+    phones?: string[];
+    location?: string | null;
+    aboutBlurb?: string | null;
     followUps?: FollowUp[];
     customFields?: Record<string, string>;
   },
