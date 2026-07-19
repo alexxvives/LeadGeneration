@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-19 — Account switch needs hard navigation
+- JWT overwrite alone is not enough: after `signIn({ redirect: false })`,
+  `router.push` + `router.refresh` leaves NextAuth `SessionProvider` on the
+  previous account. Use `window.location.assign(callbackUrl)`.
+- On credentials sign-in, clear `token.workspaceId` before re-provisioning and
+  always set `token.email` / `token.name` (even when name is nullish).
+- Standard search also ranks by fit after one query; Smart’s differentiator is
+  multi-query recall (~3× provider credits), not fit ranking itself.
+
 ### 2026-07-19 — Account switch JWT + platform invite mail
 - Custom `jwt` callback must set `token.email` / `token.name` on every
   credentials sign-in; otherwise switching to `admin@…` kept the previous

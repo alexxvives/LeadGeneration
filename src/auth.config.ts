@@ -46,13 +46,23 @@ export const authConfig = {
   providers: [credentialsProvider],
   callbacks: {
     session({ session, token }) {
-      if (typeof token.workspaceId === "string") session.workspaceId = token.workspaceId;
-      if (typeof token.userId === "string") session.userId = token.userId;
+      if (typeof token.workspaceId === "string") {
+        session.workspaceId = token.workspaceId;
+      } else {
+        Reflect.deleteProperty(session, "workspaceId");
+      }
+      if (typeof token.userId === "string") {
+        session.userId = token.userId;
+      } else {
+        Reflect.deleteProperty(session, "userId");
+      }
       session.isAdmin = token.isAdmin === true;
-      // Keep session.user in sync when switching accounts (JWT may retain old email otherwise).
+      // Always mirror JWT identity — never leave a prior account's email/name.
       if (session.user) {
-        if (typeof token.email === "string") session.user.email = token.email;
-        if (typeof token.name === "string") session.user.name = token.name;
+        session.user.email =
+          typeof token.email === "string" ? token.email : "";
+        session.user.name =
+          typeof token.name === "string" ? token.name : null;
       }
       return session;
     },

@@ -99,10 +99,12 @@ export function AuthModal({
       sessionStorage.setItem("hermes_guest", "1");
       sessionStorage.removeItem("leadify_guest");
       sessionStorage.removeItem("lodestar_guest");
+      // Full navigation so SessionProvider cannot keep the previous account.
+      window.location.assign(callbackUrl);
+      return;
     }
     onClose();
     router.push(callbackUrl);
-    router.refresh();
   };
 
   const ensureTurnstile = async (): Promise<boolean> => {

@@ -143,9 +143,23 @@ export function BoardsView({
         </section>
       ) : null}
 
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
         {boards.map((b) => (
           <li key={b.id} className="group relative">
+            {!b.isDefault && !b.shared ? (
+              <button
+                type="button"
+                aria-label={`Delete ${b.name}`}
+                title="Delete"
+                className="absolute -right-2 -top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-ink-900 text-mist-500 opacity-0 shadow-sm transition-opacity hover:border-rose-400/40 hover:bg-rose-400/10 hover:text-rose-300 group-hover:opacity-100 focus-visible:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleDelete(b.id);
+                }}
+              >
+                <XIcon className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
             <div
               role="button"
               tabIndex={0}
@@ -217,57 +231,49 @@ export function BoardsView({
                     </h3>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {!b.shared ? (
-                    <button
-                      type="button"
-                      title="Invite collaborator"
-                      aria-label={`Invite collaborator to ${b.name}`}
-                      className="inline-flex h-7 items-center gap-1 rounded-full border border-white/10 px-2.5 text-[11px] font-medium text-aurora-300 transition-colors hover:border-aurora-400/40 hover:bg-aurora-400/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setInviteBoard(b);
-                      }}
-                    >
-                      <UsersIcon className="h-3.5 w-3.5" />
-                      Invite
-                    </button>
-                  ) : null}
-                  {!b.isDefault && !b.shared ? (
-                    <button
-                      type="button"
-                      aria-label={`Delete ${b.name}`}
-                      title="Delete"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-mist-500 opacity-0 transition-opacity hover:bg-rose-400/10 hover:text-rose-300 group-hover:opacity-100 focus-visible:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleDelete(b.id);
-                      }}
-                    >
-                      <XIcon className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null}
-                </div>
+                {!b.shared ? (
+                  <button
+                    type="button"
+                    title="Invite collaborator"
+                    aria-label={`Invite collaborator to ${b.name}`}
+                    className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-white/10 px-2.5 text-[11px] font-medium text-aurora-300 transition-colors hover:border-aurora-400/40 hover:bg-aurora-400/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInviteBoard(b);
+                    }}
+                  >
+                    <UsersIcon className="h-3.5 w-3.5" />
+                    Invite
+                  </button>
+                ) : null}
               </div>
 
-              <dl className="mt-4 grid grid-cols-2 gap-2 text-xs text-mist-400 sm:grid-cols-4">
-                <div>
+              <dl className="mt-4 space-y-3 text-xs text-mist-400">
+                <div className="text-center">
                   <dt className="text-mist-500">Leads</dt>
-                  <dd className="font-display text-lg text-mist-100">{b.leadCount}</dd>
-                </div>
-                <div>
-                  <dt className="text-mist-500">Contacted</dt>
-                  <dd className="font-display text-lg text-mist-100">
-                    {b.contactedCount}
+                  <dd className="font-display text-2xl text-mist-100">
+                    {b.leadCount}
                   </dd>
                 </div>
-                <div>
-                  <dt className="text-mist-500">Sent</dt>
-                  <dd className="font-display text-lg text-mist-100">{b.sentCount}</dd>
-                </div>
-                <div>
-                  <dt className="text-mist-500">Closed</dt>
-                  <dd className="font-display text-lg text-mist-100">{b.closedCount}</dd>
+                <div className="grid grid-cols-3 gap-2 border-t border-white/8 pt-3 text-center">
+                  <div>
+                    <dt className="text-mist-500">Contacted</dt>
+                    <dd className="font-display text-lg text-mist-100">
+                      {b.contactedCount}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-mist-500">Sent</dt>
+                    <dd className="font-display text-lg text-mist-100">
+                      {b.sentCount}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-mist-500">Closed</dt>
+                    <dd className="font-display text-lg text-mist-100">
+                      {b.closedCount}
+                    </dd>
+                  </div>
                 </div>
               </dl>
             </div>

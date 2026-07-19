@@ -164,9 +164,11 @@ export function LoginForm({
               ? "Account created, but sign-in failed. Try signing in."
               : "Invalid email or password.",
         );
+      } else if (typeof window !== "undefined") {
+        // Full navigation so SessionProvider cannot keep the previous account.
+        window.location.assign(callbackUrl);
       } else {
         router.push(callbackUrl);
-        router.refresh();
       }
     } catch {
       setError("Something went wrong. Please try again.");

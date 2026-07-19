@@ -52,16 +52,16 @@ const STRATEGIES: {
     label: "Standard",
     summary: "One focused query — fastest path from ICP to a shortlist.",
     detail:
-      'Runs a single search like "[niche] [location] contact email". Best when you already know the niche and just want a first pass of websites with contact hints. Lowest provider usage (~1 credit unit per run).',
+      'Runs a single search like "[niche] [location] contact email", dedupes by domain, then sorts by Hermes Mail\'s transparent fit score. Best when you already know the niche and want a first pass. Uses ~1× provider credits vs Smart.',
     credits: "~1× credits",
-    bestFor: "Quick tests, narrow niches, demo runs",
+    bestFor: "Quick tests, narrow niches",
   },
   {
     id: "smart",
     label: "Smart",
     summary: "Expands your ICP into several queries, merges results, ranks by fit.",
     detail:
-      "Builds multiple query variants (contact email, official website, top/best lists), runs them sequentially, dedupes by domain, then sorts by Hermes Mail's transparent fit score. Higher recall for vague or competitive niches.",
+      "Builds multiple query variants (contact email, official website, top/best lists), runs them sequentially, dedupes by domain, then sorts by Hermes Mail's transparent fit score. Higher recall for vague or competitive niches. Uses ~3× provider credits vs Standard.",
     credits: "~3× credits",
     bestFor: "Competitive markets, vague ICPs, quality over speed",
   },
@@ -527,6 +527,8 @@ export function SearchPanel({
           <p className="mt-1.5 text-xs leading-relaxed text-mist-400">{active.detail}</p>
           <p className="mt-2 text-[11px] uppercase tracking-wider text-mist-500">
             Best for · {active.bestFor}
+            <span className="mx-2 text-mist-600">·</span>
+            {active.credits}
           </p>
         </div>
       </div>

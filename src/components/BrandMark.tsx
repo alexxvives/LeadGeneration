@@ -12,8 +12,6 @@ export function BrandMark({
   const px = size === "lg" ? 48 : size === "sm" ? 28 : 36;
   const text =
     size === "lg" ? "text-2xl" : size === "sm" ? "text-base" : "text-[1.25rem]";
-  const mailText =
-    size === "lg" ? "text-sm" : size === "sm" ? "text-[10px]" : "text-xs";
 
   return (
     <span className="inline-flex items-center gap-2.5">
@@ -36,9 +34,7 @@ export function BrandMark({
           <span className="font-semibold tracking-[0.04em] text-mist-100">
             HERMES
           </span>
-          <span
-            className={`ml-1.5 font-semibold tracking-[0.04em] text-aurora-300 ${mailText}`}
-          >
+          <span className="ml-1.5 font-semibold tracking-[0.04em] text-aurora-300">
             mail
           </span>
         </span>

@@ -165,31 +165,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       ...authConfig.callbacks,
       async jwt({ token, user }) {
         if (user) {
-          // Always overwrite identity fields on sign-in so switching accounts
-          // (e.g. admin ↔ personal) does not keep the previous JWT email.
-          if (user.email) token.email = user.email;
-          if (user.name) token.name = user.name;
-          if (user.id) token.sub = user.id as string;
+          // Always overwrite identity on sign-in so switching accounts
+          // (admin ↔ personal) cannot keep the previous JWT email/name/workspace.
+          const email = user.email ?? null;
+          const userId =
+            (user.id as string | undefined) ?? `user_${email ?? "unknown"}`;
+          token.email = email;
+          token.name =
+            user.name ?? (email ? email.split("@")[0] : null) ?? null;
+          token.sub = userId;
+          token.userId = userId;
+          // Clear until re-provisioned — avoids leaking the prior account's workspace.
+          delete token.workspaceId;
 
           try {
             const db = getDb(binding);
-            const email = user.email ?? null;
-            const userId =
-              (user.id as string | undefined) ?? `user_${email ?? "unknown"}`;
             const ws = await getOrCreateWorkspaceForUser(db, userId, email);
             token.workspaceId = ws.id;
-            token.userId = userId;
           } catch (err) {
             console.error("[auth] workspace provision failed", err);
-            if (user.id) token.userId = user.id as string;
-            if (user.email) token.email = user.email;
           }
 
           const fromUser = (user as { isAdmin?: boolean }).isAdmin;
           if (typeof fromUser === "boolean") {
             token.isAdmin = fromUser;
-          } else if (user.email) {
-            const row = await findAuthUserByEmail(user.email).catch(() => null);
+          } else if (email) {
+            const row = await findAuthUserByEmail(email).catch(() => null);
             token.isAdmin = Boolean(row?.isAdmin);
           } else {
             token.isAdmin = false;

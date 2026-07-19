@@ -9,19 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-19 (studio space + marketing sign-in)
+## ⏱️ Status — updated 2026-07-19 (logo/search/boards + account switch)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Deployed:** D1 migrations `0019` + `0020` on prod. Redeploy for latest UI.
+**Deployed:** D1 migrations `0019` + `0020` on prod. Redeploy for latest UI/auth.
 
 ### This pass
-- Search: removed monthly lead-credits leftover copy.
-- Studio wider (`max-w-[90rem]`, tighter gutters); Leads Contact → icon+counts
-  below `xl`; info drawer title wraps (no pencil); outreach row dividers fixed.
-- Boards: Invite top-right; Create Board modal (not `prompt`); invite mail via
-  platform Resend → Maileroo (`MAILEROO_API_KEY`) → SMTP.
-- Marketing Sign in = dismissible overlay (not only `/login`); JWT overwrites
-  email on account switch (admin ↔ personal).
+- BrandMark: `mail` same size/family as `HERMES` (aurora color only).
+- Search: Standard also ranks by fit; Smart copy includes ~3× credits; Best for
+  trimmed; credits line shown under strategy blurb.
+- Boards: delete control outside card (top-right); stats = Leads row +
+  Contacted/Sent/Closed row; Invite keeps header space.
+- Auth: hard `location.assign` after credentials sign-in; JWT clears prior
+  workspace and always overwrites email/name on account switch.
 
 ### Next
 1. Redeploy; set verified `OUTREACH_FROM_EMAIL` (+ optional `MAILEROO_API_KEY`)
