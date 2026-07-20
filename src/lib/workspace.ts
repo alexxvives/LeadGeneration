@@ -55,6 +55,7 @@ export function newWorkspace(args: {
     preferredSendPath: null,
     emailVerifyEnabled: true,
     connectedMailbox: null,
+    outreachProfilesJson: null,
   };
 }
 
@@ -71,7 +72,14 @@ export async function getOrCreateWorkspaceForUser(
   const existing = await db.getWorkspaceByOwner(userId);
   if (existing) return existing;
   const name = email ? `${email.split("@")[0]}'s workspace` : "My workspace";
-  return db.createWorkspace(newWorkspace({ name, ownerUserId: userId }));
+  try {
+    return await db.createWorkspace(newWorkspace({ name, ownerUserId: userId }));
+  } catch {
+    // Unique owner index / concurrent create — re-read the winner.
+    const again = await db.getWorkspaceByOwner(userId);
+    if (again) return again;
+    throw new Error("Could not create workspace for user");
+  }
 }
 
 /**

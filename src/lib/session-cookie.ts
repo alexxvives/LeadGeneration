@@ -12,7 +12,7 @@ export type SessionIdentity = {
   isAdmin: boolean;
 };
 
-function useSecureCookies(req: Request): boolean {
+function preferSecureCookies(req: Request): boolean {
   try {
     if (new URL(req.url).protocol === "https:") return true;
   } catch {
@@ -65,13 +65,17 @@ function serializeCookie(
  * Clear every Auth.js session cookie variant, then set a fresh JWT for
  * `identity`. Used when client-side signIn/signOut cannot replace an existing
  * session (common on Workers with chunked `__Secure-` cookies).
+ *
+ * Callers must be on a path that skips the Auth.js `auth()` middleware wrapper
+ * — that wrapper re-emits the request session onto the response and would
+ * overwrite this cookie (see `src/middleware.ts` SESSION_WRITE_PATHS).
  */
 export async function setSessionCookie(
   req: Request,
   res: NextResponse,
   identity: SessionIdentity,
 ): Promise<void> {
-  const secure = useSecureCookies(req);
+  const secure = preferSecureCookies(req);
   const cookieName = secure
     ? "__Secure-authjs.session-token"
     : "authjs.session-token";

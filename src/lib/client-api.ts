@@ -49,6 +49,15 @@ export class QuotaExceededError extends Error {
   }
 }
 
+export class RateLimitedError extends Error {
+  readonly retryAfterMs: number;
+  constructor(message: string, retryAfterMs: number) {
+    super(message);
+    this.name = "RateLimitedError";
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
@@ -60,12 +69,22 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
       error?: string;
       quota?: { kind: "leads" | "sends" | "verifies"; planId: PlanId };
       undeliverableRemoved?: boolean;
+      rateLimited?: boolean;
+      retryAfterMs?: number;
     };
     if (res.status === 402 && err.quota) {
       throw new QuotaExceededError(
         err.error ?? "Plan limit reached",
         err.quota.kind,
         err.quota.planId,
+      );
+    }
+    if (res.status === 429 || err.rateLimited) {
+      throw new RateLimitedError(
+        err.error ?? "Rate limited",
+        typeof err.retryAfterMs === "number" && err.retryAfterMs > 0
+          ? err.retryAfterMs
+          : 15_000,
       );
     }
     const e = new Error(err.error ?? `Request failed (${res.status})`) as Error & {

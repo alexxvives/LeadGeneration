@@ -129,9 +129,13 @@ export const env = {
   // Feature flag: contact-form automation. OFF by default and demo-only.
   contactFormAutomationEnabled: () =>
     process.env.ENABLE_CONTACT_FORM_AUTOMATION === "true",
+  /**
+   * Hard cap per synchronous search request (Workers CPU/duration).
+   * TODO(queue): raise via Cloudflare Queues / Durable Objects for >50 runs.
+   */
   maxLeadsPerRun: () => {
     const n = Number(process.env.MAX_LEADS_PER_RUN);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 500;
+    return Number.isFinite(n) && n > 0 ? Math.min(50, Math.floor(n)) : 50;
   },
 
   // ── Auth (Auth.js) ──
@@ -141,6 +145,12 @@ export const env = {
   authSecret: () =>
     process.env.AUTH_SECRET?.trim() ||
     "hermes-dev-insecure-secret-change-me-in-production",
+  /**
+   * Optional first-boot admin password. When unset, `ensureBootstrapAdmin`
+   * generates a random value and logs it once (never a hardcoded default).
+   */
+  bootstrapAdminPassword: () =>
+    process.env.BOOTSTRAP_ADMIN_PASSWORD?.trim() || "",
   authResendKey: () => process.env.RESEND_API_KEY?.trim() || "",
   /**
    * Platform Maileroo *sending* key for transactional product mail
@@ -192,7 +202,7 @@ export const env = {
   // ── Smoke test bypass ──
   // When set, requests carrying `x-smoke-key: <value>` skip auth enforcement so
   // the headless smoke test can exercise the API even with auth enabled.
-  // Never set SMOKE_API_KEY in production.
+  // Ignored whenever a D1 binding is present (never against production data).
   smokeApiKey: () => process.env.SMOKE_API_KEY?.trim() ?? "",
 
   /** Resend delivery webhooks (Svix signing secret). */

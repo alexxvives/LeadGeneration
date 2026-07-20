@@ -43,7 +43,10 @@ export async function POST(req: Request) {
     return NextResponse.json(result);
   } catch (err) {
     if (isAuthError(err)) {
-      return NextResponse.json({ ok: false, error: err.message }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: err.message },
+        { status: err.status },
+      );
     }
     if (isQuotaError(err)) {
       return NextResponse.json(

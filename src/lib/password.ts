@@ -67,6 +67,12 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   return diff === 0;
 }
 
+/** Constant-time compare for webhook/shared secrets (UTF-8). */
+export function timingSafeEqualString(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  return timingSafeEqual(enc.encode(a), enc.encode(b));
+}
+
 export async function verifyPassword(
   password: string,
   stored: string,

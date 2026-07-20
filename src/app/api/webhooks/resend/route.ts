@@ -58,11 +58,16 @@ export async function POST(req: Request) {
   const probe = getDb(binding, LOCAL_WORKSPACE_ID);
 
   // Resolve which Svix secret to use (workspace auto-webhook, else platform).
-  let verifySecret = env.resendWebhookSecret();
+  // When a BYO workspace secret verifies the event, email-fallback lookups
+  // must stay inside that workspace (audit C2.9).
+  const platformSecret = env.resendWebhookSecret();
+  let verifySecret = platformSecret;
+  let secretWorkspaceId: string | null = null;
   if (tagWs) {
     const ws = await probe.getWorkspace(tagWs);
     if (ws?.resendWebhookSecret?.trim()) {
       verifySecret = ws.resendWebhookSecret.trim();
+      secretWorkspaceId = tagWs;
     }
   }
 
@@ -120,7 +125,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, matched: 0 });
   }
 
-  const target = await probe.findLatestSentByEmail(matchEmails[0]!);
+  const target = await probe.findLatestSentByEmail(
+    matchEmails[0]!,
+    secretWorkspaceId ?? undefined,
+  );
   if (!target) {
     return NextResponse.json({ ok: true, matched: 0 });
   }

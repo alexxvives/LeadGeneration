@@ -1,7 +1,8 @@
 /**
- * Credentials sign-in via /api/auth/password (sets session cookie server-side).
+ * Credentials sign-in via /api/password-login (sets session cookie).
  * Do not use next-auth/react signIn/signOut for account switches — they often
  * leave the previous JWT in place on Cloudflare Workers.
+ * Path stays outside `/api/auth/*` (Auth.js catch-all + middleware keep-alive).
  */
 export async function signInWithPassword(opts: {
   email: string;
@@ -12,7 +13,7 @@ export async function signInWithPassword(opts: {
     return { ok: false, error: "Enter email and password." };
   }
 
-  const res = await fetch("/api/auth/password", {
+  const res = await fetch("/api/password-login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",

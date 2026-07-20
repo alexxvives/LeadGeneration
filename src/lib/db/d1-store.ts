@@ -88,6 +88,8 @@ type WorkspaceRow = {
   /** Migration 0015 — daily verify counters. */
   verifies_used_today: number | null;
   verifies_resets_at: string | null;
+  /** Migration 0024 — JSON ProfileStore. */
+  outreach_profiles_json: string | null;
 };
 
 type BoardRow = {
@@ -209,6 +211,7 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
         : null,
     emailVerifyEnabled: r.email_verify_enabled === 0 ? false : true,
     connectedMailbox: parseConnectedMailbox(r.connected_mailbox_json),
+    outreachProfilesJson: r.outreach_profiles_json ?? null,
   };
 }
 
@@ -355,31 +358,61 @@ export class D1Store implements LeadRepository {
   }
 
   async createWorkspace(w: Workspace): Promise<Workspace> {
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO workspaces
+           (id, name, owner_user_id, plan_id, stripe_customer_id,
+            stripe_subscription_id, stripe_price_id, leads_used_this_month,
+            sends_used_this_month, resets_at, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO NOTHING`,
+        )
+        .bind(
+          w.id,
+          w.name,
+          w.ownerUserId,
+          w.planId,
+          w.stripeCustomerId,
+          w.stripeSubscriptionId,
+          w.stripePriceId,
+          w.leadsUsedThisMonth,
+          w.sendsUsedThisMonth,
+          w.resetsAt,
+          w.createdAt,
+          w.updatedAt,
+        )
+        .run();
+    } catch {
+      // Unique owner_user_id (workspaces_owner_unique) or transient D1 error.
+    }
+    // Race: another isolate may have created the owner row first.
+    if (w.ownerUserId) {
+      const byOwner = await this.getWorkspaceByOwner(w.ownerUserId);
+      if (byOwner) return byOwner;
+    }
+    return (await this.getWorkspace(w.id)) ?? w;
+  }
+
+  async incrementWorkspaceUsage(
+    id: string,
+    patch: { leads?: number; sends?: number; verifies?: number },
+  ): Promise<void> {
+    const leads = Math.max(0, Math.floor(patch.leads ?? 0));
+    const sends = Math.max(0, Math.floor(patch.sends ?? 0));
+    const verifies = Math.max(0, Math.floor(patch.verifies ?? 0));
+    if (leads === 0 && sends === 0 && verifies === 0) return;
     await this.db
       .prepare(
-        `INSERT INTO workspaces
-         (id, name, owner_user_id, plan_id, stripe_customer_id,
-          stripe_subscription_id, stripe_price_id, leads_used_this_month,
-          sends_used_this_month, resets_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO NOTHING`,
+        `UPDATE workspaces SET
+           leads_used_this_month = leads_used_this_month + ?,
+           sends_used_this_month = sends_used_this_month + ?,
+           verifies_used_today = COALESCE(verifies_used_today, 0) + ?,
+           updated_at = ?
+         WHERE id = ?`,
       )
-      .bind(
-        w.id,
-        w.name,
-        w.ownerUserId,
-        w.planId,
-        w.stripeCustomerId,
-        w.stripeSubscriptionId,
-        w.stripePriceId,
-        w.leadsUsedThisMonth,
-        w.sendsUsedThisMonth,
-        w.resetsAt,
-        w.createdAt,
-        w.updatedAt,
-      )
+      .bind(leads, sends, verifies, new Date().toISOString(), id)
       .run();
-    return w;
   }
 
   async updateWorkspace(id: string, patch: Partial<Workspace>): Promise<Workspace | null> {
@@ -419,6 +452,9 @@ export class D1Store implements LeadRepository {
       row.connected_mailbox_json = patch.connectedMailbox
         ? JSON.stringify(patch.connectedMailbox)
         : null;
+    }
+    if ("outreachProfilesJson" in patch) {
+      row.outreach_profiles_json = patch.outreachProfilesJson ?? null;
     }
 
     if (Object.keys(row).length === 0) return this.getWorkspace(id);
@@ -765,6 +801,82 @@ export class D1Store implements LeadRepository {
       lockedAt: r.locked_at,
       expiresAt: r.expires_at,
     };
+  }
+
+  async listBoardLocks(boardIds: string[]): Promise<BoardLock[]> {
+    const ids = [...new Set(boardIds.filter(Boolean))];
+    if (ids.length === 0) return [];
+    const now = new Date().toISOString();
+    const out: BoardLock[] = [];
+    const CHUNK = 50;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(",");
+      const { results } = await this.db
+        .prepare(
+          `SELECT * FROM board_locks
+           WHERE board_id IN (${placeholders}) AND expires_at > ?`,
+        )
+        .bind(...chunk, now)
+        .all<{
+          board_id: string;
+          user_id: string;
+          user_name: string | null;
+          locked_at: string;
+          expires_at: string;
+        }>();
+      for (const r of results) {
+        out.push({
+          boardId: r.board_id,
+          userId: r.user_id,
+          userName: r.user_name,
+          lockedAt: r.locked_at,
+          expiresAt: r.expires_at,
+        });
+      }
+    }
+    return out;
+  }
+
+  async countLeadsByBoard(): Promise<
+    Record<
+      string,
+      { total: number; contacted: number; sent: number; closed: number }
+    >
+  > {
+    const { results } = await this.db
+      .prepare(
+        `SELECT board_id AS boardId,
+                COUNT(*) AS total,
+                SUM(CASE WHEN crm_stage IN ('contacted','in_conversation','closed') THEN 1 ELSE 0 END) AS contacted,
+                SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sent,
+                SUM(CASE WHEN crm_stage = 'closed' THEN 1 ELSE 0 END) AS closed
+         FROM leads
+         WHERE workspace_id = ? AND board_id IS NOT NULL
+         GROUP BY board_id`,
+      )
+      .bind(this.workspaceId)
+      .all<{
+        boardId: string;
+        total: number;
+        contacted: number;
+        sent: number;
+        closed: number;
+      }>();
+    const map: Record<
+      string,
+      { total: number; contacted: number; sent: number; closed: number }
+    > = {};
+    for (const r of results) {
+      if (!r.boardId) continue;
+      map[r.boardId] = {
+        total: Number(r.total) || 0,
+        contacted: Number(r.contacted) || 0,
+        sent: Number(r.sent) || 0,
+        closed: Number(r.closed) || 0,
+      };
+    }
+    return map;
   }
 
   async upsertBoardLock(lock: BoardLock): Promise<BoardLock> {
@@ -1210,19 +1322,53 @@ export class D1Store implements LeadRepository {
     return results.map(rowToOutreach);
   }
 
-  async findLatestSentByEmail(email: string): Promise<Outreach | null> {
+  async listOutreachByLeadIds(leadIds: string[]): Promise<Outreach[]> {
+    const ids = [...new Set(leadIds.filter(Boolean))];
+    if (ids.length === 0) return [];
+    const out: Outreach[] = [];
+    const CHUNK = 50;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(",");
+      const { results } = await this.db
+        .prepare(
+          `SELECT * FROM outreach
+           WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
+        )
+        .bind(this.workspaceId, ...chunk)
+        .all<OutreachRow>();
+      out.push(...results.map(rowToOutreach));
+    }
+    return out;
+  }
+
+  async findLatestSentByEmail(
+    email: string,
+    workspaceId?: string,
+  ): Promise<Outreach | null> {
     const needle = email.trim().toLowerCase();
     if (!needle) return null;
-    // Unscoped on purpose — Resend webhooks are not session-bound.
-    const row = await this.db
-      .prepare(
-        `SELECT * FROM outreach
-         WHERE status = 'sent' AND lower(to_email) = ?
-         ORDER BY sent_at DESC
-         LIMIT 1`,
-      )
-      .bind(needle)
-      .first<OutreachRow>();
+    // Unscoped only for platform webhook secrets; BYO secrets must pass workspaceId.
+    const row = workspaceId
+      ? await this.db
+          .prepare(
+            `SELECT * FROM outreach
+             WHERE workspace_id = ?
+               AND status = 'sent' AND lower(to_email) = ?
+             ORDER BY sent_at DESC
+             LIMIT 1`,
+          )
+          .bind(workspaceId, needle)
+          .first<OutreachRow>()
+      : await this.db
+          .prepare(
+            `SELECT * FROM outreach
+             WHERE status = 'sent' AND lower(to_email) = ?
+             ORDER BY sent_at DESC
+             LIMIT 1`,
+          )
+          .bind(needle)
+          .first<OutreachRow>();
     return row ? rowToOutreach(row) : null;
   }
 

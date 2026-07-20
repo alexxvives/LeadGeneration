@@ -4,6 +4,10 @@ import {
   authenticateWithPassword,
   ensureBootstrapAdmin,
 } from "@/lib/auth-users";
+import {
+  checkAuthRateLimit,
+  rateLimitResponse,
+} from "@/lib/auth-rate-limit";
 import { getD1Binding } from "@/lib/cf";
 import { authRequired } from "@/lib/config";
 import { getDb } from "@/lib/db";
@@ -20,9 +24,10 @@ const bodySchema = z.object({
 
 /**
  * Password login that atomically replaces the Auth.js session cookie.
- * Client `signIn`/`signOut` often fails to swap accounts on Cloudflare
- * (existing JWT / chunked `__Secure-` cookies). This route is the source of
- * truth for credentials account switches.
+ *
+ * Lives outside `/api/auth/*` so Auth.js `[...nextauth]` never intercepts it,
+ * and middleware skips the `auth()` wrapper (that wrapper re-emits the request
+ * session and would overwrite this JWT — see LEARNINGS 2026-07-19).
  */
 export async function POST(req: Request) {
   let json: unknown;
@@ -43,15 +48,18 @@ export async function POST(req: Request) {
   const email = parsed.data.email.trim().toLowerCase();
   const password = parsed.data.password;
 
+  const rate = await checkAuthRateLimit(req, "password", email);
+  if (!rate.ok) return rateLimitResponse(rate.retryAfterSec);
+
   await ensureBootstrapAdmin().catch((err) => {
-    console.error("[auth/password] bootstrap admin failed", err);
+    console.error("[password-login] bootstrap admin failed", err);
   });
 
   let user: Awaited<ReturnType<typeof authenticateWithPassword>> = null;
   try {
     user = await authenticateWithPassword(email, password);
   } catch (err) {
-    console.error("[auth/password] lookup failed", err);
+    console.error("[password-login] lookup failed", err);
   }
 
   if (!user && !authRequired()) {
@@ -77,7 +85,7 @@ export async function POST(req: Request) {
     const ws = await getOrCreateWorkspaceForUser(db, user.id, user.email);
     workspaceId = ws.id;
   } catch (err) {
-    console.error("[auth/password] workspace provision failed", err);
+    console.error("[password-login] workspace provision failed", err);
     if (authRequired()) {
       return NextResponse.json(
         { error: "Could not open workspace. Try again." },

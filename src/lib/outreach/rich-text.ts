@@ -96,7 +96,9 @@ export function sanitizePitchHtml(html: string): string {
 
   const walk = (node: Node): string => {
     if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent ?? "";
+      // textContent decodes entities — re-escape so `&lt;img…&gt;` cannot
+      // become live markup in the sanitizer output (stored XSS / email HTML).
+      return escapeHtml(node.textContent ?? "");
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return "";
     const el = node as Element;
@@ -131,16 +133,25 @@ export function normalizePitchHtml(input: string): string {
   if (!raw) return "";
   if (!looksLikeHtml(raw)) return plainToHtmlFragment(raw);
   if (typeof DOMParser !== "undefined") return sanitizePitchHtml(raw);
-  // Workers / Node: strip scripts + event handlers; keep known tags.
-  return tidyBreaks(
-    raw
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-      .replace(/\s(?:style|class|bgcolor|color)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-      .replace(/<\/?(?!\/?(?:b|strong|i|em|u|ul|ol|li|br|p)\b)[a-z][^>]*>/gi, "")
-      .replace(/<\/p>\s*<p[^>]*>/gi, "<br><br>")
-      .replace(/<\/?p[^>]*>/gi, "<br>"),
+  // Workers / Node: decode entities so encoded tags become real tags and get
+  // stripped; then escape text between remaining (allowed) tags.
+  const decoded = raw
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"');
+  const stripped = decoded
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s(?:style|class|bgcolor|color)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/<\/?(?!\/?(?:b|strong|i|em|u|ul|ol|li|br|p)\b)[a-z][^>]*>/gi, "")
+    .replace(/<\/p>\s*<p[^>]*>/gi, "<br><br>")
+    .replace(/<\/?p[^>]*>/gi, "<br>");
+  const escaped = stripped.replace(
+    /(^|>)([^<]*)/g,
+    (_m, boundary: string, text: string) => boundary + escapeHtml(text),
   );
+  return tidyBreaks(escaped);
 }
 
 /** Convert pitch HTML (or legacy plain) to email-safe plain text. */

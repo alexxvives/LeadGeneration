@@ -4,6 +4,7 @@ import { getD1Binding } from "@/lib/cf";
 import { setOutreachDeliveryStatus, type Ctx } from "@/lib/service";
 import type { DeliveryStatus } from "@/lib/types";
 import { authRequired, env } from "@/lib/config";
+import { timingSafeEqualString } from "@/lib/password";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
       req.headers.get("x-maileroo-secret")?.trim() ||
       req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ||
       "";
-    if (header !== secret) {
+    if (!timingSafeEqualString(header, secret)) {
       return NextResponse.json({ error: "Invalid secret" }, { status: 401 });
     }
   }

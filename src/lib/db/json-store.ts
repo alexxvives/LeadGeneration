@@ -50,6 +50,10 @@ function normalizeWorkspace(w: Workspace): Workspace {
         : null,
     emailVerifyEnabled: raw.emailVerifyEnabled === false ? false : true,
     connectedMailbox: (raw.connectedMailbox as Workspace["connectedMailbox"] | undefined) ?? null,
+    outreachProfilesJson:
+      typeof raw.outreachProfilesJson === "string"
+        ? raw.outreachProfilesJson
+        : null,
     verifiesUsedToday:
       typeof raw.verifiesUsedToday === "number" ? raw.verifiesUsedToday : 0,
     verifiesResetsAt:
@@ -196,6 +200,12 @@ export class JsonStore implements LeadRepository {
 
   createWorkspace(workspace: Workspace): Promise<Workspace> {
     return this.mutate((data) => {
+      if (workspace.ownerUserId) {
+        const byOwner = data.workspaces.find(
+          (w) => w.ownerUserId === workspace.ownerUserId,
+        );
+        if (byOwner) return { data, result: byOwner };
+      }
       const idx = data.workspaces.findIndex((w) => w.id === workspace.id);
       if (idx === -1) data.workspaces.push(workspace);
       else data.workspaces[idx] = workspace;
@@ -209,6 +219,29 @@ export class JsonStore implements LeadRepository {
       if (idx === -1) return { data, result: null };
       data.workspaces[idx] = { ...data.workspaces[idx], ...patch };
       return { data, result: data.workspaces[idx] };
+    });
+  }
+
+  incrementWorkspaceUsage(
+    id: string,
+    patch: { leads?: number; sends?: number; verifies?: number },
+  ): Promise<void> {
+    const leads = Math.max(0, Math.floor(patch.leads ?? 0));
+    const sends = Math.max(0, Math.floor(patch.sends ?? 0));
+    const verifies = Math.max(0, Math.floor(patch.verifies ?? 0));
+    if (leads === 0 && sends === 0 && verifies === 0) return Promise.resolve();
+    return this.mutate((data) => {
+      const idx = data.workspaces.findIndex((w) => w.id === id);
+      if (idx === -1) return { data, result: undefined };
+      const ws = data.workspaces[idx]!;
+      data.workspaces[idx] = {
+        ...ws,
+        leadsUsedThisMonth: (ws.leadsUsedThisMonth ?? 0) + leads,
+        sendsUsedThisMonth: (ws.sendsUsedThisMonth ?? 0) + sends,
+        verifiesUsedToday: (ws.verifiesUsedToday ?? 0) + verifies,
+        updatedAt: new Date().toISOString(),
+      };
+      return { data, result: undefined };
     });
   }
 
@@ -393,6 +426,50 @@ export class JsonStore implements LeadRepository {
       return null;
     }
     return lock;
+  }
+
+  async listBoardLocks(boardIds: string[]): Promise<BoardLock[]> {
+    const want = new Set(boardIds.filter(Boolean));
+    if (want.size === 0) return [];
+    const now = new Date().toISOString();
+    const data = await this.read();
+    return data.boardLocks.filter(
+      (l) => want.has(l.boardId) && l.expiresAt > now,
+    );
+  }
+
+  async countLeadsByBoard(): Promise<
+    Record<
+      string,
+      { total: number; contacted: number; sent: number; closed: number }
+    >
+  > {
+    const data = await this.read();
+    const map: Record<
+      string,
+      { total: number; contacted: number; sent: number; closed: number }
+    > = {};
+    for (const l of data.leads) {
+      if (!this.inScope(l) || !l.boardId) continue;
+      const row = map[l.boardId] ?? {
+        total: 0,
+        contacted: 0,
+        sent: 0,
+        closed: 0,
+      };
+      row.total += 1;
+      if (
+        l.crmStage === "contacted" ||
+        l.crmStage === "in_conversation" ||
+        l.crmStage === "closed"
+      ) {
+        row.contacted += 1;
+      }
+      if (l.status === "sent") row.sent += 1;
+      if (l.crmStage === "closed") row.closed += 1;
+      map[l.boardId] = row;
+    }
+    return map;
   }
 
   upsertBoardLock(lock: BoardLock): Promise<BoardLock> {
@@ -603,12 +680,29 @@ export class JsonStore implements LeadRepository {
     return data.outreach.filter((o) => this.inScope(o)).map(normalizeOutreach);
   }
 
-  async findLatestSentByEmail(email: string): Promise<Outreach | null> {
+  async listOutreachByLeadIds(leadIds: string[]): Promise<Outreach[]> {
+    const want = new Set(leadIds.filter(Boolean));
+    if (want.size === 0) return [];
+    const data = await this.read();
+    return data.outreach
+      .filter((o) => this.inScope(o) && want.has(o.leadId))
+      .map(normalizeOutreach);
+  }
+
+  async findLatestSentByEmail(
+    email: string,
+    workspaceId?: string,
+  ): Promise<Outreach | null> {
     const needle = email.trim().toLowerCase();
     if (!needle) return null;
     const data = await this.read();
     const candidates = data.outreach
-      .filter((o) => o.status === "sent" && o.toEmail?.toLowerCase() === needle)
+      .filter(
+        (o) =>
+          o.status === "sent" &&
+          o.toEmail?.toLowerCase() === needle &&
+          (!workspaceId || o.workspaceId === workspaceId),
+      )
       .sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
     return candidates[0] ? normalizeOutreach(candidates[0]) : null;
   }

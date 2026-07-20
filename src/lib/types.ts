@@ -193,6 +193,11 @@ export interface Workspace {
   emailVerifyEnabled: boolean;
   /** Pro path: one connected mailbox (multi-inbox deferred — ADR 0010). */
   connectedMailbox: ConnectedMailbox | null;
+  /**
+   * JSON ProfileStore (`profiles` + `activeId`) for drafting voice/pitch.
+   * Null = client localStorage only (demo / not yet migrated).
+   */
+  outreachProfilesJson: string | null;
 }
 /**
  * Named collection of leads within a workspace (ADR 0014).

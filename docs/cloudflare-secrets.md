@@ -11,6 +11,7 @@ Worker name (must match): `leadgeneration` (`wrangler.jsonc` → `"name"`).
 | Secret | Purpose |
 |--------|---------|
 | `AUTH_SECRET` | Auth.js — production login |
+| `BOOTSTRAP_ADMIN_PASSWORD` | Optional first-boot admin password (`admin@tryhermesmail.com`). If unset when no admin exists, a random UUID is logged once — set this secret before first deploy. |
 | `NEXTAUTH_URL` | Canonical app URL (magic links + Gmail OAuth redirect) |
 | `RESEND_API_KEY` | Magic link + board-invite / platform transactional email |
 | `MAILEROO_API_KEY` | Optional platform Maileroo *sending* key (board invites fallback) |
@@ -30,11 +31,14 @@ Worker name (must match): `leadgeneration` (`wrangler.jsonc` → `"name"`).
 
 **Removed:** `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Admin is a normal hashed user with
 `users.is_admin = 1` (migration 0018). First boot creates
-`admin@tryhermesmail.com` / `password` — delete any leftover Wrangler secrets:
+`admin@tryhermesmail.com` using `BOOTSTRAP_ADMIN_PASSWORD` (or a one-time
+random UUID printed to Worker logs). Rotate the hash in D1 after first login.
+Delete any leftover Wrangler secrets:
 
 ```bash
 npx wrangler secret delete ADMIN_EMAIL
 npx wrangler secret delete ADMIN_PASSWORD
+npx wrangler secret put BOOTSTRAP_ADMIN_PASSWORD
 ```
 
 ### Resend delivery webhooks (bounce / reply → CRM)

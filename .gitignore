@@ -31,6 +31,10 @@ yarn-error.log*
 /data/*.json
 !/data/.gitkeep
 
+# Real lead spreadsheets (PII) — keep only the intentional example
+LEADS*.xlsx
+!LEADS_example.xlsx
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -77,10 +77,13 @@ export interface Ctx {
   scopeToWorkspace: (workspaceId: string) => LeadRepository;
 }
 
+/** Per-workspace: orphan backfill runs at most once per isolate lifetime. */
+const defaultBoardOrphansChecked = new Set<string>();
+
 /**
  * Ensure the workspace has a Default board and back-fill any leads/runs that
- * predate boards (empty boardId). Idempotent — safe on every board read.
- * Also collapses duplicate defaults (race before unique index / migration 0012).
+ * predate boards (empty boardId). Orphan scan runs once per workspace per
+ * isolate; duplicate-default collapse still runs when needed.
  */
 export async function ensureDefaultBoard(ctx: Ctx): Promise<Board> {
   const { db } = ctx;
@@ -129,34 +132,32 @@ export async function ensureDefaultBoard(ctx: Ctx): Promise<Board> {
     }
   }
 
-  const [leads, runs] = await Promise.all([db.listLeads(), db.listRuns()]);
-  const orphanLeads = leads.filter((l) => !l.boardId);
-  const orphanRuns = runs.filter((r) => !r.boardId);
-  await Promise.all([
-    ...orphanLeads.map((l) => db.updateLead(l.id, { boardId: def!.id })),
-    ...orphanRuns.map((r) => db.updateRun(r.id, { boardId: def!.id })),
-  ]);
+  if (!defaultBoardOrphansChecked.has(ctx.workspaceId)) {
+    const [leads, runs] = await Promise.all([db.listLeads(), db.listRuns()]);
+    const orphanLeads = leads.filter((l) => !l.boardId);
+    const orphanRuns = runs.filter((r) => !r.boardId);
+    await Promise.all([
+      ...orphanLeads.map((l) => db.updateLead(l.id, { boardId: def!.id })),
+      ...orphanRuns.map((r) => db.updateRun(r.id, { boardId: def!.id })),
+    ]);
+    defaultBoardOrphansChecked.add(ctx.workspaceId);
+  }
   return def;
 }
 
-function summarizeLeads(
+function summarizeBoard(
   b: Board,
-  mine: Lead[],
+  counts: { total: number; contacted: number; sent: number; closed: number },
   access: BoardMemberRole,
   shared: boolean,
   foreignLock: BoardLock | null,
 ): BoardSummary {
   return {
     ...b,
-    leadCount: mine.length,
-    contactedCount: mine.filter(
-      (l) =>
-        l.crmStage === "contacted" ||
-        l.crmStage === "in_conversation" ||
-        l.crmStage === "closed",
-    ).length,
-    sentCount: mine.filter((l) => l.status === "sent").length,
-    closedCount: mine.filter((l) => l.crmStage === "closed").length,
+    leadCount: counts.total,
+    contactedCount: counts.contacted,
+    sentCount: counts.sent,
+    closedCount: counts.closed,
     access,
     shared,
     lock: foreignLock,
@@ -192,19 +193,22 @@ export async function resolveBoardAccess(
 
 export async function listBoardSummaries(ctx: Ctx): Promise<BoardSummary[]> {
   await ensureDefaultBoard(ctx);
-  const [boards, leads] = await Promise.all([
+  const [boards, countsByBoard] = await Promise.all([
     ctx.db.listBoards(),
-    ctx.db.listLeads(),
+    ctx.db.countLeadsByBoard(),
   ]);
+  const locks = await ctx.db.listBoardLocks(boards.map((b) => b.id));
+  const lockByBoard = new Map(locks.map((l) => [l.boardId, l]));
+  const emptyCounts = { total: 0, contacted: 0, sent: 0, closed: 0 };
   const summaries: BoardSummary[] = [];
   for (const b of boards) {
-    const lock = await ctx.db.getBoardLock(b.id);
+    const lock = lockByBoard.get(b.id) ?? null;
     const foreignLock =
       lock && ctx.userId && lock.userId !== ctx.userId ? lock : null;
     summaries.push(
-      summarizeLeads(
+      summarizeBoard(
         b,
-        leads.filter((l) => l.boardId === b.id),
+        countsByBoard[b.id] ?? emptyCounts,
         "owner",
         false,
         foreignLock,
@@ -214,18 +218,20 @@ export async function listBoardSummaries(ctx: Ctx): Promise<BoardSummary[]> {
 
   if (ctx.userId) {
     const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
+    const sharedLocks = await ctx.db.listBoardLocks(sharedIds);
+    const sharedLockByBoard = new Map(sharedLocks.map((l) => [l.boardId, l]));
     for (const id of sharedIds) {
       if (summaries.some((s) => s.id === id)) continue;
       const access = await resolveBoardAccess(ctx, id);
       if (!access) continue;
-      const sharedLeads = await access.db.listLeads({ boardId: id });
-      const lock = await ctx.db.getBoardLock(id);
+      const sharedCounts = await access.db.countLeadsByBoard();
+      const lock = sharedLockByBoard.get(id) ?? null;
       const foreignLock =
         lock && ctx.userId && lock.userId !== ctx.userId ? lock : null;
       summaries.push(
-        summarizeLeads(
+        summarizeBoard(
           access.board,
-          sharedLeads,
+          sharedCounts[id] ?? emptyCounts,
           access.access,
           true,
           foreignLock,
@@ -517,12 +523,7 @@ async function recordLeadUsage(ctx: Ctx, count: number): Promise<void> {
   // Track locally too so usage bars move in `npm run dev` (enforcement still
   // gated on ctx.metered in resolveRunLeadLimit).
   if (count <= 0) return;
-  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
-  if (!ws) return;
-  await ctx.db.updateWorkspace(ctx.workspaceId, {
-    leadsUsedThisMonth: ws.leadsUsedThisMonth + count,
-    updatedAt: nowIso(),
-  });
+  await ctx.db.incrementWorkspaceUsage(ctx.workspaceId, { leads: count });
 }
 
 /** TEMP developer helper — zero monthly lead/send + daily verify counters. */
@@ -826,8 +827,8 @@ async function attachOutreach(
   db: LeadRepository,
   leads: Lead[],
 ): Promise<LeadWithOutreach[]> {
-  const all = await db.listOutreach();
-  const byLead = new Map(all.map((o) => [o.leadId, o]));
+  const rows = await db.listOutreachByLeadIds(leads.map((l) => l.id));
+  const byLead = new Map(rows.map((o) => [o.leadId, o]));
   return leads.map((l) => ({ ...l, outreach: byLead.get(l.id) ?? null }));
 }
 
@@ -909,6 +910,10 @@ export async function editOutreach(
 ): Promise<Outreach | null> {
   const existing = await ctx.db.getOutreach(outreachId);
   if (!existing) return null;
+  // Preserve send audit trail — never rewrite in-flight or sent mail.
+  if (existing.status === "sent" || existing.status === "sending") {
+    return existing;
+  }
 
   const nextPatch: Parameters<typeof ctx.db.updateOutreach>[1] = {
     ...patch,
@@ -1044,10 +1049,7 @@ export async function sendApprovedOutreach(
 
     const verified = await verifyEmail(outreach.toEmail);
     if (verified.billed) {
-      await db.updateWorkspace(ctx.workspaceId, {
-        verifiesUsedToday: verifyWs.verifiesUsedToday + 1,
-        updatedAt: nowIso(),
-      });
+      await db.incrementWorkspaceUsage(ctx.workspaceId, { verifies: 1 });
     }
     if (!verified.okToSend) {
       const lead = await db.getLead(outreach.leadId);
@@ -1182,13 +1184,7 @@ export async function sendApprovedOutreach(
       crmPatch.followUps = followUps;
     }
     await db.updateLead(outreach.leadId, crmPatch);
-    const ws = await db.getWorkspace(ctx.workspaceId);
-    if (ws) {
-      await db.updateWorkspace(ctx.workspaceId, {
-        sendsUsedThisMonth: ws.sendsUsedThisMonth + 1,
-        updatedAt: nowIso(),
-      });
-    }
+    await db.incrementWorkspaceUsage(ctx.workspaceId, { sends: 1 });
     return { ok: true, outreach: updated ?? undefined, provider: result.provider };
   }
 
@@ -1302,6 +1298,7 @@ export async function updateWorkspaceEmailSettings(
     easyEmailProvider?: EasyEmailProvider;
     preferredSendPath?: "easy" | "pro" | null;
     emailVerifyEnabled?: boolean;
+    outreachProfilesJson?: string | null;
   },
 ): Promise<void> {
   const existing = await ctx.db.getWorkspace(ctx.workspaceId);

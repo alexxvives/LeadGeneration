@@ -27,6 +27,19 @@ import type { WorkspaceSummary } from "@/lib/types";
  */
 export async function getCtx(): Promise<Ctx> {
   const binding = await getD1Binding();
+
+  // Production D1 without AUTH_SECRET must never fall open into unmetered
+  // demo mode (audit C2.6). Local `npm run dev` has no binding — still open.
+  if (binding && !authRequired()) {
+    console.error(
+      "[getCtx] D1 binding present but AUTH_SECRET missing — refusing demo mode",
+    );
+    throw new AuthError(
+      "Server misconfigured: AUTH_SECRET missing",
+      503,
+    );
+  }
+
   let workspaceId = LOCAL_WORKSPACE_ID;
   let resolved = !authRequired();
   let userId: string | null = null;
@@ -65,9 +78,9 @@ export async function getCtx(): Promise<Ctx> {
     }
 
     if (!resolved) {
-      // Headless smoke bypass (middleware already checked the key).
+      // Headless smoke bypass — never against production D1 (audit C2.7).
       const smokeKey = env.smokeApiKey();
-      if (smokeKey) {
+      if (smokeKey && !binding) {
         try {
           const h = await headers();
           if (h.get("x-smoke-key") === smokeKey) {

@@ -57,12 +57,11 @@ type ProfileStore = {
 
 /** Default sign-off shown as placeholder + empty-state resolve target. */
 export const SIGNATURE_PLACEHOLDER = [
-  "Alexandre Vives",
-  "Co-founder & CEO | AKADEMO",
-  "www.akademo-edu.com",
+  "Your Name",
+  "Your role | Your company",
 ].join("\n");
 
-export const DEFAULT_COMPANY = "AKADEMO";
+export const DEFAULT_COMPANY = "Your company";
 
 /** Common titles for the optional role dropdown (custom still allowed). */
 export const TITLE_OPTIONS = [
@@ -279,6 +278,46 @@ function normalizeProfile(p: Partial<OutreachProfile> & { defaultOffer?: string 
 
 function writeStore(store: ProfileStore): void {
   localStorage.setItem(KEY, JSON.stringify(store));
+  // Write-through to workspace (best-effort; demo/local still works offline).
+  if (typeof window !== "undefined") {
+    void fetch("/api/workspace/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outreachProfilesJson: JSON.stringify(store) }),
+    }).catch(() => {});
+  }
+}
+
+/**
+ * Hydrate local cache from the workspace row. One-time migrate: if the server
+ * has nothing and localStorage does, push local up.
+ */
+export async function hydrateOutreachProfilesFromServer(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const res = await fetch("/api/workspace/settings", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = (await res.json()) as { outreachProfilesJson?: string | null };
+    const raw = data.outreachProfilesJson?.trim();
+    if (raw) {
+      const parsed = JSON.parse(raw) as ProfileStore;
+      if (Array.isArray(parsed.profiles) && parsed.profiles.length > 0) {
+        localStorage.setItem(KEY, JSON.stringify(parsed));
+        return;
+      }
+    }
+    // Server empty — migrate local once.
+    const local = localStorage.getItem(KEY);
+    if (local) {
+      await fetch("/api/workspace/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outreachProfilesJson: local }),
+      }).catch(() => {});
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Active profile (or a fresh empty one). */

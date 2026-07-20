@@ -40,12 +40,16 @@ export function isQuotaError(err: unknown): err is QuotaError {
 
 /**
  * Thrown when auth is enforced but the request has no resolvable workspace
- * (missing session, provision failure). Routes map this to 401.
+ * (missing session, provision failure). Routes map this to `status` (default 401).
+ * Misconfiguration (e.g. D1 without AUTH_SECRET) uses 503.
  */
 export class AuthError extends Error {
-  constructor(message = "Sign in required.") {
+  readonly status: number;
+
+  constructor(message = "Sign in required.", status = 401) {
     super(message);
     this.name = "AuthError";
+    this.status = status;
   }
 }
 

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { registerWithPassword } from "@/lib/auth-users";
+import {
+  checkAuthRateLimit,
+  rateLimitResponse,
+} from "@/lib/auth-rate-limit";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { getCapabilities } from "@/lib/config";
 
@@ -18,6 +22,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const rate = await checkAuthRateLimit(req, "register", email || "unknown");
+  if (!rate.ok) return rateLimitResponse(rate.retryAfterSec);
+
   const caps = getCapabilities();
   if (caps.turnstile) {
     const ip =
@@ -32,7 +40,7 @@ export async function POST(req: Request) {
   }
 
   const result = await registerWithPassword(
-    String(body.email ?? ""),
+    email,
     String(body.password ?? ""),
   );
   if (!result.ok) {

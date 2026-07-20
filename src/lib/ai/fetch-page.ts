@@ -5,6 +5,45 @@
 
 import { env } from "@/lib/config";
 
+/** Reject non-public targets before fetch (SSRF hardening — audit A16). */
+export function assertPublicHttpUrl(raw: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("Invalid URL");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Only http(s) URLs are allowed");
+  }
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host === "::1" ||
+    host === "0.0.0.0"
+  ) {
+    throw new Error("Localhost URLs are not allowed");
+  }
+  // IPv4 literal private / link-local / loopback ranges.
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    if (
+      a === 10 ||
+      a === 127 ||
+      a === 0 ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31)
+    ) {
+      throw new Error("Private network URLs are not allowed");
+    }
+  }
+  return parsed;
+}
+
 function stripHtml(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -19,6 +58,7 @@ function stripHtml(html: string): string {
 }
 
 async function plainFetchPageText(url: string): Promise<string> {
+  assertPublicHttpUrl(url);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   try {
@@ -52,6 +92,7 @@ export async function fetchPublicPageText(
   url: string,
   opts?: { preferPlain?: boolean },
 ): Promise<string> {
+  assertPublicHttpUrl(url);
   const key = opts?.preferPlain ? "" : env.firecrawlKey();
   if (key) {
     try {

@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, QuotaExceededError, type BoardResponse, type FirecrawlUsage } from "@/lib/client-api";
+import {
+  api,
+  QuotaExceededError,
+  RateLimitedError,
+  type BoardResponse,
+  type FirecrawlUsage,
+} from "@/lib/client-api";
 import type { ContactMethod, CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
@@ -23,6 +29,7 @@ import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 import {
   draftFlagsFromProfile,
+  hydrateOutreachProfilesFromServer,
   loadSenderProfile,
   pitchForLang,
   resolveDraftLang,
@@ -36,6 +43,7 @@ import { AdminUsersView } from "./AdminUsersView";
 import { BoardsView } from "./BoardsView";
 import { loadStoredBoardFilter, storeBoardFilter } from "./BoardPicker";
 import { Select } from "@/components/ui/Select";
+import { Modal } from "@/components/ui/Modal";
 import type { BoardSummary, ImportLeadRow } from "@/lib/types";
 
 const CRM_STAGE_FILTERS: CrmStage[] = [
@@ -187,17 +195,19 @@ export function Studio() {
     return data;
   }, []);
 
-  // Re-fetch when sidebar board filter changes.
+  // Hydrate drafting profiles from the workspace (localStorage write-through).
+  useEffect(() => {
+    void hydrateOutreachProfilesFromServer();
+  }, []);
+
+  // Initial load + re-fetch when sidebar board filter changes (single effect).
   useEffect(() => {
     if (boardParam) storeBoardFilter(boardParam);
-    void refresh().catch((e) => toast("err", e.message));
-  }, [filterBoardId, boardParam, refresh, toast]);
-
-  useEffect(() => {
-    refresh()
+    setLoading(true);
+    void refresh()
       .catch((e) => toast("err", e.message))
       .finally(() => setLoading(false));
-  }, [refresh, toast]);
+  }, [filterBoardId, boardParam, refresh, toast]);
 
   // Pipeline: pick up webhook reply → In Conversation without a manual refresh.
   useEffect(() => {
@@ -777,23 +787,39 @@ export function Studio() {
     let failed = 0;
     let hitVerifyLimit = false;
     try {
-      for (const l of targets) {
+      for (let i = 0; i < targets.length; i++) {
+        const l = targets[i]!;
         if (!l.outreach) continue;
-        try {
-          if (l.outreach.status !== "approved") {
-            await onDecide(l.outreach.id, "approved", { silent: true });
-          }
-          await api.send(l.outreach.id);
-          recordWarmupSend();
-          sent += 1;
-        } catch (e) {
-          if (e instanceof QuotaExceededError && e.kind === "verifies") {
-            hitVerifyLimit = true;
-            setVerifyLimitPlan(e.planId);
+        let attempts = 0;
+        for (;;) {
+          try {
+            if (l.outreach.status !== "approved") {
+              await onDecide(l.outreach.id, "approved", { silent: true });
+            }
+            await api.send(l.outreach.id);
+            recordWarmupSend();
+            sent += 1;
+            break;
+          } catch (e) {
+            if (e instanceof QuotaExceededError && e.kind === "verifies") {
+              hitVerifyLimit = true;
+              setVerifyLimitPlan(e.planId);
+              break;
+            }
+            if (e instanceof RateLimitedError && attempts < 8) {
+              attempts += 1;
+              toast(
+                "ok",
+                `Pausing for rate limit… ${sent} of ${targets.length} sent`,
+              );
+              await new Promise((r) => setTimeout(r, e.retryAfterMs));
+              continue;
+            }
+            failed += 1;
             break;
           }
-          failed += 1;
         }
+        if (hitVerifyLimit) break;
       }
       await refresh();
       if (sent > 0) {
@@ -1237,24 +1263,30 @@ export function Studio() {
         />
       )}
 
-      {deletingLeads && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" />
-          <div className="animate-float-up relative flex items-center gap-3 rounded-xl2 border border-white/10 bg-ink-900 px-5 py-4 shadow-2xl">
-            <Spinner className="h-5 w-5 text-aurora-400" />
-            <p className="text-sm font-medium text-mist-100">Deleting leads…</p>
-          </div>
+      <Modal
+        open={deletingLeads}
+        onClose={() => {}}
+        dismissible={false}
+        showClose={false}
+        className="max-w-xs"
+      >
+        <div className="flex items-center gap-3">
+          <Spinner className="h-5 w-5 text-aurora-400" />
+          <p className="text-sm font-medium text-mist-100">Deleting leads…</p>
         </div>
-      )}
+      </Modal>
 
-      {importProgress && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm" />
-          <div className="animate-float-up relative w-full max-w-sm rounded-xl2 border border-aurora-400/20 bg-ink-900 p-6 shadow-2xl">
-            <p className="font-display text-lg font-semibold text-mist-100">
-              Importing leads…
-            </p>
-            <p className="mt-2 text-sm text-mist-300">
+      <Modal
+        open={!!importProgress}
+        onClose={() => {}}
+        dismissible={false}
+        showClose={false}
+        title="Importing leads…"
+        className="max-w-sm border-aurora-400/20"
+      >
+        {importProgress ? (
+          <>
+            <p className="text-sm text-mist-300">
               <span className="tabular-nums text-mist-100">
                 {importProgress.done}
               </span>
@@ -1275,60 +1307,53 @@ export function Studio() {
                 }}
               />
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        ) : null}
+      </Modal>
 
-      {pendingSendId && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
+      <Modal
+        open={!!pendingSendId}
+        onClose={() => setPendingSendId(null)}
+        title="Simulate send?"
+      >
+        <p className="text-sm text-mist-300">
+          No email provider is configured yet, so this won&apos;t leave the app. Add your
+          provider key under Settings → Sending for real inbox delivery — or continue to
+          simulate.
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <a
+            href="/app/settings"
+            className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-mist-100 transition-colors hover:bg-white/5"
+          >
+            Open Settings
+          </a>
+          <button
+            type="button"
             onClick={() => setPendingSendId(null)}
-          />
-          <div className="animate-float-up relative w-full max-w-md rounded-xl2 border border-white/10 bg-ink-900 p-6 shadow-2xl">
-            <p className="font-display text-xl font-semibold text-mist-100">Simulate send?</p>
-            <p className="mt-2 text-sm text-mist-300">
-              No email provider is configured yet, so this won&apos;t leave the app. Add your
-              provider key under Settings → Sending for real inbox delivery — or continue to
-              simulate.
-            </p>
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <a
-                href="/app/settings"
-                className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-mist-100 transition-colors hover:bg-white/5"
-              >
-                Open Settings
-              </a>
-              <button
-                type="button"
-                onClick={() => setPendingSendId(null)}
-                className="rounded-full px-4 py-2 text-sm font-medium text-mist-400 hover:text-mist-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmSimulateSend()}
-                className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-[1.03]"
-              >
-                Simulate send
-              </button>
-            </div>
-          </div>
+            className="rounded-full px-4 py-2 text-sm font-medium text-mist-400 hover:text-mist-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void confirmSimulateSend()}
+            className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-[1.03]"
+          >
+            Simulate send
+          </button>
         </div>
-      )}
+      </Modal>
 
-      {warmupWarn && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
-            onClick={() => setWarmupWarn(null)}
-          />
-          <div className="animate-float-up relative w-full max-w-md rounded-xl2 border border-amber-400/20 bg-ink-900 p-6 shadow-2xl">
-            <p className="font-display text-xl font-semibold text-mist-100">
-              Soft warmup recommend
-            </p>
-            <p className="mt-2 text-sm text-mist-300">
+      <Modal
+        open={!!warmupWarn}
+        onClose={() => setWarmupWarn(null)}
+        title="Soft warmup recommend"
+        className="max-w-md border-amber-400/20"
+      >
+        {warmupWarn ? (
+          <>
+            <p className="text-sm text-mist-300">
               You&apos;ve sent{" "}
               <span className="text-mist-100">{warmupWarn.todayCount}</span> today. For a
               newer sender we recommend staying around{" "}
@@ -1351,9 +1376,9 @@ export function Studio() {
                 Send anyway
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        ) : null}
+      </Modal>
 
       {upgrade && (
         <UpgradeModal
@@ -1390,7 +1415,11 @@ export function Studio() {
       />
 
       {/* Toasts */}
-      <div className="pointer-events-none fixed bottom-6 right-6 z-[60] flex flex-col gap-2">
+      <div
+        className="pointer-events-none fixed bottom-6 right-6 z-[60] flex flex-col gap-2"
+        role="status"
+        aria-live="polite"
+      >
         {toasts.map((t) => (
           <div
             key={t.id}

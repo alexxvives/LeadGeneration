@@ -4,11 +4,37 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-19 — Audit report execution (steps 1–17)
+- Validated Opus AUDIT_REPORT.md against current tree; executed Section 5
+  steps 1–17. Key fixes: PII xlsx removed; bootstrap pw from env/random;
+  rich-text entity XSS; atomic usage increments; unique workspace owner;
+  AUTH_SECRET+D1 fail-closed; smoke bypass off on D1; webhook email fallback
+  scoped + Maileroo timingSafeEqual; maxLeads 50; listOutreachByLeadIds;
+  board count/lock batching; outreach email index; editOutreach sent guard;
+  SSRF URL deny; auth rate limits; Modal+aria-live; Send-all 429 retry;
+  workspace outreach_profiles_json; icon diet + matcher.
+- History purge of `LEADS (2)*.xlsx` still needs a human `git filter-repo`.
+- Prod admin may still have old bootstrap hash — rotate via
+  `BOOTSTRAP_ADMIN_PASSWORD` + D1 or password change after login.
+- Apply migrations 0021–0024 on remote D1 before deploy.
+
+### 2026-07-19 — Auth.js middleware overwrites password-login JWT
+- `setSessionCookie` on `/api/auth/password-login` worked, but the Auth.js
+  `auth()` middleware wrapper re-emitted the *request* session (or cleared the
+  new cookie) onto the response afterward — account switch stayed on
+  alexxvives@gmail.com. Fix: skip `auth()` for session-write paths; move login
+  to `/api/password-login` (outside `/api/auth/*`). Compat shim kept at old path.
+
+### 2026-07-19 — /api/auth/password stolen by Auth.js catch-all
+- `POST /api/auth/password` hit `[...nextauth]` → literal `"Bad request."`
+  (Auth.js action name). Use `/api/password-login` (outside catch-all). Cookie
+  rewrite stays in `session-cookie.ts`.
+- Admin pw reset in D1 to bootstrap `password` while debugging.
+
 ### 2026-07-19 — Account switch via /api/auth/password
 - Client `signOut` + `signIn` still left `__Secure-authjs.session-token`
-  (chunked) as alexxvives on Workers. Fix: `POST /api/auth/password` clears
-  all session cookie variants and `encode()`s a fresh JWT (`session-cookie.ts`).
-- Client only calls that route + hard navigates (`client-sign-in.ts`).
+  (chunked) as alexxvives on Workers. Fix: password-login clears cookies +
+  encodes a fresh JWT.
 - D1: `admin@tryhermesmail.com` ≠ `alexxvives@gmail.com` (magic-link, no pw).
 
 ### 2026-07-19 — Account switch needs hard navigation

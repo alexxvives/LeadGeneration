@@ -47,6 +47,14 @@ export interface LeadRepository {
   getWorkspaceByStripeCustomer(customerId: string): Promise<Workspace | null>;
   createWorkspace(workspace: Workspace): Promise<Workspace>;
   updateWorkspace(id: string, patch: Partial<Workspace>): Promise<Workspace | null>;
+  /**
+   * Atomically bump usage counters (`SET x = x + ?`) so concurrent Workers
+   * isolates cannot lose increments via read-modify-write.
+   */
+  incrementWorkspaceUsage(
+    id: string,
+    patch: { leads?: number; sends?: number; verifies?: number },
+  ): Promise<void>;
   /** All workspaces (admin). Not scoped. */
   listWorkspaces(): Promise<Workspace[]>;
   /**
@@ -86,8 +94,19 @@ export interface LeadRepository {
   listPendingInvitesForEmail(email: string): Promise<BoardInvite[]>;
   listPendingInvitesForBoard(boardId: string): Promise<BoardInvite[]>;
   getBoardLock(boardId: string): Promise<BoardLock | null>;
+  /** Active (non-expired) locks for the given board ids. */
+  listBoardLocks(boardIds: string[]): Promise<BoardLock[]>;
   upsertBoardLock(lock: BoardLock): Promise<BoardLock>;
   clearBoardLock(boardId: string, userId?: string): Promise<boolean>;
+  /**
+   * Per-board lead counts for the current workspace (GROUP BY — no full row load).
+   */
+  countLeadsByBoard(): Promise<
+    Record<
+      string,
+      { total: number; contacted: number; sent: number; closed: number }
+    >
+  >;
   /** Role when user is a member; null if not. */
   getMemberRole(boardId: string, userId: string): Promise<BoardMemberRole | null>;
 
@@ -124,12 +143,22 @@ export interface LeadRepository {
   getOutreach(id: string): Promise<Outreach | null>;
   getOutreachByLead(leadId: string): Promise<Outreach | null>;
   listOutreach(): Promise<Outreach[]>;
+  /** Outreach rows for the given lead ids (chunked IN-list on D1). */
+  listOutreachByLeadIds(leadIds: string[]): Promise<Outreach[]>;
 
   /**
    * Cross-workspace: latest sent outreach for a recipient (inbound reply match).
    * Prefer tag-based matching when provider tags are present.
    */
-  findLatestSentByEmail(email: string): Promise<Outreach | null>;
+  /**
+   * Latest sent outreach for `email`. When `workspaceId` is set, search is
+   * tenant-scoped (required when the webhook was verified with a BYO secret).
+   * Omit for platform-level secrets only.
+   */
+  findLatestSentByEmail(
+    email: string,
+    workspaceId?: string,
+  ): Promise<Outreach | null>;
 
   /**
    * Sends in the last minute (workspace-scoped) for rate limiting across

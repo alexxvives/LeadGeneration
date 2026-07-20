@@ -21,7 +21,9 @@ const CreateRunSchema = z.object({
   staticBody: z.boolean().optional(),
   aiPersonalize: z.boolean().optional(),
   searchStrategy: z.enum(["standard", "smart", "local"]).optional(),
-  maxLeads: z.number().int().min(1).max(500).optional(),
+  // Sync search runs inside one Worker request — hard-capped (audit C2.4).
+  // TODO(queue): Cloudflare Queues / Durable Objects for larger batches.
+  maxLeads: z.number().int().min(1).max(50).optional(),
   demo: z.boolean().optional(),
   boardId: z.string().min(1).max(80).optional().nullable(),
 });

@@ -42,7 +42,24 @@ const PatchSchema = z.object({
   clearResendApiKey: z.boolean().optional(),
   /** When true, clear Maileroo key (explicit wipe). */
   clearMailerooApiKey: z.boolean().optional(),
+  /** Drafting profiles JSON (profiles + activeId). */
+  outreachProfilesJson: z.string().max(200_000).nullable().optional(),
 });
+
+export async function GET() {
+  try {
+    const ctx = await getCtx();
+    const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+    return NextResponse.json({
+      outreachProfilesJson: ws?.outreachProfilesJson ?? null,
+    });
+  } catch (err) {
+    if (isAuthError(err)) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+}
 
 export async function PATCH(req: Request) {
   let body: unknown;
@@ -89,6 +106,9 @@ export async function PATCH(req: Request) {
   else if (data.mailerooApiKey !== undefined && data.mailerooApiKey !== null) {
     patch.mailerooApiKey = data.mailerooApiKey;
   }
+  if (data.outreachProfilesJson !== undefined) {
+    patch.outreachProfilesJson = data.outreachProfilesJson;
+  }
 
   try {
     const ctx = await getCtx();
@@ -96,7 +116,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (isAuthError(err)) {
-      return NextResponse.json({ error: err.message }, { status: 401 });
+      return NextResponse.json({ error: err.message }, { status: err.status });
     }
     if (isNotFoundError(err)) {
       return NextResponse.json({ error: err.message }, { status: 404 });

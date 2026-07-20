@@ -37,7 +37,8 @@ export const ANNUAL_DISCOUNT = 0.2;
  * it fits under the plan’s monthly lead-credit cap *and* remaining credits
  * this period (no separate Free per-run lock).
  */
-export const LEAD_COUNT_OPTIONS = [10, 25, 50, 100, 500] as const;
+/** Per-request UI options — hard-capped at 50 (sync Worker run; TODO(queue)). */
+export const LEAD_COUNT_OPTIONS = [10, 25, 50] as const;
 
 export const PLANS: Record<PlanId, Plan> = {
   free: {

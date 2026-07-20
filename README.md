@@ -55,7 +55,7 @@ Copy `.env.example` → `.env.local` and fill in what you have. All are optional
 | --- | --- | --- |
 | `FIRECRAWL_API_KEY` | Live web search + page scrape (preferred) | Demo leads |
 | `EXA_API_KEY` | Alternative live search provider | Demo leads |
-| `MAX_LEADS_PER_RUN` | Leads discovered per search (default 12) | 12 |
+| `MAX_LEADS_PER_RUN` | Leads discovered per search (default 50, hard max 50) | 50 |
 | `RESEND_API_KEY` | Email sending via Resend (recommended) | Demo/simulated send |
 | `SMTP_HOST/PORT/USER/PASS` | Email via SMTP (Nodemailer) | Demo/simulated send |
 | `OUTREACH_FROM_NAME` / `OUTREACH_FROM_EMAIL` | Sender identity | Placeholder identity |
