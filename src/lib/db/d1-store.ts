@@ -504,12 +504,38 @@ export class D1Store implements LeadRepository {
   }
 
   async listAuthUsers(): Promise<
-    Array<{ id: string; email: string | null; name: string | null }>
+    Array<{
+      id: string;
+      email: string | null;
+      name: string | null;
+      isAdmin: boolean;
+    }>
   > {
-    const { results } = await this.db
-      .prepare(`SELECT id, email, name FROM users ORDER BY email ASC`)
-      .all<{ id: string; email: string | null; name: string | null }>();
-    return results ?? [];
+    try {
+      const { results } = await this.db
+        .prepare(
+          `SELECT id, email, name, is_admin AS isAdmin
+           FROM users ORDER BY email ASC`,
+        )
+        .all<{
+          id: string;
+          email: string | null;
+          name: string | null;
+          isAdmin: number | null;
+        }>();
+      return (results ?? []).map((r) => ({
+        id: r.id,
+        email: r.email,
+        name: r.name,
+        isAdmin: Boolean(r.isAdmin),
+      }));
+    } catch {
+      // Migration 0018 not applied yet.
+      const { results } = await this.db
+        .prepare(`SELECT id, email, name FROM users ORDER BY email ASC`)
+        .all<{ id: string; email: string | null; name: string | null }>();
+      return (results ?? []).map((r) => ({ ...r, isAdmin: false }));
+    }
   }
 
   // ---- Boards ----

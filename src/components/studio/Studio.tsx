@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   api,
   QuotaExceededError,
@@ -98,6 +99,8 @@ function queryForView(next: StudioView, boardId?: string | null): string {
 
 export function Studio() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = session?.isAdmin === true;
   const searchParams = useSearchParams();
   const view = viewFromParams(searchParams.get("view"));
   const boardParam = searchParams.get("board");
@@ -928,7 +931,11 @@ export function Studio() {
                         ? "Outreach"
                         : view === "runs"
                           ? "Search runs"
-                          : "Search"}
+                          : view === "admin"
+                            ? "Platform overview"
+                            : view === "admin-users"
+                              ? "Users"
+                              : "Search"}
             </h1>
             {view === "boards" ? (
               <button
@@ -954,7 +961,11 @@ export function Studio() {
                       ? "Draft, approve, and send outreach one lead at a time."
                       : view === "runs"
                         ? "History of searches in this workspace."
-                        : "Find prospects by niche and location."}
+                        : view === "admin"
+                          ? "Cross-workspace health — workspaces, usage, and billing signals."
+                          : view === "admin-users"
+                            ? "Plan, usage, and send setup across workspaces."
+                            : "Find prospects by niche and location."}
           </p>
           {editLocked && filterBoardId ? (
             <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200">
@@ -999,7 +1010,12 @@ export function Studio() {
               </select>
             </label>
           ) : null}
-          {view !== "dashboard" && view !== "boards" && board?.workspace && (
+          {!isAdmin &&
+            view !== "dashboard" &&
+            view !== "boards" &&
+            view !== "admin" &&
+            view !== "admin-users" &&
+            board?.workspace && (
             <div className="hidden min-w-[18rem] flex-col gap-1 sm:flex sm:min-w-[26rem]">
               <div
                 className={`grid gap-4 ${

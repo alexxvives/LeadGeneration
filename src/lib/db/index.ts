@@ -68,7 +68,12 @@ export interface LeadRepository {
   }>;
   /** Auth.js users table (D1) or derived from workspaces (JSON). */
   listAuthUsers(): Promise<
-    Array<{ id: string; email: string | null; name: string | null }>
+    Array<{
+      id: string;
+      email: string | null;
+      name: string | null;
+      isAdmin: boolean;
+    }>
   >;
 
   // Boards (named lead collections — ADR 0014)

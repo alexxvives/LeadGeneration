@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-19 — Admin UX: account filter, unmetered, exclude from tenants
+- Platform/Users: `select-ink` account filter + `input-ink` search; Studio
+  header owns Platform/Users titles (was falling through to “Search”).
+- `listAdminUsers` skips `users.is_admin` workspaces; admin `getCtx` is
+  unmetered; Studio hides usage bars when `session.isAdmin`.
+- `BOOTSTRAP_ADMIN_PASSWORD` is first-boot only — once any admin exists,
+  `ensureBootstrapAdmin` no-ops; rotate via D1 hash / login, then delete the
+  Wrangler secret if set.
+
 ### 2026-07-19 — Audit report execution (steps 1–17)
 - Validated Opus AUDIT_REPORT.md against current tree; executed Section 5
   steps 1–17. Key fixes: PII xlsx removed; bootstrap pw from env/random;
@@ -14,8 +23,8 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   SSRF URL deny; auth rate limits; Modal+aria-live; Send-all 429 retry;
   workspace outreach_profiles_json; icon diet + matcher.
 - History purge of `LEADS (2)*.xlsx` still needs a human `git filter-repo`.
-- Prod admin may still have old bootstrap hash — rotate via
-  `BOOTSTRAP_ADMIN_PASSWORD` + D1 or password change after login.
+- Prod admin password: rotate D1 `users.password_hash` (or change after login);
+  do not rely on `BOOTSTRAP_ADMIN_PASSWORD` once an admin row exists.
 - Apply migrations 0021–0024 on remote D1 before deploy.
 
 ### 2026-07-19 — Auth.js middleware overwrites password-login JWT

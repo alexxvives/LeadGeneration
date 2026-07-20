@@ -1948,34 +1948,40 @@ export async function listAdminUsers(ctx: Ctx): Promise<AdminUserRow[]> {
   const emailByUserId = new Map(
     authUsers.map((u) => [u.id, { email: u.email, name: u.name }] as const),
   );
+  // Platform admins are operators, not tracked tenants.
+  const adminUserIds = new Set(
+    authUsers.filter((u) => u.isAdmin).map((u) => u.id),
+  );
 
-  return workspaces.map((w) => {
-    const plan = getPlan(w.planId);
-    const owner = w.ownerUserId ? emailByUserId.get(w.ownerUserId) : undefined;
-    return {
-      workspaceId: w.id,
-      workspaceName: w.name,
-      ownerUserId: w.ownerUserId,
-      ownerEmail: owner?.email ?? null,
-      ownerName: owner?.name ?? null,
-      planId: w.planId,
-      leadsUsedThisMonth: w.leadsUsedThisMonth,
-      leadsLimit: plan.leadCreditsPerMonth,
-      sendsUsedThisMonth: w.sendsUsedThisMonth,
-      sendsLimit: plan.sendsPerMonth,
-      verifiesUsedToday: w.verifiesUsedToday,
-      verifiesLimit: plan.verifiesPerDay,
-      leadCount: counts.leads[w.id] ?? 0,
-      sentCount: counts.sent[w.id] ?? 0,
-      runCount: counts.runs[w.id] ?? 0,
-      stripeCustomerId: w.stripeCustomerId,
-      hasMailbox: Boolean(w.connectedMailbox),
-      hasEasySendKey: Boolean(w.resendApiKey || w.mailerooApiKey),
-      emailVerifyEnabled: w.emailVerifyEnabled !== false,
-      createdAt: w.createdAt,
-      updatedAt: w.updatedAt,
-    };
-  });
+  return workspaces
+    .filter((w) => !w.ownerUserId || !adminUserIds.has(w.ownerUserId))
+    .map((w) => {
+      const plan = getPlan(w.planId);
+      const owner = w.ownerUserId ? emailByUserId.get(w.ownerUserId) : undefined;
+      return {
+        workspaceId: w.id,
+        workspaceName: w.name,
+        ownerUserId: w.ownerUserId,
+        ownerEmail: owner?.email ?? null,
+        ownerName: owner?.name ?? null,
+        planId: w.planId,
+        leadsUsedThisMonth: w.leadsUsedThisMonth,
+        leadsLimit: plan.leadCreditsPerMonth,
+        sendsUsedThisMonth: w.sendsUsedThisMonth,
+        sendsLimit: plan.sendsPerMonth,
+        verifiesUsedToday: w.verifiesUsedToday,
+        verifiesLimit: plan.verifiesPerDay,
+        leadCount: counts.leads[w.id] ?? 0,
+        sentCount: counts.sent[w.id] ?? 0,
+        runCount: counts.runs[w.id] ?? 0,
+        stripeCustomerId: w.stripeCustomerId,
+        hasMailbox: Boolean(w.connectedMailbox),
+        hasEasySendKey: Boolean(w.resendApiKey || w.mailerooApiKey),
+        emailVerifyEnabled: w.emailVerifyEnabled !== false,
+        createdAt: w.createdAt,
+        updatedAt: w.updatedAt,
+      };
+    });
 }
 
 /** Platform-wide admin overview (caller must gate on isAdminSession). */
@@ -2017,9 +2023,12 @@ export async function getAdminPlatformStats(ctx: Ctx): Promise<AdminPlatformStat
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 8);
 
+  const nonAdminAuthUsers = authUsers.filter((u) => !u.isAdmin);
+
   return {
     workspaceCount: users.length,
-    userCount: authUsers.length || users.filter((u) => u.ownerUserId).length,
+    userCount:
+      nonAdminAuthUsers.length || users.filter((u) => u.ownerUserId).length,
     totalLeads,
     totalSendsLifetime,
     totalRuns,

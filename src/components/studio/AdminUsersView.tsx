@@ -5,12 +5,14 @@ import { api } from "@/lib/client-api";
 import type { AdminUserRow, PlanId } from "@/lib/types";
 import { getPlan, PLAN_ORDER } from "@/lib/plans";
 import { Spinner } from "@/components/ui";
+import { Select } from "@/components/ui/Select";
 
 export function AdminUsersView() {
   const [users, setUsers] = useState<AdminUserRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [planFilter, setPlanFilter] = useState<PlanId | "all">("all");
+  const [accountFilter, setAccountFilter] = useState<string>("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -27,10 +29,25 @@ export function AdminUsersView() {
     };
   }, []);
 
+  const accountOptions = useMemo(() => {
+    if (!users) return [];
+    return [...users]
+      .sort((a, b) =>
+        (a.ownerEmail ?? a.workspaceName).localeCompare(
+          b.ownerEmail ?? b.workspaceName,
+        ),
+      )
+      .map((u) => ({
+        id: u.workspaceId,
+        label: u.ownerEmail ?? u.ownerName ?? u.workspaceName,
+      }));
+  }, [users]);
+
   const filtered = useMemo(() => {
     if (!users) return [];
     const needle = q.trim().toLowerCase();
     return users.filter((u) => {
+      if (accountFilter !== "all" && u.workspaceId !== accountFilter) return false;
       if (planFilter !== "all" && u.planId !== planFilter) return false;
       if (!needle) return true;
       const hay = [
@@ -45,7 +62,7 @@ export function AdminUsersView() {
         .toLowerCase();
       return hay.includes(needle);
     });
-  }, [users, q, planFilter]);
+  }, [users, q, planFilter, accountFilter]);
 
   if (err) {
     return (
@@ -65,25 +82,31 @@ export function AdminUsersView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-[11px] uppercase tracking-wider text-aurora-300">Admin</p>
-        <h1 className="mt-1 font-display text-3xl font-semibold text-mist-100">Users</h1>
-        <p className="mt-2 text-sm text-mist-400">
-          {users.length} workspace{users.length === 1 ? "" : "s"} · plan, usage, and send setup
-        </p>
-      </div>
-
       <div className="flex flex-wrap items-center gap-3">
+        <Select
+          value={accountFilter}
+          onChange={(e) => setAccountFilter(e.target.value)}
+          className="w-full min-w-[14rem] flex-1 py-2 text-sm sm:max-w-xs"
+          aria-label="Filter by account"
+        >
+          <option value="all">All accounts</option>
+          {accountOptions.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.label}
+            </option>
+          ))}
+        </Select>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search email, workspace, Stripe…"
-          className="min-w-[14rem] flex-1 rounded-lg border border-white/10 bg-ink-900/60 px-4 py-2.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+          className="input-ink min-w-[14rem] flex-1 py-2 text-sm"
         />
-        <select
+        <Select
           value={planFilter}
           onChange={(e) => setPlanFilter(e.target.value as PlanId | "all")}
-          className="rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2.5 text-sm text-mist-100"
+          className="w-full py-2 text-sm sm:w-auto"
+          aria-label="Filter by plan"
         >
           <option value="all">All plans</option>
           {PLAN_ORDER.map((id) => (
@@ -91,7 +114,7 @@ export function AdminUsersView() {
               {getPlan(id).name}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div className="overflow-x-auto rounded-xl2 border border-white/8">

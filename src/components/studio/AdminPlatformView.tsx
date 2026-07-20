@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/client-api";
-import type { AdminPlatformStats, PlanId } from "@/lib/types";
+import type { AdminPlatformStats, AdminUserRow, PlanId } from "@/lib/types";
 import { getPlan } from "@/lib/plans";
 import { Spinner } from "@/components/ui";
+import { Select } from "@/components/ui/Select";
 
 function StatCard({
   label,
@@ -27,16 +27,71 @@ function StatCard({
 
 const PLAN_ORDER: PlanId[] = ["free", "starter", "pro", "agency"];
 
+function statsForUsers(users: AdminUserRow[]): AdminPlatformStats {
+  const byPlan: Record<PlanId, number> = {
+    free: 0,
+    starter: 0,
+    pro: 0,
+    agency: 0,
+  };
+  let totalLeads = 0;
+  let totalSendsLifetime = 0;
+  let totalRuns = 0;
+  let leadsUsedThisMonth = 0;
+  let sendsUsedThisMonth = 0;
+  let verifiesUsedToday = 0;
+  let paidWorkspaceCount = 0;
+  let withStripeCustomer = 0;
+  let withMailbox = 0;
+  let withEasySendKey = 0;
+
+  for (const u of users) {
+    byPlan[u.planId] = (byPlan[u.planId] ?? 0) + 1;
+    totalLeads += u.leadCount;
+    totalSendsLifetime += u.sentCount;
+    totalRuns += u.runCount;
+    leadsUsedThisMonth += u.leadsUsedThisMonth;
+    sendsUsedThisMonth += u.sendsUsedThisMonth;
+    verifiesUsedToday += u.verifiesUsedToday;
+    if (u.planId !== "free") paidWorkspaceCount += 1;
+    if (u.stripeCustomerId) withStripeCustomer += 1;
+    if (u.hasMailbox) withMailbox += 1;
+    if (u.hasEasySendKey) withEasySendKey += 1;
+  }
+
+  const recentSignups = [...users]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 8);
+
+  return {
+    workspaceCount: users.length,
+    userCount: users.filter((u) => u.ownerUserId).length,
+    totalLeads,
+    totalSendsLifetime,
+    totalRuns,
+    leadsUsedThisMonth,
+    sendsUsedThisMonth,
+    verifiesUsedToday,
+    byPlan,
+    paidWorkspaceCount,
+    withStripeCustomer,
+    withMailbox,
+    withEasySendKey,
+    recentSignups,
+  };
+}
+
 export function AdminPlatformView() {
-  const [data, setData] = useState<AdminPlatformStats | null>(null);
+  const [users, setUsers] = useState<AdminUserRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [accountFilter, setAccountFilter] = useState<string>("all");
 
   useEffect(() => {
     let cancelled = false;
     api
-      .adminOverview()
-      .then((s) => {
-        if (!cancelled) setData(s);
+      .adminUsers()
+      .then(({ users: list }) => {
+        if (!cancelled) setUsers(list);
       })
       .catch((e) => {
         if (!cancelled) setErr(e instanceof Error ? e.message : "Failed to load");
@@ -45,6 +100,29 @@ export function AdminPlatformView() {
       cancelled = true;
     };
   }, []);
+
+  const accountOptions = useMemo(() => {
+    if (!users) return [];
+    return [...users]
+      .sort((a, b) =>
+        (a.ownerEmail ?? a.workspaceName).localeCompare(
+          b.ownerEmail ?? b.workspaceName,
+        ),
+      )
+      .map((u) => ({
+        id: u.workspaceId,
+        label: u.ownerEmail ?? u.ownerName ?? u.workspaceName,
+      }));
+  }, [users]);
+
+  const data = useMemo(() => {
+    if (!users) return null;
+    const scoped =
+      accountFilter === "all"
+        ? users
+        : users.filter((u) => u.workspaceId === accountFilter);
+    return statsForUsers(scoped);
+  }, [users, accountFilter]);
 
   if (err) {
     return (
@@ -66,22 +144,20 @@ export function AdminPlatformView() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-[11px] uppercase tracking-wider text-aurora-300">Admin</p>
-          <h1 className="mt-1 font-display text-3xl font-semibold text-mist-100">
-            Platform overview
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-mist-400">
-            Cross-workspace health — workspaces, usage, and billing signals.
-          </p>
-        </div>
-        <Link
-          href="/app?view=admin-users"
-          className="rounded-full border border-white/10 px-4 py-2 text-sm text-mist-200 hover:border-aurora-400/40 hover:text-aurora-300"
+      <div className="max-w-xs">
+        <Select
+          value={accountFilter}
+          onChange={(e) => setAccountFilter(e.target.value)}
+          className="w-full py-2 text-sm"
+          aria-label="Filter by account"
         >
-          View all users →
-        </Link>
+          <option value="all">All accounts</option>
+          {accountOptions.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.label}
+            </option>
+          ))}
+        </Select>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

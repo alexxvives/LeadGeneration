@@ -50,7 +50,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   Checkout CTAs. Public.
 - **`/login`** — sign-in / create account. **Password is primary** (hashed on
   the Auth.js `users` table). Platform admin is a normal account with
-  `users.is_admin = 1` (bootstrap: `admin@tryhermesmail.com` / `password`).
+  `users.is_admin = 1` (first-boot: `admin@tryhermesmail.com` from
+  `BOOTSTRAP_ADMIN_PASSWORD` or a one-time logged UUID).
   Magic link (SMTP/Resend) is **forgot password** (+ Turnstile when set).
   Marketing nav: one CTA — **Sign in** (prod) or **Open studio** (local).
 - **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar

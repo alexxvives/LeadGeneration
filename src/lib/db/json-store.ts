@@ -278,7 +278,12 @@ export class JsonStore implements LeadRepository {
   }
 
   async listAuthUsers(): Promise<
-    Array<{ id: string; email: string | null; name: string | null }>
+    Array<{
+      id: string;
+      email: string | null;
+      name: string | null;
+      isAdmin: boolean;
+    }>
   > {
     const workspaces = await this.listWorkspaces();
     return workspaces
@@ -287,6 +292,7 @@ export class JsonStore implements LeadRepository {
         id: w.ownerUserId!,
         email: w.fromEmail ?? (w.name.includes("@") ? w.name : null),
         name: w.name,
+        isAdmin: false,
       }));
   }
 

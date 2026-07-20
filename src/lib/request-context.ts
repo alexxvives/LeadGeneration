@@ -3,6 +3,7 @@ import { getD1Binding } from "@/lib/cf";
 import { getDb, LOCAL_WORKSPACE_ID } from "@/lib/db";
 import { authRequired, env } from "@/lib/config";
 import { auth } from "@/auth";
+import { isAdminSession } from "@/lib/admin";
 import { getPlan } from "@/lib/plans";
 import {
   ensureUsageWindow,
@@ -45,10 +46,12 @@ export async function getCtx(): Promise<Ctx> {
   let userId: string | null = null;
   let userEmail: string | null = null;
   let userName: string | null = null;
+  let isAdmin = !authRequired();
 
   if (authRequired()) {
     try {
       const session = await auth();
+      isAdmin = isAdminSession(session);
       userEmail = session?.user?.email ?? null;
       userName = session?.user?.name ?? null;
       userId =
@@ -111,7 +114,8 @@ export async function getCtx(): Promise<Ctx> {
   return {
     db,
     workspaceId,
-    metered: !!binding,
+    // Platform admins are unmetered (unlimited leads/sends/verifies).
+    metered: !!binding && !isAdmin,
     userId,
     userEmail,
     userName,

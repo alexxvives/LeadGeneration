@@ -329,6 +329,25 @@ html[data-theme="light"] {
   .select-ink:disabled {
     opacity: 0.4;
   }
+
+  .input-ink {
+    background-color: color-mix(in srgb, var(--ink-900) 60%, transparent);
+    border: 1px solid var(--glass-border);
+    border-radius: 0.5rem;
+    color: var(--mist-100);
+    padding: 0.75rem 1rem;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  .input-ink::placeholder {
+    color: var(--mist-500);
+  }
+  .input-ink:focus {
+    border-color: color-mix(in srgb, var(--aurora-400) 60%, transparent);
+  }
+  .input-ink:disabled {
+    opacity: 0.4;
+  }
   .card-hover {
     transition:
       transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
