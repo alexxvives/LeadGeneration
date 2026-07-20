@@ -353,8 +353,6 @@ export function EmailSettingsForm({
                         maileroo.com
                       </a>
                       → add your domain → create a Sending Key → paste here.
-                      Sending works immediately. Bounce/reply tracking needs a
-                      one-time webhook (below) — Maileroo has no auto-setup API.
                     </span>
                   }
                 >
@@ -385,8 +383,6 @@ export function EmailSettingsForm({
                         resend.com
                       </a>
                       → add your domain → create an API key → paste here.
-                      Bounce and reply tracking is set up automatically when you
-                      save the key — nothing to configure in Resend.
                     </span>
                   }
                 >

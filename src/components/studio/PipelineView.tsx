@@ -14,6 +14,7 @@ import {
 } from "@dnd-kit/core";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
+import { FitMeter } from "@/components/ui";
 import { displayWebsite } from "@/lib/website";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
@@ -309,6 +310,9 @@ function DraggablePipelineCard({
         {subtitle && (
           <p className="mt-0.5 truncate text-xs leading-snug text-mist-500">{subtitle}</p>
         )}
+        <div className="mt-1.5">
+          <FitMeter score={lead.fitScore} compact />
+        </div>
         {showMeta && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {replied && (

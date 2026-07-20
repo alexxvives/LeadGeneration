@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState, type ComponentType, type SVGProps } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type SVGProps,
+} from "react";
 import { signOut, useSession } from "next-auth/react";
 import { BrandMark } from "@/components/BrandMark";
 import { AuthModal } from "@/components/AuthModal";
@@ -90,9 +97,14 @@ export function StudioShell({
   const { open: setupOpen, setOpen: setSetupOpen } = useGettingStartedOpen();
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
+  const inviteRedirectTried = useRef(false);
 
   const view = searchParams.get("view");
   const boardParam = searchParams.get("board");
+  const userId =
+    session?.userId ??
+    session?.user?.id ??
+    (session?.user?.email ? `user_${session.user.email}` : null);
 
   const refreshBoards = useCallback(() => {
     api
@@ -166,7 +178,7 @@ export function StudioShell({
     if (authOpen || typeof window === "undefined") return;
     if (searchParams.get("setup") === "1") return;
     try {
-      if (!isGettingStartedDone()) {
+      if (!isGettingStartedDone(userId)) {
         const guest = isGuestSession();
         if (guest || status === "authenticated" || authRequired) {
           setSetupOpen(true);
@@ -175,7 +187,37 @@ export function StudioShell({
     } catch {
       /* ignore */
     }
-  }, [authOpen, status, authRequired, setSetupOpen, searchParams]);
+  }, [authOpen, status, authRequired, setSetupOpen, searchParams, userId]);
+
+  // Reset invite redirect when the signed-in account changes.
+  useEffect(() => {
+    inviteRedirectTried.current = false;
+  }, [userId]);
+
+  // After login (and after the tour closes), surface pending board invites.
+  useEffect(() => {
+    if (status !== "authenticated" || authOpen || setupOpen) return;
+    if (typeof window === "undefined") return;
+    // Wait until the tour is finished (or was already done) so invites show after it.
+    if (!isGettingStartedDone(userId)) return;
+    if (inviteRedirectTried.current) return;
+    if (searchParams.get("view") === "boards") {
+      inviteRedirectTried.current = true;
+      return;
+    }
+    inviteRedirectTried.current = true;
+    let cancelled = false;
+    api
+      .listMyInvites()
+      .then(({ invites }) => {
+        if (cancelled || invites.length === 0) return;
+        router.replace("/app?view=boards");
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [status, authOpen, setupOpen, userId, searchParams, router]);
 
   const markGuest = () => {
     markGuestSession();
@@ -454,6 +496,7 @@ export function StudioShell({
         onClose={() => setSetupOpen(false)}
         caps={caps}
         identity={identity}
+        userId={userId}
       />
     </div>
   );

@@ -15,10 +15,56 @@ const GETTING_STARTED_LEGACY = [
   "leadify_getting_started_v3",
   "lodestar_getting_started_v3",
 ];
+const FORCE_TUTORIAL_KEY = "hermes_force_tutorial";
 
-export function isGettingStartedDone(): boolean {
+function storageKeyForUser(userId?: string | null): string {
+  return userId ? `${GETTING_STARTED_KEY}:${userId}` : GETTING_STARTED_KEY;
+}
+
+/**
+ * Tour completion is per-user when signed in. New signups set
+ * `hermes_force_tutorial` so a prior guest Skip on the same browser cannot
+ * suppress the tour.
+ */
+export function isGettingStartedDone(userId?: string | null): boolean {
   if (typeof window === "undefined") return true;
+  try {
+    if (sessionStorage.getItem(FORCE_TUTORIAL_KEY) === "1") return false;
+  } catch {
+    /* ignore */
+  }
+  if (userId) {
+    const keyed = localStorage.getItem(storageKeyForUser(userId));
+    if (keyed === "done") return true;
+    // Returning accounts: migrate a pre-per-user “done” once. New signups
+    // never hit this while force_tutorial is set.
+    const globalDone =
+      readMigratedKey(GETTING_STARTED_KEY, GETTING_STARTED_LEGACY) === "done";
+    if (globalDone) {
+      try {
+        localStorage.setItem(storageKeyForUser(userId), "done");
+      } catch {
+        /* ignore */
+      }
+      return true;
+    }
+    return false;
+  }
   return readMigratedKey(GETTING_STARTED_KEY, GETTING_STARTED_LEGACY) === "done";
+}
+
+export function markGettingStartedDone(userId?: string | null): void {
+  try {
+    sessionStorage.removeItem(FORCE_TUTORIAL_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    localStorage.setItem(storageKeyForUser(userId), "done");
+    if (userId) localStorage.setItem(GETTING_STARTED_KEY, "done");
+  } catch {
+    /* ignore */
+  }
 }
 
 export interface GettingStartedCaps {
@@ -263,11 +309,14 @@ function fireConfetti() {
 export function GettingStartedWizard({
   open,
   onClose,
+  userId = null,
 }: {
   open: boolean;
   onClose: () => void;
   caps?: GettingStartedCaps;
   identity?: GettingStartedIdentity;
+  /** Auth.js user id — scopes the “done” flag per account. */
+  userId?: string | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -284,15 +333,11 @@ export function GettingStartedWizard({
 
   const finish = useCallback(
     (celebrate = false) => {
-      try {
-        localStorage.setItem(GETTING_STARTED_KEY, "done");
-      } catch {
-        /* ignore */
-      }
+      markGettingStartedDone(userId);
       if (celebrate) fireConfetti();
       onClose();
     },
-    [onClose],
+    [onClose, userId],
   );
 
   useEffect(() => {

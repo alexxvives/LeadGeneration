@@ -14,7 +14,11 @@ import {
   type OutreachProfile,
 } from "@/lib/sender-profile";
 import { generateDraft } from "@/lib/outreach/draft-preview";
-import { langLabel, type OutreachLang } from "@/lib/outreach/locale";
+import {
+  langLabel,
+  outreachLangFromText,
+  type OutreachLang,
+} from "@/lib/outreach/locale";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import type { Lead, Run } from "@/lib/types";
 import { Spinner } from "@/components/ui";
@@ -104,18 +108,19 @@ function previewDraft(
 ): { subject: string; body: string; missingPitch: boolean } {
   const pitch = (profile.pitches[lang] ?? "").trim();
   const missingPitch = !pitch;
+  if (missingPitch) {
+    return { subject: "", body: "", missingPitch: true };
+  }
   const subjectTpl = subjectForLang(profile, lang);
-  // Never fall back to locale sample pitch — that made EN previews look "wrong"
-  // when only an ES (etc.) version existed.
   const draft = generateDraft(PREVIEW_LEAD, PREVIEW_RUN, {
     forceLang: lang,
     signOff: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-    offerNotes: pitch || `[Add ${langLabel(lang)} email body template]`,
+    offerNotes: pitch,
     subjectTemplate: subjectTpl || null,
     aiPersonalize: false,
     staticBody: true,
   });
-  return { ...draft, missingPitch };
+  return { ...draft, missingPitch: false };
 }
 
 type SavedField = "subject" | "pitch" | "signOff" | null;
@@ -154,6 +159,15 @@ export function SenderProfileForm() {
   useEffect(() => {
     reload();
   }, []);
+
+  // Open the flag that already has a body (any language — not English-only).
+  useEffect(() => {
+    if (!profile) return;
+    const primary = primaryPitchLang(profile);
+    if (primary) setPreviewLang(primary);
+    // Only when switching profiles — not on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
 
   useEffect(() => {
     return () => {
@@ -225,23 +239,47 @@ export function SenderProfileForm() {
     });
 
   const saveOnBlur = (field: SavedField) => {
+    let lang = previewLang;
+    const pitchHtml = (profile.pitches[previewLang] ?? "").trim();
+    const pitches: OutreachProfile["pitches"] = {
+      ...profile.pitches,
+      [previewLang]: pitchHtml,
+    };
+    const subjects: OutreachProfile["subjects"] = {
+      ...profile.subjects,
+      [previewLang]: subjectValue.trim(),
+    };
+
+    // If the body is clearly another language and that slot is empty, move it
+    // so drafts/translate use the right flag (English is not required).
+    if (field === "pitch" && pitchHtml) {
+      const plain = pitchHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      if (plain.length >= 40) {
+        const detected = outreachLangFromText(plain);
+        if (detected !== previewLang && !pitches[detected]?.trim()) {
+          pitches[detected] = pitchHtml;
+          pitches[previewLang] = "";
+          if (subjects[previewLang]?.trim() && !subjects[detected]?.trim()) {
+            subjects[detected] = subjects[previewLang] ?? "";
+            subjects[previewLang] = "";
+          }
+          lang = detected;
+          setPreviewLang(detected);
+        }
+      }
+    }
+
     const next: OutreachProfile = {
       ...profile,
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-      subjects: {
-        ...profile.subjects,
-        [previewLang]: subjectValue.trim(),
-      },
+      subjects,
       subjectTemplate: subjectValue.trim() || profile.subjectTemplate.trim(),
-      pitches: {
-        ...profile.pitches,
-        [previewLang]: (profile.pitches[previewLang] ?? "").trim(),
-      },
+      pitches,
     };
     const serialized = JSON.stringify({
-      subject: next.subjects[previewLang] ?? "",
+      subject: next.subjects[lang] ?? "",
       signature: next.signature,
-      pitch: next.pitches[previewLang] ?? "",
+      pitch: next.pitches[lang] ?? "",
       name: next.name.trim(),
     });
     if (focusSnapshot.current !== null && focusSnapshot.current === serialized) {
@@ -596,7 +634,7 @@ export function SenderProfileForm() {
                 });
               }}
               onBlur={() => saveOnBlur("pitch")}
-              placeholder={`Write your ${langLabel(previewLang)} email body…`}
+              placeholder="Write your email body…"
             />
             {genProvider && !genError && (
               <p className="mt-1.5 text-xs text-mist-500">
@@ -735,22 +773,24 @@ export function SenderProfileForm() {
                 Translating into {langLabel(previewLang)}…
               </p>
             ) : null}
-            <p className="mt-3 text-xs text-mist-500">Subject</p>
-            <p className="mt-0.5 font-medium text-mist-100">{preview.subject}</p>
-            <div className="mt-4 border-t border-white/5 pt-4">
-              <div
-                className="pitch-preview font-sans text-sm leading-relaxed text-mist-300 [&_b]:font-semibold [&_strong]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
-                dangerouslySetInnerHTML={{
-                  __html: normalizePitchHtml(preview.body),
-                }}
-              />
-            </div>
             {preview.missingPitch && !translating ? (
-              <p className="mt-3 text-[11px] leading-relaxed text-amber-200/80">
-                No {langLabel(previewLang)} body yet — switch the flag again to
-                auto-translate from your existing version, or write it on the left.
+              <p className="mt-8 text-center text-sm text-mist-500">
+                Preview will appear when the template is filled.
               </p>
-            ) : null}
+            ) : (
+              <>
+                <p className="mt-3 text-xs text-mist-500">Subject</p>
+                <p className="mt-0.5 font-medium text-mist-100">{preview.subject}</p>
+                <div className="mt-4 border-t border-white/5 pt-4">
+                  <div
+                    className="pitch-preview font-sans text-sm leading-relaxed text-mist-300 [&_b]:font-semibold [&_strong]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5"
+                    dangerouslySetInnerHTML={{
+                      __html: normalizePitchHtml(preview.body),
+                    }}
+                  />
+                </div>
+              </>
+            )}
           </div>
         ) : null}
       </div>

@@ -184,6 +184,12 @@ export function AuthModal({
           setError(data.error ?? "Could not create account.");
           return;
         }
+        // Force product tour for new accounts even if this browser skipped it as guest.
+        try {
+          sessionStorage.setItem("hermes_force_tutorial", "1");
+        } catch {
+          /* ignore */
+        }
       } else if (turnstileSiteKey && !(await ensureTurnstile())) {
         return;
       }

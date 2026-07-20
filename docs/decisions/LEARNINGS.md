@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-19 — Tutorial skip after signup + invites only on Boards
+- Tour “done” lived in a browser-global localStorage key, so guest Skip
+  suppressed the tour after account create. Fix: `hermes_force_tutorial` on
+  register + per-user done key; invite redirect after tour (or immediate if
+  tour already done).
+- Fit scores were always computed; Pipeline cards simply never rendered
+  FitMeter — search lands on Pipeline so scores looked “missing”.
+
 ### 2026-07-19 — Admin UX: account filter, unmetered, exclude from tenants
 - Platform/Users: `select-ink` account filter + `input-ink` search; Studio
   header owns Platform/Users titles (was falling through to “Search”).

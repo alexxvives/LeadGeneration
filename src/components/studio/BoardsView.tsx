@@ -115,35 +115,36 @@ export function BoardsView({
         <p className="text-xs text-mist-500">Working…</p>
       ) : null}
 
-      {invites.length > 0 ? (
-        <section className="rounded-xl2 border border-amber-400/25 bg-amber-400/5 p-4">
-          <h2 className="text-sm font-medium text-amber-200">
-            Board invites
-          </h2>
-          <ul className="mt-3 space-y-2">
-            {invites.map((inv) => (
-              <li
-                key={inv.id}
-                className="flex flex-wrap items-center justify-between gap-2 text-sm"
-              >
-                <span className="text-mist-200">
-                  <span className="font-medium text-mist-100">{inv.boardName}</span>
-                  <span className="text-mist-500"> · editor</span>
-                </span>
+      <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
+        {invites.map((inv) => (
+          <li key={inv.id}>
+            <div className="flex h-full flex-col rounded-xl2 border-2 border-dashed border-amber-400/45 bg-amber-400/[0.06] p-5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-amber-300/90">
+                    Invite pending
+                  </p>
+                  <h3 className="mt-1 truncate font-display text-lg font-semibold text-mist-100">
+                    {inv.boardName}
+                  </h3>
+                  <p className="mt-1 text-xs text-mist-500">
+                    Editor access · confirm to join this board
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 flex flex-1 flex-col justify-end">
                 <button
                   type="button"
+                  disabled={busy}
                   onClick={() => void handleAccept(inv.id)}
-                  className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent"
+                  className="w-full rounded-full bg-aurora-400 px-4 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
                 >
-                  Accept
+                  Accept invite
                 </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
+              </div>
+            </div>
+          </li>
+        ))}
         {boards.map((b) => (
           <li key={b.id} className="group relative">
             {!b.isDefault && !b.shared ? (

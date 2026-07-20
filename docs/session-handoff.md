@@ -9,20 +9,17 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-19 (admin UX polish)
+## ⏱️ Status — updated 2026-07-19 (onboarding + invite UX)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Local:** admin UI + unmetered admin + audit 1–17; `tsc` + `lint` green.
+**Local:** onboarding/invite/fit/template polish; `tsc` + `lint` green.
 **Migrations:** 0021–0024 applied locally; **remote D1 not yet** (`npm run cf:migrate`).
 
 ### This pass
-- Admin Platform/Users: account filter (`select-ink`), `input-ink` search field;
-  removed Platform “Admin” eyebrow + “View all users” pill; Studio header titles
-  for admin views (no more Search bleed-through).
-- Admin excluded from tracked Users/overview counts (`users.is_admin`).
-- Admin unmetered (`getCtx` metered=false) + usage bars hidden in Studio.
-- Clarified `BOOTSTRAP_ADMIN_PASSWORD` is first-boot only — not needed once an
-  admin row exists (may delete Wrangler secret).
+- New signup forces product tour (`hermes_force_tutorial`); tour done is per-user.
+- Pending board invites: redirect to Boards after login/tour; dashed invite cards.
+- Pipeline cards show fit score; empty template preview placeholder; language
+  auto-slot on blur; shortened Maileroo/Resend hints.
 
 ### Next
 1. `npm run cf:migrate` (remote) then deploy Worker.
