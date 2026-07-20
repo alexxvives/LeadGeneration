@@ -4,13 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
-### 2026-07-19 — Account switch: must signOut first
-- Auth.js credentials `signIn` **does not replace** an existing JWT. Switching
-  admin ↔ personal while already signed in kept the old cookie even after
-  `location.assign`. Fix: `signOut({ redirect: false })` → `signIn` → verify
-  `/api/auth/session` email → hard navigate (`src/lib/client-sign-in.ts`).
-- D1: `admin@tryhermesmail.com` is a separate user/workspace from
-  `alexxvives@gmail.com` (magic-link, no password hash).
+### 2026-07-19 — Account switch via /api/auth/password
+- Client `signOut` + `signIn` still left `__Secure-authjs.session-token`
+  (chunked) as alexxvives on Workers. Fix: `POST /api/auth/password` clears
+  all session cookie variants and `encode()`s a fresh JWT (`session-cookie.ts`).
+- Client only calls that route + hard navigates (`client-sign-in.ts`).
+- D1: `admin@tryhermesmail.com` ≠ `alexxvives@gmail.com` (magic-link, no pw).
 
 ### 2026-07-19 — Account switch needs hard navigation
 - JWT overwrite alone is not enough: after `signIn({ redirect: false })`,

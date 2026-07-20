@@ -9,20 +9,17 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-19 (account-switch fix + studio polish)
+## ⏱️ Status — updated 2026-07-19 (password cookie swap)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Deployed:** Redeploy required for signOut-first account switch.
+**Deployed:** Redeploy required — `/api/auth/password` session cookie rewrite.
 
 ### This pass
-- Auth: `signInWithPassword` signs out first, verifies session email, then hard
-  navigates — fixes admin login sticking on alexxvives while already signed in.
-- Boards delete chip: ink-700 / ink-850 (light-theme safe).
-- Leads table: removed top count strip.
-- Search copy tightened; sidebar `sm:w-[18.4rem]` (+15%).
+- Auth: `POST /api/auth/password` clears chunked Auth.js cookies and sets a new
+  JWT (bypasses broken client signIn/signOut account switch on Workers).
 
 ### Next
-1. Redeploy (critical for admin account switch).
+1. Redeploy (required for admin login).
 2. Verified `OUTREACH_FROM_EMAIL` (+ optional `MAILEROO_API_KEY`) for invites.
 3. Soft-lock banner + 423 on concurrent edit.
 
