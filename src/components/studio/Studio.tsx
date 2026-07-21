@@ -43,6 +43,7 @@ import { AdminPlatformView } from "./AdminPlatformView";
 import { AdminUsersView } from "./AdminUsersView";
 import { BoardsView } from "./BoardsView";
 import { loadStoredBoardFilter, storeBoardFilter } from "./BoardPicker";
+import { BOARD_REFRESH_EVENT } from "./GettingStartedWizard";
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import type { BoardSummary, ImportLeadRow } from "@/lib/types";
@@ -388,6 +389,8 @@ export function Studio() {
         offerNotes:
           "We build booking sites that turn website visitors into scheduled appointments.",
         demo: true,
+        autoDraft: true,
+        maxLeads: 6,
         boardId: def,
       });
       await refresh();
@@ -399,6 +402,15 @@ export function Studio() {
       setRunning(false);
     }
   };
+
+  // Tour (and other chrome) can seed/refresh the board without a full remount.
+  useEffect(() => {
+    const onRefresh = () => {
+      void refresh().catch(() => undefined);
+    };
+    window.addEventListener(BOARD_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(BOARD_REFRESH_EVENT, onRefresh);
+  }, [refresh]);
 
   const executeImport = async (leads: ImportLeadRow[], dest: BoardDestination) => {
     const CHUNK = 80;

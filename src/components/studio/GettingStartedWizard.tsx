@@ -10,6 +10,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowIcon, XIcon } from "@/components/icons";
 import { readMigratedKey } from "@/lib/browser-storage";
 import { loadStoredBoardFilter } from "@/components/studio/BoardPicker";
+import { api } from "@/lib/client-api";
+
+export const BOARD_REFRESH_EVENT = "hermes:board-refresh";
 
 export const GETTING_STARTED_KEY = "hermes_getting_started_v3";
 const GETTING_STARTED_LEGACY = [
@@ -118,7 +121,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="pipeline-board"]',
       prefer: "right",
       title: "Work the pipeline",
-      body: "New leads land in these columns. Drag a card anywhere to move stages, click ⓘ for details. Approve drafts from the Outreach tab.",
+      body: "Sample leads are loaded for the tour. Drag a card between stages, click ⓘ for details. Approve drafts from Outreach.",
       scrollBlock: "start",
     },
     {
@@ -136,7 +139,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="outreach-queue"]',
       prefer: "right",
       title: "Send from Outreach",
-      body: "Draft → approve → send lives here. Open a row to edit the email; send stays per-lead after you approve.",
+      body: "Draft → approve → send lives here. Open a row to edit; send stays per-lead after you approve.",
       scrollBlock: "start",
     },
     {
@@ -340,6 +343,7 @@ export function GettingStartedWizard({
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [anchored, setAnchored] = useState(false);
   const measuringRef = useRef(false);
+  const seededRef = useRef(false);
 
   const STEPS = useMemo(() => buildSteps(), []);
   const current = STEPS[step] ?? STEPS[0]!;
@@ -356,10 +360,47 @@ export function GettingStartedWizard({
   );
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      seededRef.current = false;
+      return;
+    }
     setStep(0);
     setRect(null);
     setAnchored(false);
+  }, [open]);
+
+  // Seed sample leads once so Pipeline / Leads / Outreach show real UI, not
+  // “Your board is clear”. Free, offline demo — no provider credits.
+  useEffect(() => {
+    if (!open || seededRef.current) return;
+    seededRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api.board(null);
+        if (cancelled || (data.leads?.length ?? 0) > 0) return;
+        const def =
+          data.boards?.find((b) => b.isDefault)?.id ?? data.boards?.[0]?.id;
+        await api.createRun({
+          niche: "boutique dental clinics",
+          location: "Austin, TX",
+          offerNotes:
+            "We build booking sites that turn website visitors into scheduled appointments.",
+          demo: true,
+          autoDraft: true,
+          maxLeads: 6,
+          boardId: def,
+        });
+        if (!cancelled) {
+          window.dispatchEvent(new Event(BOARD_REFRESH_EVENT));
+        }
+      } catch (err) {
+        console.error("[tour] demo seed failed", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   // Navigate when the step path differs — once per step (include board filter
@@ -385,7 +426,6 @@ export function GettingStartedWizard({
     }
     const el = document.querySelector(current.target);
     if (!el) {
-      // Keep prior spotlight while the new view mounts — don’t flicker the tip.
       return;
     }
     if (!measuringRef.current) {
@@ -411,8 +451,10 @@ export function GettingStartedWizard({
   useLayoutEffect(() => {
     if (!open) return;
     measure();
-    // Fewer retries — view swaps settle quickly; avoid tip remount thrash.
-    const timers = [50, 200, 450].map((ms) => window.setTimeout(measure, ms));
+    // Retry through view mount + demo seed paint.
+    const timers = [50, 200, 450, 900, 1600].map((ms) =>
+      window.setTimeout(measure, ms),
+    );
     const onResize = () => measure();
     let scrollTimer = 0;
     const onScroll = () => {
@@ -421,11 +463,17 @@ export function GettingStartedWizard({
     };
     window.addEventListener("resize", onResize);
     window.addEventListener("scroll", onScroll, true);
+    const onRefresh = () => {
+      window.setTimeout(measure, 80);
+      window.setTimeout(measure, 400);
+    };
+    window.addEventListener(BOARD_REFRESH_EVENT, onRefresh);
     return () => {
       timers.forEach(clearTimeout);
       window.clearTimeout(scrollTimer);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener(BOARD_REFRESH_EVENT, onRefresh);
     };
   }, [open, step, measure, pathname, searchParams]);
 
@@ -440,11 +488,14 @@ export function GettingStartedWizard({
 
   if (!open) return null;
 
-  // Fade tip in place instead of unmounting — remount replayed animate-float-up
-  // and looked like a double render on Pipeline / Leads.
-  const tipReady = !current.target || anchored;
+  // Always show the tip card — never opacity-0 / pointer-events-none (that made
+  // step 4 look “missing” when the target was still mounting). Spotlight waits
+  // for anchor; tip sits centered until then.
   const pad = current.pad ?? 10;
-  const tipPos = placeTip(current.target ? rect : null, current.prefer);
+  const tipPos = placeTip(
+    current.target && anchored ? rect : null,
+    current.prefer,
+  );
   const tipStyle: React.CSSProperties = {
     top: tipPos.top,
     left: tipPos.left,
@@ -487,9 +538,7 @@ export function GettingStartedWizard({
 
       <div
         key={current.id}
-        className={`pointer-events-auto absolute z-[71] w-[min(100%-2rem,22rem)] transition-[top,left,opacity] duration-200 ease-out ${
-          tipReady ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        className="pointer-events-auto absolute z-[71] w-[min(100%-2rem,22rem)] transition-[top,left] duration-200 ease-out"
         style={tipStyle}
       >
         <div className="relative animate-float-up rounded-xl2 border border-aurora-400/25 bg-ink-900 p-5 shadow-2xl shadow-black/50">

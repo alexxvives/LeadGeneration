@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-21 — Tour step 4 + sample leads
+- Step 4 “missing”: tip used opacity-0 + pointer-events-none until anchor;
+  Outreach target often wasn’t ready → blank overlay, can’t Next. Tip always
+  visible (centered until spotlight locks).
+- Tour auto-seeds offline demo leads (+ drafts) when the board is empty so
+  Pipeline/Leads/Outreach show real UI instead of “Your board is clear”.
+- `demo: true` bypasses find-leads pause + quota and skips lead-credit burn
+  (Load demo / tour seed must work with FC down or Search paused).
+
 ### 2026-07-21 — Tour Pipeline/Leads double-paint
 - Steps 2–3 felt laggy: tour `push`ed `/app?view=…` without `board`, shell
   immediately `replace`d to add stored board → Studio setLoading → tip

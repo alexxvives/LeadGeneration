@@ -597,14 +597,18 @@ export async function createAndRunSearch(
   input: CreateRunInput,
 ): Promise<Run> {
   const wsGate = await ctx.db.getWorkspace(ctx.workspaceId);
-  if (wsGate && wsGate.findLeadsEnabled === false) {
+  // Demo data is offline sample leads — not live Find leads. Keep the Load
+  // demo / tour seed path working when Search is paused or FC credits are down.
+  if (wsGate && wsGate.findLeadsEnabled === false && !input.demo) {
     throw new ForbiddenError(
       "Find leads is disabled for this account. Contact support if you need it re-enabled.",
     );
   }
   // Quota + per-run cap BEFORE creating the run, so an over-limit request
   // doesn't leave a stray failed run behind and can surface a clean 402.
-  const maxLeads = await resolveRunLeadLimit(ctx, input.maxLeads);
+  const maxLeads = input.demo
+    ? Math.min(Math.max(1, input.maxLeads ?? 8), 12)
+    : await resolveRunLeadLimit(ctx, input.maxLeads);
   const searchInput: CreateRunInput = { ...input, maxLeads };
   const boardId = await resolveBoardId(ctx, { boardId: input.boardId });
 
@@ -732,7 +736,10 @@ export async function createAndRunSearch(
     }
 
     // Enriched leads consume lead credits (1 credit = 1 lead — business-plan §6).
-    await recordLeadUsage(ctx, leads.length);
+    // Demo samples are free / offline — don't burn plan or Insider counters.
+    if (!input.demo) {
+      await recordLeadUsage(ctx, leads.length);
+    }
 
     const updated = await db.updateRun(run.id, {
       status: "complete",

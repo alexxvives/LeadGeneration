@@ -9,21 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-21 (tour lag + Insider FC)
+## ⏱️ Status — updated 2026-07-21 (tour samples + step 4)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local; **remote D1 needs `npm run cf:migrate`** (incl. `find_leads_enabled`).
 
 ### This pass
-- Tour steps 2–3 lag: one navigation (board preserved), no loading flash on
-  soft board sync, tip fade instead of remount, empty-view tour anchors.
-- Insider “Credits unavailable”: `remaining_credits` snake_case parse fix.
-- Soft lock 404: clear stale `?board=` before heartbeat.
-- Admin Dashboard: removed tenants subtitle.
+- Tour: always show tip (step 4 was invisible/stuck); auto-seed demo leads +
+  drafts when board empty; demo runs bypass find-leads/quota and don’t burn
+  credits.
+- Earlier: tour double-nav lag, Insider `remaining_credits` parse, stale board
+  lock 404, admin subtitle removed.
 
 ### Next
-1. Deploy (credits + tour + lock fixes).
+1. Deploy.
 2. `npm run cf:migrate` (remote) if not already.
 3. Measure email-found % on live Firecrawl runs.
 4. Optional dogfood non-admin account for Search/Pipeline.
