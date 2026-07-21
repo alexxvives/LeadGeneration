@@ -310,11 +310,31 @@ export const api = {
   deleteLead: (id: string) =>
     jsonFetch<{ ok: boolean }>(`/api/leads/${id}`, { method: "DELETE" }),
 
-  deleteLeads: (ids: string[]) =>
-    jsonFetch<{ deleted: number }>("/api/leads/bulk-delete", {
-      method: "POST",
-      body: JSON.stringify({ ids }),
-    }),
+  /**
+   * Bulk-delete. Server accepts at most 500 ids per request — we chunk here
+   * so “select all” on large boards doesn’t 400.
+   */
+  deleteLeads: async (
+    ids: string[],
+    opts?: { onProgress?: (done: number, total: number) => void },
+  ) => {
+    const CHUNK = 500;
+    const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+    let deleted = 0;
+    for (let i = 0; i < unique.length; i += CHUNK) {
+      const chunk = unique.slice(i, i + CHUNK);
+      const result = await jsonFetch<{ deleted: number }>(
+        "/api/leads/bulk-delete",
+        {
+          method: "POST",
+          body: JSON.stringify({ ids: chunk }),
+        },
+      );
+      deleted += result.deleted;
+      opts?.onProgress?.(Math.min(i + chunk.length, unique.length), unique.length);
+    }
+    return { deleted };
+  },
 
   suggestLocations: (q: string) =>
     jsonFetch<{ suggestions: LocationSuggestion[] }>(

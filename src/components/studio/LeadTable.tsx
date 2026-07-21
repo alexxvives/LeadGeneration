@@ -179,13 +179,14 @@ export function LeadTable({
     const ids = [...selected];
     if (ids.length === 0) return;
     setDeleting(true);
+    // Hide selection chrome immediately — parent also optimistically removes rows.
+    setSelected(new Set());
+    setConfirmBulk(false);
     try {
       if (onDeleteLeads) await onDeleteLeads(ids);
       else if (onDeleteLead) {
         for (const id of ids) onDeleteLead(id);
       }
-      setSelected(new Set());
-      setConfirmBulk(false);
     } finally {
       setDeleting(false);
     }

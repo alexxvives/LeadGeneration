@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-21 — Bulk-delete 400 on “select all”
+- `/api/leads/bulk-delete` zod-maxes `ids` at **500**. Selecting all on a
+  ~600+ lead board POSTed one body → 400; optimistic hide then `refresh()`
+  restored rows. Fix: client chunks at 500 with progress; UI already hides
+  rows + modal while chunks run.
+
 ### 2026-07-21 — Bad import: Gmail companies + invented websites
 - Pre-fix import mapped company→empty `Name`, then invented company/website
   from email domain → 132× `company=Gmail` / `https://gmail.com`, hundreds of

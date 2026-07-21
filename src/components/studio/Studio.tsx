@@ -143,6 +143,10 @@ export function Studio() {
     total: number;
   } | null>(null);
   const [deletingLeads, setDeletingLeads] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const importAbortRef = useRef<AbortController | null>(null);
   const importRunIdRef = useRef<string | null>(null);
   const importConfirmedRef = useRef(0);
@@ -967,12 +971,16 @@ export function Studio() {
     const idSet = new Set(leadIds);
     importAbortRef.current?.abort();
     setDeletingLeads(true);
-    // Optimistic — empty board immediately so UI doesn’t flash old rows.
+    setDeleteProgress({ done: 0, total: leadIds.length });
+    // Optimistic — hide rows immediately so large deletes don’t feel stuck.
     setBoard((b) =>
       b ? { ...b, leads: b.leads.filter((l) => !idSet.has(l.id)) } : b,
     );
+    setSelectedId((cur) => (cur && idSet.has(cur) ? null : cur));
     try {
-      const { deleted } = await api.deleteLeads(leadIds);
+      const { deleted } = await api.deleteLeads(leadIds, {
+        onProgress: (done, total) => setDeleteProgress({ done, total }),
+      });
       toast(
         "ok",
         `Deleted ${deleted} lead${deleted === 1 ? "" : "s"}.`,
@@ -984,6 +992,7 @@ export function Studio() {
       toast("err", (e as Error).message);
     } finally {
       setDeletingLeads(false);
+      setDeleteProgress(null);
     }
   };
 
@@ -1381,11 +1390,39 @@ export function Studio() {
         onClose={() => {}}
         dismissible={false}
         showClose={false}
-        className="max-w-xs"
+        title="Deleting leads…"
+        className="max-w-sm border-aurora-400/20"
       >
         <div className="flex items-center gap-3">
-          <Spinner className="h-5 w-5 text-aurora-400" />
-          <p className="text-sm font-medium text-mist-100">Deleting leads…</p>
+          <Spinner className="h-5 w-5 shrink-0 text-aurora-400" />
+          <div className="min-w-0 flex-1">
+            {deleteProgress && deleteProgress.total > 1 ? (
+              <>
+                <p className="text-sm text-mist-300">
+                  <span className="tabular-nums text-mist-100">
+                    {deleteProgress.done}
+                  </span>
+                  {" / "}
+                  <span className="tabular-nums">{deleteProgress.total}</span>
+                </p>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-950/60">
+                  <div
+                    className="h-full rounded-full bg-aurora-400 transition-[width] duration-300 ease-out"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (deleteProgress.done / deleteProgress.total) * 100,
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-sm font-medium text-mist-100">
+                Removing from the board…
+              </p>
+            )}
+          </div>
         </div>
       </Modal>
 
