@@ -9,6 +9,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowIcon, XIcon } from "@/components/icons";
 import { readMigratedKey } from "@/lib/browser-storage";
+import { loadStoredBoardFilter } from "@/components/studio/BoardPicker";
 
 export const GETTING_STARTED_KEY = "hermes_getting_started_v3";
 const GETTING_STARTED_LEGACY = [
@@ -228,6 +229,20 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+/** Keep the sidebar board filter on tour navigations so StudioShell doesn’t
+ *  immediately `replace` a second time (that double-render feels like lag). */
+function withBoardFilter(path: string): string {
+  if (path.startsWith("/app/settings")) return path;
+  try {
+    const stored = loadStoredBoardFilter();
+    if (!stored || stored === "all") return path;
+    if (/(?:^|[?&])board=/.test(path)) return path;
+    return `${path}${path.includes("?") ? "&" : "?"}board=${encodeURIComponent(stored)}`;
+  } catch {
+    return path;
+  }
+}
+
 function pathMatches(
   pathname: string,
   searchParams: URLSearchParams,
@@ -347,12 +362,14 @@ export function GettingStartedWizard({
     setAnchored(false);
   }, [open]);
 
-  // Navigate when the step path differs — once per step.
+  // Navigate when the step path differs — once per step (include board filter
+  // so the shell doesn’t fire a second replace).
   useEffect(() => {
     if (!open) return;
     if (!onCorrectPath) {
       setAnchored(false);
-      router.push(current.path);
+      setRect(null);
+      router.replace(withBoardFilter(current.path), { scroll: false });
     }
   }, [open, step, current.path, onCorrectPath, router]);
 
@@ -364,28 +381,27 @@ export function GettingStartedWizard({
       return;
     }
     if (!onCorrectPath) {
-      setAnchored(false);
       return;
     }
     const el = document.querySelector(current.target);
     if (!el) {
-      setAnchored(false);
+      // Keep prior spotlight while the new view mounts — don’t flicker the tip.
       return;
     }
     if (!measuringRef.current) {
       measuringRef.current = true;
       el.scrollIntoView({
         block: current.scrollBlock ?? "nearest",
-        behavior: "smooth",
+        // Instant: smooth scroll re-fires measure via scroll listeners → tip jump.
+        behavior: "auto",
       });
       window.setTimeout(() => {
         measuringRef.current = false;
-      }, 400);
+      }, 200);
     }
     const next = el.getBoundingClientRect();
     // Ignore zero-size flashes during layout
     if (next.width < 8 || next.height < 8) {
-      setAnchored(false);
       return;
     }
     setRect(next);
@@ -395,13 +411,21 @@ export function GettingStartedWizard({
   useLayoutEffect(() => {
     if (!open) return;
     measure();
-    const timers = [80, 250, 500, 900].map((ms) => window.setTimeout(measure, ms));
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
+    // Fewer retries — view swaps settle quickly; avoid tip remount thrash.
+    const timers = [50, 200, 450].map((ms) => window.setTimeout(measure, ms));
+    const onResize = () => measure();
+    let scrollTimer = 0;
+    const onScroll = () => {
+      window.clearTimeout(scrollTimer);
+      scrollTimer = window.setTimeout(measure, 80);
+    };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       timers.forEach(clearTimeout);
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
+      window.clearTimeout(scrollTimer);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open, step, measure, pathname, searchParams]);
 
@@ -416,8 +440,9 @@ export function GettingStartedWizard({
 
   if (!open) return null;
 
-  // Avoid center-flash: hide tip until the target (or centered step) is ready.
-  const showTip = !current.target || anchored;
+  // Fade tip in place instead of unmounting — remount replayed animate-float-up
+  // and looked like a double render on Pipeline / Leads.
+  const tipReady = !current.target || anchored;
   const pad = current.pad ?? 10;
   const tipPos = placeTip(current.target ? rect : null, current.prefer);
   const tipStyle: React.CSSProperties = {
@@ -460,91 +485,94 @@ export function GettingStartedWizard({
         )}
       </svg>
 
-      {showTip && (
-        <div
-          className="pointer-events-auto absolute z-[71] w-[min(100%-2rem,22rem)] transition-[top,left] duration-200 ease-out"
-          style={tipStyle}
-        >
-          <div className="relative animate-float-up rounded-xl2 border border-aurora-400/25 bg-ink-900 p-5 shadow-2xl shadow-black/50">
+      <div
+        key={current.id}
+        className={`pointer-events-auto absolute z-[71] w-[min(100%-2rem,22rem)] transition-[top,left,opacity] duration-200 ease-out ${
+          tipReady ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        style={tipStyle}
+      >
+        <div className="relative animate-float-up rounded-xl2 border border-aurora-400/25 bg-ink-900 p-5 shadow-2xl shadow-black/50">
+          <button
+            type="button"
+            onClick={() => finish(false)}
+            className="absolute right-3 top-3 rounded-lg p-1.5 text-mist-500 hover:bg-white/5 hover:text-mist-100"
+            aria-label="Close"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+
+          <div className="mb-3 flex gap-1.5">
+            {STEPS.map((s, i) => (
+              <span
+                key={s.id}
+                className={`h-1 flex-1 rounded-full transition-colors ${
+                  i <= step ? "bg-aurora-400" : "bg-white/10"
+                }`}
+              />
+            ))}
+          </div>
+
+          <p className="text-[11px] uppercase tracking-widest text-aurora-300">
+            Tour · {step + 1} / {STEPS.length}
+          </p>
+          <h2 id="tour-title" className="mt-2 pr-6 font-display text-xl font-semibold text-mist-100">
+            {current.title}
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-mist-300">{current.body}</p>
+
+          <div className="mt-5 flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => finish(false)}
-              className="absolute right-3 top-3 rounded-lg p-1.5 text-mist-500 hover:bg-white/5 hover:text-mist-100"
-              aria-label="Close"
+              className="text-sm text-mist-500 hover:text-mist-200"
             >
-              <XIcon className="h-4 w-4" />
+              Skip
             </button>
-
-            <div className="mb-3 flex gap-1.5">
-              {STEPS.map((s, i) => (
-                <span
-                  key={s.id}
-                  className={`h-1 flex-1 rounded-full transition-colors ${
-                    i <= step ? "bg-aurora-400" : "bg-white/10"
-                  }`}
-                />
-              ))}
-            </div>
-
-            <p className="text-[11px] uppercase tracking-widest text-aurora-300">
-              Tour · {step + 1} / {STEPS.length}
-            </p>
-            <h2 id="tour-title" className="mt-2 pr-6 font-display text-xl font-semibold text-mist-100">
-              {current.title}
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-mist-300">{current.body}</p>
-
-            <div className="mt-5 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => finish(false)}
-                className="text-sm text-mist-500 hover:text-mist-200"
-              >
-                Skip
-              </button>
-              <div className="flex gap-2">
-                {step > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAnchored(false);
-                      setStep((s) => s - 1);
-                    }}
-                    className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-mist-100 hover:bg-white/5"
-                  >
-                    Back
-                  </button>
-                )}
-                {!isLast ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAnchored(false);
-                      setStep((s) => s + 1);
-                    }}
-                    className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
-                  >
-                    Next
-                    <ArrowIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      finish(true);
-                      router.push("/app");
-                    }}
-                    className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
-                  >
-                    Start searching
-                    <ArrowIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                  </button>
-                )}
-              </div>
+            <div className="flex gap-2">
+              {step > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAnchored(false);
+                    setRect(null);
+                    setStep((s) => s - 1);
+                  }}
+                  className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-mist-100 hover:bg-white/5"
+                >
+                  Back
+                </button>
+              )}
+              {!isLast ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAnchored(false);
+                    setRect(null);
+                    setStep((s) => s + 1);
+                  }}
+                  className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
+                >
+                  Next
+                  <ArrowIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    finish(true);
+                    router.replace(withBoardFilter("/app"), { scroll: false });
+                  }}
+                  className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
+                >
+                  Start searching
+                  <ArrowIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                </button>
+              )}
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

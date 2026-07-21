@@ -9,21 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-21 (Insider FC parse + board lock)
+## ⏱️ Status — updated 2026-07-21 (tour lag + Insider FC)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local; **remote D1 needs `npm run cf:migrate`** (incl. `find_leads_enabled`).
 
 ### This pass
-- Insider “Credits unavailable”: `getFirecrawlRemainingCredits` now reads
-  `remaining_credits` (Firecrawl snake_case); was looking for camelCase only.
-- Soft lock 404 during tutorial: validate/clear stale `?board=` / localStorage
-  ids against workspace boards before heartbeat.
-- Admin Dashboard: removed “Live snapshot of tenants…” subtitle.
+- Tour steps 2–3 lag: one navigation (board preserved), no loading flash on
+  soft board sync, tip fade instead of remount, empty-view tour anchors.
+- Insider “Credits unavailable”: `remaining_credits` snake_case parse fix.
+- Soft lock 404: clear stale `?board=` before heartbeat.
+- Admin Dashboard: removed tenants subtitle.
 
 ### Next
-1. Deploy (credits fix is live-critical for Insider).
+1. Deploy (credits + tour + lock fixes).
 2. `npm run cf:migrate` (remote) if not already.
 3. Measure email-found % on live Firecrawl runs.
 4. Optional dogfood non-admin account for Search/Pipeline.

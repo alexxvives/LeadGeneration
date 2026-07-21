@@ -120,6 +120,8 @@ export function StudioShell({
   // Sync board filter from URL, else localStorage. Keep `board` in the URL so
   // every view (leads/pipeline/…) filters the same way. Drop ids that aren't
   // in this workspace (stale localStorage from another account/session).
+  // Skip injecting board while the tour is open — the wizard navigates with
+  // the filter already attached (avoids a second replace / double paint).
   useEffect(() => {
     if (boardParam === "all" || boardParam === "") {
       setActiveBoardId(null);
@@ -159,6 +161,7 @@ export function StudioShell({
       return;
     }
     setActiveBoardId(id);
+    if (setupOpen) return;
     if (pathname.startsWith("/app")) {
       const params = new URLSearchParams(searchParams.toString());
       if (!params.has("board")) {
@@ -167,7 +170,7 @@ export function StudioShell({
         router.replace(q ? `${pathname}?${q}` : pathname);
       }
     }
-  }, [boardParam, boards, pathname, router, searchParams]);
+  }, [boardParam, boards, pathname, router, searchParams, setupOpen]);
 
   const setBoardFilter = (id: string | null) => {
     const next = id ?? "all";

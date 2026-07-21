@@ -124,6 +124,7 @@ export function Studio() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const hasLoadedRef = useRef(false);
 
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -213,12 +214,20 @@ export function Studio() {
   }, []);
 
   // Initial load + re-fetch when sidebar board filter changes (single effect).
+  // Soft-refresh after first paint so adding `?board=` mid-tour doesn't flash
+  // the full-page spinner (that looked like a double render).
   useEffect(() => {
     if (boardParam) storeBoardFilter(boardParam);
-    setLoading(true);
+    const first = !hasLoadedRef.current;
+    if (first) setLoading(true);
     void refresh()
+      .then(() => {
+        hasLoadedRef.current = true;
+      })
       .catch((e) => toast("err", e.message))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (first) setLoading(false);
+      });
   }, [filterBoardId, boardParam, refresh, toast]);
 
   // Pipeline: pick up webhook reply → In Conversation without a manual refresh.
@@ -1158,19 +1167,17 @@ export function Studio() {
 
       {/* Pipeline view — CRM kanban only */}
       {view === "pipeline" && (
-        hasLeads ? (
-          <div data-tour="pipeline-board" className="min-h-0 flex-1">
+        <div data-tour="pipeline-board" className="min-h-0 flex-1">
+          {hasLeads ? (
             <PipelineView
               leads={board!.leads}
               onOpen={openInfo}
               onMoveStage={onMoveStage}
             />
-          </div>
-        ) : (
-          <div data-tour="pipeline-board" className="min-h-0 flex-1">
+          ) : (
             <EmptyState onLoadDemo={loadDemo} running={running} />
-          </div>
-        )
+          )}
+        </div>
       )}
 
       {/* All leads — table / cards / map */}
@@ -1275,7 +1282,7 @@ export function Studio() {
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1">
+          <div data-tour="leads-table" className="min-h-0 flex-1">
             <EmptyState onLoadDemo={loadDemo} running={running} />
           </div>
         )
@@ -1303,7 +1310,9 @@ export function Studio() {
             />
           </div>
         ) : (
-          <EmptyState onLoadDemo={loadDemo} running={running} />
+          <div data-tour="outreach-queue" className="min-h-0 flex-1">
+            <EmptyState onLoadDemo={loadDemo} running={running} />
+          </div>
         )
       )}
 

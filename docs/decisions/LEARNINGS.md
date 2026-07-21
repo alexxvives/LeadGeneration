@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-21 — Tour Pipeline/Leads double-paint
+- Steps 2–3 felt laggy: tour `push`ed `/app?view=…` without `board`, shell
+  immediately `replace`d to add stored board → Studio setLoading → tip
+  unmounted/remounted (`animate-float-up` twice). Fixed: tour navigates with
+  board filter via `replace`; shell skips inject while tour open; soft-refresh
+  after first load; tip fades instead of unmount; empty Leads/Outreach keep
+  `data-tour` anchors; scroll measure debounced.
+
 ### 2026-07-21 — Insider credits snake_case + stale board lock
 - `getFirecrawlRemainingCredits` looked for camelCase `remainingCredits`;
   Firecrawl `/v1/team/credit-usage` returns `data.remaining_credits` (same
