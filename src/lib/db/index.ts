@@ -174,6 +174,10 @@ export interface LeadRepository {
 
   /** Wipe runs/leads/outreach/boards for this workspace (keeps the workspace row). */
   clearWorkspaceData(): Promise<void>;
+  /** Delete the workspace row (caller should clear data first). */
+  deleteWorkspace(id: string): Promise<boolean>;
+  /** Delete Auth.js user + accounts/sessions (no-op-ish in JSON demo). */
+  deleteAuthUser(userId: string): Promise<boolean>;
 }
 
 /**

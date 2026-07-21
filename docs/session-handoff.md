@@ -9,23 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-21 (admin ops + Firecrawl credits + UI)
+## ⏱️ Status — updated 2026-07-21 (pre-ship fixes: import/403/credits/stripe)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Local:** admin-only nav; Insider invite links; light-mode toggles; marketing contrast.
-**Migrations:** 0021–0024 applied locally; **remote D1 not yet** (`npm run cf:migrate`).
+**Local:** admin ops chrome; Insider invites; account delete (live only).
+**Migrations:** 0021–**0025** local; **remote D1 needs `npm run cf:migrate`** (incl. `find_leads_enabled`).
 
 ### This pass
-- Firecrawl: contact links from markdown → `/contacto`/`/contact` only (no JSON extract).
-- Admin: Dashboard = platform overview; Users + Insider signup link; no studio product nav.
-- Settings: Resources under Plan & usage; light-mode switch + profile buttons.
-- Marketing readability (landing, how-it-works, ethics, deliverability).
-- Prospeo deferred; keep MyEmailVerifier (cheaper free tier than switching).
+- Find leads off: Search form blocked; **Import stays** on Search view (no redirect).
+- Disabled Find leads → **403** on `POST /api/runs` (`ForbiddenError`).
+- Insider: no invented credit fallback — null FC → “unavailable” + **402**.
+- Account delete: best-effort Stripe cancel; cascade tokens/invites; admin typed `DELETE`.
+- Admin Settings: no Danger zone. Admin Users: Insider pool display, toggle busy/toast, trash a11y.
 
 ### Next
-1. Deploy after `npm run cf:migrate` (remote) if needed.
+1. `npm run cf:migrate` (remote) then deploy.
 2. Measure email-found % on live Firecrawl runs.
-3. Optional: dogfood account (non-admin) for Search/Pipeline testing.
+3. Optional dogfood non-admin account for Search/Pipeline.
 4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---

@@ -1,4 +1,4 @@
-import { env, getCapabilities } from "@/lib/config";
+import { env, getCapabilities, authRequired } from "@/lib/config";
 import { HelpIcon, SparkIcon } from "@/components/icons";
 import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
 import { getPlan, isPaidPlan } from "@/lib/plans";
@@ -8,6 +8,7 @@ import { BillingActions } from "@/components/studio/BillingActions";
 import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
 import { DeveloperModePanel } from "@/components/studio/DeveloperModePanel";
 import { SendSetupPanel } from "@/components/studio/SendSetupPanel";
+import { DeleteAccountPanel } from "@/components/studio/DeleteAccountPanel";
 import { isAdminSession } from "@/lib/admin";
 import { auth } from "@/auth";
 import Link from "next/link";
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic";
 
 // Settings: editable outreach profile + capability status.
 // API keys are never rendered — only has* flags reach the client.
+// Platform admins get a slim ops-focused page (no studio send/profiles).
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -56,6 +58,9 @@ export default async function SettingsPage({
   const session = await auth().catch(() => null);
   // Local demo: tools stay available. Production: users.is_admin via JWT.
   const showAdminTools = isAdminSession(session);
+  const isAdmin = showAdminTools;
+  const userEmail =
+    (session?.user?.email as string | undefined) ?? ctx.userEmail ?? null;
 
   const canSendEmail =
     caps.canSendEmail ||
@@ -79,6 +84,72 @@ export default async function SettingsPage({
   const appUrl = env.appUrl();
   const appUrlLooksLocal =
     /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(appUrl);
+
+  if (isAdmin) {
+    return (
+      <main className="mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8">
+        <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+          Admin settings
+        </h1>
+        <p className="mt-0.5 text-sm text-mist-500">
+          Platform tools for operators — not a personal lead studio.
+        </p>
+
+        <section className="mt-8">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+            Signed in as
+          </h2>
+          <div className="rounded-xl2 border border-white/10 p-5">
+            <p className="font-medium text-mist-100">{userEmail ?? "Admin"}</p>
+            <p className="mt-1 text-sm text-mist-500">
+              Manage tenants from Dashboard and Users. Plan overrides and credit
+              resets for this admin workspace live below.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3 text-sm">
+              <Link
+                href="/app?view=admin"
+                className="text-aurora-300 hover:underline"
+              >
+                ← Platform dashboard
+              </Link>
+              <Link
+                href="/app?view=admin-users"
+                className="text-aurora-300 hover:underline"
+              >
+                Users
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-8">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+            Admin tools
+          </h2>
+          <DeveloperModePanel metered={usage.metered} currentPlanId={usage.planId} />
+        </section>
+
+        <section className="mt-8">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+            Resources
+          </h2>
+          <div className="overflow-hidden rounded-xl2 border border-white/10">
+            <Link
+              href="/how-it-works"
+              className="flex items-center gap-4 p-5 transition-colors hover:bg-white/[0.03]"
+            >
+              <HelpIcon className="h-5 w-5 shrink-0 text-mist-500" />
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">How it works</p>
+                <p className="text-sm text-mist-500">Product walkthrough for support context.</p>
+              </div>
+              <span className="text-mist-500">→</span>
+            </Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8">
@@ -145,7 +216,7 @@ export default async function SettingsPage({
               <p className="font-display text-xl font-semibold">{plan.name} plan</p>
               <p className="text-sm text-mist-500">
                 {usage.planId === "insider"
-                  ? "Shared Firecrawl credits power live search for all Insiders. Sends are unlimited (your own mailbox)."
+                  ? "Shared lead pool powers live search for all Insiders. Sends are unlimited (your own mailbox)."
                   : usage.metered
                     ? "Usage resets on the 1st of each month."
                     : "You’re on the local preview — open the live app to save sending details and use your plan."}
@@ -164,14 +235,14 @@ export default async function SettingsPage({
               >
                 {usage.planId === "insider" ? (
                   <UsageBar
-                    label="Firecrawl credits"
-                    remaining={
-                      usage.firecrawlCreditsRemaining ?? usage.leadsLimit
-                    }
+                    label="Leads"
+                    title="Firecrawl credits"
+                    unavailable={usage.firecrawlCreditsRemaining == null}
+                    remaining={usage.firecrawlCreditsRemaining ?? undefined}
                   />
                 ) : (
                   <UsageBar
-                    label="Lead credits"
+                    label="Leads"
                     used={usage.leadsUsed}
                     limit={usage.leadsLimit}
                   />
@@ -249,14 +320,12 @@ export default async function SettingsPage({
         </div>
       </section>
 
-      {showAdminTools ? (
-        <section className="mt-8">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-            Admin tools
-          </h2>
-          <DeveloperModePanel metered={usage.metered} currentPlanId={usage.planId} />
-        </section>
-      ) : null}
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Danger zone
+        </h2>
+        <DeleteAccountPanel email={userEmail} liveApp={authRequired()} />
+      </section>
     </main>
   );
 }

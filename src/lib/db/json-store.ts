@@ -49,6 +49,7 @@ function normalizeWorkspace(w: Workspace): Workspace {
         ? (raw.preferredSendPath as "easy" | "pro")
         : null,
     emailVerifyEnabled: raw.emailVerifyEnabled === false ? false : true,
+    findLeadsEnabled: raw.findLeadsEnabled === false ? false : true,
     connectedMailbox: (raw.connectedMailbox as Workspace["connectedMailbox"] | undefined) ?? null,
     outreachProfilesJson:
       typeof raw.outreachProfilesJson === "string"
@@ -729,11 +730,36 @@ export class JsonStore implements LeadRepository {
 
   clearWorkspaceData(): Promise<void> {
     return this.mutate((data) => {
-      data.boards = data.boards.filter((b) => !this.inScope(b));
-      data.runs = data.runs.filter((r) => !this.inScope(r));
-      data.leads = data.leads.filter((l) => !this.inScope(l));
-      data.outreach = data.outreach.filter((o) => !this.inScope(o));
+      const ownedBoardIds = new Set(
+        data.boards.filter((b) => b.workspaceId === this.workspaceId).map((b) => b.id),
+      );
+      data.boardMembers = data.boardMembers.filter((m) => !ownedBoardIds.has(m.boardId));
+      data.boardInvites = data.boardInvites.filter((i) => !ownedBoardIds.has(i.boardId));
+      data.boardLocks = data.boardLocks.filter((l) => !ownedBoardIds.has(l.boardId));
+      data.boards = data.boards.filter((b) => b.workspaceId !== this.workspaceId);
+      data.runs = data.runs.filter((r) => (r.workspaceId ?? this.workspaceId) !== this.workspaceId);
+      data.leads = data.leads.filter((l) => (l.workspaceId ?? this.workspaceId) !== this.workspaceId);
+      data.outreach = data.outreach.filter(
+        (o) => (o.workspaceId ?? this.workspaceId) !== this.workspaceId,
+      );
       return { data, result: undefined };
+    });
+  }
+
+  deleteWorkspace(id: string): Promise<boolean> {
+    return this.mutate((data) => {
+      const before = data.workspaces.length;
+      data.workspaces = data.workspaces.filter((w) => w.id !== id);
+      return { data, result: data.workspaces.length < before };
+    });
+  }
+
+  deleteAuthUser(userId: string): Promise<boolean> {
+    return this.mutate((data) => {
+      data.boardMembers = data.boardMembers.filter((m) => m.userId !== userId);
+      data.boardLocks = data.boardLocks.filter((l) => l.userId !== userId);
+      // JSON store has no Auth.js users / verification_tokens — live cascade is D1.
+      return { data, result: true };
     });
   }
 }

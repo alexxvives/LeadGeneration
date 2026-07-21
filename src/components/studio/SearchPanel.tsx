@@ -204,6 +204,7 @@ export function SearchPanel({
   compact = false,
   planId = "free",
   leadsRemaining = null,
+  findLeadsEnabled = true,
   onProfileChange,
 }: {
   onSearch: (v: SearchValues) => void;
@@ -213,6 +214,8 @@ export function SearchPanel({
   planId?: PlanId;
   /** Remaining monthly lead credits (null = unmetered / unknown). */
   leadsRemaining?: number | null;
+  /** Admin can disable Find leads for this account. */
+  findLeadsEnabled?: boolean;
   /** Fired when the Search profile picker changes the active profile. */
   onProfileChange?: () => void;
 }) {
@@ -246,22 +249,34 @@ export function SearchPanel({
 
   // Clamp selection if plan/remaining credits shrink.
   useEffect(() => {
+    // Insider + null remaining = credits API down — don't invent a batch size.
+    if (planId === "insider" && leadsRemaining == null) return;
     const creditCap =
-      leadsRemaining == null ? planCap : Math.max(1, Math.min(planCap, leadsRemaining));
+      leadsRemaining == null
+        ? planCap
+        : Math.max(1, Math.min(planCap, leadsRemaining));
     setMaxLeads((prev) => {
       if (prev <= creditCap) return prev;
       const opts = [...LEAD_COUNT_OPTIONS].filter((n) => n <= creditCap);
       return opts.length > 0 ? opts[opts.length - 1]! : creditCap;
     });
-  }, [planCap, leadsRemaining]);
+  }, [planCap, leadsRemaining, planId]);
 
   const selectedProfile =
     profileId && profiles.find((p) => p.id === profileId)
       ? profiles.find((p) => p.id === profileId)!
       : null;
 
+  const creditsUnavailable = planId === "insider" && leadsRemaining == null;
+  const creditsEmpty =
+    planId === "insider" && leadsRemaining != null && leadsRemaining <= 0;
+
   const canSubmit =
-    niche.trim().length > 0 && locationConfirmed && !running;
+    niche.trim().length > 0 &&
+    locationConfirmed &&
+    !running &&
+    !creditsUnavailable &&
+    !creditsEmpty;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -292,6 +307,18 @@ export function SearchPanel({
   };
 
   const active = STRATEGIES.find((s) => s.id === searchStrategy) ?? STRATEGIES[0]!;
+
+  if (!findLeadsEnabled) {
+    return (
+      <div className="rounded-xl2 border border-amber-400/25 bg-amber-400/[0.05] px-5 py-6 text-center">
+        <p className="font-medium text-mist-100">Find leads is paused</p>
+        <p className="mt-1 text-sm text-mist-500">
+          Live search is disabled for this account. Import below still works —
+          contact support if you need Find leads re-enabled.
+        </p>
+      </div>
+    );
+  }
 
   const applyIcp = (icp: SavedIcp) => {
     setNiche(icp.niche);
@@ -455,12 +482,13 @@ export function SearchPanel({
             {LEAD_COUNT_OPTIONS.map((n) => {
               const overPlan = n > planCap;
               // Insider remaining = raw Firecrawl credits (not 1:1 with leads).
-              // Only hard-block when the pool is empty; server clamps batch size.
+              // Null = usage API down — block all sizes (no invented balance).
               const overCredits =
-                leadsRemaining != null &&
-                (planId === "insider"
-                  ? leadsRemaining <= 0
-                  : n > leadsRemaining);
+                (planId === "insider" && leadsRemaining == null) ||
+                (leadsRemaining != null &&
+                  (planId === "insider"
+                    ? leadsRemaining <= 0
+                    : n > leadsRemaining));
               const disabled = overPlan || overCredits;
               const isActive = maxLeads === n;
               return (
@@ -473,11 +501,13 @@ export function SearchPanel({
                   title={
                     overPlan
                       ? `Your plan includes ${planMonthlyCap} leads / month — upgrade for larger batches`
-                      : overCredits
-                        ? planId === "insider"
-                          ? "Shared Firecrawl credits are empty"
-                          : `Only ${leadsRemaining} lead credit${leadsRemaining === 1 ? "" : "s"} left this month`
-                        : `Find ${n} leads`
+                      : planId === "insider" && leadsRemaining == null
+                        ? "Firecrawl credits unavailable — try again shortly"
+                        : overCredits
+                          ? planId === "insider"
+                            ? "Shared lead pool is empty"
+                            : `Only ${leadsRemaining} lead credit${leadsRemaining === 1 ? "" : "s"} left this month`
+                          : `Find ${n} leads`
                   }
                   onClick={() => !disabled && setMaxLeads(n)}
                   className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${

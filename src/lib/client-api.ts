@@ -179,6 +179,21 @@ export const api = {
       { method: "POST" },
     ),
 
+  adminDeleteUser: (workspaceId: string) =>
+    jsonFetch<{ ok: boolean }>("/api/admin/users", {
+      method: "DELETE",
+      body: JSON.stringify({ workspaceId }),
+    }),
+
+  adminSetFindLeads: (workspaceId: string, findLeadsEnabled: boolean) =>
+    jsonFetch<{ ok: boolean; findLeadsEnabled: boolean }>("/api/admin/users", {
+      method: "PATCH",
+      body: JSON.stringify({ workspaceId, findLeadsEnabled }),
+    }),
+
+  deleteAccount: () =>
+    jsonFetch<{ ok: boolean }>("/api/account", { method: "DELETE" }),
+
   createRun: (input: {
     niche: string;
     location?: string;

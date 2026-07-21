@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { env } from "@/lib/config";
 import { PLANS } from "@/lib/plans";
-import type { PlanId } from "@/lib/types";
+import type { PlanId, Workspace } from "@/lib/types";
 
 /**
  * Stripe client + helpers. All Stripe access is server-side only; the secret
@@ -23,4 +23,33 @@ export function priceIdForPlan(planId: PlanId): string | null {
   if (!envName) return null;
   const ids = env.stripePriceIds();
   return ids[planId as keyof typeof ids] ?? null;
+}
+
+/**
+ * Best-effort: cancel an active Stripe subscription before wiping a workspace.
+ * Missing key / already-canceled / missing sub are non-fatal so local delete
+ * still completes (GDPR wipe must not block on billing API).
+ */
+export async function cancelWorkspaceBilling(
+  ws: Pick<Workspace, "stripeSubscriptionId" | "stripeCustomerId">,
+): Promise<void> {
+  if (!env.stripeSecretKey()) return;
+  const subId = ws.stripeSubscriptionId?.trim();
+  if (!subId) return;
+  try {
+    const stripe = getStripe();
+    await stripe.subscriptions.cancel(subId);
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code?: string }).code)
+        : "";
+    if (code === "resource_missing") return;
+    console.error(
+      "[billing] cancelWorkspaceBilling failed",
+      subId,
+      ws.stripeCustomerId,
+      err,
+    );
+  }
 }

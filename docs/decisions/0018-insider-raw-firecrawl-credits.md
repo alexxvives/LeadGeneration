@@ -25,6 +25,7 @@ and it hid the real shared pool number.
   resource is the shared key.
 
 ## Consequences
-- Usage bars label “Firecrawl credits” with a remaining-style meter.
-- SearchPanel lead-count options disable when `n > remainingCredits`.
+- Usage bars label **Leads** with the raw remaining count (e.g.
+  `34,258 available`), not a soft `used / 250` heuristic.
+- SearchPanel lead-count options disable when the shared pool is empty.
 - Docs / ADR 0017 features line updated via this ADR.

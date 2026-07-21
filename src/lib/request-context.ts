@@ -6,7 +6,6 @@ import { auth } from "@/auth";
 import { isAdminSession } from "@/lib/admin";
 import {
   getPlan,
-  INSIDER_CREDITS_FALLBACK,
   INSIDER_SHARED_POOL,
 } from "@/lib/plans";
 import { sumInsiderSharedUsage } from "@/lib/insider-quota";
@@ -152,6 +151,7 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
         verifiesLimit: free.verifiesPerDay,
         verifiesResetsAt: null,
         emailVerifyEnabled: true,
+        findLeadsEnabled: true,
       };
     }
     const monthly = await ensureUsageWindow(ctx.db, ws);
@@ -160,14 +160,13 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
     if (fresh.planId === "insider") {
       const shared = await sumInsiderSharedUsage(ctx.db);
       const fc = await getFirecrawlRemainingCredits();
-      const creditsLeft = fc != null ? fc : INSIDER_CREDITS_FALLBACK;
       return {
         workspaceId: fresh.id,
         planId: fresh.planId,
         metered: ctx.metered,
         leadsUsed: shared.leads,
-        // Display capacity mirrors raw FC remaining (not ÷ estimated burn).
-        leadsLimit: creditsLeft,
+        // Null FC → 0 display capacity (never invent a fallback balance).
+        leadsLimit: fc ?? 0,
         firecrawlCreditsRemaining: fc,
         sendsUsed: fresh.sendsUsedThisMonth,
         sendsLimit: 0,
@@ -177,6 +176,7 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
         verifiesLimit: INSIDER_SHARED_POOL.verifiesPerDay,
         verifiesResetsAt: fresh.verifiesResetsAt,
         emailVerifyEnabled: fresh.emailVerifyEnabled !== false,
+        findLeadsEnabled: fresh.findLeadsEnabled !== false,
       };
     }
     return {
@@ -193,9 +193,19 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
       verifiesLimit: plan.verifiesPerDay,
       verifiesResetsAt: fresh.verifiesResetsAt,
       emailVerifyEnabled: fresh.emailVerifyEnabled !== false,
+      findLeadsEnabled: fresh.findLeadsEnabled !== false,
     };
   } catch (err) {
     console.error("[getWorkspaceSummary] failed", err);
+    // Fail closed on Find leads when metered: a DB blip must not re-enable Search
+    // for an account the admin paused. Demo/local stays permissive.
+    let findLeadsEnabled = !ctx.metered;
+    try {
+      const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+      if (ws) findLeadsEnabled = ws.findLeadsEnabled !== false;
+    } catch {
+      /* keep fail-closed default */
+    }
     return {
       workspaceId: ctx.workspaceId,
       planId: "free",
@@ -209,6 +219,7 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
       verifiesLimit: free.verifiesPerDay,
       verifiesResetsAt: null,
       emailVerifyEnabled: true,
+      findLeadsEnabled,
     };
   }
 }

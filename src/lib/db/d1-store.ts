@@ -85,6 +85,8 @@ type WorkspaceRow = {
   connected_mailbox_json: string | null;
   /** Migration 0014 — 0/1; null treated as enabled. */
   email_verify_enabled: number | null;
+  /** Migration 0025 — 0/1; null treated as enabled. */
+  find_leads_enabled: number | null;
   /** Migration 0015 — daily verify counters. */
   verifies_used_today: number | null;
   verifies_resets_at: string | null;
@@ -210,6 +212,7 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
         ? r.preferred_send_path
         : null,
     emailVerifyEnabled: r.email_verify_enabled === 0 ? false : true,
+    findLeadsEnabled: r.find_leads_enabled === 0 ? false : true,
     connectedMailbox: parseConnectedMailbox(r.connected_mailbox_json),
     outreachProfilesJson: r.outreach_profiles_json ?? null,
   };
@@ -447,6 +450,9 @@ export class D1Store implements LeadRepository {
     }
     if ("emailVerifyEnabled" in patch) {
       row.email_verify_enabled = patch.emailVerifyEnabled === false ? 0 : 1;
+    }
+    if ("findLeadsEnabled" in patch) {
+      row.find_leads_enabled = patch.findLeadsEnabled === false ? 0 : 1;
     }
     if ("connectedMailbox" in patch) {
       row.connected_mailbox_json = patch.connectedMailbox
@@ -1430,21 +1436,89 @@ export class D1Store implements LeadRepository {
   }
 
   async clearWorkspaceData(): Promise<void> {
-    await this.db
-      .prepare(`DELETE FROM outreach WHERE workspace_id = ?`)
+    const boards = await this.db
+      .prepare(`SELECT id FROM boards WHERE workspace_id = ?`)
       .bind(this.workspaceId)
+      .all<{ id: string }>();
+    const boardIds = (boards.results ?? []).map((b) => b.id);
+    const stmts = [];
+    for (const boardId of boardIds) {
+      stmts.push(
+        this.db
+          .prepare(`DELETE FROM board_members WHERE board_id = ?`)
+          .bind(boardId),
+      );
+      stmts.push(
+        this.db
+          .prepare(`DELETE FROM board_invites WHERE board_id = ?`)
+          .bind(boardId),
+      );
+      stmts.push(
+        this.db
+          .prepare(`DELETE FROM board_locks WHERE board_id = ?`)
+          .bind(boardId),
+      );
+    }
+    stmts.push(
+      this.db
+        .prepare(`DELETE FROM outreach WHERE workspace_id = ?`)
+        .bind(this.workspaceId),
+    );
+    stmts.push(
+      this.db
+        .prepare(`DELETE FROM leads WHERE workspace_id = ?`)
+        .bind(this.workspaceId),
+    );
+    stmts.push(
+      this.db
+        .prepare(`DELETE FROM runs WHERE workspace_id = ?`)
+        .bind(this.workspaceId),
+    );
+    stmts.push(
+      this.db
+        .prepare(`DELETE FROM boards WHERE workspace_id = ?`)
+        .bind(this.workspaceId),
+    );
+    if (stmts.length > 0) {
+      await this.db.batch(stmts);
+    }
+  }
+
+  async deleteWorkspace(id: string): Promise<boolean> {
+    const r = await this.db
+      .prepare(`DELETE FROM workspaces WHERE id = ?`)
+      .bind(id)
       .run();
-    await this.db
-      .prepare(`DELETE FROM leads WHERE workspace_id = ?`)
-      .bind(this.workspaceId)
-      .run();
-    await this.db
-      .prepare(`DELETE FROM runs WHERE workspace_id = ?`)
-      .bind(this.workspaceId)
-      .run();
-    await this.db
-      .prepare(`DELETE FROM boards WHERE workspace_id = ?`)
-      .bind(this.workspaceId)
-      .run();
+    return (r.meta?.changes ?? 0) > 0;
+  }
+
+  async deleteAuthUser(userId: string): Promise<boolean> {
+    const user = await this.db
+      .prepare(`SELECT email FROM users WHERE id = ?`)
+      .bind(userId)
+      .first<{ email: string | null }>();
+    const email = user?.email?.trim().toLowerCase() ?? null;
+
+    const stmts = [
+      this.db.prepare(`DELETE FROM accounts WHERE "userId" = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM sessions WHERE "userId" = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM board_members WHERE user_id = ?`).bind(userId),
+      this.db.prepare(`DELETE FROM board_locks WHERE user_id = ?`).bind(userId),
+    ];
+    if (email) {
+      stmts.push(
+        this.db
+          .prepare(`DELETE FROM verification_tokens WHERE lower(identifier) = ?`)
+          .bind(email),
+      );
+      stmts.push(
+        this.db
+          .prepare(`DELETE FROM board_invites WHERE lower(email) = ?`)
+          .bind(email),
+      );
+    }
+    stmts.push(this.db.prepare(`DELETE FROM users WHERE id = ?`).bind(userId));
+    await this.db.batch(stmts);
+    return true;
   }
 }

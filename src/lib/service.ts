@@ -17,13 +17,18 @@ import { env } from "@/lib/config";
 import { getCachedVerify, verifyEmail } from "@/lib/email/verify";
 import {
   getPlan,
-  INSIDER_CREDITS_FALLBACK,
   INSIDER_SHARED_POOL,
   isPaidPlan,
 } from "@/lib/plans";
 import { sumInsiderSharedUsage } from "@/lib/insider-quota";
 import { getFirecrawlRemainingCredits } from "@/lib/search/firecrawl";
-import { BoardLockedError, NotFoundError, QuotaError } from "@/lib/errors";
+import {
+  BoardLockedError,
+  ForbiddenError,
+  NotFoundError,
+  QuotaError,
+} from "@/lib/errors";
+import { cancelWorkspaceBilling } from "@/lib/billing/stripe";
 import { ensureUsageWindow, ensureVerifyWindow } from "@/lib/workspace";
 import type {
   Board,
@@ -501,12 +506,22 @@ async function resolveRunLeadLimit(
       planId = fresh.planId;
       if (fresh.planId === "insider") {
         // Shared Firecrawl API key = shared pool. Gate on raw credits > 0;
-        // batch size still hard-capped (credits ≠ leads 1:1).
+        // batch size still hard-capped (credits ≠ leads 1:1). Never invent a
+        // fallback balance when the usage API is unreachable.
         const fc = await getFirecrawlRemainingCredits();
-        const creditsLeft = fc != null ? fc : INSIDER_CREDITS_FALLBACK;
         used = (await sumInsiderSharedUsage(ctx.db)).leads;
-        remaining = creditsLeft;
         planMonthlyCap = hardCap;
+        if (fc == null) {
+          throw new QuotaError({
+            kind: "leads",
+            planId: "insider",
+            limit: 0,
+            used,
+            message:
+              "Firecrawl credits unavailable right now. Try again shortly.",
+          });
+        }
+        remaining = fc;
       } else {
         planMonthlyCap = Math.min(hardCap, plan.leadCreditsPerMonth);
         used = fresh.leadsUsedThisMonth;
@@ -581,6 +596,12 @@ export async function createAndRunSearch(
   ctx: Ctx,
   input: CreateRunInput,
 ): Promise<Run> {
+  const wsGate = await ctx.db.getWorkspace(ctx.workspaceId);
+  if (wsGate && wsGate.findLeadsEnabled === false) {
+    throw new ForbiddenError(
+      "Find leads is disabled for this account. Contact support if you need it re-enabled.",
+    );
+  }
   // Quota + per-run cap BEFORE creating the run, so an over-limit request
   // doesn't leave a stray failed run behind and can surface a clean 402.
   const maxLeads = await resolveRunLeadLimit(ctx, input.maxLeads);
@@ -1986,10 +2007,11 @@ export async function generatePitchFromWebsite(
 
 /** Platform-wide admin Users table (caller must gate on isAdminSession). */
 export async function listAdminUsers(ctx: Ctx): Promise<AdminUserRow[]> {
-  const [workspaces, counts, authUsers] = await Promise.all([
+  const [workspaces, counts, authUsers, firecrawlCredits] = await Promise.all([
     ctx.db.listWorkspaces(),
     ctx.db.adminCountByWorkspace(),
     ctx.db.listAuthUsers(),
+    getFirecrawlRemainingCredits(),
   ]);
   const emailByUserId = new Map(
     authUsers.map((u) => [u.id, { email: u.email, name: u.name }] as const),
@@ -2004,6 +2026,7 @@ export async function listAdminUsers(ctx: Ctx): Promise<AdminUserRow[]> {
     .map((w) => {
       const plan = getPlan(w.planId);
       const owner = w.ownerUserId ? emailByUserId.get(w.ownerUserId) : undefined;
+      const insider = w.planId === "insider";
       return {
         workspaceId: w.id,
         workspaceName: w.name,
@@ -2012,7 +2035,10 @@ export async function listAdminUsers(ctx: Ctx): Promise<AdminUserRow[]> {
         ownerName: owner?.name ?? null,
         planId: w.planId,
         leadsUsedThisMonth: w.leadsUsedThisMonth,
-        leadsLimit: plan.leadCreditsPerMonth,
+        leadsLimit: insider
+          ? (firecrawlCredits ?? 0)
+          : plan.leadCreditsPerMonth,
+        firecrawlCreditsRemaining: insider ? firecrawlCredits : null,
         sendsUsedThisMonth: w.sendsUsedThisMonth,
         sendsLimit: plan.sendsPerMonth,
         verifiesUsedToday: w.verifiesUsedToday,
@@ -2024,6 +2050,7 @@ export async function listAdminUsers(ctx: Ctx): Promise<AdminUserRow[]> {
         hasMailbox: Boolean(w.connectedMailbox),
         hasEasySendKey: Boolean(w.resendApiKey || w.mailerooApiKey),
         emailVerifyEnabled: w.emailVerifyEnabled !== false,
+        findLeadsEnabled: w.findLeadsEnabled !== false,
         createdAt: w.createdAt,
         updatedAt: w.updatedAt,
       };
@@ -2089,4 +2116,57 @@ export async function getAdminPlatformStats(ctx: Ctx): Promise<AdminPlatformStat
     withEasySendKey,
     recentSignups,
   };
+}
+
+/**
+ * Wipe a workspace’s data + row and (when present) the Auth.js owner.
+ * Used by self-serve account deletion and admin user delete.
+ * Does not delete platform admins. Cancels Stripe subscription best-effort first.
+ */
+export async function deleteWorkspaceAccount(
+  ctx: Ctx,
+  workspaceId: string,
+): Promise<void> {
+  const { LOCAL_WORKSPACE_ID } = await import("@/lib/db");
+  if (workspaceId === LOCAL_WORKSPACE_ID) {
+    throw new Error("Cannot delete the local demo workspace");
+  }
+  const ws = await ctx.db.getWorkspace(workspaceId);
+  if (!ws) throw new NotFoundError("Workspace not found");
+
+  if (ws.ownerUserId) {
+    const authUsers = await ctx.db.listAuthUsers();
+    const owner = authUsers.find((u) => u.id === ws.ownerUserId);
+    if (owner?.isAdmin) {
+      throw new Error("Cannot delete a platform admin account");
+    }
+  }
+
+  await cancelWorkspaceBilling(ws);
+
+  const scoped = ctx.scopeToWorkspace(workspaceId);
+  await scoped.clearWorkspaceData();
+  if (ws.ownerUserId) {
+    await ctx.db.deleteAuthUser(ws.ownerUserId);
+  }
+  await ctx.db.deleteWorkspace(workspaceId);
+}
+
+/** Self-serve: delete the signed-in user’s workspace + auth identity. */
+export async function deleteOwnAccount(ctx: Ctx): Promise<void> {
+  await deleteWorkspaceAccount(ctx, ctx.workspaceId);
+}
+
+/** Admin: toggle Find leads (Search) for any workspace. */
+export async function setFindLeadsEnabled(
+  ctx: Ctx,
+  workspaceId: string,
+  enabled: boolean,
+): Promise<void> {
+  const existing = await ctx.db.getWorkspace(workspaceId);
+  if (!existing) throw new NotFoundError("Workspace not found");
+  await ctx.db.updateWorkspace(workspaceId, {
+    findLeadsEnabled: enabled,
+    updatedAt: nowIso(),
+  });
 }

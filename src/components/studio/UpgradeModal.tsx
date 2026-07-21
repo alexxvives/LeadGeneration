@@ -101,33 +101,59 @@ export function UsageBar({
   used,
   limit,
   remaining,
+  unavailable,
+  title,
 }: {
   label: string;
   used?: number;
   limit?: number;
   /** Provider credit balance (e.g. Firecrawl remaining, or verify pool). */
   remaining?: number;
+  /** True when the credit API could not be read (do not invent a balance). */
+  unavailable?: boolean;
+  /** Native tooltip (e.g. “Firecrawl credits”). */
+  title?: string;
 }) {
-  if (remaining != null) {
-    // Soft full heuristic for remaining-credit meters (≈100 vs larger packs).
-    // Fill rises with usage (same direction as Leads / Sends), not remaining credits.
-    const softFull = remaining <= 120 ? 100 : 250;
-    const used = Math.max(0, softFull - Math.min(remaining, softFull));
-    const pct = Math.min(100, Math.round((used / softFull) * 100));
-    const tone =
-      remaining <= 0 ? "bg-rose-400" : remaining < 25 ? "bg-amber-400" : "bg-aurora-400";
+  if (unavailable) {
     return (
-      <div className="min-w-0">
+      <div className="min-w-0" title={title}>
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="shrink-0 text-mist-300">{label}</span>
+          <span className="min-w-0 truncate tabular-nums text-amber-200/90">
+            Credits unavailable
+          </span>
+        </div>
+        <div className="meter-track mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
+          <div className="h-full w-full rounded-full bg-amber-400/30" />
+        </div>
+      </div>
+    );
+  }
+
+  if (remaining != null) {
+    // Show the real remaining balance (e.g. shared pool as leads available).
+    const visualPct =
+      remaining <= 0
+        ? 0
+        : remaining < 50
+          ? Math.max(8, Math.round((remaining / 50) * 40))
+          : remaining < 500
+            ? 40 + Math.round(((remaining - 50) / 450) * 35)
+            : Math.min(100, 75 + Math.round(Math.log10(remaining) * 5));
+    const tone =
+      remaining <= 0 ? "bg-rose-400" : remaining < 100 ? "bg-amber-400" : "bg-aurora-400";
+    return (
+      <div className="min-w-0" title={title ?? "Firecrawl credits"}>
         <div className="flex items-center justify-between gap-2 text-sm">
           <span className="shrink-0 text-mist-300">{label}</span>
           <span className="min-w-0 truncate tabular-nums text-mist-500">
-            {used} / {softFull}
+            {remaining.toLocaleString()} available
           </span>
         </div>
         <div className="meter-track mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
           <div
             className={`h-full rounded-full ${tone} transition-all`}
-            style={{ width: `${pct}%` }}
+            style={{ width: `${visualPct}%` }}
           />
         </div>
       </div>
@@ -138,7 +164,7 @@ export function UsageBar({
   const lim = limit ?? 0;
   if (lim <= 0 && remaining == null) {
     return (
-      <div className="min-w-0">
+      <div className="min-w-0" title={title}>
         <div className="flex items-center justify-between gap-2 text-sm">
           <span className="shrink-0 text-mist-300">{label}</span>
           <span className="min-w-0 truncate tabular-nums text-mist-500">Unlimited</span>
@@ -152,7 +178,7 @@ export function UsageBar({
   const pct = lim > 0 ? Math.min(100, Math.round((u / lim) * 100)) : 0;
   const tone = pct >= 100 ? "bg-rose-400" : pct >= 80 ? "bg-amber-400" : "bg-aurora-400";
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" title={title}>
       <div className="flex items-center justify-between gap-2 text-sm">
         <span className="shrink-0 text-mist-300">{label}</span>
         <span className="min-w-0 truncate tabular-nums text-mist-500">

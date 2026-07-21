@@ -58,16 +58,23 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   nav: **Dashboard · Search · Pipeline · Leads · Outreach · Runs · Boards**.
   Board filter (**All** or one board) sits above the account card. Settings
   opens from the **account card** at the bottom of the sidebar (not a Workspace
-  nav item). Views use `?view=`:
+  nav item). **Platform admins** get a slim ops nav (**Dashboard · Users**) and
+  an ops-only Settings page (no outreach/send profiles). Views use `?view=`:
 
   - **Dashboard** (`?view=dashboard`) — workspace-wide stats across all boards
-    (pipeline stages, sends, recent runs).
+    (pipeline stages, sends, recent runs). Admins see the **platform** dashboard
+    (`?view=admin`) instead.
 
   - **Search** (default / no `?view=`) — always-expanded search form + CSV/Excel
     import. Search and import open a board-picker modal; leads land on the
     chosen board (workspace **Default** if none). Live search when Firecrawl
     is configured; otherwise load demo data. After a run, the app redirects to
     Pipeline. Integration status lives in Settings (no mode banner).
+    **Find leads** can be paused per account by an admin — the Search form is
+    disabled but **Import stays available** on this view.
+
+  - **Admin Users** (`?view=admin-users`) — tenant table: plan override, Find
+    leads toggle, typed `DELETE` account wipe (cancels Stripe when configured).
 
   - **Pipeline** (`?view=pipeline`) — CRM kanban for the active board filter
     (**All** = every board) across four active stages (*New · Contacted · In
@@ -102,9 +109,12 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
 - **`/app/settings`** — sender profile, **Sending** dual path (Easy Resend + DNS
   health, or Pro Connect Google mailbox), plan/usage, Boards link, Integrations
-  status, “Ready to send?” checklist. Microsoft mailbox connect is next.
+  status, “Ready to send?” checklist, and **Danger zone** self-serve account
+  deletion (live app only; type `DELETE`). Microsoft mailbox connect is next.
   Resources (Getting started wizard, How it works, Plans). No env-var names in
   the UI. Secrets are never shown. Reopen the guide via **Getting started**.
+  Platform admins see a slim **Admin settings** page (tools + resources only —
+  no Danger zone / outreach send setup).
 
 ## 4. Demo mode vs live mode
 

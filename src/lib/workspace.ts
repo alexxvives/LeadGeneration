@@ -54,6 +54,7 @@ export function newWorkspace(args: {
     easyEmailProvider: "resend",
     preferredSendPath: null,
     emailVerifyEnabled: true,
+    findLeadsEnabled: true,
     connectedMailbox: null,
     outreachProfilesJson: null,
   };

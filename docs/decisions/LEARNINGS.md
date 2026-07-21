@@ -4,6 +4,27 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-21 — Pre-ship: Import stays, 403, no FC fallback, Stripe cancel
+- Find leads off: Search form blocked; Import remains on Search view (no
+  redirect / nav hide). `ForbiddenError` → 403 on `POST /api/runs`.
+- Insider: null Firecrawl usage → “Credits unavailable” + 402 (never invent
+  1000). Admin Users shows shared pool remaining.
+- Account delete: best-effort Stripe `subscriptions.cancel`; cascade
+  `verification_tokens` + `board_invites` by email; admin typed `DELETE`.
+- Admin Settings: no Danger zone. getWorkspaceSummary fail-closes Find leads
+  when metered.
+
+### 2026-07-21 — Account deletion, Find-leads toggle, Insider “Leads” meter
+- Self-delete: Settings danger zone → `DELETE /api/account`. Admin Users:
+  trash → `DELETE /api/admin/users`. Cascades workspace data + Auth.js owner
+  (never admin / local workspace).
+- `find_leads_enabled` (migration 0025): admin switch; blocks Search form +
+  `createAndRunSearch` (ADR 0019). Import stays available.
+- Insider usage bar: label **Leads**, show raw remaining
+  (`34,258 available`) — UsageBar soft `0/250` was wrong for large FC balances.
+- Admin chrome: no Board/Profile pickers; Settings is ops-only (no send/
+  profiles). Dashboard: plan donut, 14-day signups, activity bars, top leads.
+
 ### 2026-07-21 — Locked-stack doc/code cleanup (no dual verify/search stories)
 - Swept stale “Zeruh primary / Firecrawl+Exa dual search / Maileroo Verify as
   product verify” copy. Truth: Firecrawl-only search; MyEmailVerifier primary

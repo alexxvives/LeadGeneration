@@ -46,8 +46,9 @@ export const LEAD_COUNT_OPTIONS = [10, 25, 50] as const;
 export const FIRECRAWL_FREE_MONTHLY_CREDITS = 1000;
 
 /**
- * Fallback when the Firecrawl credit-usage API is unreachable — show/use the
- * free-tier monthly allotment as raw credits (not ÷ estimated burn).
+ * Soft plan-table figure for Insider (not used for live gating). Live capacity
+ * is Firecrawl remaining credits; when that API is unreachable we show
+ * “unavailable” and reject search (402) — never invent this number as balance.
  */
 export const INSIDER_CREDITS_FALLBACK = FIRECRAWL_FREE_MONTHLY_CREDITS;
 
@@ -57,7 +58,7 @@ export const INSIDER_CREDITS_FALLBACK = FIRECRAWL_FREE_MONTHLY_CREDITS;
  * Verifies stay capped to the MEV free daily pool.
  */
 export const INSIDER_SHARED_POOL = {
-  /** Soft display cap when credit API is down (raw FC credits). */
+  /** Plan-table soft figure only — live UI/API use Firecrawl remaining. */
   leadCreditsPerMonth: INSIDER_CREDITS_FALLBACK,
   unlimitedSends: true as const,
   verifiesPerDay: 100,

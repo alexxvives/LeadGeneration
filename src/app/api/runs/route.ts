@@ -6,7 +6,7 @@ import {
   healStuckImportRuns,
   healStuckSearchRuns,
 } from "@/lib/service";
-import { isQuotaError } from "@/lib/errors";
+import { isForbiddenError, isQuotaError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,6 +62,9 @@ export async function POST(req: Request) {
         { error: err.message, quota: { kind: err.kind, planId: err.planId, limit: err.limit } },
         { status: 402 },
       );
+    }
+    if (isForbiddenError(err)) {
+      return NextResponse.json({ error: err.message }, { status: 403 });
     }
     if (err instanceof Error && err.name === "SearchUnavailableError") {
       return NextResponse.json({ error: err.message }, { status: 400 });

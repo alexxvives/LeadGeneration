@@ -124,6 +124,7 @@ export function Studio() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
@@ -1030,10 +1031,13 @@ export function Studio() {
               >
                 {board.workspace.planId === "insider" ? (
                   <UsageBar
-                    label="Firecrawl credits"
+                    label="Leads"
+                    title="Firecrawl credits"
+                    unavailable={
+                      board.workspace.firecrawlCreditsRemaining == null
+                    }
                     remaining={
-                      board.workspace.firecrawlCreditsRemaining ??
-                      board.workspace.leadsLimit
+                      board.workspace.firecrawlCreditsRemaining ?? undefined
                     }
                   />
                 ) : (
@@ -1104,12 +1108,12 @@ export function Studio() {
             running={running}
             compact={false}
             planId={board?.workspace?.planId ?? "free"}
+            findLeadsEnabled={board?.workspace?.findLeadsEnabled !== false}
             leadsRemaining={
               !board?.workspace?.metered
                 ? null
                 : board.workspace.planId === "insider"
-                  ? (board.workspace.firecrawlCreditsRemaining ??
-                    board.workspace.leadsLimit)
+                  ? board.workspace.firecrawlCreditsRemaining ?? null
                   : Math.max(
                       0,
                       board.workspace.leadsLimit - board.workspace.leadsUsed,

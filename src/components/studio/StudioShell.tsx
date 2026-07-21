@@ -379,14 +379,16 @@ export function StudioShell({
 
         {/* Board + outreach profile filters + account card */}
         <div className="mt-auto border-t border-white/5 pt-5">
-          <div className="mb-5 space-y-2">
-            <BoardPicker
-              boards={boards}
-              activeBoardId={activeBoardId}
-              onChange={setBoardFilter}
-            />
-            <ProfilePicker />
-          </div>
+          {!isAdmin ? (
+            <div className="mb-5 space-y-2">
+              <BoardPicker
+                boards={boards}
+                activeBoardId={activeBoardId}
+                onChange={setBoardFilter}
+              />
+              <ProfilePicker />
+            </div>
+          ) : null}
 
           <div className="hidden sm:block">
             <Link

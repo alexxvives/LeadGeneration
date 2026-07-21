@@ -89,3 +89,17 @@ export class NotFoundError extends Error {
 export function isNotFoundError(err: unknown): err is NotFoundError {
   return err instanceof NotFoundError;
 }
+
+/** Feature or action forbidden for this account (e.g. Find leads disabled). */
+export class ForbiddenError extends Error {
+  readonly status = 403;
+
+  constructor(message = "Forbidden.") {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
+
+export function isForbiddenError(err: unknown): err is ForbiddenError {
+  return err instanceof ForbiddenError;
+}

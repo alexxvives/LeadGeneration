@@ -196,6 +196,11 @@ export interface Workspace {
    * the check (saves credits). ADR 0016.
    */
   emailVerifyEnabled: boolean;
+  /**
+   * When false, Find leads (Search) is hidden/blocked for this workspace.
+   * Admin-controlled — used to pause Insider (or any) search without a plan change.
+   */
+  findLeadsEnabled: boolean;
   /** Pro path: one connected mailbox (multi-inbox deferred — ADR 0010). */
   connectedMailbox: ConnectedMailbox | null;
   /**
@@ -318,6 +323,13 @@ export interface AdminUserRow {
   hasMailbox: boolean;
   hasEasySendKey: boolean;
   emailVerifyEnabled: boolean;
+  /** False = Find leads / Search disabled for this account. */
+  findLeadsEnabled: boolean;
+  /**
+   * Insider only: live shared Firecrawl remaining credits (null = API unreachable).
+   * Non-insider rows are null.
+   */
+  firecrawlCreditsRemaining?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -437,6 +449,8 @@ export interface WorkspaceSummary {
   verifiesResetsAt: string | null;
   /** Workspace wants email verify at send (requires server key). */
   emailVerifyEnabled: boolean;
+  /** False = Find leads / Search disabled (admin toggle). */
+  findLeadsEnabled: boolean;
 }
 
 export interface CreateRunInput {
