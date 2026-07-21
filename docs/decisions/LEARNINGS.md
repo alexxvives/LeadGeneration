@@ -900,8 +900,8 @@ the old SMTP-only footer falsely said ?demo? when Resend was already configured.
 ### 2026-07-14 ? Onboarding tour + location pick + search UX
 - Wizard jumped to step 3 because it auto-selected the first ?incomplete?
   checklist item (search/email already green on prod). Always open on step 1.
-- Replaced checklist modal with a coach-mark tour (Search ? Pipeline ?
-  Settings); Settings has a temporary ?Replay product tour? button.
+- Replaced checklist modal with a coach-mark tour (Search → Pipeline →
+  Settings). Tour replay is `/app?setup=1` only (no Settings button).
 - EmptyState image+`from-ink-950` gradient removed from Search ? looked like a
   stray overlay under the form.
 - Location must be picked from Photon suggestions (or cleared); free-typed
@@ -1053,3 +1053,11 @@ live product preview (map + pipeline) ? dropped missing hero image dependency.
   and stop once N leads have email (total can exceed N).
 - Expensive part of “enrichment” is Firecrawl scrapes, not Workers AI blurbs.
   Still run scrape enrichment on every kept hit — that’s the product.
+
+### 2026-07-21 — Tour copy trim; drop Developer mode from Settings
+- Shorter coach-mark copy; no “replay from Settings” CTA. Tour force remains
+  `/app?setup=1`.
+- Removed `DeveloperModePanel` from admin Settings (plan override for other
+  tenants stays on Admin → Users).
+- Sending identity **Your name** = inbox From display name
+  (`Alex <you@domain.com>`), not email sign-off (that’s Outreach profile).

@@ -9,18 +9,16 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-21 (tour samples + step 4)
+## ⏱️ Status — updated 2026-07-21 (tour copy + drop Dev mode)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local; **remote D1 needs `npm run cf:migrate`** (incl. `find_leads_enabled`).
 
 ### This pass
-- Tour: always show tip (step 4 was invisible/stuck); auto-seed demo leads +
-  drafts when board empty; demo runs bypass find-leads/quota and don’t burn
-  credits.
-- Earlier: tour double-nav lag, Insider `remaining_credits` parse, stale board
-  lock 404, admin subtitle removed.
+- Tour copy shortened (search / pipeline / leads / outreach / BYO sender / done).
+- Removed Developer mode panel from Settings (incl. tour replay button).
+- Tour reopen: `/app?setup=1` only.
 
 ### Next
 1. Deploy.

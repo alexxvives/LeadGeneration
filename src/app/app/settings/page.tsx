@@ -6,7 +6,6 @@ import type { Workspace } from "@/lib/types";
 import { UsageBar } from "@/components/studio/UpgradeModal";
 import { BillingActions } from "@/components/studio/BillingActions";
 import { SenderProfileForm } from "@/components/studio/SenderProfileForm";
-import { DeveloperModePanel } from "@/components/studio/DeveloperModePanel";
 import { SendSetupPanel } from "@/components/studio/SendSetupPanel";
 import { DeleteAccountPanel } from "@/components/studio/DeleteAccountPanel";
 import { isAdminSession } from "@/lib/admin";
@@ -102,8 +101,7 @@ export default async function SettingsPage({
           <div className="rounded-xl2 border border-white/10 p-5">
             <p className="font-medium text-mist-100">{userEmail ?? "Admin"}</p>
             <p className="mt-1 text-sm text-mist-500">
-              Manage tenants from Dashboard and Users. Plan overrides and credit
-              resets for this admin workspace live below.
+              Manage tenants from Dashboard and Users.
             </p>
             <div className="mt-4 flex flex-wrap gap-3 text-sm">
               <Link
@@ -120,13 +118,6 @@ export default async function SettingsPage({
               </Link>
             </div>
           </div>
-        </section>
-
-        <section className="mt-8">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-            Admin tools
-          </h2>
-          <DeveloperModePanel metered={usage.metered} currentPlanId={usage.planId} />
         </section>
 
         <section className="mt-8">

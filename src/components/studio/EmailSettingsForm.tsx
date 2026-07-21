@@ -277,7 +277,7 @@ export function EmailSettingsForm({
             onChange={(e) => setField("fromName", e.target.value)}
             onFocus={captureFocus}
             onBlur={() => void saveIfChanged()}
-            placeholder={defaults.fromName}
+            placeholder="Alex Rivera"
             disabled={!canEdit}
             className={inputCls}
           />

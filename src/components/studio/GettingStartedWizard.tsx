@@ -2,7 +2,7 @@
 
 /**
  * Product tour — coach marks: Search → Pipeline → Table → Settings → Resend.
- * Reopen via Settings → Developer mode or /app?setup=1.
+ * Force via /app?setup=1.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -113,7 +113,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="search-panel"]',
       prefer: "right",
       title: "Start with a search",
-      body: "Describe who you want, pick a location from the suggestions (don’t free-type), choose how many leads, then hit Find leads.",
+      body: "Describe who you want, pick a location from the suggestions, choose how many leads, then hit Find leads.",
     },
     {
       id: "pipeline",
@@ -121,7 +121,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="pipeline-board"]',
       prefer: "right",
       title: "Work the pipeline",
-      body: "Sample leads are loaded for the tour. Drag a card between stages, click ⓘ for details. Approve drafts from Outreach.",
+      body: "Drag a card between stages, click ⓘ for details.",
       scrollBlock: "start",
     },
     {
@@ -130,7 +130,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="leads-table"]',
       prefer: "above",
       title: "Browse all leads",
-      body: "The Leads tab holds the full list — table, cards, or map. Export when you’re ready.",
+      body: "The Leads tab holds the full list — table, cards, or map. Export if desired.",
       scrollBlock: "center",
     },
     {
@@ -139,7 +139,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="outreach-queue"]',
       prefer: "right",
       title: "Send from Outreach",
-      body: "Draft → approve → send lives here. Open a row to edit; send stays per-lead after you approve.",
+      body: "Draft → approve → send lives here.",
       scrollBlock: "start",
     },
     {
@@ -157,8 +157,8 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="resend-key"]',
       prefer: "left",
       pad: 14,
-      title: "Bring your own sender (Resend)",
-      body: "For real inbox delivery, pick Resend or Maileroo, paste your API key, and send from your verified domain — we don’t host a shared “HERMES mail domain” for client outreach (that burns reputation). Platform keys are for local/dev demos only.",
+      title: "Bring your own sender",
+      body: "For real inbox delivery, pick Resend or Maileroo, paste your API key, and send from your verified domain.",
       scrollBlock: "center",
     },
     {
@@ -166,7 +166,7 @@ function buildSteps(): TourStep[] {
       path: "/app",
       target: null,
       title: "You’re ready",
-      body: "Try a search, review drafts under Outreach, and only approve what you’d send yourself. Replay this tour anytime from Settings → Developer mode.",
+      body: "Try a search, review drafts under Outreach, and only approve what you’d send yourself.",
     },
   ];
 }
