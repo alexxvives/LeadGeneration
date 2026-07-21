@@ -342,6 +342,10 @@ export function GettingStartedWizard({
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [anchored, setAnchored] = useState(false);
+  /** If the target never mounts, show the tip centered once (no slide). */
+  const [fallbackCenter, setFallbackCenter] = useState(false);
+  /** Final tip placement for this step — set once so it never slides. */
+  const [tipPos, setTipPos] = useState<TipPos | null>(null);
   const measuringRef = useRef(false);
   const seededRef = useRef(false);
 
@@ -359,15 +363,21 @@ export function GettingStartedWizard({
     [onClose, userId],
   );
 
+  const resetTip = useCallback(() => {
+    setAnchored(false);
+    setRect(null);
+    setFallbackCenter(false);
+    setTipPos(null);
+  }, []);
+
   useEffect(() => {
     if (!open) {
       seededRef.current = false;
       return;
     }
     setStep(0);
-    setRect(null);
-    setAnchored(false);
-  }, [open]);
+    resetTip();
+  }, [open, resetTip]);
 
   // Seed sample leads once so Pipeline / Leads / Outreach show real UI, not
   // “Your board is clear”. Free, offline demo — no provider credits.
@@ -408,11 +418,22 @@ export function GettingStartedWizard({
   useEffect(() => {
     if (!open) return;
     if (!onCorrectPath) {
-      setAnchored(false);
-      setRect(null);
+      resetTip();
       router.replace(withBoardFilter(current.path), { scroll: false });
     }
-  }, [open, step, current.path, onCorrectPath, router]);
+  }, [open, step, current.path, onCorrectPath, router, resetTip]);
+
+  // Safety: if the spotlight target never appears, still show the tip centered.
+  useEffect(() => {
+    if (!open) return;
+    if (!current.target) {
+      setFallbackCenter(false);
+      return;
+    }
+    setFallbackCenter(false);
+    const t = window.setTimeout(() => setFallbackCenter(true), 800);
+    return () => window.clearTimeout(t);
+  }, [open, step, current.target]);
 
   const measure = useCallback(() => {
     if (!open) return;
@@ -477,6 +498,22 @@ export function GettingStartedWizard({
     };
   }, [open, step, measure, pathname, searchParams]);
 
+  // Lock placement once — tip mounts at its final spot (no center→side tween).
+  useLayoutEffect(() => {
+    if (!open || tipPos) return;
+    if (!current.target) {
+      setTipPos(placeTip(null, current.prefer));
+      return;
+    }
+    if (anchored && rect) {
+      setTipPos(placeTip(rect, current.prefer));
+      return;
+    }
+    if (fallbackCenter) {
+      setTipPos(placeTip(null, current.prefer));
+    }
+  }, [open, tipPos, current.target, current.prefer, anchored, rect, fallbackCenter]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -488,19 +525,14 @@ export function GettingStartedWizard({
 
   if (!open) return null;
 
-  // Always show the tip card — never opacity-0 / pointer-events-none (that made
-  // step 4 look “missing” when the target was still mounting). Spotlight waits
-  // for anchor; tip sits centered until then.
   const pad = current.pad ?? 10;
-  const tipPos = placeTip(
-    current.target && anchored ? rect : null,
-    current.prefer,
-  );
-  const tipStyle: React.CSSProperties = {
-    top: tipPos.top,
-    left: tipPos.left,
-    ...(tipPos.transform ? { transform: tipPos.transform } : {}),
-  };
+  const tipStyle: React.CSSProperties | undefined = tipPos
+    ? {
+        top: tipPos.top,
+        left: tipPos.left,
+        ...(tipPos.transform ? { transform: tipPos.transform } : {}),
+      }
+    : undefined;
 
   return (
     <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-labelledby="tour-title">
@@ -536,92 +568,92 @@ export function GettingStartedWizard({
         )}
       </svg>
 
-      <div
-        key={current.id}
-        className="pointer-events-auto absolute z-[71] w-[min(100%-2rem,22rem)] transition-[top,left] duration-200 ease-out"
-        style={tipStyle}
-      >
-        <div className="relative animate-float-up rounded-xl2 border border-aurora-400/25 bg-ink-900 p-5 shadow-2xl shadow-black/50">
-          <button
-            type="button"
-            onClick={() => finish(false)}
-            className="absolute right-3 top-3 rounded-lg p-1.5 text-mist-500 hover:bg-white/5 hover:text-mist-100"
-            aria-label="Close"
-          >
-            <XIcon className="h-4 w-4" />
-          </button>
-
-          <div className="mb-3 flex gap-1.5">
-            {STEPS.map((s, i) => (
-              <span
-                key={s.id}
-                className={`h-1 flex-1 rounded-full transition-colors ${
-                  i <= step ? "bg-aurora-400" : "bg-white/10"
-                }`}
-              />
-            ))}
-          </div>
-
-          <p className="text-[11px] uppercase tracking-widest text-aurora-300">
-            Tour · {step + 1} / {STEPS.length}
-          </p>
-          <h2 id="tour-title" className="mt-2 pr-6 font-display text-xl font-semibold text-mist-100">
-            {current.title}
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-mist-300">{current.body}</p>
-
-          <div className="mt-5 flex items-center justify-between gap-2">
+      {tipPos ? (
+        <div
+          key={current.id}
+          className="pointer-events-auto absolute z-[71] w-[min(100%-2rem,22rem)]"
+          style={tipStyle}
+        >
+          <div className="relative animate-float-up rounded-xl2 border border-aurora-400/25 bg-ink-900 p-5 shadow-2xl shadow-black/50">
             <button
               type="button"
               onClick={() => finish(false)}
-              className="text-sm text-mist-500 hover:text-mist-200"
+              className="absolute right-3 top-3 rounded-lg p-1.5 text-mist-500 hover:bg-white/5 hover:text-mist-100"
+              aria-label="Close"
             >
-              Skip
+              <XIcon className="h-4 w-4" />
             </button>
-            <div className="flex gap-2">
-              {step > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAnchored(false);
-                    setRect(null);
-                    setStep((s) => s - 1);
-                  }}
-                  className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-mist-100 hover:bg-white/5"
-                >
-                  Back
-                </button>
-              )}
-              {!isLast ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAnchored(false);
-                    setRect(null);
-                    setStep((s) => s + 1);
-                  }}
-                  className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
-                >
-                  Next
-                  <ArrowIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    finish(true);
-                    router.replace(withBoardFilter("/app"), { scroll: false });
-                  }}
-                  className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
-                >
-                  Start searching
-                  <ArrowIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                </button>
-              )}
+
+            <div className="mb-3 flex gap-1.5">
+              {STEPS.map((s, i) => (
+                <span
+                  key={s.id}
+                  className={`h-1 flex-1 rounded-full transition-colors ${
+                    i <= step ? "bg-aurora-400" : "bg-white/10"
+                  }`}
+                />
+              ))}
+            </div>
+
+            <p className="text-[11px] uppercase tracking-widest text-aurora-300">
+              Tour · {step + 1} / {STEPS.length}
+            </p>
+            <h2 id="tour-title" className="mt-2 pr-6 font-display text-xl font-semibold text-mist-100">
+              {current.title}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-mist-300">{current.body}</p>
+
+            <div className="mt-5 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => finish(false)}
+                className="text-sm text-mist-500 hover:text-mist-200"
+              >
+                Skip
+              </button>
+              <div className="flex gap-2">
+                {step > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetTip();
+                      setStep((s) => s - 1);
+                    }}
+                    className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-mist-100 hover:bg-white/5"
+                  >
+                    Back
+                  </button>
+                )}
+                {!isLast ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetTip();
+                      setStep((s) => s + 1);
+                    }}
+                    className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
+                  >
+                    Next
+                    <ArrowIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      finish(true);
+                      router.replace(withBoardFilter("/app"), { scroll: false });
+                    }}
+                    className="group inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
+                  >
+                    Start searching
+                    <ArrowIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
