@@ -43,28 +43,45 @@ async function firecrawlFetch(url: string, body: unknown): Promise<Response> {
   });
 }
 
+/** Coerce Firecrawl credit fields (number or numeric string) → non‑negative int. */
+export function parseFirecrawlCredits(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) return Math.max(0, Math.floor(raw));
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const n = Number(raw);
+    if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+  }
+  return null;
+}
+
 /** Remaining Firecrawl credits for the API key team (null if unavailable). */
 export async function getFirecrawlRemainingCredits(): Promise<number | null> {
   const key = env.firecrawlKey();
   if (!key) return null;
   try {
     const res = await fetch(FIRECRAWL_CREDITS, {
-      headers: { Authorization: `Bearer ${key}` },
+      headers: {
+        Authorization: `Bearer ${key}`,
+        Accept: "application/json",
+      },
       signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
     });
     if (!res.ok) return null;
-    // API returns snake_case (`remaining_credits`); accept camelCase too.
+    // API returns snake_case (`remaining_credits`); accept camelCase / strings.
     const json = (await res.json()) as {
-      data?: { remaining_credits?: number; remainingCredits?: number };
-      remaining_credits?: number;
-      remainingCredits?: number;
+      data?: {
+        remaining_credits?: unknown;
+        remainingCredits?: unknown;
+      };
+      remaining_credits?: unknown;
+      remainingCredits?: unknown;
     };
-    const n =
-      json.data?.remaining_credits ??
-      json.data?.remainingCredits ??
-      json.remaining_credits ??
-      json.remainingCredits;
-    return typeof n === "number" && Number.isFinite(n) ? Math.max(0, n) : null;
+    return (
+      parseFirecrawlCredits(json.data?.remaining_credits) ??
+      parseFirecrawlCredits(json.data?.remainingCredits) ??
+      parseFirecrawlCredits(json.remaining_credits) ??
+      parseFirecrawlCredits(json.remainingCredits)
+    );
   } catch {
     return null;
   }

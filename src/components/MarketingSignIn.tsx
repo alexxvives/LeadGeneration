@@ -21,9 +21,23 @@ export function useMarketingSignIn(): SignInCtx {
   return useContext(Ctx);
 }
 
+/** Same-origin path only (blocks open redirects via ?callbackUrl=). */
+function safeCallbackUrl(raw: string | null | undefined): string {
+  if (!raw) return "/app";
+  if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  if (typeof window === "undefined") return "/app";
+  try {
+    const url = new URL(raw);
+    if (url.origin !== window.location.origin) return "/app";
+    return `${url.pathname}${url.search}` || "/app";
+  } catch {
+    return "/app";
+  }
+}
+
 /**
- * Marketing-page sign-in overlay. CTAs call openSignIn() instead of navigating
- * to /login (middleware can still send unauthenticated /app traffic to /login).
+ * Marketing-page sign-in overlay. CTAs + middleware (`/?signin=1`) open this;
+ * `/login` redirects here for Auth.js `pages.signIn`.
  */
 export function MarketingSignInProvider({
   children,
@@ -40,6 +54,7 @@ export function MarketingSignInProvider({
   const [authMode, setAuthMode] = useState<"signin" | "signup" | "magic">(
     "signin",
   );
+  const [callbackUrl, setCallbackUrl] = useState("/app");
 
   const openSignIn = useCallback(() => {
     setAuthMode("signin");
@@ -54,6 +69,7 @@ export function MarketingSignInProvider({
           open={open}
           setOpen={setOpen}
           setAuthMode={setAuthMode}
+          setCallbackUrl={setCallbackUrl}
         />
       </Suspense>
       <AuthModal
@@ -63,7 +79,7 @@ export function MarketingSignInProvider({
         credentialsMode={!authRequired}
         magicLink={magicLink}
         turnstileSiteKey={turnstileSiteKey}
-        callbackUrl="/app"
+        callbackUrl={callbackUrl}
         allowGuest={!authRequired}
         dismissible
         initialMode={authMode}
@@ -77,16 +93,21 @@ function SignInQuerySync({
   open,
   setOpen,
   setAuthMode,
+  setCallbackUrl,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
   setAuthMode: (m: "signin" | "signup" | "magic") => void;
+  setCallbackUrl: (v: string) => void;
 }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
+    const cb = searchParams.get("callbackUrl");
+    if (cb) setCallbackUrl(safeCallbackUrl(cb));
+
     const insider = searchParams.get("insider");
     if (insider) {
       try {
@@ -100,14 +121,23 @@ function SignInQuerySync({
       setAuthMode("signin");
       setOpen(true);
     }
-  }, [searchParams, setOpen, setAuthMode]);
+  }, [searchParams, setOpen, setAuthMode, setCallbackUrl]);
 
   useEffect(() => {
     if (open) return;
-    if (!searchParams.get("signin") && !searchParams.get("insider")) return;
+    if (
+      !searchParams.get("signin") &&
+      !searchParams.get("insider") &&
+      !searchParams.get("callbackUrl") &&
+      !searchParams.get("authError")
+    ) {
+      return;
+    }
     const next = new URLSearchParams(searchParams.toString());
     next.delete("signin");
     next.delete("insider");
+    next.delete("callbackUrl");
+    next.delete("authError");
     const q = next.toString();
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   }, [open, pathname, router, searchParams]);

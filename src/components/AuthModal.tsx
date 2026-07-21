@@ -338,9 +338,12 @@ export function AuthModal({
               <span className="mb-1.5 block text-sm font-medium text-mist-100">Email</span>
               <input
                 type="email"
+                name="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoFocus
+                autoComplete="email"
+                inputMode="email"
                 placeholder="you@company.com"
                 className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60"
               />
@@ -357,10 +360,13 @@ export function AuthModal({
                   ) : null}
                 </span>
                 <PasswordField
+                  name="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  autoComplete={
+                    mode === "signup" ? "new-password" : "current-password"
+                  }
                   required
                 />
               </label>

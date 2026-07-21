@@ -143,8 +143,8 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 - Board-invite mail is **platform** Resend ? optional `MAILEROO_API_KEY` ?
   SMTP ? never workspace BYO keys. Resend `onboarding@resend.dev` only
   delivers to the Resend account owner; production needs a verified from-domain.
-- Marketing Sign in opens `AuthModal` overlay (`dismissible`); `/login` remains
-  for middleware redirects.
+- Marketing Sign in opens `AuthModal` overlay (`dismissible`); `/login` and
+  unauth `/app` both land on `/?signin=1` (modal), not a separate login page.
 
 ### 2026-07-19 ? Invite modal + light pills + info card
 - Board Collaborate modal portals to `document.body` (parent `animate-float-up`
@@ -1061,3 +1061,28 @@ live product preview (map + pipeline) ? dropped missing hero image dependency.
   tenants stays on Admin → Users).
 - Sending identity **Your name** = inbox From display name
   (`Alex <you@domain.com>`), not email sign-off (that’s Outreach profile).
+
+### 2026-07-21 — One sign-in UI; magic-link needs verified From domain
+- Removed duplicate `/login` form — route redirects to `/?signin=1`. Middleware
+  does the same for unauth studio hits.
+- Forgot-password mail uses platform Resend + `authFromEmail()`. Without a
+  verified domain, From is `onboarding@resend.dev`, which **only delivers to
+  the Resend account owner** — not “because the site is on workers.dev”, but
+  because there is no verified sending domain yet. Fix: verify a domain in
+  Resend and set `OUTREACH_FROM_EMAIL` to an address on that domain.
+
+### 2026-07-21 — Insider credits parse harden; drop FC badge; migrate 0025
+- `getFirecrawlRemainingCredits` now coerces numeric strings + shares
+  `parseFirecrawlCredits` with the usage route (admin “Credits unavailable”
+  while the badge showed a number was a parse / shape mismatch).
+- Removed studio `FirecrawlUsageBadge` pill (Insider still sees pool on
+  Settings / Admin Users).
+- Remote D1 applied `0025_find_leads_enabled` — Search toggle was failing with
+  `no such column: find_leads_enabled`.
+
+### 2026-07-21 — Find leads on/off + sign-in autocomplete
+- Insider “Find leads” disabled while toggle On was `leadsRemaining == null`
+  (credits API blip), not the admin pause. Null no longer hard-blocks the
+  button; Off keeps the form and disables submit.
+- `PasswordField` forced `autoComplete="new-password"` after props spread, so
+  sign-in never got `current-password` / email autocomplete.

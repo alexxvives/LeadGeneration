@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { env, getCapabilities } from "@/lib/config";
+import { parseFirecrawlCredits } from "@/lib/search/firecrawl";
 
 /**
  * Proxy Firecrawl team credit usage. Never exposes the API key — only remaining
@@ -14,8 +15,10 @@ export const dynamic = "force-dynamic";
 type FirecrawlUsagePayload = {
   success?: boolean;
   data?: {
-    remaining_credits?: number;
-    plan_credits?: number;
+    remaining_credits?: unknown;
+    remainingCredits?: unknown;
+    plan_credits?: unknown;
+    planCredits?: unknown;
     billing_period_start?: string | null;
     billing_period_end?: string | null;
   };
@@ -56,8 +59,12 @@ export async function GET() {
       );
     }
     const json = (await res.json()) as FirecrawlUsagePayload;
-    const remaining = json.data?.remaining_credits ?? null;
-    const plan = json.data?.plan_credits ?? null;
+    const remaining =
+      parseFirecrawlCredits(json.data?.remaining_credits) ??
+      parseFirecrawlCredits(json.data?.remainingCredits);
+    const plan =
+      parseFirecrawlCredits(json.data?.plan_credits) ??
+      parseFirecrawlCredits(json.data?.planCredits);
     return NextResponse.json({
       available: remaining != null,
       provider: "firecrawl" as const,

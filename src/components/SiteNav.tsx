@@ -21,7 +21,6 @@ const LINKS = [
  */
 export function SiteNav({ authRequired = false }: { authRequired?: boolean }) {
   const pathname = usePathname();
-  const onLogin = pathname === "/login";
   const [open, setOpen] = useState(false);
   const { openSignIn } = useMarketingSignIn();
 
@@ -64,11 +63,11 @@ export function SiteNav({ authRequired = false }: { authRequired?: boolean }) {
               {l.label}
             </Link>
           ))}
-          {!onLogin ? renderCta(false) : null}
+          {renderCta(false)}
         </nav>
 
         <div className="flex items-center gap-3 md:hidden">
-          {!onLogin ? renderCta(true) : null}
+          {renderCta(true)}
           <button
             type="button"
             aria-expanded={open}

@@ -62,7 +62,9 @@ const authMiddleware = auth((req) => {
     if (pathname.startsWith("/api")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const url = new URL("/login", req.nextUrl.origin);
+    // Landing AuthModal — not the legacy /login page (that only redirects here).
+    const url = new URL("/", req.nextUrl.origin);
+    url.searchParams.set("signin", "1");
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
   }

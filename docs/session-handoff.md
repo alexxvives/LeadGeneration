@@ -9,23 +9,22 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-21 (tour copy + drop Dev mode)
+## ⏱️ Status — updated 2026-07-21 (find-leads UX + autocomplete)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
-**Migrations:** 0021–**0025** local; **remote D1 needs `npm run cf:migrate`** (incl. `find_leads_enabled`).
+**Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Tour copy shortened (search / pipeline / leads / outreach / BYO sender / done).
-- Removed Developer mode panel from Settings (incl. tour replay button).
-- Tour reopen: `/app?setup=1` only.
+- Find leads On = searchable (null FC credits no longer disable button); Off =
+  form stays, submit disabled.
+- Sign-in email/password autocomplete fixed (`PasswordField` was overriding).
 
 ### Next
-1. Deploy.
-2. `npm run cf:migrate` (remote) if not already.
+1. Deploy (all pending UI/auth/search fixes).
+2. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
 3. Measure email-found % on live Firecrawl runs.
-4. Optional dogfood non-admin account for Search/Pipeline.
-5. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
+4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 

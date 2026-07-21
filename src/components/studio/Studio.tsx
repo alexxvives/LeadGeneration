@@ -8,7 +8,6 @@ import {
   QuotaExceededError,
   RateLimitedError,
   type BoardResponse,
-  type FirecrawlUsage,
 } from "@/lib/client-api";
 import type { ContactMethod, CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
@@ -18,7 +17,6 @@ import { LeadMap } from "./LeadMap";
 import { LeadDrawer } from "./LeadDrawer";
 import { UpgradeModal, UsageBar } from "./UpgradeModal";
 import { VerifyLimitModal } from "./VerifyLimitModal";
-import { FirecrawlUsageBadge } from "./FirecrawlUsageBadge";
 import { Spinner, crmStageLabel } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
@@ -137,8 +135,6 @@ export function Studio() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [upgrade, setUpgrade] = useState<UpgradePrompt | null>(null);
   const [verifyLimitPlan, setVerifyLimitPlan] = useState<PlanId | null>(null);
-  const [fcUsageKey, setFcUsageKey] = useState(0);
-  const [fcBefore, setFcBefore] = useState<FirecrawlUsage | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<{
@@ -335,10 +331,7 @@ export function Studio() {
 
   const executeSearch = async (v: SearchValues, boardId: string) => {
     setRunning(true);
-    let before: FirecrawlUsage | null = null;
     try {
-      before = await api.firecrawlUsage().catch(() => null);
-      setFcBefore(before);
       activeRunIdRef.current = null;
       setActiveRunId(null);
       await api.createRun({
@@ -357,7 +350,6 @@ export function Studio() {
       storeBoardFilter(boardId);
       const data = await refresh();
       const n = data.leads.length;
-      setFcUsageKey((k) => k + 1);
       toast(
         "ok",
         `${data.run?.mode === "live" ? "Live search" : "Search"} complete — ${n} lead${n === 1 ? "" : "s"} charted.`,
@@ -956,7 +948,7 @@ export function Studio() {
 
   return (
     <main className="mx-auto flex h-dvh max-w-[90rem] flex-col overflow-hidden px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-3 sm:pt-8">
-      <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[1fr_auto_1fr]">
+      <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[1fr_auto]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -1012,12 +1004,6 @@ export function Studio() {
             <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200">
               {lockHolder ?? "Someone else"} is editing this board — view only until they leave.
             </p>
-          ) : null}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-center">
-          {view === "board" && board?.capabilities.firecrawl ? (
-            <FirecrawlUsageBadge refreshKey={fcUsageKey} before={fcBefore} />
           ) : null}
         </div>
 
@@ -1147,10 +1133,10 @@ export function Studio() {
             planId={board?.workspace?.planId ?? "free"}
             findLeadsEnabled={board?.workspace?.findLeadsEnabled !== false}
             leadsRemaining={
-              !board?.workspace?.metered
-                ? null
-                : board.workspace.planId === "insider"
-                  ? board.workspace.firecrawlCreditsRemaining ?? null
+              board?.workspace?.planId === "insider"
+                ? (board.workspace.firecrawlCreditsRemaining ?? null)
+                : !board?.workspace?.metered
+                  ? null
                   : Math.max(
                       0,
                       board.workspace.leadsLimit - board.workspace.leadsUsed,

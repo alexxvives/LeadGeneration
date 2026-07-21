@@ -48,12 +48,13 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   compliance section. Brand-first marketing view. Public.
 - **`/pricing`** — the four plans (Free / Starter / Pro / Agency) with Stripe
   Checkout CTAs. Public.
-- **`/login`** — sign-in / create account. **Password is primary** (hashed on
-  the Auth.js `users` table). Platform admin is a normal account with
-  `users.is_admin = 1` (first-boot: `admin@tryhermesmail.com` from
-  `BOOTSTRAP_ADMIN_PASSWORD` or a one-time logged UUID).
-  Magic link (SMTP/Resend) is **forgot password** (+ Turnstile when set).
-  Marketing nav: one CTA — **Sign in** (prod) or **Open studio** (local).
+- **Sign in** — marketing overlay (`AuthModal` via `/?signin=1`). **Password
+  is primary** (hashed on the Auth.js `users` table). Platform admin is a
+  normal account with `users.is_admin = 1` (first-boot:
+  `admin@tryhermesmail.com` from `BOOTSTRAP_ADMIN_PASSWORD` or a one-time
+  logged UUID). Magic link (SMTP/Resend) is **forgot password** (+ Turnstile
+  when set). `/login` only redirects here (Auth.js `pages.signIn`). Unauth
+  `/app` → `/?signin=1&callbackUrl=/app`.
 - **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar
   nav: **Dashboard · Search · Pipeline · Leads · Outreach · Runs · Boards**.
   Board filter (**All** or one board) sits above the account card. Settings

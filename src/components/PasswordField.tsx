@@ -33,6 +33,7 @@ export function PasswordField({
   value,
   onChange,
   onFocus,
+  autoComplete = "new-password",
   ...rest
 }: Props) {
   const [visible, setVisible] = useState(false);
@@ -66,7 +67,7 @@ export function PasswordField({
         // Saved mask is fake text (fixed length). Real keys use password discs.
         type={isMasked ? "text" : visible ? "text" : "password"}
         disabled={disabled}
-        autoComplete="new-password"
+        autoComplete={autoComplete}
         spellCheck={false}
         className={
           isMasked
