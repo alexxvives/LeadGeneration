@@ -267,17 +267,14 @@ export function SearchPanel({
       ? profiles.find((p) => p.id === profileId)!
       : null;
 
-  // Insider: only block when the shared pool is known-empty. Null = usage API
-  // blip — still allow submit; the server re-checks Firecrawl credits.
-  const creditsEmpty =
-    planId === "insider" && leadsRemaining != null && leadsRemaining <= 0;
-
+  // Admin pause is the only feature gate on the client. Credit / quota checks
+  // stay on the server (402) so a Firecrawl usage blip can't look like "Search
+  // disabled" when the admin toggle is On.
   const canSubmit =
     findLeadsEnabled &&
     niche.trim().length > 0 &&
     locationConfirmed &&
-    !running &&
-    !creditsEmpty;
+    !running;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -351,13 +348,6 @@ export function SearchPanel({
       className="glass rounded-xl2 p-5 sm:p-6"
       data-tour="search-panel"
     >
-      {!findLeadsEnabled ? (
-        <p className="mb-4 rounded-lg border border-amber-400/25 bg-amber-400/[0.05] px-4 py-3 text-sm text-mist-300">
-          <span className="font-medium text-mist-100">Find leads is paused</span>
-          {" — "}
-          live search is disabled for this account. Import below still works.
-        </p>
-      ) : null}
       <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
         <Field label="Who do you want to reach?">
           <input
@@ -477,13 +467,12 @@ export function SearchPanel({
           >
             {LEAD_COUNT_OPTIONS.map((n) => {
               const overPlan = n > planCap;
-              // Insider remaining = raw Firecrawl credits (not 1:1 with leads).
-              // Null = usage API blip — don't lock batch sizes; server enforces.
+              // Metered plans: lock sizes above remaining monthly credits.
+              // Insider: credits ≠ leads 1:1 — never lock batch sizes here.
               const overCredits =
+                planId !== "insider" &&
                 leadsRemaining != null &&
-                (planId === "insider"
-                  ? leadsRemaining <= 0
-                  : n > leadsRemaining);
+                n > leadsRemaining;
               const disabled = !findLeadsEnabled || overPlan || overCredits;
               const isActive = maxLeads === n;
               return (
@@ -494,15 +483,11 @@ export function SearchPanel({
                   aria-checked={isActive}
                   disabled={disabled}
                   title={
-                    !findLeadsEnabled
-                      ? "Find leads is paused for this account"
-                      : overPlan
-                        ? `Your plan includes ${planMonthlyCap} leads / month — upgrade for larger batches`
-                        : overCredits
-                          ? planId === "insider"
-                            ? "Shared lead pool is empty"
-                            : `Only ${leadsRemaining} lead credit${leadsRemaining === 1 ? "" : "s"} left this month`
-                          : `Find ${n} leads`
+                    overPlan
+                      ? `Your plan includes ${planMonthlyCap} leads / month — upgrade for larger batches`
+                      : overCredits
+                        ? `Only ${leadsRemaining} lead credit${leadsRemaining === 1 ? "" : "s"} left this month`
+                        : `Find ${n} leads`
                   }
                   onClick={() => !disabled && setMaxLeads(n)}
                   className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -557,13 +542,6 @@ export function SearchPanel({
         <button
           type="submit"
           disabled={!canSubmit}
-          title={
-            !findLeadsEnabled
-              ? "Find leads is paused for this account"
-              : creditsEmpty
-                ? "Shared lead pool is empty"
-                : undefined
-          }
           className="btn-aurora-shine inline-flex items-center justify-center rounded-full px-8 py-3 font-semibold text-on-accent shadow-[0_0_24px_-6px_rgba(67,224,168,0.55)] transition-transform hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:[animation:none]"
         >
           {running ? (

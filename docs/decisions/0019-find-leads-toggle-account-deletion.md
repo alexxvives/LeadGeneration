@@ -9,8 +9,9 @@ to permanently remove an account.
 
 ## Decision
 - `workspaces.find_leads_enabled` (default on). Admin Users table exposes a
-  per-row toggle; Search form is blocked + `createAndRunSearch` returns 403.
-  **Import stays available** on the Search view when Find leads is off.
+  per-row toggle; Find leads submit is disabled (no banner) +
+  `createAndRunSearch` returns 403. **Import stays available** on the Search
+  view when Find leads is off.
 - Self-serve `DELETE /api/account` and admin `DELETE /api/admin/users` wipe
   workspace data, board sharing rows, verification tokens / invites by email,
   and the Auth.js owner (never platform admins / local demo workspace).

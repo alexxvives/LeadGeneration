@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-21 — Find leads: no pause banner; credits ≠ UI disable
+- Off: keep Search form, disable Find leads only — no “paused” banner/title.
+- On: client must not grey out submit for null/0 Firecrawl credits (looked
+  like admin Off). Server still 402s on empty/unavailable pool.
+- getWorkspaceSummary error path defaults Find leads On (read DB flag when
+  possible); ForbiddenError remains the real pause gate.
+
 ### 2026-07-21 — Tour step 4 + sample leads
 - Step 4 “missing”: tip used opacity-0 + pointer-events-none until anchor;
   Outreach target often wasn’t ready → blank overlay, can’t Next. Tip always
@@ -38,8 +45,8 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   1000). Admin Users shows shared pool remaining.
 - Account delete: best-effort Stripe `subscriptions.cancel`; cascade
   `verification_tokens` + `board_invites` by email; admin typed `DELETE`.
-- Admin Settings: no Danger zone. getWorkspaceSummary fail-closes Find leads
-  when metered.
+- Admin Settings: no Danger zone. (Summary error path later changed to prefer
+  DB Find-leads flag / default On — see entry above.)
 
 ### 2026-07-21 — Account deletion, Find-leads toggle, Insider “Leads” meter
 - Self-delete: Settings danger zone → `DELETE /api/account`. Admin Users:

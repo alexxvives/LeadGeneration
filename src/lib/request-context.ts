@@ -197,14 +197,15 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
     };
   } catch (err) {
     console.error("[getWorkspaceSummary] failed", err);
-    // Fail closed on Find leads when metered: a DB blip must not re-enable Search
-    // for an account the admin paused. Demo/local stays permissive.
-    let findLeadsEnabled = !ctx.metered;
+    // Prefer the workspace row's admin flag. Default On so a usage/credits
+    // blip doesn't grey out Search when the toggle is On — createAndRunSearch
+    // still enforces ForbiddenError when Find leads is actually paused.
+    let findLeadsEnabled = true;
     try {
       const ws = await ctx.db.getWorkspace(ctx.workspaceId);
       if (ws) findLeadsEnabled = ws.findLeadsEnabled !== false;
     } catch {
-      /* keep fail-closed default */
+      /* keep default On; server gate remains authoritative */
     }
     return {
       workspaceId: ctx.workspaceId,

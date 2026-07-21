@@ -71,8 +71,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     chosen board (workspace **Default** if none). Live search when Firecrawl
     is configured; otherwise load demo data. After a run, the app redirects to
     Pipeline. Integration status lives in Settings (no mode banner).
-    **Find leads** can be paused per account by an admin — the Search form is
-    disabled but **Import stays available** on this view.
+    **Find leads** can be paused per account by an admin — the Find leads
+    button stays disabled (no pause banner); **Import stays available**.
 
   - **Admin Users** (`?view=admin-users`) — tenant table: plan override, Find
     leads toggle, typed `DELETE` account wipe (cancels Stripe when configured).

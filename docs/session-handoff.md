@@ -9,19 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-21 (find-leads UX + autocomplete)
+## ⏱️ Status — updated 2026-07-21 (Find leads button gate)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Find leads On = searchable (null FC credits no longer disable button); Off =
-  form stays, submit disabled.
-- Sign-in email/password autocomplete fixed (`PasswordField` was overriding).
+- Find leads Off → disabled submit only (no pause banner/copy).
+- Find leads On → submit gated by niche/location/running only; FC credits no
+  longer disable the button (server 402 still enforces empty/unavailable pool).
+- getWorkspaceSummary catch: default Find leads On; read DB flag when possible.
 
 ### Next
-1. Deploy (all pending UI/auth/search fixes).
+1. Deploy (this Find-leads UX fix).
 2. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
 3. Measure email-found % on live Firecrawl runs.
 4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
