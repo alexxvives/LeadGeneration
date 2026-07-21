@@ -93,13 +93,69 @@ function aliasColMap(headers: string[]): ColMap {
   };
 }
 
-async function resolveColMap(headers: string[]): Promise<ColMap> {
+function colFill(matrix: string[][], col: number): number {
+  if (col < 0 || matrix.length < 2) return 0;
+  let n = 0;
+  for (let r = 1; r < matrix.length; r++) {
+    if (cellStr(matrix[r]?.[col] ?? "").trim()) n++;
+  }
+  return n;
+}
+
+/**
+ * Prefer LLM for odd/localized headers, but never keep a sparse "company"
+ * mapping when alias found a denser business column (e.g. Opportunity vs
+ * empty Name → would drop most rows).
+ */
+function reconcileColMap(ai: ColMap, alias: ColMap, matrix: string[][]): ColMap {
+  const out = { ...ai };
+  const aiFill = colFill(matrix, out.company);
+  const aliasFill = colFill(matrix, alias.company);
+
+  // AI put company on the person-name column while Opportunity/Company exists.
+  if (
+    alias.company >= 0 &&
+    out.company === alias.contactName &&
+    alias.company !== out.company
+  ) {
+    const personCol = out.contactName >= 0 ? out.contactName : out.company;
+    out.company = alias.company;
+    if (personCol !== out.company) out.contactName = personCol;
+  } else if (
+    alias.company >= 0 &&
+    aliasFill > aiFill * 2 &&
+    aliasFill >= Math.max(10, aiFill + 50)
+  ) {
+    // AI company column is mostly empty; alias business column is dense.
+    if (out.contactName < 0 && out.company >= 0 && out.company !== alias.company) {
+      out.contactName = out.company;
+    }
+    out.company = alias.company;
+  }
+
+  // Fill gaps from alias when AI omitted a field.
+  if (out.emails < 0) out.emails = alias.emails;
+  if (out.website < 0) out.website = alias.website;
+  if (out.phones < 0) out.phones = alias.phones;
+  if (out.location < 0) out.location = alias.location;
+  if (out.contactName < 0) out.contactName = alias.contactName;
+  if (out.companyType < 0) out.companyType = alias.companyType;
+  if (out.company < 0) out.company = alias.company;
+
+  return out;
+}
+
+async function resolveColMap(
+  headers: string[],
+  matrix: string[][],
+): Promise<ColMap> {
+  const alias = aliasColMap(headers);
   // Imports are rare vs draft AI — prefer LLM (any language / odd CRM names).
-  // Alias list is the demo / zero-key fallback only.
+  // Alias list is the demo / zero-key fallback + density safety net.
   try {
     const { mapping } = await api.mapImportColumns(headers);
     if (mapping && (mapping.company != null || mapping.emails != null)) {
-      return {
+      const ai: ColMap = {
         company: mapping.company ?? -1,
         emails: mapping.emails ?? -1,
         website: mapping.website ?? -1,
@@ -108,11 +164,12 @@ async function resolveColMap(headers: string[]): Promise<ColMap> {
         contactName: mapping.contactName ?? -1,
         companyType: mapping.companyType ?? -1,
       };
+      return reconcileColMap(ai, alias, matrix);
     }
   } catch {
     // fall through
   }
-  return aliasColMap(headers);
+  return alias;
 }
 
 /** ExcelJS cell values may be hyperlinks, formulas, or rich text — never `[object Object]`. */
@@ -164,7 +221,7 @@ function normalizePhone(raw: string): string {
 async function rowsFromMatrix(matrix: string[][]): Promise<ImportLeadRow[]> {
   if (matrix.length < 2) return [];
   const headers = matrix[0].map((h) => cellStr(h));
-  const cols = await resolveColMap(headers);
+  const cols = await resolveColMap(headers, matrix);
 
   if (cols.company < 0 && cols.emails < 0) {
     throw new Error(

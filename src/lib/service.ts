@@ -2,11 +2,7 @@ import type { LeadRepository } from "@/lib/db";
 import { newId, nowIso } from "@/lib/id";
 import { runSearch, SearchUnavailableError } from "@/lib/search";
 import { generateDraft, stripLegacyCompliance } from "@/lib/outreach/draft";
-import {
-  mapPool,
-  personalizeDraftForLead,
-  scoreLeadPitchFit,
-} from "@/lib/ai/generate";
+import { mapPool, personalizeDraftForLead } from "@/lib/ai/generate";
 import {
   outreachLangFromLocation,
   type OutreachLang,
@@ -62,9 +58,11 @@ import type {
 const LOCK_TTL_MS = 150_000; // 2.5 minutes
 import { mailboxPublicStatus } from "@/lib/email/mailbox";
 import { scoreImportedLead } from "@/lib/fit-score";
-import { aiAvailable } from "@/lib/ai/chat";
-import { fetchPublicPageText } from "@/lib/ai/fetch-page";
-import { extractBlurb, extractLocation, extractPhones } from "@/lib/search/enrich";
+import {
+  companyGuessFromEmail,
+  isFreeMailDomain,
+  websiteFromEmail,
+} from "@/lib/website";
 
 /**
  * Application services. API routes stay thin and call into these functions,
@@ -1282,9 +1280,15 @@ function domainKey(website: string | null | undefined): string | null {
     ).hostname
       .replace(/^www\./, "")
       .toLowerCase();
-    return host || null;
+    // Never dedupe/merge on consumer mail hosts (many unrelated @gmail.com leads).
+    if (!host || isFreeMailDomain(host)) return null;
+    return host;
   } catch {
-    return website.replace(/^https?:\/\//i, "").replace(/^www\./, "").split("/")[0]?.toLowerCase() || null;
+    const host =
+      website.replace(/^https?:\/\//i, "").replace(/^www\./, "").split("/")[0]?.toLowerCase() ||
+      null;
+    if (!host || isFreeMailDomain(host)) return null;
+    return host;
   }
 }
 
@@ -1496,6 +1500,29 @@ export async function cancelRunningImportRuns(ctx: Ctx): Promise<number> {
     n++;
   }
   return n;
+}
+
+/** User cancelled the import modal — stop accepting further chunks. */
+export async function cancelImportRun(
+  ctx: Ctx,
+  runId: string,
+): Promise<{ ok: true }> {
+  const existing = await ctx.db.getRun(runId);
+  if (
+    !existing ||
+    existing.workspaceId !== ctx.workspaceId ||
+    existing.provider !== "import"
+  ) {
+    return { ok: true };
+  }
+  if (existing.status === "running") {
+    await ctx.db.updateRun(existing.id, {
+      status: "failed",
+      error: "Cancelled by user",
+      completedAt: nowIso(),
+    });
+  }
+  return { ok: true };
 }
 
 /** Update user-managed CRM fields on a lead (stage, contact method, notes, follow-ups). */
@@ -1776,45 +1803,29 @@ export async function importLeads(
       }
     }
 
-    // Plain website fetch (no Firecrawl) + optional AI pitch-fit. AI tokens are
-    // tiny; Firecrawl credits are the costly part — keep imports off that path.
-    const useAi = await aiAvailable();
+    // Spreadsheet-only: no per-row website fetch / AI pitch-fit. Those made
+    // multi-thousand imports crawl (HTTP × concurrency 3). Fit score uses
+    // columns already on the row; users can enrich later from the drawer.
     const { suggestCompanyType } = await import("@/lib/company-type");
-    const draftLeads = await mapPool(freshRows, 3, async (r) => {
-      const company = (
-        r.company ||
-        r.emails[0]?.split("@")[1]?.split(".")[0] ||
-        "Unknown company"
-      ).replace(/^./, (c) => c.toUpperCase());
-      const website =
-        r.website ||
-        (r.emails[0]?.includes("@")
-          ? `https://${r.emails[0].split("@")[1]}`
-          : null);
-
-      let aboutBlurb: string | null = null;
-      let location = r.location;
-      let phones = r.phones;
-      if (website) {
-        try {
-          const pageText = await fetchPublicPageText(website, { preferPlain: true });
-          aboutBlurb = extractBlurb(pageText);
-          if (!location) location = extractLocation(pageText);
-          if (phones.length === 0) {
-            const found = extractPhones(pageText);
-            if (found.length) phones = found.slice(0, 5);
-          }
-        } catch {
-          /* best-effort enrich */
-        }
-      }
+    const leads: Lead[] = freshRows.map((r) => {
+      const fromEmail = r.emails[0] ?? null;
+      const rawCompany =
+        r.company.trim() ||
+        companyGuessFromEmail(fromEmail) ||
+        "Unknown company";
+      const company = rawCompany.replace(/^./, (c) => c.toUpperCase());
+      // Never invent https://gmail.com (etc.) from a free-mail inbox.
+      const website = r.website || websiteFromEmail(fromEmail);
+      const location = r.location;
+      const phones = r.phones;
+      const aboutBlurb: string | null = null;
 
       const companyType =
         r.companyType ||
         suggestCompanyType(company, aboutBlurb, r.location) ||
         null;
 
-      let scored = scoreImportedLead(
+      const scored = scoreImportedLead(
         {
           company,
           website,
@@ -1827,21 +1838,6 @@ export async function importLeads(
         },
         offerNotes || null,
       );
-      if (useAi && offerNotes) {
-        const pitchFit = await scoreLeadPitchFit({
-          pitch: offerNotes,
-          company,
-          aboutBlurb,
-          location,
-          website,
-        });
-        if (pitchFit) {
-          scored = {
-            score: Math.min(100, scored.score + pitchFit.boost),
-            reasons: [...scored.reasons, pitchFit.reason],
-          };
-        }
-      }
 
       return {
         id: newId("lead"),
@@ -1869,7 +1865,6 @@ export async function importLeads(
         createdAt: nowIso(),
       };
     });
-    const leads: Lead[] = draftLeads;
 
     if (leads.length > 0) await db.createLeads(leads);
     if (leads.length > 0) await recordLeadUsage(ctx, leads.length);

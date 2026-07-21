@@ -1,5 +1,5 @@
 /**
- * Best-effort plain text from a public URL for pitch generation / import enrich.
+ * Best-effort plain text from a public URL for pitch generation / on-demand enrich.
  * Prefers Firecrawl when configured; otherwise a plain fetch + tag strip.
  */
 

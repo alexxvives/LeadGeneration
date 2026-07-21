@@ -4,6 +4,44 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-21 — Bad import: Gmail companies + invented websites
+- Pre-fix import mapped company→empty `Name`, then invented company/website
+  from email domain → 132× `company=Gmail` / `https://gmail.com`, hundreds of
+  domain-slug names (`Ismet`, `Mohg`). Phones usually matched the email row;
+  “wrong phone” cases are mostly **duplicate emails** in the xlsx (multi-site
+  brands).
+- Fix: never invent website/company from free-mail domains; `domainKey` ignores
+  them for merge. Repaired alexxvives D1 from `LEADS.xlsx` (576 rows).
+
+### 2026-07-21 — Fast import + cancel
+- Import was slow because each new row did `fetchPublicPageText` + optional AI
+  pitch-fit (concurrency 3). Spreadsheet-only path now: score from columns,
+  chunk 250, soft progress bar, Cancel aborts fetch + marks run failed.
+- Trade-off: no auto about-blurb/phone fill from the site on import (drawer
+  enrich / Find leads still can).
+
+### 2026-07-21 — Import “0 / 617” on LEADS.xlsx
+- File has ~2482 rows; only **617 have email**. AI mapped `company` → empty
+  `Name` instead of `Opportunity` → client kept only email rows → UI showed
+  `0 / 617`. Progress stuck at 0 until first chunk finished (was website enrich).
+- Fix: prompt + density reconcile (Opportunity beats sparse Name).
+- Cursor **IDE** can build that xlsx; Cursor **API** still ≠ in-app search
+  (ADR 0020 clarification).
+
+### 2026-07-21 — Invite toast + tour demo cleanup
+- Board invite ok copy: just “Invite saved/emailed for {email}.” (no Resend
+  troubleshooting blurb).
+- Tour demo seed: track lead ids; delete on Skip/Done so sample leads don’t
+  stay on the board after the tutorial.
+
+### 2026-07-21 — Cursor API ≠ Firecrawl (ADR 0020)
+- Rejected using Cursor Pro / `@cursor/sdk` as Insider scrape/search. Coding
+  agents ≠ web search+scrape; subscription ≠ Worker scrape credits.
+- Deferred path A: cheap LLM extract on FC markdown; path B (second
+  SearchProvider) only if FC cost still hurts after A. No code change yet.
+- Having a Cursor **API key** still doesn’t change this — SDK is agents-on-repo,
+  not Firecrawl-class search/scrape.
+
 ### 2026-07-21 — Find leads: no pause banner; credits ≠ UI disable
 - Off: keep Search form, disable Find leads only — no “paused” banner/title.
 - On: client must not grey out submit for null/0 Firecrawl credits (looked
@@ -17,6 +55,7 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   visible (centered until spotlight locks).
 - Tour auto-seeds offline demo leads (+ drafts) when the board is empty so
   Pipeline/Leads/Outreach show real UI instead of “Your board is clear”.
+  Those ids are deleted on Skip/Done (see invite toast + tour cleanup entry).
 - `demo: true` bypasses find-leads pause + quota and skips lead-credit burn
   (Load demo / tour seed must work with FC down or Search paused).
 

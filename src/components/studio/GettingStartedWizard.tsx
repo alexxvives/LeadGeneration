@@ -348,6 +348,8 @@ export function GettingStartedWizard({
   const [tipPos, setTipPos] = useState<TipPos | null>(null);
   const measuringRef = useRef(false);
   const seededRef = useRef(false);
+  /** Lead ids from this tour’s demo seed — removed when the tour ends. */
+  const tourDemoLeadIdsRef = useRef<string[]>([]);
 
   const STEPS = useMemo(() => buildSteps(), []);
   const current = STEPS[step] ?? STEPS[0]!;
@@ -357,8 +359,20 @@ export function GettingStartedWizard({
   const finish = useCallback(
     (celebrate = false) => {
       markGettingStartedDone(userId);
-      if (celebrate) fireConfetti();
-      onClose();
+      const demoIds = tourDemoLeadIdsRef.current;
+      tourDemoLeadIdsRef.current = [];
+      void (async () => {
+        if (demoIds.length > 0) {
+          try {
+            await api.deleteLeads(demoIds);
+            window.dispatchEvent(new Event(BOARD_REFRESH_EVENT));
+          } catch (err) {
+            console.error("[tour] demo cleanup failed", err);
+          }
+        }
+        if (celebrate) fireConfetti();
+        onClose();
+      })();
     },
     [onClose, userId],
   );
@@ -380,7 +394,8 @@ export function GettingStartedWizard({
   }, [open, resetTip]);
 
   // Seed sample leads once so Pipeline / Leads / Outreach show real UI, not
-  // “Your board is clear”. Free, offline demo — no provider credits.
+  // “Your board is clear”. Free, offline demo — no provider credits. Cleared
+  // in finish() so they don’t linger after Skip / Done.
   useEffect(() => {
     if (!open || seededRef.current) return;
     seededRef.current = true;
@@ -391,7 +406,7 @@ export function GettingStartedWizard({
         if (cancelled || (data.leads?.length ?? 0) > 0) return;
         const def =
           data.boards?.find((b) => b.isDefault)?.id ?? data.boards?.[0]?.id;
-        await api.createRun({
+        const { run } = await api.createRun({
           niche: "boutique dental clinics",
           location: "Austin, TX",
           offerNotes:
@@ -401,9 +416,10 @@ export function GettingStartedWizard({
           maxLeads: 6,
           boardId: def,
         });
-        if (!cancelled) {
-          window.dispatchEvent(new Event(BOARD_REFRESH_EVENT));
-        }
+        if (cancelled) return;
+        const { leads } = await api.runWithLeads(run.id);
+        tourDemoLeadIdsRef.current = leads.map((l) => l.id);
+        window.dispatchEvent(new Event(BOARD_REFRESH_EVENT));
       } catch (err) {
         console.error("[tour] demo seed failed", err);
       }

@@ -58,5 +58,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0017 — Hidden Insider plan with shared free-credit pool](0017-insider-shared-free-pool.md) _(credit display amended by [0018](0018-insider-raw-firecrawl-credits.md))_
 - [0018 — Insider shows raw Firecrawl remaining credits](0018-insider-raw-firecrawl-credits.md)
 - [0019 — Admin Find-leads toggle + account deletion](0019-find-leads-toggle-account-deletion.md)
+- [0020 — Cursor API is not a Firecrawl alternative](0020-no-cursor-api-for-search.md) _(deferred: Insider Grok/LLM extract on FC markdown)_
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

@@ -559,8 +559,8 @@ function BoardInviteModal({
       setEmail("");
       setOkMsg(
         emailSent
-          ? `Invite emailed to ${trimmed}. They can also accept under Boards when signed in.`
-          : `Invite saved for ${trimmed}. They’ll see it under Boards when signed in — notification email couldn’t be sent (check platform Resend/Maileroo).`,
+          ? `Invite emailed to ${trimmed}.`
+          : `Invite saved for ${trimmed}.`,
       );
       await loadPeople();
       onInvited();

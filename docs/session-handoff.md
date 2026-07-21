@@ -9,23 +9,24 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-21 (Find leads button gate)
+## ⏱️ Status — updated 2026-07-21 (import data repair)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Find leads Off → disabled submit only (no pause banner/copy).
-- Find leads On → submit gated by niche/location/running only; FC credits no
-  longer disable the button (server 402 still enforces empty/unavailable pool).
-- getWorkspaceSummary catch: default Find leads On; read DB flag when possible.
+- Import quality: no free-mail → website/company invent; domain merge ignores
+  gmail.com etc. Repaired alexxvives board from `LEADS.xlsx` (576 updates).
+- Prior: fast spreadsheet import + cancel; Opportunity column map fix.
 
 ### Next
-1. Deploy (this Find-leads UX fix).
-2. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
-3. Measure email-found % on live Firecrawl runs.
-4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
+1. Deploy import quality + speed/cancel fixes (live DB already repaired).
+2. Optional clean re-import of full ~2482 rows (current board is email-row set).
+3. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
+4. Measure email-found % on live Firecrawl runs.
+5. Optional: ADR 0020 path A (cheap LLM extract) if quality/COGS need it.
+6. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 

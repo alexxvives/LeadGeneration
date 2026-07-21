@@ -11,8 +11,13 @@ genuinely good.**
 Code: `src/lib/search/` (`index.ts`, `query.ts`, `firecrawl.ts`,
 `enrich.ts`, `demo.ts`) and `src/lib/fit-score.ts`.
 
-**Provider:** Firecrawl only. Demo is never a silent fallback for live searches
-— use “Load demo data” for that.
+**Provider:** Firecrawl only (ADR 0002). **Not** Cursor API/agents — wrong
+surface for search/scrape (ADR 0020). Demo is never a silent fallback for live
+searches — use “Load demo data” for that.
+
+**Deferred (ADR 0020 path A):** optional cheap LLM extract/polish on Firecrawl
+markdown for Insiders (xAI Grok or existing Workers AI / Groq / Gemini) — does
+not replace find+fetch.
 
 1. **Query building** (`query.ts` → `buildQuery`): one query
    `"{niche} in {location}"` (or niche alone) that finds **businesses**, not
@@ -50,8 +55,10 @@ Code: `src/lib/search/` (`index.ts`, `query.ts`, `firecrawl.ts`,
    contactability (up to ~25) scaled down when relevance is weak — so a random
    email with no niche signal stays low. No free points for “appeared in
    search”. Location mismatch can erase the score. Imports use the same rubric
-   via `scoreImportedLead` (contactability-led when there is no niche). Every
-   point is explained in `fitReasons` in the Lead detail drawer.
+   via `scoreImportedLead` (contactability-led when there is no niche). CSV/Excel
+   import scores from spreadsheet columns only (no per-row website fetch) so
+   large lists stay fast. Every point is explained in `fitReasons` in the Lead
+   detail drawer.
 6. **Fallback**: no key, zero results, or any provider error → deterministic
    **demo leads** from `demo.ts` so the UI always works (constitution Art. I.2).
 

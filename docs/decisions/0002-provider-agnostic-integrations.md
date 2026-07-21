@@ -10,8 +10,10 @@ change vendors without touching the UI.
 
 ## Decision
 - **Search:** a `SearchProvider` interface; **Firecrawl** is the sole live
-  implementation (Exa removed — ADR 0017). Missing key → “Load demo data” /
-  explicit demo mode (never a silent live→demo swap for paid runs).
+  implementation (Exa removed — ADR 0017). Cursor API / agents are **not** a
+  search provider ([ADR 0020](0020-no-cursor-api-for-search.md)). Missing key →
+  “Load demo data” / explicit demo mode (never a silent live→demo swap for
+  paid runs).
 - **Email:** `sendEmail()` tries Resend → SMTP (Nodemailer) → demo (simulated),
   chosen by which env vars are present. (Mailbox / Easy BYO peers added later —
   ADR 0010 / 0011.)

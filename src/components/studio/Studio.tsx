@@ -138,11 +138,14 @@ export function Studio() {
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<{
+    /** Smooth display value (may lead confirmed slightly). */
     done: number;
     total: number;
   } | null>(null);
   const [deletingLeads, setDeletingLeads] = useState(false);
   const importAbortRef = useRef<AbortController | null>(null);
+  const importRunIdRef = useRef<string | null>(null);
+  const importConfirmedRef = useRef(0);
   const [pendingSendId, setPendingSendId] = useState<string | null>(null);
   const [warmupWarn, setWarmupWarn] = useState<{
     outreachId: string;
@@ -404,8 +407,21 @@ export function Studio() {
     return () => window.removeEventListener(BOARD_REFRESH_EVENT, onRefresh);
   }, [refresh]);
 
+  const cancelImport = () => {
+    const runId = importRunIdRef.current;
+    importAbortRef.current?.abort();
+    if (runId) {
+      void fetch("/api/leads/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: [], runId, cancel: true }),
+      }).catch(() => undefined);
+    }
+  };
+
   const executeImport = async (leads: ImportLeadRow[], dest: BoardDestination) => {
-    const CHUNK = 80;
+    // Larger chunks are fine now that import is spreadsheet-only (no HTTP enrich).
+    const CHUNK = 250;
     const total = leads.length;
     let runId: string | undefined;
     let boardIdOut: string | undefined;
@@ -416,8 +432,27 @@ export function Studio() {
     importAbortRef.current?.abort();
     const ac = new AbortController();
     importAbortRef.current = ac;
+    importRunIdRef.current = null;
+    importConfirmedRef.current = 0;
 
     setImportProgress({ done: 0, total });
+
+    // Soft progress: ease toward the next chunk ceiling while a request is in flight.
+    const softTimer = window.setInterval(() => {
+      if (ac.signal.aborted) return;
+      setImportProgress((p) => {
+        if (!p || p.total <= 0) return p;
+        const confirmed = importConfirmedRef.current;
+        const softCap = Math.min(
+          p.total - (confirmed >= p.total ? 0 : 1),
+          confirmed + CHUNK * 0.9,
+        );
+        if (p.done >= softCap) return p;
+        const step = Math.max(0.4, (softCap - p.done) * 0.12);
+        return { ...p, done: Math.min(softCap, p.done + step) };
+      });
+    }, 80);
+
     try {
       for (let i = 0; i < leads.length; i += CHUNK) {
         if (ac.signal.aborted) throw new Error("Import cancelled");
@@ -451,11 +486,14 @@ export function Studio() {
         };
         if (!res.ok) throw new Error(data.error ?? "Import failed");
         runId = data.run?.id ?? runId;
+        importRunIdRef.current = runId ?? null;
         boardIdOut = data.boardId ?? boardIdOut;
         imported += data.imported ?? 0;
         merged += data.merged ?? 0;
         skipped += data.skipped ?? 0;
-        setImportProgress({ done: Math.min(i + chunk.length, total), total });
+        const confirmed = Math.min(i + chunk.length, total);
+        importConfirmedRef.current = confirmed;
+        setImportProgress({ done: confirmed, total });
       }
       // Safety finalize if the last data chunk didn't flip status (network blip).
       if (runId && !ac.signal.aborted) {
@@ -498,7 +536,10 @@ export function Studio() {
       }
       throw e;
     } finally {
+      window.clearInterval(softTimer);
       if (importAbortRef.current === ac) importAbortRef.current = null;
+      importRunIdRef.current = null;
+      importConfirmedRef.current = 0;
       setImportProgress(null);
     }
   };
@@ -1360,24 +1401,36 @@ export function Studio() {
           <>
             <p className="text-sm text-mist-300">
               <span className="tabular-nums text-mist-100">
-                {importProgress.done}
+                {Math.floor(importProgress.done)}
               </span>
               {" / "}
               <span className="tabular-nums">{importProgress.total}</span> rows
             </p>
             <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-ink-950/60">
               <div
-                className="h-full rounded-full bg-aurora-400 transition-[width] duration-300 ease-out"
+                className="h-full rounded-full bg-aurora-400 transition-[width] duration-150 ease-out"
                 style={{
                   width: `${
                     importProgress.total
-                      ? Math.round(
-                          (importProgress.done / importProgress.total) * 100,
+                      ? Math.min(
+                          100,
+                          Math.round(
+                            (importProgress.done / importProgress.total) * 100,
+                          ),
                         )
                       : 0
                   }%`,
                 }}
               />
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={cancelImport}
+                className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-mist-100 transition-colors hover:bg-white/5"
+              >
+                Cancel
+              </button>
             </div>
           </>
         ) : null}
