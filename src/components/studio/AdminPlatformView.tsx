@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { AdminPlatformStats, AdminUserRow, PlanId } from "@/lib/types";
-import { getPlan } from "@/lib/plans";
+import { getPlan, isPaidPlan } from "@/lib/plans";
 import { Spinner } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 
@@ -25,7 +25,7 @@ function StatCard({
   );
 }
 
-const PLAN_ORDER: PlanId[] = ["free", "starter", "pro", "agency"];
+const PLAN_ORDER: PlanId[] = ["free", "starter", "pro", "agency", "insider"];
 
 function statsForUsers(users: AdminUserRow[]): AdminPlatformStats {
   const byPlan: Record<PlanId, number> = {
@@ -33,6 +33,7 @@ function statsForUsers(users: AdminUserRow[]): AdminPlatformStats {
     starter: 0,
     pro: 0,
     agency: 0,
+    insider: 0,
   };
   let totalLeads = 0;
   let totalSendsLifetime = 0;
@@ -53,7 +54,7 @@ function statsForUsers(users: AdminUserRow[]): AdminPlatformStats {
     leadsUsedThisMonth += u.leadsUsedThisMonth;
     sendsUsedThisMonth += u.sendsUsedThisMonth;
     verifiesUsedToday += u.verifiesUsedToday;
-    if (u.planId !== "free") paidWorkspaceCount += 1;
+    if (isPaidPlan(u.planId)) paidWorkspaceCount += 1;
     if (u.stripeCustomerId) withStripeCustomer += 1;
     if (u.hasMailbox) withMailbox += 1;
     if (u.hasEasySendKey) withEasySendKey += 1;

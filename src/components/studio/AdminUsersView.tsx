@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { AdminUserRow, PlanId } from "@/lib/types";
-import { getPlan, PLAN_ORDER } from "@/lib/plans";
+import { ADMIN_PLAN_ORDER, getPlan } from "@/lib/plans";
 import { Spinner } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 
@@ -13,6 +13,8 @@ export function AdminUsersView() {
   const [q, setQ] = useState("");
   const [planFilter, setPlanFilter] = useState<PlanId | "all">("all");
   const [accountFilter, setAccountFilter] = useState<string>("all");
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,8 +82,50 @@ export function AdminUsersView() {
     );
   }
 
+  async function generateInsiderLink() {
+    setInviteBusy(true);
+    setErr(null);
+    try {
+      const { url } = await api.createInsiderInvite();
+      setInviteUrl(url);
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        /* user can copy manually */
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not create invite");
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl2 border border-white/10 bg-ink-900/40 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-mist-100">Insider access</p>
+          <p className="mt-0.5 text-xs text-mist-500">
+            Assign Insider on a row below, or generate a signup link (30 days).
+            New accounts via the link get Insider automatically.
+          </p>
+          {inviteUrl ? (
+            <p className="mt-2 break-all font-mono text-[11px] text-aurora-300">
+              {inviteUrl}
+              <span className="ml-2 text-mist-500">(copied if clipboard allowed)</span>
+            </p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          disabled={inviteBusy}
+          onClick={() => void generateInsiderLink()}
+          className="shrink-0 rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent disabled:opacity-50"
+        >
+          {inviteBusy ? "Generating…" : "Generate Insider signup link"}
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <Select
           value={accountFilter}
@@ -109,7 +153,7 @@ export function AdminUsersView() {
           aria-label="Filter by plan"
         >
           <option value="all">All plans</option>
-          {PLAN_ORDER.map((id) => (
+          {ADMIN_PLAN_ORDER.map((id) => (
             <option key={id} value={id}>
               {getPlan(id).name}
             </option>
@@ -152,15 +196,40 @@ export function AdminUsersView() {
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
-                        u.planId === "free"
-                          ? "bg-white/5 text-mist-300 ring-white/10"
-                          : "bg-aurora-400/15 text-aurora-300 ring-aurora-400/25"
-                      }`}
+                    <Select
+                      value={u.planId}
+                      className="min-w-[7.5rem] py-1.5 text-xs"
+                      aria-label={`Plan for ${u.ownerEmail ?? u.workspaceName}`}
+                      onChange={(e) => {
+                        const next = e.target.value as PlanId;
+                        void api
+                          .setPlanDev(next, u.workspaceId)
+                          .then(() => {
+                            setUsers((prev) =>
+                              prev
+                                ? prev.map((row) =>
+                                    row.workspaceId === u.workspaceId
+                                      ? { ...row, planId: next }
+                                      : row,
+                                  )
+                                : prev,
+                            );
+                          })
+                          .catch((err) => {
+                            setErr(
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to set plan",
+                            );
+                          });
+                      }}
                     >
-                      {getPlan(u.planId).name}
-                    </span>
+                      {ADMIN_PLAN_ORDER.map((id) => (
+                        <option key={id} value={id}>
+                          {getPlan(id).name}
+                        </option>
+                      ))}
+                    </Select>
                   </td>
                   <td className="px-4 py-3 text-mist-300">
                     <p>

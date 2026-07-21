@@ -7,7 +7,7 @@ import { StarIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import { api } from "@/lib/client-api";
-import { PLAN_ORDER, PLANS } from "@/lib/plans";
+import { ADMIN_PLAN_ORDER, PLANS } from "@/lib/plans";
 import type { PlanId } from "@/lib/types";
 
 /**
@@ -104,9 +104,10 @@ export function DeveloperModePanel({
             className="py-2 text-sm"
             aria-label="Override plan"
           >
-            {PLAN_ORDER.map((id) => (
+            {ADMIN_PLAN_ORDER.map((id) => (
               <option key={id} value={id}>
                 {PLANS[id].name}
+                {PLANS[id].hidden ? " (hidden)" : ""}
               </option>
             ))}
           </Select>

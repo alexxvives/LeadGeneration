@@ -8,27 +8,24 @@ genuinely good.**
 
 ## What happens today (Phase B)
 
-Code: `src/lib/search/` (`index.ts`, `query.ts`, `firecrawl.ts`, `exa.ts`,
+Code: `src/lib/search/` (`index.ts`, `query.ts`, `firecrawl.ts`,
 `enrich.ts`, `demo.ts`) and `src/lib/fit-score.ts`.
 
-**Provider order:** Firecrawl first; if it errors or returns no pages, **Exa**
-runs as fallback when `EXA_API_KEY` is set. Demo is never a silent fallback for
-live searches.
+**Provider:** Firecrawl only. Demo is never a silent fallback for live searches
+— use “Load demo data” for that.
 
-1. **Query building** (`query.ts` → `buildQueries`): the search hero exposes a
-   **Search mode** toggle backed by `CreateRunInput.searchStrategy`:
-   - `standard` — one focused query (`niche + location + "contact email"`).
-     Fastest, one provider call. Default.
-   - `smart` — expands the ICP into several phrasings (contact page, official
-     site, "top … in …") that are run and merged. Higher recall, ~3× credits.
-   - `local` — phrasings tuned for brick-and-mortar / near-me businesses
-     (directory-style, reviews, phone/address). Best when Location is filled in.
-   All modes enrich, dedupe by domain, then **rank by fit score** and cap to
-   the per-run limit. Smart/local mainly buy recall (more queries), not a
-   different scorer.
-2. **Provider search**: **Firecrawl** `/v1/search` + scrape (preferred). If
-   Firecrawl fails or returns zero pages, **Exa** runs next (when keyed).
-   Live search never silently swaps in demo leads — use “Load demo data” for that.
+1. **Query building** (`query.ts` → `buildQuery`): one query
+   `"{niche} in {location}"` (or niche alone) that finds **businesses**, not
+   contact-form pages. Fill modes:
+   - **Standard** — stop at N companies (email optional).
+   - **Complete** — keep companies without email, continue until N have an
+     email (total may exceed N; overfetches ~3×N, hard-capped for Workers).
+   Every company is **kept** with phone/address/category even without email.
+2. **Firecrawl search + scrape:** `/v1/search`, then per hit: scrape the
+   **landing** page (`onlyMainContent: false` — header/footer) first. If still
+   no email → `/contacto` then `/contact`. **No `/map`**. Skip scrape when the
+   search snippet already has an email. Regex: emails, phones, address;
+   `suggestCompanyType` for category. AI blurb polish is optional/cheap.
 3. **Enrichment** (`enrich.ts`) — Phase B improvements shipped 2026-07-14:
    - **Company name**: splits the page title on common separators (` | `, ` - `,
      ` — `, `:`), skips generic segments ("Contact Us", "Home", "About", "Welcome
@@ -77,8 +74,8 @@ about the limitations:
 - **The fit score is relevance-first** (niche tokens + location), with
   contactability as a secondary boost. It is still heuristic — not LLM ICP
   reasoning.
-- **Single page per result.** We don't crawl the site (about/team/contact pages)
-  to build a fuller profile.
+- **Contact pages were shallow.** Mitigated 2026-07-20 (Firecrawl deepen +
+  optional JSON extract). Still no full-site crawl or people-DB email finder.
 
 None of this is a bug — it's an intentional MVP scope with graceful fallback.
 The roadmap below is how it becomes a real moat.
@@ -90,39 +87,66 @@ won't disturb the approval/send flow.
 
 ### Tier 1 — high impact, low effort
 1. **Structured extraction instead of regex.** ✅ _Partial_ — Workers AI (optional)
-   rewrites lead `aboutBlurb` from scraped text after live search. Still to do:
-   Firecrawl `/extract` for typed `{ company, emails[], phones[], contactName, services[] }`.
-   Heuristic extract remains the zero-key fallback.
-2. **Email verification.** ✅ _Shipped (send-time)_ — MyEmailVerifier
-   (`MYEMAILVERIFIER_API_KEY`, preferred) or Zeruh
-   (`MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY`) in `sendApprovedOutreach`. Blocks
-   hard undeliverables; strips the bad address and rejects outreach. Plan-tiered
-   daily verify caps (Free 5 → Agency 100). Not run on enrich (credit cost +
-   Excel import parity). Still to do: persist a `deliverable` flag on the lead.
-3. **Smarter query building.** ✅ _Shipped_ — `query.ts` expands the niche into
-   multiple queries for the `smart`/`local` strategies and merges them. Still to
-   do: LLM-driven synonym/ICP expansion and site-type hints (e.g. exclude
-   aggregators/directories when you want the business's own site).
+   rewrites lead `aboutBlurb`; Firecrawl JSON extract runs when contact crawl
+   still finds no email. Heuristic regex remains the zero-key path.
+2. **Email verification.** ✅ _Shipped (send-time, ADR 0016)_ — **MyEmailVerifier**
+   (`MYEMAILVERIFIER_API_KEY`) primary; Zeruh legacy only. Blocks hard
+   undeliverables at send. Plan-tiered daily caps. Still to do: persist a
+   `deliverable` flag on the lead.
+3. **Smarter query building.** ✅ _Baseline_ — single `niche in city` query +
+   Standard/Complete fill modes. Still to do: LLM synonym/ICP expansion.
+4. **Shallow site crawl.** ✅ _Shipped_ — landing header/footer first, then
+   `/contacto` → `/contact` only if needed; `/map` unused.
+
+### Addon spike (deferred — prefer Firecrawl juice first)
+5. **People-DB email finder (e.g. Prospeo)** — **deferred / likely overkill.**
+   Another paid key for a gap Firecrawl contact-path deepen should close for
+   most SMB sites. Revisit only if measured email-found % stays low after
+   deepen. **Non-goals:** Apollo, MillionVerifier, PlusVibe send, AI Ark.
 
 ### Tier 2 — the local-business unlock
-4. **Places/Maps data for local ICPs.** For "dentists in Austin"-type queries, a
+6. **Places/Maps data for local ICPs.** For "dentists in Austin"-type queries, a
    Google Places / OpenStreetMap-style source gives authoritative name, address,
    phone, website, rating, and review count — then scrape the site for email.
    This is the right primary source for local lead-gen and should sit alongside
    web search as a provider.
-5. **Shallow site crawl.** For each business site, fetch a couple of likely pages
-   (`/contact`, `/about`, `/team`) to raise email-hit rate and profile depth.
 
 ### Tier 3 — real intelligence
-6. **ICP fit via the model, not just heuristics.** Given the user's ICP + offer,
+7. **ICP fit via the model, not just heuristics.** Given the user's ICP + offer,
    score each enriched profile with an LLM/embedding similarity and produce a
    short "why this fits" that's about *fit*, not just contactability. Keep the
    transparent-reasons UX.
-7. **Dedup + entity resolution** across sources (same business, different URLs).
-8. **Caching + incremental runs** so re-searching a niche is cheap and doesn't
+8. **Dedup + entity resolution** across sources (same business, different URLs).
+9. **Caching + incremental runs** so re-searching a niche is cheap and doesn't
    re-scrape.
-9. **Compliance-aware source filtering** (respect robots/ToS, never login-gated —
+10. **Compliance-aware source filtering** (respect robots/ToS, never login-gated —
    already a constitution rule; enforce in code).
+
+## Prospeo spike (design only — do not ship yet)
+
+**Gap Firecrawl cannot close:** many sites never publish a mailto; the inbox
+lives in a people database (name + company domain → work email).
+
+**Trigger (strict):** after Firecrawl search + deepen + JSON extract, lead has
+`emails.length === 0` AND a resolvable domain AND (optional) `contactName`.
+
+**Call shape (sketch):**
+
+```ts
+// src/lib/search/prospeo.ts — not implemented
+findEmail({ fullName?, company, domain }) → { email, verified } | null
+```
+
+**Wiring:** one optional step at the end of `runSearch` / lead enrich, behind
+`PROSPEO_API_KEY`. No key → skip (demo-safe). Never a second search provider.
+Never call on leads that already have an email. Count against a plan quota if
+shipped.
+
+**Ship criteria:** run 50 live leads; if Prospeo recovers ≥20% of “no email”
+cases at acceptable $/email, add provider. Else drop.
+
+**Non-goals:** Apollo, AI Ark, MillionVerifier, PlusVibe send — until this spike
+is accepted or rejected.
 
 ## Design constraints (keep these)
 
@@ -131,11 +155,10 @@ won't disturb the approval/send flow.
 - Public web only; no login-gated scraping.
 - Isolate all of this in `src/lib/search/`; the rest of the app shouldn't care
   how a `Lead` was produced.
+- Prefer **one** scrape path (Firecrawl) and **one** verify path (MyEmailVerifier).
 
 ## Provider notes
 
-- **Firecrawl** — search + scrape + `/extract`; best single dependency for
-  Tier 1. (During setup the MCP search returned HTTP 401 — verify the key is
-  active if the app stays in demo mode.)
-- **Exa** — strong semantic/neural search; good for discovery and as a fallback.
+- **Firecrawl** — sole live search path (search + full-page scrape + map deepen).
+- **MyEmailVerifier** — sole marketed verify (ADR 0016).
 - Consider a **Places** source for local business ICPs (Tier 2).

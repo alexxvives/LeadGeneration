@@ -9,22 +9,24 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-19 (onboarding + invite UX)
+## ⏱️ Status — updated 2026-07-21 (admin ops + Firecrawl credits + UI)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Local:** onboarding/invite/fit/template polish; `tsc` + `lint` green.
+**Local:** admin-only nav; Insider invite links; light-mode toggles; marketing contrast.
 **Migrations:** 0021–0024 applied locally; **remote D1 not yet** (`npm run cf:migrate`).
 
 ### This pass
-- New signup forces product tour (`hermes_force_tutorial`); tour done is per-user.
-- Pending board invites: redirect to Boards after login/tour; dashed invite cards.
-- Pipeline cards show fit score; empty template preview placeholder; language
-  auto-slot on blur; shortened Maileroo/Resend hints.
+- Firecrawl: contact links from markdown → `/contacto`/`/contact` only (no JSON extract).
+- Admin: Dashboard = platform overview; Users + Insider signup link; no studio product nav.
+- Settings: Resources under Plan & usage; light-mode switch + profile buttons.
+- Marketing readability (landing, how-it-works, ethics, deliverability).
+- Prospeo deferred; keep MyEmailVerifier (cheaper free tier than switching).
 
 ### Next
-1. `npm run cf:migrate` (remote) then deploy Worker.
-2. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
-3. Optional: Queues/DO for search >50 (TODO in config); soft-lock banner.
+1. Deploy after `npm run cf:migrate` (remote) if needed.
+2. Measure email-found % on live Firecrawl runs.
+3. Optional: dogfood account (non-admin) for Search/Pipeline testing.
+4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 

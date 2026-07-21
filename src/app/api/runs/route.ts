@@ -20,7 +20,7 @@ const CreateRunSchema = z.object({
   autoDraft: z.boolean().optional(),
   staticBody: z.boolean().optional(),
   aiPersonalize: z.boolean().optional(),
-  searchStrategy: z.enum(["standard", "smart", "local"]).optional(),
+  searchStrategy: z.enum(["standard", "complete"]).optional(),
   // Sync search runs inside one Worker request — hard-capped (audit C2.4).
   // TODO(queue): Cloudflare Queues / Durable Objects for larger batches.
   maxLeads: z.number().int().min(1).max(50).optional(),

@@ -44,26 +44,20 @@ const STRATEGIES: {
   label: string;
   summary: string;
   detail: string;
-  credits: string;
-  bestFor: string;
 }[] = [
   {
     id: "standard",
     label: "Standard",
-    summary: "One query → dedupe → rank by fit.",
+    summary: "Up to N companies — email optional.",
     detail:
-      "Fast first pass for a clear niche. Lowest provider cost (~1×).",
-    credits: "~1× credits",
-    bestFor: "Quick tests, narrow niches",
+      "Scrapes the landing header/footer first; only if no email, tries /contacto then /contact. Keeps phone, address, and category even without email. Stops at N leads.",
   },
   {
-    id: "smart",
-    label: "Smart",
-    summary: "Several query variants, merged and ranked by fit.",
+    id: "complete",
+    label: "Complete",
+    summary: "Keep going until N leads have an email.",
     detail:
-      "Broader recall when the niche is vague or crowded. Costs ~3× Standard.",
-    credits: "~3× credits",
-    bestFor: "Competitive or vague ICPs",
+      "Same scrape path. Companies without email are still kept, but the run continues until N emails are found — so you may get more than N leads total.",
   },
 ];
 
@@ -297,6 +291,8 @@ export function SearchPanel({
     });
   };
 
+  const active = STRATEGIES.find((s) => s.id === searchStrategy) ?? STRATEGIES[0]!;
+
   const applyIcp = (icp: SavedIcp) => {
     setNiche(icp.niche);
     setLocation(icp.location);
@@ -320,8 +316,6 @@ export function SearchPanel({
     deleteSavedIcp(id);
     setIcps(loadSavedIcps());
   };
-
-  const active = STRATEGIES.find((s) => s.id === searchStrategy) ?? STRATEGIES[0]!;
 
   if (compact && !open) {
     return (
@@ -460,8 +454,13 @@ export function SearchPanel({
           >
             {LEAD_COUNT_OPTIONS.map((n) => {
               const overPlan = n > planCap;
+              // Insider remaining = raw Firecrawl credits (not 1:1 with leads).
+              // Only hard-block when the pool is empty; server clamps batch size.
               const overCredits =
-                leadsRemaining != null && n > leadsRemaining;
+                leadsRemaining != null &&
+                (planId === "insider"
+                  ? leadsRemaining <= 0
+                  : n > leadsRemaining);
               const disabled = overPlan || overCredits;
               const isActive = maxLeads === n;
               return (
@@ -475,7 +474,9 @@ export function SearchPanel({
                     overPlan
                       ? `Your plan includes ${planMonthlyCap} leads / month — upgrade for larger batches`
                       : overCredits
-                        ? `Only ${leadsRemaining} lead credit${leadsRemaining === 1 ? "" : "s"} left this month`
+                        ? planId === "insider"
+                          ? "Shared Firecrawl credits are empty"
+                          : `Only ${leadsRemaining} lead credit${leadsRemaining === 1 ? "" : "s"} left this month`
                         : `Find ${n} leads`
                   }
                   onClick={() => !disabled && setMaxLeads(n)}
@@ -525,13 +526,6 @@ export function SearchPanel({
         <div className="mt-3 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
           <p className="text-sm font-medium text-mist-100">{active.summary}</p>
           <p className="mt-1.5 text-xs leading-relaxed text-mist-400">{active.detail}</p>
-          <p className="mt-2 text-[11px] tracking-wide text-mist-500">
-            <span className="uppercase tracking-wider">Best for</span>
-            {" · "}
-            {active.bestFor}
-            {" · "}
-            {active.credits}
-          </p>
         </div>
       </div>
       <div className="mt-5 flex items-center justify-center gap-4">

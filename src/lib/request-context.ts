@@ -4,7 +4,13 @@ import { getDb, LOCAL_WORKSPACE_ID } from "@/lib/db";
 import { authRequired, env } from "@/lib/config";
 import { auth } from "@/auth";
 import { isAdminSession } from "@/lib/admin";
-import { getPlan } from "@/lib/plans";
+import {
+  getPlan,
+  INSIDER_CREDITS_FALLBACK,
+  INSIDER_SHARED_POOL,
+} from "@/lib/plans";
+import { sumInsiderSharedUsage } from "@/lib/insider-quota";
+import { getFirecrawlRemainingCredits } from "@/lib/search/firecrawl";
 import {
   ensureUsageWindow,
   ensureVerifyWindow,
@@ -151,6 +157,28 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
     const monthly = await ensureUsageWindow(ctx.db, ws);
     const fresh = await ensureVerifyWindow(ctx.db, monthly);
     const plan = getPlan(fresh.planId);
+    if (fresh.planId === "insider") {
+      const shared = await sumInsiderSharedUsage(ctx.db);
+      const fc = await getFirecrawlRemainingCredits();
+      const creditsLeft = fc != null ? fc : INSIDER_CREDITS_FALLBACK;
+      return {
+        workspaceId: fresh.id,
+        planId: fresh.planId,
+        metered: ctx.metered,
+        leadsUsed: shared.leads,
+        // Display capacity mirrors raw FC remaining (not ÷ estimated burn).
+        leadsLimit: creditsLeft,
+        firecrawlCreditsRemaining: fc,
+        sendsUsed: fresh.sendsUsedThisMonth,
+        sendsLimit: 0,
+        unlimitedSends: true,
+        resetsAt: fresh.resetsAt,
+        verifiesUsed: shared.verifies,
+        verifiesLimit: INSIDER_SHARED_POOL.verifiesPerDay,
+        verifiesResetsAt: fresh.verifiesResetsAt,
+        emailVerifyEnabled: fresh.emailVerifyEnabled !== false,
+      };
+    }
     return {
       workspaceId: fresh.id,
       planId: fresh.planId,
@@ -159,6 +187,7 @@ export async function getWorkspaceSummary(ctx: Ctx): Promise<WorkspaceSummary> {
       leadsLimit: plan.leadCreditsPerMonth,
       sendsUsed: fresh.sendsUsedThisMonth,
       sendsLimit: plan.sendsPerMonth,
+      unlimitedSends: Boolean(plan.unlimitedSends),
       resetsAt: fresh.resetsAt,
       verifiesUsed: fresh.verifiesUsedToday,
       verifiesLimit: plan.verifiesPerDay,

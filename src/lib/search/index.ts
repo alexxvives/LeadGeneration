@@ -2,22 +2,27 @@ import { env, getCapabilities } from "@/lib/config";
 import { aiAvailable } from "@/lib/ai/chat";
 import { generateLeadBlurb, mapPool, scoreLeadPitchFit } from "@/lib/ai/generate";
 import { scoreLead, type RawLead } from "@/lib/fit-score";
-import type { CreateRunInput } from "@/lib/types";
+import type { CreateRunInput, SearchStrategy } from "@/lib/types";
 import { demoLeads } from "./demo";
 import {
   companyFromTitleOrUrl,
   domainFromUrl,
   extractBlurb,
+  extractContactName,
   extractEmails,
   extractLocation,
   extractPhones,
 } from "./enrich";
-import { exaProvider } from "./exa";
-import { firecrawlProvider } from "./firecrawl";
+import { enrichFirecrawlPage, firecrawlProvider } from "./firecrawl";
 import type { PageResult, SearchProvider } from "./providers";
 import { buildQueries } from "./query";
 
 export { buildQuery } from "./query";
+
+/** Safety cap on candidates fetched in Complete mode (Worker duration). */
+const COMPLETE_OVERFETCH_MULT = 3;
+const COMPLETE_CANDIDATE_HARD_CAP = 60;
+const ENRICH_CONCURRENCY = 3;
 
 export interface ScoredLead extends RawLead {
   sourceUrl: string;
@@ -41,18 +46,14 @@ export class SearchUnavailableError extends Error {
   }
 }
 
-/** Prefer Firecrawl; Exa is always listed second when keyed (runtime fallback). */
 function listProviders(): SearchProvider[] {
   const caps = getCapabilities();
   const out: SearchProvider[] = [];
   if (caps.firecrawl) out.push(firecrawlProvider());
-  if (caps.exa) out.push(exaProvider());
   return out;
 }
 
 function nicheTags(input: CreateRunInput): string[] {
-  // Prefer a short niche phrase (not just the first word — that looked like a
-  // wrong "category" on cards). Cap length so chips stay scannable.
   const niche = input.niche.trim().toLowerCase();
   const words = niche.split(/\s+/).filter(Boolean).slice(0, 3);
   const tags: string[] = [];
@@ -70,12 +71,7 @@ function pageToRawLead(page: PageResult, input: CreateRunInput): RawLead {
     website: domainFromUrl(page.url) ? `https://${domainFromUrl(page.url)}` : page.url,
     emails: extractEmails(haystack),
     phones: extractPhones(haystack),
-    // Keep scraped location only — do not invent the search city onto every lead
-    // (that hid geo mismatches like "Barcelona SC" in New York).
     location: scrapedLocation || null,
-    // Prefer meta description, then page body — both run through junk filters so
-    // cookie/privacy consent copy never lands in About. Optional Workers AI
-    // polish happens after ranking (see runSearch).
     aboutBlurb:
       extractBlurb(page.description || "") ??
       extractBlurb(page.content || "") ??
@@ -84,9 +80,20 @@ function pageToRawLead(page: PageResult, input: CreateRunInput): RawLead {
   };
 }
 
-function finalize(raw: RawLead, sourceUrl: string, input: CreateRunInput): ScoredLead {
+function finalize(
+  raw: RawLead,
+  sourceUrl: string,
+  input: CreateRunInput,
+  contactName: string | null = null,
+): ScoredLead {
   const { score, reasons } = scoreLead(raw, input);
-  return { ...raw, sourceUrl, fitScore: score, fitReasons: reasons, contactName: null };
+  return {
+    ...raw,
+    sourceUrl,
+    fitScore: score,
+    fitReasons: reasons,
+    contactName: contactName ?? raw.contactName ?? null,
+  };
 }
 
 /** Drop leads whose scraped address clearly conflicts with the requested city. */
@@ -96,11 +103,9 @@ function passesLocationGate(lead: ScoredLead, input: CreateRunInput): boolean {
   const city = want.split(",")[0]?.trim().toLowerCase();
   if (!city) return true;
   const scraped = lead.location?.trim();
-  // Only gate when we scraped a real address (not the fallback copy of input.location).
   if (!scraped) return true;
   if (scraped.toLowerCase() === want.toLowerCase()) return true;
   if (scraped.toLowerCase().includes(city)) return true;
-  // Scraped somewhere else entirely.
   return false;
 }
 
@@ -132,83 +137,114 @@ async function collectPages(
   return [...byUrl.values()];
 }
 
+function fetchLimit(strategy: SearchStrategy, target: number): number {
+  if (strategy === "complete") {
+    return Math.min(
+      Math.max(target * COMPLETE_OVERFETCH_MULT, target),
+      COMPLETE_CANDIDATE_HARD_CAP,
+    );
+  }
+  return target;
+}
+
 /**
  * Run search + enrichment.
  *
- * Demo leads are returned ONLY when `input.demo === true` (Load demo data).
- * Live searches never silently fall back to demo — empty/missing providers
- * surface a clear error so the board stays empty until the user chooses.
+ * Every company we find is kept (email optional — phone/address/category still
+ * matter). Missing email only lowers fit score. Demo only when `input.demo`.
+ *
+ * - standard: stop at N companies
+ * - complete: keep companies without email, stop once N have an email
  */
 export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
-  const limit =
+  const target =
     input.maxLeads && input.maxLeads > 0
       ? Math.floor(input.maxLeads)
       : env.maxLeadsPerRun();
+  const strategy: SearchStrategy = input.searchStrategy ?? "standard";
 
   if (input.demo) {
-    const demo = demoLeads(input, limit).map((raw, i) =>
+    const demo = demoLeads(input, target).map((raw, i) =>
       finalize(raw, raw.website ?? `https://demo.example.com/${i}`, input),
     );
     return { provider: "demo", mode: "demo", leads: demo };
   }
 
-  const strategy = input.searchStrategy ?? "standard";
-  const queries = buildQueries(input, strategy);
+  const queries = buildQueries(input);
   const providers = listProviders();
 
   if (providers.length === 0) {
     throw new SearchUnavailableError(
-      "No search provider configured. Add FIRECRAWL_API_KEY or EXA_API_KEY, or click “Load demo data”.",
+      "No search provider configured. Add FIRECRAWL_API_KEY, or click “Load demo data”.",
     );
   }
 
-  // Try Firecrawl first; if it errors or returns nothing, fall through to Exa.
+  const provider = providers[0]!;
+  const wantPages = fetchLimit(strategy, target);
   let pages: PageResult[] = [];
-  let provider = providers[0]!;
-  for (let i = 0; i < providers.length; i++) {
-    provider = providers[i]!;
-    try {
-      pages = await collectPages(provider, queries, limit);
-    } catch (err) {
-      console.error(`[search] ${provider.name} failed:`, err);
-      pages = [];
-    }
-    if (pages.length > 0) break;
-    if (i < providers.length - 1) {
-      console.warn(
-        `[search] ${provider.name} returned no pages — trying ${providers[i + 1]!.name}`,
-      );
-    }
+  try {
+    pages = await collectPages(provider, queries, wantPages);
+  } catch (err) {
+    console.error(`[search] ${provider.name} failed:`, err);
+    pages = [];
   }
+
   if (pages.length === 0) {
     return {
-      provider: providers.map((p) => p.name).join("→"),
+      provider: provider.name,
       mode: "live",
       leads: [],
       emptyReason: "Search returned no usable pages. Try a broader niche or different location.",
     };
   }
 
+  // Enrich sequentially in small pools, stopping early for Complete.
   const pageByUrl = new Map(pages.map((p) => [urlKey(p.url), p]));
-
   const seen = new Set<string>();
-  const candidates = pages
-    .map((p) => finalize(pageToRawLead(p, input), p.url, input))
-    .filter((l) => {
-      const key = domainFromUrl(l.website) ?? l.company;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return passesLocationGate(l, input);
+  const collected: ScoredLead[] = [];
+  let withEmail = 0;
+
+  // Process in chunks so Complete can stop without enriching the whole overfetch.
+  for (let i = 0; i < pages.length; i += ENRICH_CONCURRENCY) {
+    if (strategy === "standard" && collected.length >= target) break;
+    if (strategy === "complete" && withEmail >= target) break;
+
+    const chunk = pages.slice(i, i + ENRICH_CONCURRENCY);
+    await mapPool(chunk, ENRICH_CONCURRENCY, async (page) => {
+      await enrichFirecrawlPage(page);
+      return page;
     });
-  const ranked = candidates.sort((a, b) => b.fitScore - a.fitScore).slice(0, limit);
+
+    for (const page of chunk) {
+      if (strategy === "standard" && collected.length >= target) break;
+      if (strategy === "complete" && withEmail >= target) break;
+
+      const raw = pageToRawLead(page, input);
+      const haystack = `${page.title ?? ""}\n${page.description ?? ""}\n${page.content}`;
+      const lead = finalize(raw, page.url, input, extractContactName(haystack));
+      const key = domainFromUrl(lead.website) ?? lead.company;
+      if (seen.has(key)) continue;
+      if (!passesLocationGate(lead, input)) continue;
+      seen.add(key);
+      collected.push(lead);
+      if (lead.emails.length > 0) withEmail++;
+    }
+  }
+
+  if (collected.length === 0) {
+    return {
+      provider: provider.name,
+      mode: "live",
+      leads: [],
+      emptyReason: "Search returned no usable pages. Try a broader niche or different location.",
+    };
+  }
 
   const useAi = await aiAvailable();
   const pitch = input.offerNotes?.trim() || "";
   const { blurbLooksLikeJunk } = await import("@/lib/outreach/draft");
 
-  // Email verify runs only at send — not here — so we don't burn credits on
-  // leads that never go out. AI blurb + pitch-fit are optional (demo-safe).
-  const leads: ScoredLead[] = await mapPool(ranked, 3, async (lead) => {
+  const leads: ScoredLead[] = await mapPool(collected, 3, async (lead) => {
     let aboutBlurb = lead.aboutBlurb;
     if (aboutBlurb && blurbLooksLikeJunk(aboutBlurb)) aboutBlurb = null;
     if (useAi) {

@@ -21,7 +21,7 @@ const DOMAIN_TIPS = [
   },
   {
     title: "Verify before you send",
-    body: "Bounce rate above ~3% gets you throttled. Run discovered emails through a verification API (Maileroo includes one).",
+    body: "Bounce rate above ~3% gets you throttled. Hermes Mail checks addresses with MyEmailVerifier at send when verify is on.",
   },
   {
     title: "Keep sends intentional",
@@ -36,33 +36,35 @@ const DOMAIN_TIPS = [
 export default function DeliverabilityPage() {
   return (
     <MarketingShell footerTagline="Warm the domain. Then send.">
-      <section className="mx-auto max-w-7xl px-5 pb-24 pt-8 sm:px-8">
+      <section className="mx-auto max-w-3xl px-5 pb-24 pt-8 sm:max-w-4xl sm:px-8 lg:max-w-5xl">
         <div className="mb-3 flex items-center gap-3">
           <ShieldIcon className="h-5 w-5 text-amber-300" />
           <span className="text-xs font-medium uppercase tracking-widest text-amber-300">
             Deliverability guide
           </span>
         </div>
-        <h1 className="max-w-3xl font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+        <h1 className="font-display text-4xl font-semibold tracking-tight text-mist-100 sm:text-5xl">
           How to not get your domain banned
         </h1>
-        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-mist-300">
+        <p className="mt-5 text-lg leading-relaxed text-mist-200 sm:text-xl">
           Cold outreach is legal when done right. Bans come from poor hygiene —
           high bounce rates, spam complaints, unauthenticated mail.
         </p>
 
-        <ol className="mt-14 space-y-0 border-t border-white/10">
+        <ol className="mt-14 space-y-0 border-t border-white/15">
           {DOMAIN_TIPS.map((tip, i) => (
             <li
               key={tip.title}
-              className="grid gap-3 border-b border-white/10 py-7 sm:grid-cols-[3rem_1fr] sm:gap-6"
+              className="grid gap-3 border-b border-white/15 py-8 sm:grid-cols-[3.5rem_1fr] sm:gap-6"
             >
-              <span className="font-display text-2xl text-amber-300/70">
+              <span className="font-display text-2xl font-semibold text-amber-300">
                 {String(i + 1).padStart(2, "0")}
               </span>
               <div>
-                <h2 className="text-lg font-semibold text-mist-100">{tip.title}</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-mist-300">
+                <h2 className="text-lg font-semibold text-mist-100 sm:text-xl">
+                  {tip.title}
+                </h2>
+                <p className="mt-2 max-w-2xl text-base leading-relaxed text-mist-200">
                   {tip.body}
                 </p>
               </div>
@@ -70,11 +72,11 @@ export default function DeliverabilityPage() {
           ))}
         </ol>
 
-        <div className="mt-12 rounded-xl border border-amber-400/15 bg-amber-400/5 px-6 py-5">
-          <p className="text-sm leading-relaxed text-amber-200/80">
+        <div className="mt-12 rounded-xl border border-amber-400/25 bg-amber-400/10 px-6 py-5">
+          <p className="text-base leading-relaxed text-amber-100">
             <span className="font-semibold text-amber-300">Bottom line:</span>{" "}
-            Hermes Mail handles rate limiting and approval. You handle DNS and
-            domain hygiene.
+            Hermes Mail handles rate limiting, approval, and email verify. You
+            handle DNS and domain hygiene.
           </p>
         </div>
       </section>

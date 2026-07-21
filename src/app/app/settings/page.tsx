@@ -1,7 +1,7 @@
 import { env, getCapabilities } from "@/lib/config";
 import { HelpIcon, SparkIcon } from "@/components/icons";
 import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
-import { getPlan } from "@/lib/plans";
+import { getPlan, isPaidPlan } from "@/lib/plans";
 import type { Workspace } from "@/lib/types";
 import { UsageBar } from "@/components/studio/UpgradeModal";
 import { BillingActions } from "@/components/studio/BillingActions";
@@ -137,6 +137,79 @@ export default async function SettingsPage({
 
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          Plan &amp; usage
+        </h2>
+        <div className="rounded-xl2 border border-white/10 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="font-display text-xl font-semibold">{plan.name} plan</p>
+              <p className="text-sm text-mist-500">
+                {usage.planId === "insider"
+                  ? "Shared Firecrawl credits power live search for all Insiders. Sends are unlimited (your own mailbox)."
+                  : usage.metered
+                    ? "Usage resets on the 1st of each month."
+                    : "You’re on the local preview — open the live app to save sending details and use your plan."}
+              </p>
+            </div>
+            {usage.metered && <BillingActions paid={isPaidPlan(usage.planId)} />}
+          </div>
+          {usage && (
+            <div className="mt-5">
+              <div
+                className={`grid gap-4 ${
+                  caps.emailVerify && usage.emailVerifyEnabled
+                    ? "sm:grid-cols-3"
+                    : "sm:grid-cols-2"
+                }`}
+              >
+                {usage.planId === "insider" ? (
+                  <UsageBar
+                    label="Firecrawl credits"
+                    remaining={
+                      usage.firecrawlCreditsRemaining ?? usage.leadsLimit
+                    }
+                  />
+                ) : (
+                  <UsageBar
+                    label="Lead credits"
+                    used={usage.leadsUsed}
+                    limit={usage.leadsLimit}
+                  />
+                )}
+                <UsageBar
+                  label="Sends"
+                  used={usage.unlimitedSends ? 0 : usage.sendsUsed}
+                  limit={usage.unlimitedSends ? 0 : usage.sendsLimit}
+                />
+                {caps.emailVerify && usage.emailVerifyEnabled ? (
+                  <UsageBar
+                    label="Verifies / day"
+                    used={usage.verifiesUsed}
+                    limit={usage.verifiesLimit}
+                  />
+                ) : null}
+              </div>
+              {caps.emailVerify && usage.emailVerifyEnabled ? (
+                <p className="mt-2 text-xs text-mist-500">
+                  Email checks reset daily (midnight UTC)
+                  {usage.verifiesResetsAt
+                    ? ` · next reset ${new Date(usage.verifiesResetsAt).toLocaleString()}`
+                    : ""}
+                  .
+                </p>
+              ) : null}
+              {!usage.metered && (
+                <p className="mt-2 text-xs text-mist-500">
+                  Local preview tracks usage for UX; hard caps apply on the live app.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Resources
         </h2>
         <div className="overflow-hidden rounded-xl2 border border-white/10">
@@ -173,60 +246,6 @@ export default async function SettingsPage({
             </div>
             <span className="text-mist-500">→</span>
           </Link>
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
-          Plan &amp; usage
-        </h2>
-        <div className="rounded-xl2 border border-white/10 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="font-display text-xl font-semibold">{plan.name} plan</p>
-              <p className="text-sm text-mist-500">
-                {usage.metered
-                  ? "Usage resets on the 1st of each month."
-                  : "You’re on the local preview — open the live app to save sending details and use your plan."}
-              </p>
-            </div>
-            {usage.metered && <BillingActions paid={usage.planId !== "free"} />}
-          </div>
-          {usage && (
-            <div className="mt-5">
-              <div
-                className={`grid gap-4 ${
-                  caps.emailVerify && usage.emailVerifyEnabled
-                    ? "sm:grid-cols-3"
-                    : "sm:grid-cols-2"
-                }`}
-              >
-                <UsageBar label="Lead credits" used={usage.leadsUsed} limit={usage.leadsLimit} />
-                <UsageBar label="Sends" used={usage.sendsUsed} limit={usage.sendsLimit} />
-                {caps.emailVerify && usage.emailVerifyEnabled ? (
-                  <UsageBar
-                    label="Verifies / day"
-                    used={usage.verifiesUsed}
-                    limit={usage.verifiesLimit}
-                  />
-                ) : null}
-              </div>
-              {caps.emailVerify && usage.emailVerifyEnabled ? (
-                <p className="mt-2 text-xs text-mist-500">
-                  Email checks reset daily (midnight UTC)
-                  {usage.verifiesResetsAt
-                    ? ` · next reset ${new Date(usage.verifiesResetsAt).toLocaleString()}`
-                    : ""}
-                  .
-                </p>
-              ) : null}
-              {!usage.metered && (
-                <p className="mt-2 text-xs text-mist-500">
-                  Local preview tracks usage for UX; hard caps apply on the live app.
-                </p>
-              )}
-            </div>
-          )}
         </div>
       </section>
 

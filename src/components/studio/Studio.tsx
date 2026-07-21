@@ -102,8 +102,16 @@ export function Studio() {
   const { data: session } = useSession();
   const isAdmin = session?.isAdmin === true;
   const searchParams = useSearchParams();
-  const view = viewFromParams(searchParams.get("view"));
+  const rawView = searchParams.get("view");
+  const view = viewFromParams(rawView);
   const boardParam = searchParams.get("board");
+
+  // Admins land on platform dashboard — not Search / Pipeline / etc.
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (view === "admin" || view === "admin-users") return;
+    router.replace("/app?view=admin", { scroll: false });
+  }, [isAdmin, view, router]);
   // Prefer URL; if nav omitted `board`, keep the stored sidebar selection.
   const filterBoardId = (() => {
     if (boardParam === "all") return null;
@@ -310,12 +318,12 @@ export function Studio() {
         niche: v.niche,
         location: v.location,
         senderName: v.senderName,
-        searchStrategy: v.searchStrategy,
         offerNotes: v.offerNotes.trim() || undefined,
         subjectTemplate: v.subjectTemplate.trim() || undefined,
         autoDraft: v.autoDraft,
         staticBody: v.staticBody,
         aiPersonalize: v.aiPersonalize,
+        searchStrategy: v.searchStrategy,
         maxLeads: v.maxLeads,
         boardId,
       });
@@ -865,7 +873,8 @@ export function Studio() {
 
   const hasLeads = (board?.leads.length ?? 0) > 0;
   const canSearchLive = board?.capabilities.canSearchLive ?? false;
-  const lockViewport =
+  /** Pipeline / outreach / leads fill the shell; other views scroll inside it. */
+  const fillViewport =
     view === "pipeline" || view === "outreach" || view === "leads";
 
   const onDeleteLead = async (leadId: string) => {
@@ -908,13 +917,7 @@ export function Studio() {
   };
 
   return (
-    <main
-      className={
-        lockViewport
-          ? "mx-auto flex h-dvh max-w-[90rem] flex-col overflow-hidden px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-3 sm:pt-8"
-          : "mx-auto flex min-h-dvh max-w-[90rem] flex-col px-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-3 sm:pt-8"
-      }
-    >
+    <main className="mx-auto flex h-dvh max-w-[90rem] flex-col overflow-hidden px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-3 sm:pt-8">
       <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[1fr_auto_1fr]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
@@ -932,7 +935,7 @@ export function Studio() {
                         : view === "runs"
                           ? "Search runs"
                           : view === "admin"
-                            ? "Platform overview"
+                            ? "Dashboard"
                             : view === "admin-users"
                               ? "Users"
                               : "Search"}
@@ -1025,15 +1028,27 @@ export function Studio() {
                     : "grid-cols-2"
                 }`}
               >
-                <UsageBar
-                  label="Leads"
-                  used={board.workspace.leadsUsed}
-                  limit={board.workspace.leadsLimit}
-                />
+                {board.workspace.planId === "insider" ? (
+                  <UsageBar
+                    label="Firecrawl credits"
+                    remaining={
+                      board.workspace.firecrawlCreditsRemaining ??
+                      board.workspace.leadsLimit
+                    }
+                  />
+                ) : (
+                  <UsageBar
+                    label="Leads"
+                    used={board.workspace.leadsUsed}
+                    limit={board.workspace.leadsLimit}
+                  />
+                )}
                 <UsageBar
                   label="Sends"
-                  used={board.workspace.sendsUsed}
-                  limit={board.workspace.sendsLimit}
+                  used={board.workspace.unlimitedSends ? 0 : board.workspace.sendsUsed}
+                  limit={
+                    board.workspace.unlimitedSends ? 0 : board.workspace.sendsLimit
+                  }
                 />
                 {board.capabilities.emailVerify &&
                 board.workspace.emailVerifyEnabled !== false ? (
@@ -1054,6 +1069,13 @@ export function Studio() {
         </div>
       </div>
 
+      <div
+        className={
+          fillViewport
+            ? "flex min-h-0 flex-1 flex-col"
+            : "min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        }
+      >
       {/* Dashboard */}
       {view === "dashboard" && (
         <DashboardView boardFilterId={filterBoardId} boards={boards} />
@@ -1083,15 +1105,21 @@ export function Studio() {
             compact={false}
             planId={board?.workspace?.planId ?? "free"}
             leadsRemaining={
-              board?.workspace?.metered
-                ? Math.max(0, board.workspace.leadsLimit - board.workspace.leadsUsed)
-                : null
+              !board?.workspace?.metered
+                ? null
+                : board.workspace.planId === "insider"
+                  ? (board.workspace.firecrawlCreditsRemaining ??
+                    board.workspace.leadsLimit)
+                  : Math.max(
+                      0,
+                      board.workspace.leadsLimit - board.workspace.leadsUsed,
+                    )
             }
           />
           {running && <SearchProgress running={running} />}
           {!canSearchLive && !running && (
             <p className="mt-3 text-xs text-mist-500">
-              No Firecrawl/Exa key — live search is unavailable. Add a key in Settings, or
+              No Firecrawl key — live search is unavailable. Add a key in Settings, or
               import leads below.
             </p>
           )}
@@ -1263,6 +1291,7 @@ export function Studio() {
       {view === "runs" && (
         <RunsView activeRunId={activeRunId ?? board?.run?.id ?? null} />
       )}
+      </div>
 
       {selected && board && (
         <LeadDrawer

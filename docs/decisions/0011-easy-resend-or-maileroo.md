@@ -1,13 +1,14 @@
 # 0011. Easy send: Resend or Maileroo (BYO)
 - Status: accepted
 - Date: 2026-07-15
-- Amends: [0009](0009-resend-send-maileroo-verify.md) (verify split unchanged)
+- Amends: [0009](0009-resend-send-maileroo-verify.md) (Easy send peers; verify path → [0016](0016-myemailverifier-primary-verify.md))
 
 ## Context
 
 Users want a second Easy transactional sender (Maileroo) without dropping
-Resend. Maileroo already appears for verification (Zeruh) and platform SMTP;
-BYO HTTP send is a small seam behind `sendEmail()`.
+Resend. Maileroo already appears for platform SMTP / optional Easy send; BYO
+HTTP send is a small seam behind `sendEmail()`. (List hygiene verify is a
+separate concern — ADR 0016.)
 
 ## Decision
 
@@ -16,7 +17,8 @@ BYO HTTP send is a small seam behind `sendEmail()`.
    at that provider.
 2. **Workspace fields:** `easyEmailProvider` (`resend` | `maileroo`),
    `resendApiKey`, `mailerooApiKey`. Send uses the preferred key when present.
-3. **Verify path unchanged:** Zeruh via `MAILEROO_VERIFY_API_KEY` (ADR 0009).
+3. **Verify path:** independent of Easy send — **MyEmailVerifier** primary
+   (ADR 0016); Zeruh / `MAILEROO_VERIFY_API_KEY` legacy env only.
 4. **Pro path unchanged:** Google mailbox still wins over Easy keys.
 
 ## Alternatives considered

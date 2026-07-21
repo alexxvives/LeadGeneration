@@ -47,12 +47,15 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0006 — Workspace schema & service-layer isolation](0006-workspace-schema-and-isolation.md)
 - [0007 — Auth.js session strategy: JWT + split edge/server config](0007-authjs-jwt-sessions.md)
 - [0008 — Stripe billing + service-layer quota model](0008-stripe-quota-model.md)
-- [0009 — Resend for send, Maileroo/Zeruh for verify](0009-resend-send-maileroo-verify.md) _(amended by 0011 for Easy BYO Maileroo send)_
+- [0009 — Resend for send, Maileroo/Zeruh for verify](0009-resend-send-maileroo-verify.md) _(amended by 0011 for Easy send; **verify → [0016](0016-myemailverifier-primary-verify.md)**)_
 - [0010 — Google / Microsoft mailbox OAuth behind sendEmail()](0010-mailbox-oauth-send.md) _(accepted — Google first; multi-inbox deferred)_
 - [0011 — Easy send: Resend or Maileroo (BYO)](0011-easy-resend-or-maileroo.md)
 - [0012 — Natural email bodies — no STOP footer](0012-natural-email-bodies-no-stop-footer.md) _(amends constitution Art. I.3)_
 - [0013 — Pitch AI: no heuristic fallback](0013-pitch-ai-no-heuristic-fallback.md)
 - [0014 — First-class Boards for lead collections](0014-boards.md)
 - [0015 — Board sharing with soft presence lock](0015-board-sharing-soft-lock.md)
+- [0016 — MyEmailVerifier is the primary email verify provider](0016-myemailverifier-primary-verify.md) _(amends 0009 verify path)_
+- [0017 — Hidden Insider plan with shared free-credit pool](0017-insider-shared-free-pool.md) _(credit display amended by [0018](0018-insider-raw-firecrawl-credits.md))_
+- [0018 — Insider shows raw Firecrawl remaining credits](0018-insider-raw-firecrawl-credits.md)
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

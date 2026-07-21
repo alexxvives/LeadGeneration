@@ -1,6 +1,6 @@
 # 0002. Provider-agnostic search & email with demo fallback
 
-- Status: accepted
+- Status: accepted _(search implementations: Firecrawl-only since Exa removal / ADR 0017)_
 - Date: 2026-07-13
 
 ## Context
@@ -9,11 +9,12 @@ capability when keys exist, a fully working app when they don't, and freedom to
 change vendors without touching the UI.
 
 ## Decision
-- **Search:** a `SearchProvider` interface with Firecrawl (preferred) and Exa
-  implementations; `runSearch()` selects one and **falls back to demo data** on
-  missing key or any error.
+- **Search:** a `SearchProvider` interface; **Firecrawl** is the sole live
+  implementation (Exa removed — ADR 0017). Missing key → “Load demo data” /
+  explicit demo mode (never a silent live→demo swap for paid runs).
 - **Email:** `sendEmail()` tries Resend → SMTP (Nodemailer) → demo (simulated),
-  chosen by which env vars are present.
+  chosen by which env vars are present. (Mailbox / Easy BYO peers added later —
+  ADR 0010 / 0011.)
 - **Capabilities** are detected centrally in `config.ts` and surfaced in the UI.
 
 ## Alternatives considered

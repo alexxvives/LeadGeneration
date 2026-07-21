@@ -20,9 +20,14 @@ export function UpgradeModal({
   onClose: () => void;
 }) {
   const plan = getPlan(planId);
-  const nextId = PLAN_ORDER[Math.min(PLAN_ORDER.indexOf(planId) + 1, PLAN_ORDER.length - 1)];
+  const publicIdx = PLAN_ORDER.indexOf(planId);
+  const nextId =
+    publicIdx < 0
+      ? "starter"
+      : PLAN_ORDER[Math.min(publicIdx + 1, PLAN_ORDER.length - 1)]!;
   const next = getPlan(nextId);
   const label = kind === "leads" ? "lead credits" : "monthly sends";
+  const insider = planId === "insider";
 
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center p-6">
@@ -46,30 +51,44 @@ export function UpgradeModal({
         </div>
         <h2 id="upgrade-modal-title" className="mt-4 font-display text-2xl font-semibold">You&apos;re out of {label}</h2>
         <p className="mt-2 text-sm text-mist-300">
-          Your {plan.name} plan includes{" "}
-          <span className="font-medium text-mist-100">
-            {kind === "leads" ? plan.leadCreditsPerMonth : plan.sendsPerMonth}
-          </span>{" "}
-          {label} per month. Upgrade to {next.name} for{" "}
-          <span className="font-medium text-mist-100">
-            {kind === "leads" ? next.leadCreditsPerMonth : next.sendsPerMonth}
-          </span>{" "}
-          and keep going.
+          {insider && kind === "leads" ? (
+            <>
+              Shared Firecrawl credits are too low for another enrich pass.
+              Wait for the Firecrawl billing period to reset, or top up / disable
+              Smart Upgrade on the API key.
+            </>
+          ) : insider ? (
+            <>Insider sends are unlimited — this should not appear.</>
+          ) : (
+            <>
+              Your {plan.name} plan includes{" "}
+              <span className="font-medium text-mist-100">
+                {kind === "leads" ? plan.leadCreditsPerMonth : plan.sendsPerMonth}
+              </span>{" "}
+              {label} per month. Upgrade to {next.name} for{" "}
+              <span className="font-medium text-mist-100">
+                {kind === "leads" ? next.leadCreditsPerMonth : next.sendsPerMonth}
+              </span>{" "}
+              and keep going.
+            </>
+          )}
         </p>
 
         <div className="mt-6 flex items-center gap-3">
-          <Link
-            href="/pricing"
-            className="group inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-105"
-          >
-            See plans
-            <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-          </Link>
+          {!insider ? (
+            <Link
+              href="/pricing"
+              className="group inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-105"
+            >
+              See plans
+              <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+          ) : null}
           <button
             onClick={onClose}
             className="rounded-full px-4 py-2.5 text-sm text-mist-300 transition-colors hover:text-mist-100"
           >
-            Not now
+            {insider ? "OK" : "Not now"}
           </button>
         </div>
       </div>
@@ -86,11 +105,11 @@ export function UsageBar({
   label: string;
   used?: number;
   limit?: number;
-  /** Provider credit balance (e.g. Zeruh) — bar fills toward a soft full of 250. */
+  /** Provider credit balance (e.g. Firecrawl remaining, or verify pool). */
   remaining?: number;
 }) {
   if (remaining != null) {
-    // Soft full: MyEmailVerifier free day (~100) or Zeruh signup pack (~250).
+    // Soft full heuristic for remaining-credit meters (≈100 vs larger packs).
     // Fill rises with usage (same direction as Leads / Sends), not remaining credits.
     const softFull = remaining <= 120 ? 100 : 250;
     const used = Math.max(0, softFull - Math.min(remaining, softFull));
@@ -117,6 +136,19 @@ export function UsageBar({
 
   const u = used ?? 0;
   const lim = limit ?? 0;
+  if (lim <= 0 && remaining == null) {
+    return (
+      <div className="min-w-0">
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="shrink-0 text-mist-300">{label}</span>
+          <span className="min-w-0 truncate tabular-nums text-mist-500">Unlimited</span>
+        </div>
+        <div className="meter-track mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
+          <div className="h-full w-full rounded-full bg-aurora-400/40" />
+        </div>
+      </div>
+    );
+  }
   const pct = lim > 0 ? Math.min(100, Math.round((u / lim) * 100)) : 0;
   const tone = pct >= 100 ? "bg-rose-400" : pct >= 80 ? "bg-amber-400" : "bg-aurora-400";
   return (

@@ -522,7 +522,7 @@ export function SenderProfileForm() {
             reload();
             setActiveId(created.id);
           }}
-          className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-mist-300 hover:border-aurora-400/40 hover:text-mist-100"
+          className="rounded-full border border-ink-700 bg-ink-900 px-3 py-1.5 text-xs font-medium text-mist-100 hover:border-aurora-400/50 hover:text-aurora-300"
         >
           New profile
         </button>
@@ -534,7 +534,7 @@ export function SenderProfileForm() {
               deleteOutreachProfile(profile.id);
               reload();
             }}
-            className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-rose-300/80 hover:border-rose-400/40 hover:text-rose-200"
+            className="rounded-full border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-200 hover:border-rose-400 hover:bg-rose-500/15"
           >
             Delete
           </button>

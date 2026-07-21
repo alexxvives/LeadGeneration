@@ -7,10 +7,9 @@
 
 export interface Capabilities {
   firecrawl: boolean;
-  exa: boolean;
   resend: boolean;
   smtp: boolean;
-  canSearchLive: boolean; // firecrawl or exa present
+  canSearchLive: boolean; // Firecrawl key present
   canSendEmail: boolean; // resend or smtp configured (mailbox connect is workspace-scoped)
   /** Platform Google OAuth client present — Pro → Connect Google enabled. */
   gmailOAuth: boolean;
@@ -24,7 +23,7 @@ export interface Capabilities {
   authRequired: boolean;
   billing: boolean; // Stripe secret key present
   turnstile: boolean; // Turnstile configured (signup bot check)
-  /** MyEmailVerifier and/or Zeruh verify key present. */
+  /** MyEmailVerifier (preferred) and/or legacy Zeruh verify key present. */
   emailVerify: boolean;
   /**
    * Workers AI available for blurbs/pitch (binding on CF, or REST token locally).
@@ -39,15 +38,13 @@ function has(v: string | undefined | null): boolean {
 
 export function getCapabilities(): Capabilities {
   const firecrawl = has(process.env.FIRECRAWL_API_KEY);
-  const exa = has(process.env.EXA_API_KEY);
   const resend = has(process.env.RESEND_API_KEY);
   const smtp = has(process.env.SMTP_HOST) && has(process.env.SMTP_USER);
   return {
     firecrawl,
-    exa,
     resend,
     smtp,
-    canSearchLive: firecrawl || exa,
+    canSearchLive: firecrawl,
     canSendEmail: resend || smtp,
     gmailOAuth: has(process.env.GMAIL_OAUTH_CLIENT_ID) && has(process.env.GMAIL_OAUTH_CLIENT_SECRET),
     authRequired: has(process.env.AUTH_SECRET),
@@ -71,7 +68,6 @@ export function authRequired(): boolean {
 
 export const env = {
   firecrawlKey: () => process.env.FIRECRAWL_API_KEY?.trim() ?? "",
-  exaKey: () => process.env.EXA_API_KEY?.trim() ?? "",
   resendKey: () => process.env.RESEND_API_KEY?.trim() ?? "",
   fromEmail: () => process.env.OUTREACH_FROM_EMAIL?.trim() || "you@example.com",
   fromName: () => process.env.OUTREACH_FROM_NAME?.trim() || "HERMES mail",

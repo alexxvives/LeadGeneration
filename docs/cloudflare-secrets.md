@@ -18,14 +18,13 @@ Worker name (must match): `leadgeneration` (`wrangler.jsonc` → `"name"`).
 | `STRIPE_SECRET_KEY` | Billing (use `sk_live_…` in prod; `sk_test_…` only in `.env.local`) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing (`whsec_…` — live endpoint in prod) |
 | `STRIPE_*_PRICE_ID` | Live Price IDs for Starter / Pro / Agency |
-| `FIRECRAWL_API_KEY` | Live search / scrape (preferred) |
-| `EXA_API_KEY` | Search fallback when Firecrawl fails / empty |
+| `FIRECRAWL_API_KEY` | Live search / scrape |
 | `GMAIL_OAUTH_CLIENT_ID` | Pro mailbox Connect Google |
 | `GMAIL_OAUTH_CLIENT_SECRET` | Pro mailbox Connect Google |
 | `GROQ_API_KEY` | Optional pitch/blurb fallback when Workers AI fails |
 | `GEMINI_API_KEY` | Optional pitch/blurb fallback after Groq |
-| `MYEMAILVERIFIER_API_KEY` | Preferred email verify at send (100 free credits/day) |
-| `MAILEROO_VERIFY_API_KEY` | Fallback Zeruh verify (alias `ZERUH_API_KEY`) |
+| `MYEMAILVERIFIER_API_KEY` | **Primary** email verify at send (ADR 0016; ~100 free credits/day) |
+| `MAILEROO_VERIFY_API_KEY` | **Legacy only** — Zeruh verify if MEV unset (alias `ZERUH_API_KEY`). Not marketed. |
 | `RESEND_WEBHOOK_SECRET` | **Required after deploy of audit hardening** — Svix secret for bounce/reply webhooks |
 | `MAILEROO_WEBHOOK_SECRET` | Required only if you use Maileroo delivery webhooks |
 
@@ -86,8 +85,8 @@ npx wrangler secret put MYEMAILVERIFIER_API_KEY
 npx wrangler secret put MAILEROO_VERIFY_API_KEY
 ```
 
-`MYEMAILVERIFIER_API_KEY`: preferred — [myemailverifier.com](https://myemailverifier.com) dashboard (phone verify for 100 free credits/day).  
-`MAILEROO_VERIFY_API_KEY`: fallback Zeruh at [maileroo.com](https://maileroo.com) → Email Verification. Same values go in `.env.local` for `npm run dev`.
+`MYEMAILVERIFIER_API_KEY`: set this — [myemailverifier.com](https://myemailverifier.com) (phone verify for ~100 free credits/day).  
+`MAILEROO_VERIFY_API_KEY`: only if you still run Zeruh and have no MEV key — [maileroo.com](https://maileroo.com) → Email Verification. Prefer migrating to MEV. Same values go in `.env.local` for `npm run dev`.
 
 Paste the value when prompted. Never commit secret values to git.
 

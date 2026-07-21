@@ -91,7 +91,7 @@ export default function LandingPage() {
               <span className="text-aurora-300">You approve every send.</span>
             </h1>
             <p
-              className="animate-float-up mt-6 text-lg leading-relaxed text-mist-300 sm:text-xl"
+              className="animate-float-up mt-6 text-lg leading-relaxed text-mist-200 sm:text-xl"
               style={{ animationDelay: "80ms" }}
             >
               A human-in-the-loop lead studio — search a niche, enrich on a live
@@ -150,7 +150,7 @@ export default function LandingPage() {
           <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
             Four steps. One steady hand.
           </h2>
-          <p className="mt-3 max-w-2xl text-mist-300">
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-mist-200 sm:text-lg">
             Hermes Mail does the busywork — search, enrich, draft. You stay in
             control of every message that leaves.
           </p>
@@ -159,16 +159,20 @@ export default function LandingPage() {
             {FLOW.map((step, i) => (
               <li
                 key={step.n}
-                className="relative lg:border-l lg:border-white/10 lg:pl-7 lg:first:border-l-0 lg:first:pl-0"
+                className="relative lg:border-l lg:border-white/15 lg:pl-7 lg:first:border-l-0 lg:first:pl-0"
               >
                 <div className="flex items-start gap-3">
-                  <span className="font-display text-2xl text-mist-500/80">{step.n}</span>
+                  <span className="font-display text-2xl font-semibold text-aurora-300/90">
+                    {step.n}
+                  </span>
                   <div>
                     <div className="flex items-center gap-2">
-                      <step.icon className="h-5 w-5 text-aurora-300" />
+                      <step.icon className="h-5 w-5 shrink-0 text-aurora-300" />
                       <h3 className="text-lg font-semibold text-mist-100">{step.title}</h3>
                     </div>
-                    <p className="mt-2 text-sm leading-relaxed text-mist-300">{step.body}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-mist-200 sm:text-base">
+                      {step.body}
+                    </p>
                   </div>
                 </div>
                 {i < FLOW.length - 1 ? (
@@ -189,16 +193,18 @@ export default function LandingPage() {
           <h2 className="font-display text-3xl font-semibold sm:text-4xl">
             Everything you need to act
           </h2>
-          <p className="mt-3 max-w-2xl text-mist-300">
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-mist-200 sm:text-lg">
             From first search to a sent email — map, pipeline, and human approval
             in one place.
           </p>
           <div className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
             {CAPABILITIES.map((c) => (
-              <div key={c.title} className="border-t border-white/10 pt-5">
+              <div key={c.title} className="border-t border-white/15 pt-5">
                 <c.icon className="h-6 w-6 text-aurora-300" />
                 <h3 className="mt-4 text-lg font-semibold text-mist-100">{c.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-mist-300">{c.body}</p>
+                <p className="mt-2 text-sm leading-relaxed text-mist-200 sm:text-base">
+                  {c.body}
+                </p>
               </div>
             ))}
           </div>
@@ -213,7 +219,7 @@ export default function LandingPage() {
             <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
               Automation that stops at your judgment
             </h2>
-            <p className="mt-4 text-mist-300 leading-relaxed">
+            <p className="mt-4 text-base leading-relaxed text-mist-200 sm:text-lg">
               Most tools optimize for volume. Hermes Mail optimizes for sends you
               stand behind — personalized drafts, transparent fit scores, and a
               hard gate before anything hits an inbox.
@@ -234,9 +240,11 @@ export default function LandingPage() {
                 body: "Connect your domain or mailbox. Rate limits stay on by default.",
               },
             ].map((item) => (
-              <li key={item.title} className="border-l-2 border-aurora-400/40 pl-5">
+              <li key={item.title} className="border-l-2 border-aurora-400/50 pl-5">
                 <p className="font-semibold text-mist-100">{item.title}</p>
-                <p className="mt-1 text-sm text-mist-300">{item.body}</p>
+                <p className="mt-1 text-sm leading-relaxed text-mist-200 sm:text-base">
+                  {item.body}
+                </p>
               </li>
             ))}
           </ul>
@@ -253,7 +261,7 @@ export default function LandingPage() {
                 <h2 className="font-display text-3xl font-semibold sm:text-4xl">
                   Ready when you are
                 </h2>
-                <p className="mt-3 text-mist-300">
+                <p className="mt-3 text-base text-mist-200">
                   Start free. Nothing sends without your say-so.
                 </p>
               </div>

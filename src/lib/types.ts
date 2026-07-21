@@ -6,12 +6,12 @@
 export type RunMode = "demo" | "live";
 
 /**
- * How aggressively to search. `standard` runs one naive query (fast, cheap);
- * `smart` and `local` expand the ICP into several query variants that are run
- * and merged for higher recall (more provider calls / credits). All strategies
- * degrade to demo data when no key is present.
+ * How a search run fills its batch:
+ * - `standard` — up to N companies (email optional; phone/address still kept).
+ * - `complete` — keep every company found, but do not stop until N leads have
+ *   an email (final count can exceed N).
  */
-export type SearchStrategy = "standard" | "smart" | "local";
+export type SearchStrategy = "standard" | "complete";
 
 export type RunStatus = "pending" | "running" | "complete" | "failed";
 
@@ -89,7 +89,11 @@ export interface SavedIcp {
 }
 
 /** Billing plan identifiers. Definitions/quotas/prices live in src/lib/plans.ts. */
-export type PlanId = "free" | "starter" | "pro" | "agency";
+/**
+ * Public Stripe plans + hidden `insider` (admin-assigned, shared free-credit
+ * pool — not sold on /pricing).
+ */
+export type PlanId = "free" | "starter" | "pro" | "agency" | "insider";
 
 /** Easy-path transactional sender (Settings). Pro = mailbox OAuth. */
 export type EasyEmailProvider = "resend" | "maileroo";
@@ -187,8 +191,9 @@ export interface Workspace {
    */
   preferredSendPath: "easy" | "pro" | null;
   /**
-   * When true (default) and the server has a Zeruh key, verify recipient
-   * emails at send. Off skips the check (saves credits).
+   * When true (default) and the server has a verify key (MyEmailVerifier
+   * preferred; Zeruh legacy), verify recipient emails at send. Off skips
+   * the check (saves credits). ADR 0016.
    */
   emailVerifyEnabled: boolean;
   /** Pro path: one connected mailbox (multi-inbox deferred — ADR 0010). */
@@ -332,7 +337,7 @@ export interface Run {
   senderName: string | null;
   status: RunStatus;
   mode: RunMode; // "demo" when keys missing, "live" when a provider ran
-  provider: string; // "firecrawl" | "exa" | "demo"
+  provider: string; // "firecrawl" | "demo"
   leadCount: number;
   error: string | null;
   createdAt: string;
@@ -416,6 +421,13 @@ export interface WorkspaceSummary {
   leadsLimit: number;
   sendsUsed: number;
   sendsLimit: number;
+  /** Insider / BYO sender — no platform send quota. */
+  unlimitedSends?: boolean;
+  /**
+   * Insider only: live Firecrawl remaining credits on the shared API key
+   * (raw count — not divided). Null when the credit API is unreachable.
+   */
+  firecrawlCreditsRemaining?: number | null;
   resetsAt: string | null;
   /** Daily email verifies used (plan-tiered). */
   verifiesUsed: number;
@@ -448,11 +460,15 @@ export interface CreateRunInput {
   staticBody?: boolean;
   /** When true, AI rewrites each draft so wording varies per lead. */
   aiPersonalize?: boolean;
-  /** Search depth/strategy. Defaults to "standard" when omitted. */
+  /**
+   * `standard` = up to N companies (email optional).
+   * `complete` = keep going until N companies have an email (may exceed N).
+   */
   searchStrategy?: SearchStrategy;
   /**
    * How many leads to return for this run (capped by plan + remaining credits +
    * MAX_LEADS_PER_RUN). Optional — defaults to a sensible mid value.
+   * For `complete`, this is the email target (total leads may be higher).
    */
   maxLeads?: number;
   /**

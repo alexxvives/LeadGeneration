@@ -70,9 +70,9 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - **Recommendation for Lodestar now:**
   1. **BYO Easy send:** Resend **or** Maileroo API key + customer domain
      (Settings → Easy — ADR 0011). Resend remains the default DX.
-  2. **Maileroo Verify (Zeruh API)** via `MAILEROO_VERIFY_API_KEY` — verify
-     **at send** (hard-block undeliverable). Separate from Maileroo *send*.
-     Not run during search/enrich (saves credits; covers Excel imports too).
+  2. **MyEmailVerifier** via `MYEMAILVERIFIER_API_KEY` — verify **at send**
+     (hard-block undeliverable). ADR 0016. Not run during search/enrich.
+     Legacy: `MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY` if MEV unset.
   3. Keep **SMTP path** as optional platform fallback.
   4. Do **not** market a shared Lodestar From-domain for client outreach.
   5. Later (agency plans): optional Instantly/Smartlead-style multi-inbox, or
@@ -94,7 +94,7 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 | Provider | Free tier | Notes for us |
 | --- | --- | --- |
 | **Resend** | ~3k/mo (daily caps apply) | Best DX; BYO domain; not cold-infra |
-| **Maileroo** | Generous SMTP free | Cheap + verification API; SMTP path works today |
+| **Maileroo** | Generous SMTP free | Easy BYO *send* (ADR 0011); not the verify product |
 | **Amazon SES** | Cheap at scale | Best $/email later; more ops |
 | **Instantly / Smartlead** | Paid | Cold sequences + warmup; future integration |
 | **Postmark** | Low | Transactional-only — avoid for cold |
@@ -110,12 +110,14 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - `src/lib/email/maileroo.ts`: Maileroo HTTP send (`smtp.maileroo.com/api/v2`).
 - `src/lib/email/domain-health.ts` + `POST /api/providers/resend/domain-health`:
   live SPF/DKIM rows from Resend Domains API (demo-safe when no key).
-- `src/lib/email/verify.ts`: Zeruh/Maileroo verify **at send** only
-  (`sendApprovedOutreach`) when workspace `emailVerifyEnabled` is on.
-  Credits bar in Settings + studio; `GET /api/providers/zeruh/usage`.
+- `src/lib/email/verify.ts`: **MyEmailVerifier** (preferred) then legacy
+  Zeruh — **at send** only (`sendApprovedOutreach`) when
+  `emailVerifyEnabled` is on. Plan daily verify caps in Settings + studio;
+  provider balance: `GET /api/providers/verify/usage` (alias
+  `/api/providers/zeruh/usage`).
 - Quotas + rate limits in `service.ts`.
 - Settings → Easy: Resend **or** Maileroo + **Verify emails before sending**
-  (Zeruh) toggle; Pro mailbox Connect Google (`SendSetupPanel`).
+  (MyEmailVerifier) toggle; Pro mailbox Connect Google (`SendSetupPanel`).
   Workspace `preferredSendPath` chooses Easy vs Pro at send time.
   API keys are stored server-side; Settings only receives `hasResendKey` /
   `hasMailerooKey` flags.
@@ -132,6 +134,7 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   add Resend's DNS records there (or at the DNS host if nameservers differ).
   Resend does not require moving the domain away from the registrar.
 
-**Bottom line:** Resend is the right **API shape** for v1 BYO sending; Zeruh is
-the **verify** layer. Deliverability still needs the customer’s domain, DNS,
-warm-up, list hygiene, and Lodestar’s human-in-the-loop limits.
+**Bottom line:** Resend is the right **API shape** for v1 BYO sending;
+**MyEmailVerifier** is the **verify** layer (ADR 0016). Deliverability still
+needs the customer’s domain, DNS, warm-up, list hygiene, and human-in-the-loop
+limits.

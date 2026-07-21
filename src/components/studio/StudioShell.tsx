@@ -229,6 +229,7 @@ export function StudioShell({
   const userEmail = (session?.user?.email as string | undefined) ?? null;
   const settingsActive = pathname.startsWith("/app/settings");
 
+  // Admins operate the platform — not a personal lead studio.
   const navSections: {
     label: string;
     items: {
@@ -237,90 +238,90 @@ export function StudioShell({
       icon: Icon;
       active: boolean;
     }[];
-  }[] = [
-    {
-      label: "Overview",
-      items: [
+  }[] = isAdmin
+    ? [
         {
-          href: "/app?view=dashboard",
-          label: "Dashboard",
-          icon: DashboardIcon,
-          active: pathname === "/app" && view === "dashboard",
+          label: "Admin",
+          items: [
+            {
+              href: "/app?view=admin",
+              label: "Dashboard",
+              icon: ShieldIcon,
+              active: pathname === "/app" && (view === "admin" || !view),
+            },
+            {
+              href: "/app?view=admin-users",
+              label: "Users",
+              icon: UsersIcon,
+              active: pathname === "/app" && view === "admin-users",
+            },
+          ],
         },
-      ],
-    },
-    {
-      label: "Find",
-      items: [
+      ]
+    : [
         {
-          href: "/app",
-          label: "Search",
-          icon: SearchIcon,
-          active: pathname === "/app" && !view,
-        },
-        {
-          href: "/app?view=leads",
-          label: "Leads",
-          icon: UsersIcon,
-          active: pathname === "/app" && view === "leads",
-        },
-      ],
-    },
-    {
-      label: "Engage",
-      items: [
-        {
-          href: "/app?view=pipeline",
-          label: "Pipeline",
-          icon: PipelineIcon,
-          active: pathname === "/app" && view === "pipeline",
+          label: "Overview",
+          items: [
+            {
+              href: "/app?view=dashboard",
+              label: "Dashboard",
+              icon: DashboardIcon,
+              active: pathname === "/app" && view === "dashboard",
+            },
+          ],
         },
         {
-          href: "/app?view=outreach",
-          label: "Outreach",
-          icon: MailIcon,
-          active: pathname === "/app" && view === "outreach",
-        },
-      ],
-    },
-    {
-      label: "Organize",
-      items: [
-        {
-          href: "/app?view=boards",
-          label: "Boards",
-          icon: BoardsIcon,
-          active: pathname === "/app" && view === "boards",
-        },
-        {
-          href: "/app?view=runs",
-          label: "Runs",
-          icon: HistoryIcon,
-          active: pathname === "/app" && view === "runs",
-        },
-      ],
-    },
-  ];
-
-  if (isAdmin) {
-    navSections.push({
-      label: "Admin",
-      items: [
-        {
-          href: "/app?view=admin",
-          label: "Platform",
-          icon: ShieldIcon,
-          active: pathname === "/app" && view === "admin",
+          label: "Find",
+          items: [
+            {
+              href: "/app",
+              label: "Search",
+              icon: SearchIcon,
+              active: pathname === "/app" && !view,
+            },
+            {
+              href: "/app?view=leads",
+              label: "Leads",
+              icon: UsersIcon,
+              active: pathname === "/app" && view === "leads",
+            },
+          ],
         },
         {
-          href: "/app?view=admin-users",
-          label: "Users",
-          icon: UsersIcon,
-          active: pathname === "/app" && view === "admin-users",
+          label: "Engage",
+          items: [
+            {
+              href: "/app?view=pipeline",
+              label: "Pipeline",
+              icon: PipelineIcon,
+              active: pathname === "/app" && view === "pipeline",
+            },
+            {
+              href: "/app?view=outreach",
+              label: "Outreach",
+              icon: MailIcon,
+              active: pathname === "/app" && view === "outreach",
+            },
+          ],
         },
-      ],
-    });
-  }
+        {
+          label: "Organize",
+          items: [
+            {
+              href: "/app?view=boards",
+              label: "Boards",
+              icon: BoardsIcon,
+              active: pathname === "/app" && view === "boards",
+            },
+            {
+              href: "/app?view=runs",
+              label: "Runs",
+              icon: HistoryIcon,
+              active: pathname === "/app" && view === "runs",
+            },
+          ],
+        },
+      ];
 
   return (
     <div className="relative flex min-h-screen">

@@ -49,8 +49,8 @@ noted):
 | Provider | Free allotment | Used for | Binding? |
 | --- | --- | --- | --- |
 | **Firecrawl** | ~1,000 credits / mo / account | Search + scrape (+ extract) | Yes at scale |
-| **MyEmailVerifier** | ~100 credits / **day** / account | Verify-at-send | **Yes — scarcest** |
-| **Zeruh / Maileroo verify** | Provider free tier (fallback) | Verify fallback | Secondary |
+| **MyEmailVerifier** | ~100 credits / **day** / account | Verify-at-send (ADR 0016) | **Yes — scarcest** |
+| **Zeruh / Maileroo verify** | Provider free tier | Legacy env fallback only (not marketed) | Optional |
 | **Resend** | ~3,000 emails / mo | Auth / product mail; BYO for outreach | Low for outreach (BYO) |
 | **Groq / Gemini** | Generous free tiers | Pitch / blurbs / fit AI | Soft |
 | **Cloudflare Workers + D1** | Free / paid Workers | Hosting | Soft at MVP |
@@ -75,7 +75,7 @@ annual Hobby **$16**/mo):
 ### Verify unit math
 
 - Free pool: **100 / day platform-wide** (not per user).
-- Paid MEV / Zeruh: typically **~$0.001–$0.004 / verify** (order-of-magnitude).
+- Paid MyEmailVerifier: typically **~$0.001–$0.004 / verify** (order-of-magnitude).
 - Plan `verifiesPerDay` is fairness against the **shared** free pool until we
   buy a paid verify plan.
 
@@ -208,7 +208,7 @@ buy MEV credits, (b) lower Free further, or (c) offer BYO verify key on Pro+.
 | Resource | User pays (plan) | We pay (provider) | Margin lever |
 | --- | --- | --- | --- |
 | Enriched lead | Monthly lead credits | Firecrawl (+ optional LLM) | Cap + cache + standard-default mode |
-| Verify | Daily verify cap | MEV / Zeruh | Cap hard; cache hits free |
+| Verify | Daily verify cap | MyEmailVerifier (Zeruh legacy env) | Cap hard; cache hits free |
 | Send | Monthly send cap | **$0** (BYO) | Cap for abuse / spam optics |
 | AI pitch / fit | Bundled on Pro+ | Groq/Gemini free→paid | Soft gate on Pro feature flag |
 

@@ -65,7 +65,7 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
   - **Search** (default / no `?view=`) — always-expanded search form + CSV/Excel
     import. Search and import open a board-picker modal; leads land on the
-    chosen board (workspace **Default** if none). Live search when Firecrawl/Exa
+    chosen board (workspace **Default** if none). Live search when Firecrawl
     is configured; otherwise load demo data. After a run, the app redirects to
     Pipeline. Integration status lives in Settings (no mode banner).
 
@@ -112,7 +112,7 @@ The app detects capabilities from environment variables (`config.ts`):
 
 | Capability | No key (fallback) | With key (live) |
 | --- | --- | --- |
-| Search + enrichment | Realistic generated sample leads | Real web results (Firecrawl → Exa) |
+| Search + enrichment | Realistic generated sample leads | Real web results (Firecrawl) |
 | Drafting / editing / approval | Full | Full |
 | Email send | Simulated + logged, never delivered | Delivered via connected Gmail, Resend, or SMTP |
 
@@ -161,7 +161,7 @@ the local JSON-store path is always unmetered/demo.
   `D1Store` (Cloudflare D1 / SQLite, the production backend). `getDb(binding?)`
   selects D1Store when a D1Database binding is passed (Workers runtime), else
   JsonStore. Schema lives in `migrations/` (`0001`–`0015`, Wrangler format).
-- **`src/lib/search/`** — `runSearch()` tries Firecrawl then Exa (runtime fallback),
+- **`src/lib/search/`** — `runSearch()` uses Firecrawl (demo when no key / Load demo),
   scrapes/enriches to leads, and **falls back to demo data** on missing key or
   error. `enrich.ts` extracts emails/phones/blurb; `fit-score.ts` scores.
 - **`src/lib/outreach/draft.ts`** — locale-aware template personalization

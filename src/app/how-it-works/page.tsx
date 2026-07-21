@@ -47,29 +47,35 @@ export default function HowItWorksPage() {
   const required = authRequired();
   return (
     <MarketingShell footerTagline="Four steps. One steady hand.">
-      <section className="mx-auto max-w-7xl px-5 pb-24 pt-8 sm:px-8">
-        <p className="text-xs uppercase tracking-widest text-aurora-300">Product</p>
-        <h1 className="mt-3 max-w-3xl font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+      <section className="mx-auto max-w-3xl px-5 pb-24 pt-8 sm:max-w-4xl sm:px-8 lg:max-w-5xl">
+        <p className="text-xs font-medium uppercase tracking-widest text-aurora-300">
+          Product
+        </p>
+        <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-mist-100 sm:text-5xl">
           Four steps, one steady hand
         </h1>
-        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-mist-300">
+        <p className="mt-5 text-lg leading-relaxed text-mist-200 sm:text-xl">
           Search → Enrich → Draft → Approve → Send. Hermes Mail does the
           busywork; you stay in control of every message that leaves.
         </p>
 
-        <ol className="mt-16 space-y-0 border-t border-white/10">
+        <ol className="mt-14 space-y-0 border-t border-white/15">
           {STEPS.map((s, i) => (
             <li
               key={s.n}
-              className="grid gap-4 border-b border-white/10 py-8 sm:grid-cols-[5rem_1fr] sm:gap-8 sm:py-10"
+              className="grid gap-4 border-b border-white/15 py-9 sm:grid-cols-[5rem_1fr] sm:gap-8 sm:py-11"
             >
-              <span className="font-display text-3xl text-mist-500/70">{s.n}</span>
+              <span className="font-display text-3xl font-semibold text-aurora-300/90">
+                {s.n}
+              </span>
               <div>
                 <div className="flex items-center gap-3">
-                  <s.icon className="h-5 w-5 text-aurora-300" />
-                  <h2 className="text-xl font-semibold text-mist-100">{s.title}</h2>
+                  <s.icon className="h-5 w-5 shrink-0 text-aurora-300" />
+                  <h2 className="text-xl font-semibold text-mist-100 sm:text-2xl">
+                    {s.title}
+                  </h2>
                 </div>
-                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-mist-300 sm:text-base">
+                <p className="mt-3 max-w-2xl text-base leading-relaxed text-mist-200">
                   {s.body}
                 </p>
                 {i < STEPS.length - 1 ? (

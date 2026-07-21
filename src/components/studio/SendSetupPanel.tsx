@@ -41,7 +41,7 @@ export function SendSetupPanel({
   defaultPath?: PathId;
   /** True when Gmail OAuth is configured but NEXTAUTH_URL still points at localhost. */
   appUrlLooksLocal?: boolean;
-  /** Server has Zeruh / Maileroo Verify key. */
+  /** Server has MyEmailVerifier (or legacy Zeruh) verify key. */
   canVerifyEmail?: boolean;
   emailVerifyEnabled?: boolean;
 }) {

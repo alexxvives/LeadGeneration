@@ -37,6 +37,8 @@ export function AuthModal({
   allowGuest = true,
   /** When true, backdrop / Esc / X always dismiss (marketing overlay). */
   dismissible,
+  /** Prefer signup (e.g. Insider invite link). */
+  initialMode = "signin",
 }: {
   open: boolean;
   onClose: () => void;
@@ -47,6 +49,7 @@ export function AuthModal({
   callbackUrl?: string;
   allowGuest?: boolean;
   dismissible?: boolean;
+  initialMode?: FormMode;
 }) {
   const canDismiss = dismissible ?? !authRequired;
   const [email, setEmail] = useState("");
@@ -74,11 +77,11 @@ export function AuthModal({
     rendered.current = false;
     setError(null);
     setSent(false);
-    setMode("signin");
+    setMode(initialMode);
     const t = setTimeout(renderTurnstile, 50);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, initialMode]);
 
   useEffect(() => {
     if (!open) return;
@@ -170,6 +173,13 @@ export function AuthModal({
       }
 
       if (mode === "signup") {
+        let insiderToken: string | undefined;
+        try {
+          insiderToken =
+            sessionStorage.getItem("hermes_insider_invite") ?? undefined;
+        } catch {
+          insiderToken = undefined;
+        }
         const res = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -177,9 +187,13 @@ export function AuthModal({
             email: trimmed,
             password,
             turnstileToken: turnstileToken ?? undefined,
+            insiderToken,
           }),
         });
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          insider?: boolean;
+        };
         if (!res.ok) {
           setError(data.error ?? "Could not create account.");
           return;
@@ -187,6 +201,9 @@ export function AuthModal({
         // Force product tour for new accounts even if this browser skipped it as guest.
         try {
           sessionStorage.setItem("hermes_force_tutorial", "1");
+          if (data.insider) {
+            sessionStorage.removeItem("hermes_insider_invite");
+          }
         } catch {
           /* ignore */
         }

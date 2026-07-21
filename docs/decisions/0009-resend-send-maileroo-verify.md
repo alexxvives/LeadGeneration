@@ -1,5 +1,5 @@
 # 0009. Resend for send, Maileroo/Zeruh for verify
-- Status: accepted _(amended by [0011](0011-easy-resend-or-maileroo.md) — Easy BYO Maileroo send is also allowed)_
+- Status: accepted _(amended by [0011](0011-easy-resend-or-maileroo.md) for Easy BYO Maileroo send; **verify path amended by [0016](0016-myemailverifier-primary-verify.md)** — MyEmailVerifier is primary)_
 - Date: 2026-07-15
 
 ## Context
@@ -13,10 +13,9 @@ a clean verification API. Users asked us to pick one stack and stop hedging.
 1. **Send path (primary):** Resend — platform key for product/auth mail +
    **BYO Resend key + customer domain** for outreach (Settings). Best DX;
    already wired in `sendEmail()`.
-2. **Verify path:** Zeruh API (`https://api.zeruh.com/v1/verify`) via
-   `MAILEROO_VERIFY_API_KEY` (alias `ZERUH_API_KEY`). Maileroo’s verification
-   product; used **at send** (hard block undeliverable). Not on enrich — one
-   credit per send, covers search + Excel import equally.
+2. **Verify path (original):** Zeruh API via `MAILEROO_VERIFY_API_KEY` /
+   `ZERUH_API_KEY` at send. **Superseded for primary choice by [0016](0016-myemailverifier-primary-verify.md):**
+   MyEmailVerifier is preferred; Zeruh remains legacy fallback only.
 3. **SMTP:** Optional fallback only (Maileroo SMTP, SES, Google SMTP, etc.)
    when no Resend key — not the recommended cold path for v1 UX.
 4. **Not for v1:** Shared Lodestar From-domain, Instantly/Smartlead sequences.
@@ -32,8 +31,9 @@ a clean verification API. Users asked us to pick one stack and stop hedging.
 
 ## Consequences
 
-- Two keys possible in prod: `RESEND_API_KEY` (send) + `MAILEROO_VERIFY_API_KEY`
-  (verify). Zero-key demo still works (heuristic verify, demo send).
+- Prod keys: `RESEND_API_KEY` (platform send) + `MYEMAILVERIFIER_API_KEY`
+  (verify — ADR 0016). `MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY` remain
+  legacy aliases only. Zero-key demo still works (heuristic verify, demo send).
 - Docs (`email-providers.md`, `.env.example`) state this split explicitly.
 - Future Google/Microsoft OAuth mailbox send stays behind `sendEmail()` without
   changing this split.

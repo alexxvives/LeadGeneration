@@ -173,6 +173,12 @@ export const api = {
 
   adminUsers: () => jsonFetch<{ users: AdminUserRow[] }>("/api/admin/users"),
 
+  createInsiderInvite: () =>
+    jsonFetch<{ url: string; expiresInDays: number; note: string }>(
+      "/api/admin/insider-invite",
+      { method: "POST" },
+    ),
+
   createRun: (input: {
     niche: string;
     location?: string;
@@ -195,10 +201,10 @@ export const api = {
   resetUsage: () =>
     jsonFetch<{ ok: boolean }>("/api/workspace/reset-usage", { method: "POST" }),
 
-  setPlanDev: (planId: PlanId) =>
-    jsonFetch<{ ok: boolean; planId: PlanId }>("/api/workspace/set-plan", {
+  setPlanDev: (planId: PlanId, workspaceId?: string) =>
+    jsonFetch<{ ok: boolean; planId: PlanId; workspaceId: string }>("/api/workspace/set-plan", {
       method: "POST",
-      body: JSON.stringify({ planId }),
+      body: JSON.stringify({ planId, workspaceId }),
     }),
 
   clearBoard: () =>
@@ -312,7 +318,24 @@ export const api = {
   firecrawlUsage: () =>
     jsonFetch<FirecrawlUsage>("/api/providers/firecrawl/usage"),
 
-  zeruhUsage: () => jsonFetch<ZeruhUsage>("/api/providers/zeruh/usage"),
+  /** MyEmailVerifier (or legacy Zeruh) credit balance — ADR 0016. */
+  verifyUsage: () => jsonFetch<VerifyUsage>("/api/providers/verify/usage"),
+
+  mapImportColumns: (headers: string[]) =>
+    jsonFetch<{
+      mapping: Partial<{
+        company: number;
+        emails: number;
+        website: number;
+        phones: number;
+        location: number;
+        contactName: number;
+        companyType: number;
+      }> | null;
+    }>("/api/ai/map-columns", {
+      method: "POST",
+      body: JSON.stringify({ headers }),
+    }),
 };
 
 export type FirecrawlUsage = {
@@ -323,9 +346,9 @@ export type FirecrawlUsage = {
   error?: string;
 };
 
-export type ZeruhUsage = {
+export type VerifyUsage = {
   available: boolean;
-  provider: "zeruh" | "myemailverifier";
+  provider: "myemailverifier" | "zeruh";
   remainingCredits: number | null;
   permanentCredits: number | null;
   recurringCredits: number | null;
@@ -333,3 +356,6 @@ export type ZeruhUsage = {
   dailyFreeHint?: number | null;
   error?: string;
 };
+
+/** @deprecated Use VerifyUsage — name was historical (Zeruh). */
+export type ZeruhUsage = VerifyUsage;

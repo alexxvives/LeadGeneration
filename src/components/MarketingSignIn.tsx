@@ -37,8 +37,12 @@ export function MarketingSignInProvider({
   turnstileSiteKey: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"signin" | "signup" | "magic">(
+    "signin",
+  );
 
   const openSignIn = useCallback(() => {
+    setAuthMode("signin");
     setOpen(true);
   }, []);
 
@@ -46,7 +50,11 @@ export function MarketingSignInProvider({
     <Ctx.Provider value={{ openSignIn }}>
       {children}
       <Suspense fallback={null}>
-        <SignInQuerySync open={open} setOpen={setOpen} />
+        <SignInQuerySync
+          open={open}
+          setOpen={setOpen}
+          setAuthMode={setAuthMode}
+        />
       </Suspense>
       <AuthModal
         open={open}
@@ -58,31 +66,48 @@ export function MarketingSignInProvider({
         callbackUrl="/app"
         allowGuest={!authRequired}
         dismissible
+        initialMode={authMode}
       />
     </Ctx.Provider>
   );
 }
 
-/** Opens modal from `?signin=1` and clears the query when dismissed. */
+/** Opens modal from `?signin=1` / `?insider=…` and clears those query params. */
 function SignInQuerySync({
   open,
   setOpen,
+  setAuthMode,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
+  setAuthMode: (m: "signin" | "signup" | "magic") => void;
 }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
-    if (searchParams.get("signin") === "1") setOpen(true);
-  }, [searchParams, setOpen]);
+    const insider = searchParams.get("insider");
+    if (insider) {
+      try {
+        sessionStorage.setItem("hermes_insider_invite", insider);
+      } catch {
+        /* ignore */
+      }
+      setAuthMode("signup");
+      setOpen(true);
+    } else if (searchParams.get("signin") === "1") {
+      setAuthMode("signin");
+      setOpen(true);
+    }
+  }, [searchParams, setOpen, setAuthMode]);
 
   useEffect(() => {
-    if (open || !searchParams.get("signin")) return;
+    if (open) return;
+    if (!searchParams.get("signin") && !searchParams.get("insider")) return;
     const next = new URLSearchParams(searchParams.toString());
     next.delete("signin");
+    next.delete("insider");
     const q = next.toString();
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   }, [open, pathname, router, searchParams]);

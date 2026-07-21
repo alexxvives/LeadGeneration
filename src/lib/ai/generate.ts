@@ -147,6 +147,67 @@ export async function translateOutreachCopy(opts: {
   return { text, provider: out.provider };
 }
 
+export type ImportColumnField =
+  | "company"
+  | "emails"
+  | "website"
+  | "phones"
+  | "location"
+  | "contactName"
+  | "companyType"
+  | "ignore";
+
+/**
+ * Map spreadsheet header names → import fields. One short LLM call — imports
+ * are rare vs draft personalization. Returns null when AI is unavailable.
+ */
+export async function mapImportColumns(
+  headers: string[],
+): Promise<Partial<Record<ImportColumnField, number>> | null> {
+  if (headers.length === 0) return null;
+
+  const indexed = headers
+    .map((h, i) => `${i}: ${h.trim() || "(empty)"}`)
+    .join("\n");
+  const out = await aiChat(
+    [
+      "Map spreadsheet column headers to CRM import fields.",
+      "Return JSON only, no markdown.",
+      "Keys: company, emails, website, phones, location, contactName, companyType.",
+      "Values: 0-based column index (integer), or omit the key if no column fits.",
+      "Pick at most one column per key. Prefer work email over personal when unsure.",
+      "Headers may be any language (English, French, Spanish, etc.).",
+    ].join(" "),
+    `Headers:\n${indexed}`,
+  );
+  if (!out) return null;
+  try {
+    const match = out.text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const parsed = JSON.parse(match[0]) as Record<string, unknown>;
+    const fields: ImportColumnField[] = [
+      "company",
+      "emails",
+      "website",
+      "phones",
+      "location",
+      "contactName",
+      "companyType",
+    ];
+    const result: Partial<Record<ImportColumnField, number>> = {};
+    for (const f of fields) {
+      const v = parsed[f];
+      const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+      if (Number.isInteger(n) && n >= 0 && n < headers.length) {
+        result[f] = n;
+      }
+    }
+    return Object.keys(result).length > 0 ? result : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * How well a prospect matches the seller's pitch (active profile offer).
  * Small JSON reply — cheap on free Workers AI / Groq. Returns null when AI is off.

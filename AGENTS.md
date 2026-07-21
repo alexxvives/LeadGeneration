@@ -19,7 +19,7 @@ this repository. Read it first. It is intentionally short: the details live in
 **HERMES mail** — a human-in-the-loop lead-generation studio. Search a niche →
 enrich prospects → auto-draft outreach → human approves per lead → send.
 Next.js (App Router) + TypeScript + Tailwind, local JSON file DB behind a
-repository interface, provider-agnostic search (Firecrawl/Exa) and email
+repository interface, provider-agnostic search (Firecrawl) and email
 (Resend/SMTP), all with a zero-key demo mode.
 
 ## Documentation index (`docs/`)
@@ -119,7 +119,7 @@ src/lib/
   cf.ts              Cloudflare D1 binding resolver (prod only).
   ai/                Optional Workers AI (blurbs + default pitch); demo-safe null.
   db/                Repository (LeadRepository) + JsonStore (dev) & D1Store (prod), workspace-scoped.
-  search/            Providers (firecrawl/exa), enrichment, demo fallback.
+  search/            Firecrawl provider, enrichment, demo fallback.
   outreach/          Locale-aware draft templates + compliance footer.
   email/             Rate-limited sender (resend/smtp/google mailbox/demo).
   billing/           Stripe client + plan↔price mapping.

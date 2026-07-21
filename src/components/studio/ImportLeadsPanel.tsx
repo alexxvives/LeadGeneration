@@ -2,10 +2,11 @@
 
 import { useRef, useState } from "react";
 import { Spinner } from "@/components/ui";
+import { api } from "@/lib/client-api";
 import type { ImportLeadRow } from "@/lib/types";
 import { normalizeWebsiteUrl } from "@/lib/website";
 
-/** Normalize header cells for fuzzy column matching. */
+/** Normalize header cells for fuzzy column matching (alias fallback). */
 function normHeader(h: string): string {
   return h.trim().toLowerCase().replace(/[\s_-]+/g, "");
 }
@@ -61,6 +62,16 @@ const TYPE_PREFER = [
   "venue",
 ];
 
+type ColMap = {
+  company: number;
+  emails: number;
+  website: number;
+  phones: number;
+  location: number;
+  contactName: number;
+  companyType: number;
+};
+
 function pickColPreferred(headers: string[], preferred: string[]): number {
   const norms = headers.map(normHeader);
   for (const key of preferred) {
@@ -70,7 +81,41 @@ function pickColPreferred(headers: string[], preferred: string[]): number {
   return -1;
 }
 
-/** ExcelJS cell values may be hyperlinks, formulas, or rich text ΓÇö never `[object Object]`. */
+function aliasColMap(headers: string[]): ColMap {
+  return {
+    company: pickColPreferred(headers, COMPANY_PREFER),
+    emails: pickColPreferred(headers, EMAIL_PREFER),
+    website: pickColPreferred(headers, WEBSITE_PREFER),
+    phones: pickColPreferred(headers, PHONE_PREFER),
+    location: pickColPreferred(headers, LOCATION_PREFER),
+    contactName: pickColPreferred(headers, CONTACT_PREFER),
+    companyType: pickColPreferred(headers, TYPE_PREFER),
+  };
+}
+
+async function resolveColMap(headers: string[]): Promise<ColMap> {
+  // Imports are rare vs draft AI — prefer LLM (any language / odd CRM names).
+  // Alias list is the demo / zero-key fallback only.
+  try {
+    const { mapping } = await api.mapImportColumns(headers);
+    if (mapping && (mapping.company != null || mapping.emails != null)) {
+      return {
+        company: mapping.company ?? -1,
+        emails: mapping.emails ?? -1,
+        website: mapping.website ?? -1,
+        phones: mapping.phones ?? -1,
+        location: mapping.location ?? -1,
+        contactName: mapping.contactName ?? -1,
+        companyType: mapping.companyType ?? -1,
+      };
+    }
+  } catch {
+    // fall through
+  }
+  return aliasColMap(headers);
+}
+
+/** ExcelJS cell values may be hyperlinks, formulas, or rich text — never `[object Object]`. */
 function cellStr(v: unknown): string {
   if (v == null) return "";
   if (typeof v === "string") return cleanCellText(v);
@@ -116,44 +161,42 @@ function normalizePhone(raw: string): string {
   return p.replace(/[^\d+\s().-]/g, "").replace(/\s+/g, " ").trim();
 }
 
-function rowsFromMatrix(matrix: string[][]): ImportLeadRow[] {
+async function rowsFromMatrix(matrix: string[][]): Promise<ImportLeadRow[]> {
   if (matrix.length < 2) return [];
   const headers = matrix[0].map((h) => cellStr(h));
-  const companyI = pickColPreferred(headers, COMPANY_PREFER);
-  const emailI = pickColPreferred(headers, EMAIL_PREFER);
-  const websiteI = pickColPreferred(headers, WEBSITE_PREFER);
-  const phoneI = pickColPreferred(headers, PHONE_PREFER);
-  const locationI = pickColPreferred(headers, LOCATION_PREFER);
-  const contactI = pickColPreferred(headers, CONTACT_PREFER);
-  const typeI = pickColPreferred(headers, TYPE_PREFER);
+  const cols = await resolveColMap(headers);
 
-  if (companyI < 0 && emailI < 0) {
+  if (cols.company < 0 && cols.emails < 0) {
     throw new Error(
-      "Couldn't find a Company or Email column. Rename a header to Company / Email (or Opportunity, Business, Website, etc.) and try again.",
+      "Couldn't map a Company or Email column. Rename a header to Company / Email (or try again with AI available).",
     );
   }
 
   const out: ImportLeadRow[] = [];
   for (let r = 1; r < matrix.length; r++) {
     const row = matrix[r] ?? [];
-    const company = companyI >= 0 ? cellStr(row[companyI]) : "";
-    const emails = emailI >= 0 ? splitList(cellStr(row[emailI])) : [];
+    const company = cols.company >= 0 ? cellStr(row[cols.company]) : "";
+    const emails = cols.emails >= 0 ? splitList(cellStr(row[cols.emails])) : [];
     if (!company && emails.length === 0) continue;
     const phones =
-      phoneI >= 0
-        ? splitList(cellStr(row[phoneI]))
+      cols.phones >= 0
+        ? splitList(cellStr(row[cols.phones]))
             .map(normalizePhone)
             .filter((p) => p.replace(/\D/g, "").length >= 6)
         : [];
     out.push({
       company,
       emails,
-      website: websiteI >= 0 ? normalizeWebsiteUrl(cellStr(row[websiteI]) || null) : null,
+      website:
+        cols.website >= 0
+          ? normalizeWebsiteUrl(cellStr(row[cols.website]) || null)
+          : null,
       phones,
-      // Keep full street addresses from the file (better for outreach than city-only).
-      location: locationI >= 0 ? cellStr(row[locationI]) || null : null,
-      contactName: contactI >= 0 ? cellStr(row[contactI]) || null : null,
-      companyType: typeI >= 0 ? cellStr(row[typeI]) || null : null,
+      location: cols.location >= 0 ? cellStr(row[cols.location]) || null : null,
+      contactName:
+        cols.contactName >= 0 ? cellStr(row[cols.contactName]) || null : null,
+      companyType:
+        cols.companyType >= 0 ? cellStr(row[cols.companyType]) || null : null,
     });
   }
   return out;
@@ -189,7 +232,7 @@ async function parseFile(file: File): Promise<ImportLeadRow[]> {
   }
 
   if (name.endsWith(".xls") && !name.endsWith(".xlsx")) {
-    throw new Error("Legacy .xls is not supported ΓÇö save as .xlsx or export CSV.");
+    throw new Error("Legacy .xls is not supported — save as .xlsx or export CSV.");
   }
 
   if (name.endsWith(".xlsx")) {
@@ -220,7 +263,6 @@ async function parseFile(file: File): Promise<ImportLeadRow[]> {
 
   throw new Error("Use a .csv or .xlsx file.");
 }
-
 
 /**
  * Drop-zone / file picker. Destination board is chosen in a parent modal
@@ -259,8 +301,8 @@ export function ImportLeadsPanel({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-mist-100">Already have a list?</p>
           <p className="mt-1 text-xs leading-relaxed text-mist-500">
-            Drop a CSV or Excel file. We auto-detect Opportunity/Company, Email, Website,
-            Phone, Address. You&apos;ll choose which board they go to next.
+            Drop a CSV or Excel file. We use AI to map columns (any language), then
+            you choose which board they go to.
           </p>
         </div>
         <button

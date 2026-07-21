@@ -15,7 +15,14 @@ import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
 import { getCachedVerify, verifyEmail } from "@/lib/email/verify";
-import { getPlan } from "@/lib/plans";
+import {
+  getPlan,
+  INSIDER_CREDITS_FALLBACK,
+  INSIDER_SHARED_POOL,
+  isPaidPlan,
+} from "@/lib/plans";
+import { sumInsiderSharedUsage } from "@/lib/insider-quota";
+import { getFirecrawlRemainingCredits } from "@/lib/search/firecrawl";
 import { BoardLockedError, NotFoundError, QuotaError } from "@/lib/errors";
 import { ensureUsageWindow, ensureVerifyWindow } from "@/lib/workspace";
 import type {
@@ -484,6 +491,7 @@ async function resolveRunLeadLimit(
   let planMonthlyCap = hardCap;
   let remaining = Number.POSITIVE_INFINITY;
   let planId: PlanId = "free";
+  let used = 0;
 
   if (ctx.metered) {
     const ws = await ctx.db.getWorkspace(ctx.workspaceId);
@@ -491,14 +499,25 @@ async function resolveRunLeadLimit(
       const fresh = await ensureUsageWindow(ctx.db, ws);
       const plan = getPlan(fresh.planId);
       planId = fresh.planId;
-      planMonthlyCap = Math.min(hardCap, plan.leadCreditsPerMonth);
-      remaining = plan.leadCreditsPerMonth - fresh.leadsUsedThisMonth;
+      if (fresh.planId === "insider") {
+        // Shared Firecrawl API key = shared pool. Gate on raw credits > 0;
+        // batch size still hard-capped (credits ≠ leads 1:1).
+        const fc = await getFirecrawlRemainingCredits();
+        const creditsLeft = fc != null ? fc : INSIDER_CREDITS_FALLBACK;
+        used = (await sumInsiderSharedUsage(ctx.db)).leads;
+        remaining = creditsLeft;
+        planMonthlyCap = hardCap;
+      } else {
+        planMonthlyCap = Math.min(hardCap, plan.leadCreditsPerMonth);
+        used = fresh.leadsUsedThisMonth;
+        remaining = plan.leadCreditsPerMonth - fresh.leadsUsedThisMonth;
+      }
       if (remaining <= 0) {
         throw new QuotaError({
           kind: "leads",
           planId: fresh.planId,
-          limit: plan.leadCreditsPerMonth,
-          used: fresh.leadsUsedThisMonth,
+          limit: planId === "insider" ? 0 : planMonthlyCap,
+          used,
         });
       }
     }
@@ -506,7 +525,7 @@ async function resolveRunLeadLimit(
 
   const want =
     requested && requested > 0 ? Math.floor(requested) : Math.min(10, planMonthlyCap);
-  if (want > planMonthlyCap) {
+  if (planId !== "insider" && want > planMonthlyCap) {
     throw new QuotaError({
       kind: "leads",
       planId,
@@ -516,6 +535,10 @@ async function resolveRunLeadLimit(
     });
   }
 
+  // Insider remaining is FC credits (not lead slots) — only require credits > 0.
+  if (planId === "insider") {
+    return Math.max(1, Math.min(want, hardCap));
+  }
   return Math.max(1, Math.min(want, planMonthlyCap, remaining, hardCap));
 }
 
@@ -536,9 +559,19 @@ export async function resetWorkspaceUsage(ctx: Ctx): Promise<void> {
   });
 }
 
-/** TEMP developer helper — force a plan without Stripe (local / testing only). */
-export async function setWorkspacePlanDev(ctx: Ctx, planId: PlanId): Promise<void> {
-  await ctx.db.updateWorkspace(ctx.workspaceId, {
+/**
+ * Admin helper — force a plan without Stripe. Optional `workspaceId` targets
+ * another workspace (e.g. gift Insider to a friend).
+ */
+export async function setWorkspacePlanDev(
+  ctx: Ctx,
+  planId: PlanId,
+  workspaceId?: string,
+): Promise<void> {
+  const id = workspaceId?.trim() || ctx.workspaceId;
+  const existing = await ctx.db.getWorkspace(id);
+  if (!existing) throw new NotFoundError("Workspace not found");
+  await ctx.db.updateWorkspace(id, {
     planId,
     updatedAt: nowIso(),
   });
@@ -610,6 +643,7 @@ export async function createAndRunSearch(
       companyType: suggestCompanyType(
         l.company,
         l.aboutBlurb,
+        l.location,
         ...(l.tags ?? []),
       ),
       tags: l.tags,
@@ -1033,17 +1067,21 @@ export async function sendApprovedOutreach(
     const hasVerifyProvider =
       Boolean(env.myEmailVerifierKey()) || Boolean(env.zeruhVerifyKey());
     const cached = getCachedVerify(outreach.toEmail);
-    if (
-      hasVerifyProvider &&
-      !cached &&
-      verifyWs.verifiesUsedToday >= plan.verifiesPerDay
-    ) {
+    const verifyLimit =
+      verifyWs.planId === "insider"
+        ? INSIDER_SHARED_POOL.verifiesPerDay
+        : plan.verifiesPerDay;
+    const verifyUsed =
+      verifyWs.planId === "insider"
+        ? (await sumInsiderSharedUsage(db)).verifies
+        : verifyWs.verifiesUsedToday;
+    if (hasVerifyProvider && !cached && verifyUsed >= verifyLimit) {
       await releaseClaim();
       throw new QuotaError({
         kind: "verifies",
         planId: verifyWs.planId,
-        limit: plan.verifiesPerDay,
-        used: verifyWs.verifiesUsedToday,
+        limit: verifyLimit,
+        used: verifyUsed,
       });
     }
 
@@ -1078,14 +1116,17 @@ export async function sendApprovedOutreach(
     if (ws) {
       const fresh = await ensureUsageWindow(db, ws);
       const plan = getPlan(fresh.planId);
-      if (fresh.sendsUsedThisMonth >= plan.sendsPerMonth) {
-        await releaseClaim();
-        throw new QuotaError({
-          kind: "sends",
-          planId: fresh.planId,
-          limit: plan.sendsPerMonth,
-          used: fresh.sendsUsedThisMonth,
-        });
+      // Insider = BYO sender — no platform send quota.
+      if (!plan.unlimitedSends) {
+        if (fresh.sendsUsedThisMonth >= plan.sendsPerMonth) {
+          await releaseClaim();
+          throw new QuotaError({
+            kind: "sends",
+            planId: fresh.planId,
+            limit: plan.sendsPerMonth,
+            used: fresh.sendsUsedThisMonth,
+          });
+        }
       }
     }
   }
@@ -1689,14 +1730,19 @@ export async function importLeads(
       const freshWs = ws ? await db.getWorkspace(ctx.workspaceId) : null;
       if (freshWs) {
         const plan = getPlan(freshWs.planId);
-        const remaining = Math.max(0, plan.leadCreditsPerMonth - freshWs.leadsUsedThisMonth);
+        const used = freshWs.leadsUsedThisMonth;
+        const remaining =
+          freshWs.planId === "insider"
+            ? // Imports use plain fetch (no Firecrawl) — do not gate on FC credits.
+              Number.POSITIVE_INFINITY
+            : Math.max(0, plan.leadCreditsPerMonth - used);
         if (freshRows.length > remaining) {
           throw new QuotaError({
             kind: "leads",
             planId: freshWs.planId,
-            limit: plan.leadCreditsPerMonth,
-            used: freshWs.leadsUsedThisMonth,
-            message: `Import would use ${freshRows.length} leads but only ${remaining} remain this month.`,
+            limit: used + remaining,
+            used,
+            message: `Import would use ${freshRows.length} leads but only ${remaining} remain.`,
           });
         }
       }
@@ -1993,6 +2039,7 @@ export async function getAdminPlatformStats(ctx: Ctx): Promise<AdminPlatformStat
     starter: 0,
     pro: 0,
     agency: 0,
+    insider: 0,
   };
   let totalLeads = 0;
   let totalSendsLifetime = 0;
@@ -2013,7 +2060,7 @@ export async function getAdminPlatformStats(ctx: Ctx): Promise<AdminPlatformStat
     leadsUsedThisMonth += u.leadsUsedThisMonth;
     sendsUsedThisMonth += u.sendsUsedThisMonth;
     verifiesUsedToday += u.verifiesUsedToday;
-    if (u.planId !== "free") paidWorkspaceCount += 1;
+    if (isPaidPlan(u.planId)) paidWorkspaceCount += 1;
     if (u.stripeCustomerId) withStripeCustomer += 1;
     if (u.hasMailbox) withMailbox += 1;
     if (u.hasEasySendKey) withEasySendKey += 1;

@@ -53,8 +53,7 @@ Copy `.env.example` → `.env.local` and fill in what you have. All are optional
 
 | Variable | Purpose | Without it |
 | --- | --- | --- |
-| `FIRECRAWL_API_KEY` | Live web search + page scrape (preferred) | Demo leads |
-| `EXA_API_KEY` | Alternative live search provider | Demo leads |
+| `FIRECRAWL_API_KEY` | Live web search + page scrape | Demo leads |
 | `MAX_LEADS_PER_RUN` | Leads discovered per search (default 50, hard max 50) | 50 |
 | `RESEND_API_KEY` | Email sending via Resend (recommended) | Demo/simulated send |
 | `SMTP_HOST/PORT/USER/PASS` | Email via SMTP (Nodemailer) | Demo/simulated send |
@@ -80,7 +79,7 @@ so `npm run dev` is always the open, zero-key demo.
 
 | Capability | No keys (demo) | With keys (live) |
 | --- | --- | --- |
-| Search & enrichment | Realistic sample leads | Real web results via Firecrawl/Exa |
+| Search & enrichment | Realistic sample leads | Real web results via Firecrawl |
 | Fit scoring, drafting, editing | ✅ Full | ✅ Full |
 | Approve / reject queue | ✅ Full | ✅ Full |
 | Email send | Simulated (logged, not delivered) | Delivered via Resend/SMTP |

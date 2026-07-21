@@ -48,7 +48,7 @@ to steal, not repos to vendor**.
 | Sender rotation / cool-off on bounce | OutreachStud-io / Wu-Wei | After multi-inbox | P2 |
 | Template variables + follow-up sequences | PaulleDemon | We have Day+3/+7 notes; real sequence templates next | P1 |
 | Spintax / A-B variants | PaulleDemon / cold tools | Optional; keep HITL (no auto-blast) | P2 |
-| Email verify before send | already (Zeruh) | Keep; surface failures in Outreach UI | done / polish |
+| Email verify before send | already (MyEmailVerifier — ADR 0016) | Keep; surface failures in Outreach UI | done / polish |
 
 ### Ordered next steps
 1. **P0 UX:** dual-path Settings copy (Easy Resend vs Pro mailbox “coming”).
@@ -135,7 +135,7 @@ Verify always:
 
 - **[gstack](https://github.com/garrytan/gstack) `/scrape`:** agent browser skill for
   *developers* extracting page data while coding. Useful for **QA / dogfood /
-  agent workflows** — not a replacement for Firecrawl/Exa in production search.
+  agent workflows** — not a replacement for Firecrawl in production search.
 - ~~Root `SKILL.md` (data-scraper-agent)~~ **deleted** — wrong stack for Lodestar.
 
 ---

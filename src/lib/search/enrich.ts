@@ -84,6 +84,16 @@ function isPlausibleEmail(email: string): boolean {
   return domain.includes(".");
 }
 
+/** Pull a person name from Firecrawl JSON-extract lines (`Contact: Jane Doe`). */
+export function extractContactName(text: string): string | null {
+  const m = text.match(
+    /\bContact:\s*([A-Z][a-zA-Z.'\-]+(?:\s+[A-Z][a-zA-Z.'\-]+){0,3})\b/,
+  );
+  const name = m?.[1]?.trim();
+  if (!name || name.length < 3 || name.length > 60) return null;
+  return name;
+}
+
 export function extractEmails(text: string): string[] {
   const found = text.match(EMAIL_RE) ?? [];
   const clean = found

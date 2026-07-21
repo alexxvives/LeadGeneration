@@ -27,7 +27,7 @@ Landing (/)
   └─ Sign in / Sign up (AuthModal or /login; guest mode when auth off)
        └─ Studio (/app) — StudioShell sidebar: Dashboard · Search · Leads · Pipeline · Outreach · Boards · Runs · Settings
             ├─ SEARCH: SearchPanel → BoardAssignModal (pick board) → POST /api/runs
-            │     └─ createAndRunSearch: search (Firecrawl/Exa) → enrich → fit-score → optional AI drafts
+            │     └─ createAndRunSearch: search (Firecrawl) → enrich → fit-score → optional AI drafts
             │           → redirected to Pipeline view on completion
             ├─ IMPORT: ImportLeadsPanel (xlsx/csv, client-parsed) → chunked POST /api/leads/import
             ├─ REVIEW: Leads (table/cards/map) → LeadDrawer (info | draft composer)

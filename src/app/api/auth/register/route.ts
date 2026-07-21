@@ -6,16 +6,27 @@ import {
 } from "@/lib/auth-rate-limit";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { getCapabilities } from "@/lib/config";
+import { getD1Binding } from "@/lib/cf";
+import { getDb } from "@/lib/db";
+import { verifyInsiderInviteToken } from "@/lib/insider-invite";
+import { getOrCreateWorkspaceForUser } from "@/lib/workspace";
+import { nowIso } from "@/lib/id";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * Public signup: email + password → Auth.js user with password_hash.
+ * Optional insiderToken (admin invite) → workspace plan = insider.
  * Client then calls signIn("credentials").
  */
 export async function POST(req: Request) {
-  let body: { email?: string; password?: string; turnstileToken?: string };
+  let body: {
+    email?: string;
+    password?: string;
+    turnstileToken?: string;
+    insiderToken?: string;
+  };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -46,9 +57,27 @@ export async function POST(req: Request) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+
+  let insider = false;
+  if (result.created && verifyInsiderInviteToken(body.insiderToken)) {
+    try {
+      const binding = await getD1Binding();
+      const db = getDb(binding);
+      const ws = await getOrCreateWorkspaceForUser(db, result.userId, email);
+      await db.updateWorkspace(ws.id, {
+        planId: "insider",
+        updatedAt: nowIso(),
+      });
+      insider = true;
+    } catch (err) {
+      console.error("[register] insider plan apply failed", err);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     userId: result.userId,
     created: result.created,
+    insider,
   });
 }
