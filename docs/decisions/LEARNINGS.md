@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-21 — Insider credits snake_case + stale board lock
+- `getFirecrawlRemainingCredits` looked for camelCase `remainingCredits`;
+  Firecrawl `/v1/team/credit-usage` returns `data.remaining_credits` (same
+  shape the usage badge route already parsed). Insider admin/Settings showed
+  “Credits unavailable” despite a live key. Fixed to prefer snake_case.
+- Soft lock heartbeat 404 during tutorial: `hermes_active_board` from another
+  session was injected into `?board=` before validation. Clear unknown ids
+  against `listBoards` before heartbeat; ignore not-found and reset filter.
+- Admin Dashboard: removed “Live snapshot of tenants…” subtitle.
+
 ### 2026-07-21 — Pre-ship: Import stays, 403, no FC fallback, Stripe cancel
 - Find leads off: Search form blocked; Import remains on Search view (no
   redirect / nav hide). `ForbiddenError` → 403 on `POST /api/runs`.

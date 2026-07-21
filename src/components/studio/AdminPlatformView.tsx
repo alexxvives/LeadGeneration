@@ -342,12 +342,7 @@ export function AdminPlatformView() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-sm text-mist-500">
-            Live snapshot of tenants (excludes platform admins).
-          </p>
-        </div>
+      <div className="flex flex-wrap items-end justify-end gap-3">
         <div className="w-full max-w-xs">
           <Select
             value={accountFilter}

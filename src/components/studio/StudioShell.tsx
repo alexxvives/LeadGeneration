@@ -118,7 +118,8 @@ export function StudioShell({
   }, [refreshBoards, pathname, view]);
 
   // Sync board filter from URL, else localStorage. Keep `board` in the URL so
-  // every view (leads/pipeline/…) filters the same way.
+  // every view (leads/pipeline/…) filters the same way. Drop ids that aren't
+  // in this workspace (stale localStorage from another account/session).
   useEffect(() => {
     if (boardParam === "all" || boardParam === "") {
       setActiveBoardId(null);
@@ -126,14 +127,39 @@ export function StudioShell({
       return;
     }
     if (boardParam) {
+      if (boards.length > 0 && !boards.some((b) => b.id === boardParam)) {
+        storeBoardFilter("all");
+        setActiveBoardId(null);
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("board");
+        const q = params.toString();
+        router.replace(q ? `${pathname}?${q}` : pathname);
+        return;
+      }
       setActiveBoardId(boardParam);
-      storeBoardFilter(boardParam);
+      if (boards.length === 0 || boards.some((b) => b.id === boardParam)) {
+        storeBoardFilter(boardParam);
+      }
       return;
     }
     const stored = loadStoredBoardFilter();
     const id = stored === "all" || !stored ? null : stored;
+    if (!id) {
+      setActiveBoardId(null);
+      return;
+    }
+    if (boards.length === 0) {
+      // Wait to validate before writing board into the URL.
+      setActiveBoardId(id);
+      return;
+    }
+    if (!boards.some((b) => b.id === id)) {
+      storeBoardFilter("all");
+      setActiveBoardId(null);
+      return;
+    }
     setActiveBoardId(id);
-    if (id && pathname.startsWith("/app")) {
+    if (pathname.startsWith("/app")) {
       const params = new URLSearchParams(searchParams.toString());
       if (!params.has("board")) {
         params.set("board", id);
@@ -141,7 +167,7 @@ export function StudioShell({
         router.replace(q ? `${pathname}?${q}` : pathname);
       }
     }
-  }, [boardParam, pathname, router, searchParams]);
+  }, [boardParam, boards, pathname, router, searchParams]);
 
   const setBoardFilter = (id: string | null) => {
     const next = id ?? "all";

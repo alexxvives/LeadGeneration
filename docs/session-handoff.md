@@ -9,24 +9,25 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-21 (pre-ship fixes: import/403/credits/stripe)
+## ⏱️ Status — updated 2026-07-21 (Insider FC parse + board lock)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local; **remote D1 needs `npm run cf:migrate`** (incl. `find_leads_enabled`).
 
 ### This pass
-- Find leads off: Search form blocked; **Import stays** on Search view (no redirect).
-- Disabled Find leads → **403** on `POST /api/runs` (`ForbiddenError`).
-- Insider: no invented credit fallback — null FC → “unavailable” + **402**.
-- Account delete: best-effort Stripe cancel; cascade tokens/invites; admin typed `DELETE`.
-- Admin Settings: no Danger zone. Admin Users: Insider pool display, toggle busy/toast, trash a11y.
+- Insider “Credits unavailable”: `getFirecrawlRemainingCredits` now reads
+  `remaining_credits` (Firecrawl snake_case); was looking for camelCase only.
+- Soft lock 404 during tutorial: validate/clear stale `?board=` / localStorage
+  ids against workspace boards before heartbeat.
+- Admin Dashboard: removed “Live snapshot of tenants…” subtitle.
 
 ### Next
-1. `npm run cf:migrate` (remote) then deploy.
-2. Measure email-found % on live Firecrawl runs.
-3. Optional dogfood non-admin account for Search/Pipeline.
-4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
+1. Deploy (credits fix is live-critical for Insider).
+2. `npm run cf:migrate` (remote) if not already.
+3. Measure email-found % on live Firecrawl runs.
+4. Optional dogfood non-admin account for Search/Pipeline.
+5. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 

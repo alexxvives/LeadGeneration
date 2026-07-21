@@ -238,6 +238,14 @@ export function Studio() {
       setLockHolder(null);
       return;
     }
+    // Wait for board list so we don't heartbeat a stale id from another session.
+    if (boards.length === 0) return;
+    if (!boards.some((b) => b.id === bid)) {
+      storeBoardFilter("all");
+      setEditLocked(false);
+      setLockHolder(null);
+      return;
+    }
     let cancelled = false;
     const beat = async () => {
       try {
@@ -249,6 +257,14 @@ export function Studio() {
       } catch (e) {
         if (cancelled) return;
         const msg = e instanceof Error ? e.message : "";
+        const notFound = /not found/i.test(msg);
+        if (notFound) {
+          storeBoardFilter("all");
+          setEditLocked(false);
+          setLockHolder(null);
+          router.replace(`/app${queryForView(view, null)}`, { scroll: false });
+          return;
+        }
         const locked =
           (e as Error & { locked?: boolean }).locked ||
           /working on this board|paused/i.test(msg);
@@ -269,7 +285,7 @@ export function Studio() {
       window.clearInterval(id);
       void api.releaseBoardLock(bid).catch(() => undefined);
     };
-  }, [filterBoardId, board?.boardLock]);
+  }, [filterBoardId, boards, board?.boardLock, router, view]);
 
   useEffect(() => {
     const lock = board?.boardLock;

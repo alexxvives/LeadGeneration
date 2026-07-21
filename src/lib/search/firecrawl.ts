@@ -53,11 +53,17 @@ export async function getFirecrawlRemainingCredits(): Promise<number | null> {
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) return null;
+    // API returns snake_case (`remaining_credits`); accept camelCase too.
     const json = (await res.json()) as {
-      data?: { remainingCredits?: number };
+      data?: { remaining_credits?: number; remainingCredits?: number };
+      remaining_credits?: number;
       remainingCredits?: number;
     };
-    const n = json.data?.remainingCredits ?? json.remainingCredits;
+    const n =
+      json.data?.remaining_credits ??
+      json.data?.remainingCredits ??
+      json.remaining_credits ??
+      json.remainingCredits;
     return typeof n === "number" && Number.isFinite(n) ? Math.max(0, n) : null;
   } catch {
     return null;
