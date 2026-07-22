@@ -333,6 +333,7 @@ export function LeadDrawer(props: DrawerProps) {
                   id="lead-drawer-title"
                   key={`${lead.id}-company-${lead.company}`}
                   defaultValue={lead.company}
+                  placeholder="Company name"
                   onBlur={(e) => {
                     const next = e.target.value.trim();
                     if (next && next !== lead.company) {

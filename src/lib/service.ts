@@ -1728,6 +1728,112 @@ export async function updateLeadCrm(
   return db.updateLead(leadId, next);
 }
 
+/**
+ * Create a blank lead on a board and open it for manual fill-in (Leads UI).
+ * Reuses a single completed "manual" run per board so Runs stays tidy.
+ */
+export async function createManualLead(
+  ctx: Ctx,
+  opts?: { boardId?: string | null },
+): Promise<LeadWithOutreach> {
+  let boardId: string;
+  let db = ctx.db;
+  let workspaceId = ctx.workspaceId;
+
+  if (opts?.boardId) {
+    const access = await resolveBoardAccess(ctx, opts.boardId);
+    if (!access) throw new NotFoundError("Board not found");
+    boardId = access.board.id;
+    db = access.db;
+    workspaceId = access.board.workspaceId;
+  } else {
+    const def = await ensureDefaultBoard(ctx);
+    boardId = def.id;
+  }
+
+  await assertBoardEditable(ctx, boardId);
+
+  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+  if (ws) await ensureUsageWindow(ctx.db, ws);
+
+  if (ctx.metered) {
+    const freshWs = ws ? await ctx.db.getWorkspace(ctx.workspaceId) : null;
+    if (freshWs) {
+      const plan = getPlan(freshWs.planId);
+      const used = freshWs.leadsUsedThisMonth;
+      const remaining =
+        freshWs.planId === "insider"
+          ? Number.POSITIVE_INFINITY
+          : Math.max(0, plan.leadCreditsPerMonth - used);
+      if (remaining < 1) {
+        throw new QuotaError({
+          kind: "leads",
+          planId: freshWs.planId,
+          limit: used + remaining,
+          used,
+          message: "No lead credits left this month — upgrade to add more.",
+        });
+      }
+    }
+  }
+
+  const runs = await db.listRuns();
+  let run =
+    runs.find((r) => r.boardId === boardId && r.provider === "manual") ?? null;
+  if (!run) {
+    run = {
+      id: newId("run"),
+      workspaceId,
+      boardId,
+      niche: "Manual entry",
+      location: null,
+      offerNotes: null,
+      senderName: null,
+      status: "complete",
+      mode: "live",
+      provider: "manual",
+      leadCount: 0,
+      error: null,
+      createdAt: nowIso(),
+      completedAt: nowIso(),
+    };
+    await db.createRun(run);
+  }
+
+  const lead: Lead = {
+    id: newId("lead"),
+    workspaceId,
+    runId: run.id,
+    boardId,
+    company: "",
+    website: null,
+    emails: [],
+    phones: [],
+    contactName: null,
+    location: null,
+    aboutBlurb: null,
+    companyType: null,
+    tags: ["manual"],
+    fitScore: 0,
+    fitReasons: [],
+    sourceUrl: "manual",
+    status: "new",
+    crmStage: "new",
+    contactMethods: [],
+    notes: null,
+    followUps: [],
+    customFields: {},
+    createdAt: nowIso(),
+  };
+
+  await db.createLeads([lead]);
+  await recordLeadUsage(ctx, 1);
+  const boardCount = await db.countLeads({ boardId });
+  await db.updateRun(run.id, { leadCount: boardCount });
+
+  return { ...lead, outreach: null };
+}
+
 /** Row shape for CSV/Excel import (flexible mapping happens client-side). */
 export type { ImportLeadRow };
 

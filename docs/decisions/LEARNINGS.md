@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Manual Add lead
+- `POST /api/leads` → `createManualLead`: blank company/fields, tag `manual`,
+  reuses one completed `provider: "manual"` run per board (keeps Runs clean).
+- Quota same as import (insider unmetered for this path). UI opens info drawer.
+
 ### 2026-07-22 — Settings template is canonical; flag is preview-only
 - `templateLang` must never choose editor text (`primaryPitchLang` ignores it).
 - Stale `pitches[en]` from old re-key made preview ignore live Spanish edits and

@@ -17,7 +17,7 @@ import { LeadMap } from "./LeadMap";
 import { LeadDrawer } from "./LeadDrawer";
 import { UpgradeModal, UsageBar } from "./UpgradeModal";
 import { VerifyLimitModal } from "./VerifyLimitModal";
-import { crmStageLabel } from "@/components/ui";
+import { crmStageLabel, Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
 import { PipelineView } from "./PipelineView";
@@ -157,6 +157,7 @@ export function Studio() {
   const [verifyLimitPlan, setVerifyLimitPlan] = useState<PlanId | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
+  const [addingLead, setAddingLead] = useState(false);
   const [importProgress, setImportProgress] = useState<{
     /** Smooth display value (may lead confirmed slightly). */
     done: number;
@@ -972,6 +973,36 @@ export function Studio() {
     setSelectedId(id);
   };
 
+  const onAddLead = async () => {
+    if (addingLead || editLocked || !board) return;
+    setAddingLead(true);
+    try {
+      const { lead } = await api.createLead({ boardId: filterBoardId });
+      setBoard((b) =>
+        b
+          ? {
+              ...b,
+              leads: [lead, ...b.leads],
+              workspace: {
+                ...b.workspace,
+                leadsUsed: b.workspace.leadsUsed + 1,
+              },
+            }
+          : b,
+      );
+      setBoards((list) =>
+        list.map((b) =>
+          b.id === lead.boardId ? { ...b, leadCount: b.leadCount + 1 } : b,
+        ),
+      );
+      openInfo(lead.id);
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setAddingLead(false);
+    }
+  };
+
   const selected = board?.leads.find((l) => l.id === selectedId) ?? null;
 
   /** Accent-fold + every token must appear (company, email, location, …). */
@@ -1411,27 +1442,48 @@ export function Studio() {
       {view === "leads" && (
         <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
-            <p className="text-xs uppercase tracking-widest text-mist-500">
-              <span className="font-semibold text-mist-200">
-                {loading ||
-                leadsHydrating ||
-                !board ||
-                leadsFilterPending ||
-                (hasLeads && !leadsBodyReady)
-                  ? "…"
-                  : filteredLeads.length}
-              </span>
-              {board &&
-              hasLeads &&
-              (pipelineFilter !== "all" || leadSearch.trim()) ? (
-                <>
-                  {" "}
-                  of{" "}
-                  <span className="font-semibold text-mist-200">{board.leads.length}</span>
-                </>
-              ) : null}{" "}
-              leads
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs uppercase tracking-widest text-mist-500">
+                <span className="font-semibold text-mist-200">
+                  {loading ||
+                  leadsHydrating ||
+                  !board ||
+                  leadsFilterPending ||
+                  (hasLeads && !leadsBodyReady)
+                    ? "…"
+                    : filteredLeads.length}
+                </span>
+                {board &&
+                hasLeads &&
+                (pipelineFilter !== "all" || leadSearch.trim()) ? (
+                  <>
+                    {" "}
+                    of{" "}
+                    <span className="font-semibold text-mist-200">
+                      {board.leads.length}
+                    </span>
+                  </>
+                ) : null}{" "}
+                leads
+              </p>
+              {board && !editLocked ? (
+                <button
+                  type="button"
+                  onClick={() => void onAddLead()}
+                  disabled={addingLead || loading || leadsHydrating}
+                  className="glass inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-mist-100 transition-transform hover:scale-[1.02] disabled:opacity-50"
+                >
+                  {addingLead ? (
+                    <Spinner className="h-3 w-3 text-aurora-300" />
+                  ) : (
+                    <span className="text-aurora-300" aria-hidden>
+                      +
+                    </span>
+                  )}
+                  Add lead
+                </button>
+              ) : null}
+            </div>
             <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
               <LayoutToggle active={layoutTab === "table"} onClick={() => selectLayout("table")}>
                 Table

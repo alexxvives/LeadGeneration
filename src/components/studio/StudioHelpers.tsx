@@ -32,7 +32,7 @@ export function EmptyState() {
       <SparkIcon className="mx-auto h-7 w-7 text-aurora-300" />
       <h2 className="mt-3 font-display text-xl font-semibold text-mist-100">Your board is clear</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-mist-300">
-        Run a search or import a list to add leads to this board.
+        Run a search, import a list, or use Add lead to fill one in by hand.
       </p>
     </div>
   );

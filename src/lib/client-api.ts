@@ -291,6 +291,12 @@ export const api = {
       body: JSON.stringify({ outreachId }),
     }),
 
+  createLead: (opts?: { boardId?: string | null }) =>
+    jsonFetch<{ lead: LeadWithOutreach }>("/api/leads", {
+      method: "POST",
+      body: JSON.stringify({ boardId: opts?.boardId ?? null }),
+    }),
+
   updateLead: (
     id: string,
     patch: {
