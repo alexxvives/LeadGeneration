@@ -37,6 +37,11 @@ export type OutreachProfile = {
    */
   pitches: Partial<Record<OutreachLang, string>>;
   /**
+   * Language flag last chosen in Settings. Persists across visits; labels the
+   * slot the subject/body editors write into. Does not translate content.
+   */
+  templateLang?: OutreachLang;
+  /**
    * When true, each draft is AI-rewritten so wording varies per lead.
    * When false, the email body template is used as-is (placeholders only).
    */
@@ -89,6 +94,20 @@ function newId(): string {
   return `op_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+const OUTREACH_LANGS: OutreachLang[] = [
+  "en",
+  "es",
+  "fr",
+  "it",
+  "de",
+  "pt",
+  "pl",
+];
+
+function isOutreachLang(v: unknown): v is OutreachLang {
+  return typeof v === "string" && (OUTREACH_LANGS as string[]).includes(v);
+}
+
 function emptyProfile(partial?: Partial<OutreachProfile>): OutreachProfile {
   return {
     id: partial?.id ?? newId(),
@@ -101,6 +120,9 @@ function emptyProfile(partial?: Partial<OutreachProfile>): OutreachProfile {
     subjectTemplate: partial?.subjectTemplate ?? "",
     subjects: partial?.subjects ?? {},
     pitches: partial?.pitches ?? {},
+    templateLang: isOutreachLang(partial?.templateLang)
+      ? partial.templateLang
+      : undefined,
     aiPersonalize: partial?.aiPersonalize ?? false,
     staticBody: partial?.staticBody,
   };
@@ -173,13 +195,18 @@ export function resolveDraftLang(
 
 /**
  * Primary pitch language = the template slot the user is maintaining.
- * Prefer the longest filled slot; if text clearly matches another filled
- * language, use that. English is not required — any slot works.
+ * Prefer the Settings flag (`templateLang`) when that slot has content;
+ * otherwise the longest filled slot (with a light text-language hint).
  */
 export function primaryPitchLang(p: OutreachProfile): OutreachLang | null {
-  const order: OutreachLang[] = ["en", "es", "fr", "it", "de", "pt", "pl"];
-  const filled = order.filter((lang) => p.pitches[lang]?.trim());
-  if (filled.length === 0) return null;
+  if (p.templateLang && p.pitches[p.templateLang]?.trim()) {
+    return p.templateLang;
+  }
+  const filled = OUTREACH_LANGS.filter((lang) => p.pitches[lang]?.trim());
+  if (filled.length === 0) {
+    // Flag chosen but body still empty — still treat flag as the active slot.
+    return p.templateLang ?? null;
+  }
   if (filled.length === 1) return filled[0]!;
 
   let best = filled[0]!;
@@ -193,6 +220,49 @@ export function primaryPitchLang(p: OutreachProfile): OutreachLang | null {
   }
   const detected = outreachLangFromText(p.pitches[best] ?? "");
   return filled.includes(detected) ? detected : best;
+}
+
+/**
+ * Move subject/body onto a new language key without translating. Sign-off is
+ * shared and unchanged. Used when the Settings flag changes so editors keep
+ * the same text.
+ */
+export function rekeyTemplateLang(
+  p: OutreachProfile,
+  to: OutreachLang,
+): OutreachProfile {
+  const from = p.templateLang ?? primaryPitchLang(p) ?? to;
+  if (from === to) {
+    return { ...p, templateLang: to };
+  }
+  const body = (p.pitches[from] ?? pitchForLang(p, from)).trim();
+  const subject =
+    p.subjects[from]?.trim() ||
+    subjectForLang(p, from) ||
+    p.subjectTemplate.trim();
+
+  const pitches: Partial<Record<OutreachLang, string>> = { ...p.pitches };
+  const subjects: Partial<Record<OutreachLang, string>> = { ...p.subjects };
+
+  if (body) pitches[to] = body;
+  else if (!pitches[to]?.trim()) delete pitches[to];
+
+  if (subject) subjects[to] = subject;
+  else if (!subjects[to]?.trim()) delete subjects[to];
+
+  // Drop the old slot when it was just the same canonical template.
+  if (from !== to) {
+    if ((pitches[from] ?? "").trim() === body) delete pitches[from];
+    if ((subjects[from] ?? "").trim() === subject) delete subjects[from];
+  }
+
+  return {
+    ...p,
+    templateLang: to,
+    pitches,
+    subjects,
+    subjectTemplate: subject || p.subjectTemplate.trim(),
+  };
 }
 
 function migrateLegacySingle(raw: string): ProfileStore {
@@ -218,6 +288,7 @@ function migrateLegacySingle(raw: string): ProfileStore {
       subjectTemplate: String(parsed.subjectTemplate ?? ""),
       subjects: parsed.subjects ?? {},
       pitches,
+      templateLang: parsed.templateLang,
       aiPersonalize: resolveAiPersonalize(parsed),
       staticBody: parsed.staticBody,
     });
@@ -289,6 +360,7 @@ function normalizeProfile(p: Partial<OutreachProfile> & { defaultOffer?: string 
     subjectTemplate: String(p.subjectTemplate ?? ""),
     subjects,
     pitches,
+    templateLang: p.templateLang,
     aiPersonalize: resolveAiPersonalize(p),
     staticBody: p.staticBody,
   });

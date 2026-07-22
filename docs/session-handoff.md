@@ -9,18 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-22 (import stage + layout tab)
+## ⏱️ Status — updated 2026-07-22 (settings template language)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Import maps Stage column → CRM (Email Sent/Called/CLIENT/…).
-- Layout Table/Cards/Map: tab highlight urgent; pane mount deferred.
+- Settings language flag persists (`templateLang` on outreach profile).
+- Flag change re-keys same subject/body (no translate); sign-off unchanged.
+- Prior: import Stage→CRM; layout tab urgency.
 
 ### Next
-1. Deploy; hard-refresh; confirm layout toggle + re-import stages.
+1. Hard-refresh Settings: change flag, leave, return — flag + template text stick.
 2. Optional: allow importing same-name rows as distinct locations (address key).
 3. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
 4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.

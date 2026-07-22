@@ -6,7 +6,9 @@ import {
   deleteOutreachProfile,
   hydrateOutreachProfilesFromServer,
   loadOutreachProfiles,
+  pitchForLang,
   primaryPitchLang,
+  rekeyTemplateLang,
   saveSenderProfile,
   setActiveOutreachProfile,
   subjectForLang,
@@ -99,7 +101,9 @@ function previewDraft(
   profile: OutreachProfile,
   lang: OutreachLang,
 ): { subject: string; body: string; missingPitch: boolean } {
-  const pitch = (profile.pitches[lang] ?? "").trim();
+  // Prefer the flagged slot; fall back so a re-key / legacy profile never
+  // blanks the preview while the left editors still show text.
+  const pitch = pitchForLang(profile, lang);
   const missingPitch = !pitch;
   if (missingPitch) {
     return { subject: "", body: "", missingPitch: true };
@@ -158,11 +162,12 @@ export function SenderProfileForm() {
     })();
   }, []);
 
-  // Open the flag that already has a body (any language — not English-only).
+  // Restore the persisted flag (or the slot that already has a body).
   useEffect(() => {
     if (!profile) return;
-    const primary = primaryPitchLang(profile);
-    if (primary) setPreviewLang(primary);
+    const saved =
+      profile.templateLang ?? primaryPitchLang(profile) ?? "en";
+    setPreviewLang(saved);
     // Only when switching profiles — not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
@@ -242,10 +247,17 @@ export function SenderProfileForm() {
     setSavedField(null);
   };
 
-  const pitchValue = profile.pitches[previewLang] ?? "";
+  // Editors follow the flagged slot. Only fall back when that key is missing
+  // (legacy profiles) — not when the user cleared it to "".
+  const pitchValue =
+    profile.pitches[previewLang] !== undefined
+      ? (profile.pitches[previewLang] ?? "")
+      : pitchForLang(profile, previewLang);
 
   const subjectValue =
-    profile.subjects[previewLang] ?? profile.subjectTemplate ?? "";
+    profile.subjects[previewLang] !== undefined
+      ? (profile.subjects[previewLang] ?? "")
+      : subjectForLang(profile, previewLang) || profile.subjectTemplate || "";
 
   const fieldSnapshot = () =>
     JSON.stringify({
@@ -271,6 +283,7 @@ export function SenderProfileForm() {
     // or move text between flags on blur.
     const next: OutreachProfile = {
       ...profile,
+      templateLang: previewLang,
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
       subjects,
       subjectTemplate: subjectValue.trim() || profile.subjectTemplate.trim(),
@@ -288,28 +301,43 @@ export function SenderProfileForm() {
     persist(next, field);
   };
 
-  /** Switch preview flag — flush current slot first so edits are not lost. */
+  /**
+   * Switch language flag — persist choice and re-key the same subject/body onto
+   * the new slot (no translation). Sign-off is shared and stays put.
+   */
   const switchPreviewLang = (lang: OutreachLang) => {
     setLangMenuOpen(false);
     const current = profileRef.current;
-    if (current && lang !== previewLang) {
-      const next: OutreachProfile = {
-        ...current,
-        signature: current.signature.trim() || SIGNATURE_PLACEHOLDER,
-        subjects: {
-          ...current.subjects,
-          [previewLang]: (current.subjects[previewLang] ?? current.subjectTemplate ?? "").trim(),
-        },
-        subjectTemplate:
-          (current.subjects[previewLang] ?? current.subjectTemplate ?? "").trim() ||
-          current.subjectTemplate.trim(),
-        pitches: {
-          ...current.pitches,
-          [previewLang]: (current.pitches[previewLang] ?? "").trim(),
-        },
-      };
-      persist(next, "pitch");
+    if (!current) {
+      setPreviewLang(lang);
+      return;
     }
+    // Flush in-progress edits into the current slot before re-keying.
+    const flushed: OutreachProfile = {
+      ...current,
+      templateLang: current.templateLang ?? previewLang,
+      signature: current.signature.trim() || SIGNATURE_PLACEHOLDER,
+      subjects: {
+        ...current.subjects,
+        [previewLang]: (
+          current.subjects[previewLang] ??
+          current.subjectTemplate ??
+          ""
+        ).trim(),
+      },
+      subjectTemplate:
+        (current.subjects[previewLang] ?? current.subjectTemplate ?? "").trim() ||
+        current.subjectTemplate.trim(),
+      pitches: {
+        ...current.pitches,
+        [previewLang]: (current.pitches[previewLang] ?? "").trim(),
+      },
+    };
+    const next =
+      lang === previewLang
+        ? { ...flushed, templateLang: lang }
+        : rekeyTemplateLang(flushed, lang);
+    persist(next, null);
     setSavedField(null);
     setPreviewLang(lang);
   };
@@ -352,6 +380,7 @@ export function SenderProfileForm() {
         const next: OutreachProfile = {
           ...profile,
           website: site.trim(),
+          templateLang: previewLang,
           signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
           pitches: { ...profile.pitches, [previewLang]: data.pitch },
         };
@@ -506,7 +535,11 @@ export function SenderProfileForm() {
                 schedulePersist(
                   {
                     ...profile,
-                    subjects: { ...profile.subjects, [previewLang]: e.target.value },
+                    templateLang: previewLang,
+                    subjects: {
+                      ...profile.subjects,
+                      [previewLang]: e.target.value,
+                    },
                     subjectTemplate: e.target.value,
                   },
                   "subject",
@@ -585,6 +618,7 @@ export function SenderProfileForm() {
                 schedulePersist(
                   {
                     ...profile,
+                    templateLang: previewLang,
                     pitches: { ...profile.pitches, [previewLang]: html },
                   },
                   "pitch",
@@ -672,10 +706,10 @@ export function SenderProfileForm() {
                   type="button"
                   onClick={() => setLangMenuOpen((o) => !o)}
                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-ink-950/50 transition-colors hover:border-aurora-400/40 hover:bg-ink-900"
-                  aria-label={`Preview language: ${langLabel(previewLang)}`}
+                  aria-label={`Template language: ${langLabel(previewLang)}`}
                   aria-expanded={langMenuOpen}
                   aria-haspopup="listbox"
-                  title="Switch language version (does not auto-translate)"
+                  title="Template language (keeps your text; does not translate)"
                 >
                   <FlagImg cc={activeCc} />
                 </button>

@@ -109,7 +109,9 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     (incl. full address), about blurb, fit-score reasons, CRM stage, dated notes
     journal, and the outreach composer (draft → edit → approve → send).
 
-- **`/app/settings`** — sender profile, **Sending** dual path (Easy Resend + DNS
+- **`/app/settings`** — sender profile (language flag persists as
+  `templateLang`; changing it re-keys the same subject/body without
+  translating — sign-off is shared), **Sending** dual path (Easy Resend + DNS
   health, or Pro Connect Google mailbox), plan/usage, Boards link, Integrations
   status, “Ready to send?” checklist, and **Danger zone** self-serve account
   deletion (live app only; type `DELETE`). Microsoft mailbox connect is next.

@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Settings template language persists; no content swap
+- Outreach flag was React-only (`previewLang`), so leaving Settings reset it.
+  Persisted as `profile.templateLang` (localStorage + workspace JSON).
+- Switching the flag used to bind editors to an empty slot (looked like the
+  template “changed”). Now `rekeyTemplateLang` moves the same subject/body
+  onto the new key with no translation; sign-off stays shared.
+
 ### 2026-07-22 — Import Stage column + layout tab urgency
 - Spreadsheet Stage/Status mapped via `parseImportCrmStage` (Email Sent→
   contacted+email, Called→contacted+phone, CLIENT→closed, etc.). Import API
