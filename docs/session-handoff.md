@@ -9,20 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-22 (settings template language)
+## ⏱️ Status — updated 2026-07-22 (preview flag + test email)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Settings language flag persists (`templateLang` on outreach profile).
-- Flag change re-keys same subject/body (no translate); sign-off unchanged.
-- Prior: import Stage→CRM; layout tab urgency.
+- Settings flag = preview only (template editors unchanged; preview may translate).
+- Settings → Sending: **Send a test email** (`POST /api/send/test`).
+- Prior: Domain health Poll removed; templateLang persist; import Stage→CRM.
 
 ### Next
-1. Hard-refresh Settings: change flag, leave, return — flag + template text stick.
-2. Optional: allow importing same-name rows as distinct locations (address key).
+1. Hard-refresh Settings: flip flag → preview updates, left template stays.
+2. Send a test email to a real inbox (needs Easy/Pro transport).
 3. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
 4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 

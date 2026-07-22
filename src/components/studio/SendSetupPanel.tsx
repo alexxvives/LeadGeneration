@@ -9,6 +9,7 @@ import {
 } from "@/components/studio/EmailSettingsForm";
 import { DomainHealthPanel } from "@/components/studio/DomainHealthChecklist";
 import { EmailVerifySettings } from "@/components/studio/EmailVerifySettings";
+import { Spinner } from "@/components/ui";
 import {
   loadWarmupProfile,
   recommendedDailySoftCap,
@@ -53,6 +54,10 @@ export function SendSetupPanel({
   const [mailbox, setMailbox] = useState(mailboxInitial);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [testTo, setTestTo] = useState("");
+  const [testBusy, setTestBusy] = useState(false);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
+  const [testOk, setTestOk] = useState<boolean | null>(null);
 
   useEffect(() => {
     setMailbox(mailboxInitial);
@@ -112,6 +117,46 @@ export function SendSetupPanel({
 
   function connectGoogle() {
     window.location.href = "/api/mailbox/google/start";
+  }
+
+  async function sendTest() {
+    const to = testTo.trim();
+    if (!to) return;
+    setTestBusy(true);
+    setTestMsg(null);
+    setTestOk(null);
+    try {
+      const res = await fetch("/api/send/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        provider?: string;
+        demo?: boolean;
+      };
+      if (!res.ok || !data.ok) {
+        setTestOk(false);
+        setTestMsg(data.error ?? "Could not send test email");
+        return;
+      }
+      setTestOk(true);
+      if (data.demo) {
+        setTestMsg(
+          "Demo mode — no provider configured. Send was simulated (check server logs).",
+        );
+      } else {
+        const via = data.provider ? ` via ${data.provider}` : "";
+        setTestMsg(`Test email sent${via}. Check ${to}.`);
+      }
+    } catch {
+      setTestOk(false);
+      setTestMsg("Network error");
+    } finally {
+      setTestBusy(false);
+    }
   }
 
   return (
@@ -296,6 +341,55 @@ export function SendSetupPanel({
           </div>
         </div>
       )}
+
+      <div className="rounded-xl2 border border-white/10 p-5">
+        <h3 className="text-sm font-semibold text-mist-100">Send a test email</h3>
+        <p className="mt-1 text-xs text-mist-500">
+          Uses your current {path === "pro" ? "Pro mailbox / Easy fallback" : "Easy"}{" "}
+          setup. Enter any inbox to confirm delivery.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <input
+            type="email"
+            value={testTo}
+            onChange={(e) => {
+              setTestTo(e.target.value);
+              setTestMsg(null);
+              setTestOk(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && testTo.trim() && !testBusy && canEdit) {
+                void sendTest();
+              }
+            }}
+            placeholder="you@example.com"
+            disabled={!canEdit || testBusy}
+            className="min-w-[14rem] flex-1 rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60 disabled:opacity-50"
+          />
+          <button
+            type="button"
+            disabled={!canEdit || testBusy || !testTo.trim()}
+            onClick={() => void sendTest()}
+            className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+          >
+            {testBusy ? <Spinner className="h-3.5 w-3.5" /> : <MailIcon className="h-4 w-4" />}
+            {testBusy ? "Sending…" : "Send test"}
+          </button>
+        </div>
+        {testMsg ? (
+          <p
+            className={`mt-3 text-sm ${
+              testOk === false
+                ? "text-rose-300"
+                : testOk
+                  ? "text-aurora-300"
+                  : "text-mist-300"
+            }`}
+          >
+            {testMsg}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

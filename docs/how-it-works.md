@@ -110,11 +110,12 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     journal, and the outreach composer (draft → edit → approve → send).
 
 - **`/app/settings`** — sender profile (language flag persists as
-  `templateLang`; changing it re-keys the same subject/body without
-  translating — sign-off is shared), **Sending** dual path (Easy Resend + DNS
-  health, or Pro Connect Google mailbox), plan/usage, Boards link, Integrations
-  status, “Ready to send?” checklist, and **Danger zone** self-serve account
-  deletion (live app only; type `DELETE`). Microsoft mailbox connect is next.
+  `templateLang` and only changes the **preview** — template editors stay as
+  written; preview may translate for display), **Sending** dual path (Easy
+  Resend + DNS health, or Pro Connect Google mailbox) plus **Send a test
+  email**, plan/usage, Boards link, Integrations status, “Ready to send?”
+  checklist, and **Danger zone** self-serve account deletion (live app only;
+  type `DELETE`). Microsoft mailbox connect is next.
   Resources (Getting started wizard, How it works, Plans). No env-var names in
   the UI. Secrets are never shown. Reopen the guide via **Getting started**.
   Platform admins see a slim **Admin settings** page (tools + resources only —

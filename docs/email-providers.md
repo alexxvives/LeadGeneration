@@ -118,7 +118,9 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - Quotas + rate limits in `service.ts`.
 - Settings → Easy: Resend **or** Maileroo + **Verify emails before sending**
   (MyEmailVerifier) toggle; Pro mailbox Connect Google (`SendSetupPanel`).
-  Workspace `preferredSendPath` chooses Easy vs Pro at send time.
+  **Send a test email** (`POST /api/send/test`) hits the same `sendEmail()`
+  path without an approved outreach. Workspace `preferredSendPath` chooses
+  Easy vs Pro at send time.
   API keys are stored server-side; Settings only receives `hasResendKey` /
   `hasMailerooKey` flags.
 - Stay pluggable: swapping providers is config, not a rewrite.

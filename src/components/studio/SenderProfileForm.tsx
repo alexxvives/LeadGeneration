@@ -8,7 +8,6 @@ import {
   loadOutreachProfiles,
   pitchForLang,
   primaryPitchLang,
-  rekeyTemplateLang,
   saveSenderProfile,
   setActiveOutreachProfile,
   subjectForLang,
@@ -100,15 +99,17 @@ const PREVIEW_RUN: Run = {
 function previewDraft(
   profile: OutreachProfile,
   lang: OutreachLang,
+  opts?: { pitch?: string; subject?: string },
 ): { subject: string; body: string; missingPitch: boolean } {
-  // Prefer the flagged slot; fall back so a re-key / legacy profile never
-  // blanks the preview while the left editors still show text.
-  const pitch = pitchForLang(profile, lang);
+  const pitch = (opts?.pitch ?? pitchForLang(profile, lang)).trim();
   const missingPitch = !pitch;
   if (missingPitch) {
     return { subject: "", body: "", missingPitch: true };
   }
-  const subjectTpl = subjectForLang(profile, lang);
+  const subjectTpl =
+    opts?.subject?.trim() ||
+    subjectForLang(profile, lang) ||
+    profile.subjectTemplate.trim();
   const draft = generateDraft(PREVIEW_LEAD, PREVIEW_RUN, {
     forceLang: lang,
     signOff: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
@@ -118,6 +119,27 @@ function previewDraft(
     staticBody: true,
   });
   return { ...draft, missingPitch: false };
+}
+
+async function translateForPreview(
+  text: string,
+  targetLang: OutreachLang,
+  kind: "subject" | "body",
+): Promise<string | null> {
+  const src = text.trim();
+  if (!src) return "";
+  try {
+    const res = await fetch("/api/ai/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: src, targetLang, kind }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { text?: string };
+    return data.text?.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 type SavedField = "subject" | "pitch" | "signOff" | null;
@@ -130,6 +152,9 @@ export function SenderProfileForm() {
   const [profiles, setProfiles] = useState<OutreachProfile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [savedField, setSavedField] = useState<SavedField>(null);
+  /** Language the left editors write into — stable across flag changes. */
+  const [editorLang, setEditorLang] = useState<OutreachLang>("en");
+  /** Flag on the preview panel only. */
   const [previewLang, setPreviewLang] = useState<OutreachLang>("en");
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [websitePrompt, setWebsitePrompt] = useState(false);
@@ -138,6 +163,14 @@ export function SenderProfileForm() {
   const [genError, setGenError] = useState<string | null>(null);
   const [genProvider, setGenProvider] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewNote, setPreviewNote] = useState<string | null>(null);
+  const [translatedPreview, setTranslatedPreview] = useState<{
+    subject: string;
+    pitch: string;
+    lang: OutreachLang;
+    sourceKey: string;
+  } | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const langMenuRef = useRef<HTMLDivElement | null>(null);
@@ -162,12 +195,14 @@ export function SenderProfileForm() {
     })();
   }, []);
 
-  // Restore the persisted flag (or the slot that already has a body).
+  // Lock editors to the source template; restore preview flag separately.
   useEffect(() => {
     if (!profile) return;
-    const saved =
-      profile.templateLang ?? primaryPitchLang(profile) ?? "en";
-    setPreviewLang(saved);
+    const source = primaryPitchLang(profile) ?? "en";
+    setEditorLang(source);
+    setPreviewLang(profile.templateLang ?? source);
+    setTranslatedPreview(null);
+    setPreviewNote(null);
     // Only when switching profiles — not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
@@ -196,10 +231,120 @@ export function SenderProfileForm() {
     return () => document.removeEventListener("mousedown", onDown);
   }, [langMenuOpen, profileMenuOpen]);
 
-  const preview = useMemo(
-    () => (profile ? previewDraft(profile, previewLang) : null),
-    [profile, previewLang],
-  );
+  // Source template the editors maintain (never follows the preview flag).
+  const sourcePitch = profile
+    ? profile.pitches[editorLang] !== undefined
+      ? (profile.pitches[editorLang] ?? "")
+      : pitchForLang(profile, editorLang)
+    : "";
+  const sourceSubject = profile
+    ? profile.subjects[editorLang] !== undefined
+      ? (profile.subjects[editorLang] ?? "")
+      : subjectForLang(profile, editorLang) || profile.subjectTemplate || ""
+    : "";
+  const sourceKey = `${editorLang}|${sourceSubject.trim()}|${sourcePitch.trim()}`;
+
+  // Translate preview when the flag differs from the source template language.
+  useEffect(() => {
+    if (!profile) return;
+    if (previewLang === editorLang) {
+      setTranslatedPreview(null);
+      setPreviewNote(null);
+      setPreviewBusy(false);
+      return;
+    }
+    const storedPitch = profile.pitches[previewLang]?.trim();
+    const storedSubject = profile.subjects[previewLang]?.trim();
+    if (storedPitch) {
+      setTranslatedPreview({
+        subject: storedSubject || sourceSubject.trim(),
+        pitch: storedPitch,
+        lang: previewLang,
+        sourceKey,
+      });
+      setPreviewNote(null);
+      setPreviewBusy(false);
+      return;
+    }
+    if (!sourcePitch.trim()) {
+      setTranslatedPreview(null);
+      setPreviewNote(null);
+      setPreviewBusy(false);
+      return;
+    }
+    if (
+      translatedPreview &&
+      translatedPreview.lang === previewLang &&
+      translatedPreview.sourceKey === sourceKey
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    setPreviewBusy(true);
+    setPreviewNote(null);
+    void (async () => {
+      const [subj, body] = await Promise.all([
+        translateForPreview(sourceSubject, previewLang, "subject"),
+        translateForPreview(sourcePitch, previewLang, "body"),
+      ]);
+      if (cancelled) return;
+      setPreviewBusy(false);
+      if (subj === null && body === null) {
+        setTranslatedPreview(null);
+        setPreviewNote(
+          "Showing your original template — preview translation isn’t available right now.",
+        );
+        return;
+      }
+      setTranslatedPreview({
+        subject: (subj ?? sourceSubject).trim(),
+        pitch: (body ?? sourcePitch).trim(),
+        lang: previewLang,
+        sourceKey,
+      });
+      setPreviewNote("Preview only — your template on the left is unchanged.");
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // translatedPreview intentionally omitted — compared inside to avoid loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, editorLang, previewLang, sourceKey, sourcePitch, sourceSubject]);
+
+  const preview = useMemo(() => {
+    if (!profile) return null;
+    if (previewLang === editorLang) {
+      return previewDraft(profile, editorLang, {
+        pitch: sourcePitch,
+        subject: sourceSubject,
+      });
+    }
+    if (
+      translatedPreview &&
+      translatedPreview.lang === previewLang &&
+      translatedPreview.sourceKey === sourceKey
+    ) {
+      return previewDraft(profile, previewLang, {
+        pitch: translatedPreview.pitch,
+        subject: translatedPreview.subject,
+      });
+    }
+    // While translating (or if AI unavailable), still show the source template
+    // so the panel never goes blank when the flag changes.
+    return previewDraft(profile, previewLang, {
+      pitch: sourcePitch,
+      subject: sourceSubject,
+    });
+  }, [
+    profile,
+    editorLang,
+    previewLang,
+    sourcePitch,
+    sourceSubject,
+    sourceKey,
+    translatedPreview,
+  ]);
 
   if (!profile) {
     return (
@@ -247,42 +392,32 @@ export function SenderProfileForm() {
     setSavedField(null);
   };
 
-  // Editors follow the flagged slot. Only fall back when that key is missing
-  // (legacy profiles) — not when the user cleared it to "".
-  const pitchValue =
-    profile.pitches[previewLang] !== undefined
-      ? (profile.pitches[previewLang] ?? "")
-      : pitchForLang(profile, previewLang);
-
-  const subjectValue =
-    profile.subjects[previewLang] !== undefined
-      ? (profile.subjects[previewLang] ?? "")
-      : subjectForLang(profile, previewLang) || profile.subjectTemplate || "";
+  const pitchValue = sourcePitch;
+  const subjectValue = sourceSubject;
 
   const fieldSnapshot = () =>
     JSON.stringify({
       subject: subjectValue.trim(),
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-      pitch: (profile.pitches[previewLang] ?? "").trim(),
+      pitch: (profile.pitches[editorLang] ?? "").trim(),
       name: profile.name.trim(),
     });
 
   const saveOnBlur = (field: SavedField) => {
-    const lang = previewLang;
-    const pitchHtml = (profile.pitches[previewLang] ?? "").trim();
+    const lang = editorLang;
+    const pitchHtml = (profile.pitches[editorLang] ?? "").trim();
     const pitches: OutreachProfile["pitches"] = {
       ...profile.pitches,
-      [previewLang]: pitchHtml,
+      [editorLang]: pitchHtml,
     };
     const subjects: OutreachProfile["subjects"] = {
       ...profile.subjects,
-      [previewLang]: subjectValue.trim(),
+      [editorLang]: subjectValue.trim(),
     };
 
-    // Keep body/subject in the language slot the user chose — never auto-detect
-    // or move text between flags on blur.
     const next: OutreachProfile = {
       ...profile,
+      // Keep the preview flag as chosen; editors stay on editorLang.
       templateLang: previewLang,
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
       subjects,
@@ -301,45 +436,14 @@ export function SenderProfileForm() {
     persist(next, field);
   };
 
-  /**
-   * Switch language flag — persist choice and re-key the same subject/body onto
-   * the new slot (no translation). Sign-off is shared and stays put.
-   */
+  /** Preview flag only — never moves or rewrites the left-hand template. */
   const switchPreviewLang = (lang: OutreachLang) => {
     setLangMenuOpen(false);
-    const current = profileRef.current;
-    if (!current) {
-      setPreviewLang(lang);
-      return;
-    }
-    // Flush in-progress edits into the current slot before re-keying.
-    const flushed: OutreachProfile = {
-      ...current,
-      templateLang: current.templateLang ?? previewLang,
-      signature: current.signature.trim() || SIGNATURE_PLACEHOLDER,
-      subjects: {
-        ...current.subjects,
-        [previewLang]: (
-          current.subjects[previewLang] ??
-          current.subjectTemplate ??
-          ""
-        ).trim(),
-      },
-      subjectTemplate:
-        (current.subjects[previewLang] ?? current.subjectTemplate ?? "").trim() ||
-        current.subjectTemplate.trim(),
-      pitches: {
-        ...current.pitches,
-        [previewLang]: (current.pitches[previewLang] ?? "").trim(),
-      },
-    };
-    const next =
-      lang === previewLang
-        ? { ...flushed, templateLang: lang }
-        : rekeyTemplateLang(flushed, lang);
-    persist(next, null);
-    setSavedField(null);
     setPreviewLang(lang);
+    const current = profileRef.current;
+    if (!current) return;
+    persist({ ...current, templateLang: lang }, null);
+    setSavedField(null);
   };
 
   const captureFocus = () => {
@@ -382,7 +486,7 @@ export function SenderProfileForm() {
           website: site.trim(),
           templateLang: previewLang,
           signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-          pitches: { ...profile.pitches, [previewLang]: data.pitch },
+          pitches: { ...profile.pitches, [editorLang]: data.pitch },
         };
         persist(next, "pitch");
         setWebsitePrompt(false);
@@ -538,7 +642,7 @@ export function SenderProfileForm() {
                     templateLang: previewLang,
                     subjects: {
                       ...profile.subjects,
-                      [previewLang]: e.target.value,
+                      [editorLang]: e.target.value,
                     },
                     subjectTemplate: e.target.value,
                   },
@@ -619,7 +723,7 @@ export function SenderProfileForm() {
                   {
                     ...profile,
                     templateLang: previewLang,
-                    pitches: { ...profile.pitches, [previewLang]: html },
+                    pitches: { ...profile.pitches, [editorLang]: html },
                   },
                   "pitch",
                 );
@@ -699,6 +803,7 @@ export function SenderProfileForm() {
                 Preview · example to {EXAMPLE_COMPANY}
                 <span className="ml-1.5 normal-case tracking-normal text-mist-600">
                   · {langLabel(previewLang)}
+                  {previewBusy ? " · translating…" : ""}
                 </span>
               </p>
               <div ref={langMenuRef} className="relative shrink-0">
@@ -706,10 +811,10 @@ export function SenderProfileForm() {
                   type="button"
                   onClick={() => setLangMenuOpen((o) => !o)}
                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-ink-950/50 transition-colors hover:border-aurora-400/40 hover:bg-ink-900"
-                  aria-label={`Template language: ${langLabel(previewLang)}`}
+                  aria-label={`Preview language: ${langLabel(previewLang)}`}
                   aria-expanded={langMenuOpen}
                   aria-haspopup="listbox"
-                  title="Template language (keeps your text; does not translate)"
+                  title="Preview language — changes the preview only; template stays as written"
                 >
                   <FlagImg cc={activeCc} />
                 </button>
@@ -750,9 +855,12 @@ export function SenderProfileForm() {
                 ) : null}
               </div>
             </div>
+            {previewNote ? (
+              <p className="mt-2 text-[11px] text-mist-500">{previewNote}</p>
+            ) : null}
             {preview.missingPitch ? (
               <p className="mt-8 text-center text-sm text-mist-500">
-                Preview will appear when the template is filled for this language.
+                Preview will appear when the email body template is filled in.
               </p>
             ) : (
               <>

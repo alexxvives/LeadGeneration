@@ -37,8 +37,9 @@ function statusTone(status: DomainDnsRecord["status"]) {
 }
 
 /**
- * Easy Sending: live Resend DNS rows + poll, with manual fallback when
- * no API key (demo-safe). Compact mode fits inside the sending-identity card.
+ * Easy Sending: live Resend DNS rows (auto-check on load + every 30s until
+ * ready). Manual fallback when no API key (demo-safe). Compact mode fits
+ * inside the sending-identity card.
  */
 export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
   const [health, setHealth] = useState<DomainHealthResult | null>(null);
@@ -129,18 +130,15 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
             <p className="mt-0.5 text-sm text-mist-200">{statusLabel}</p>
             <p className="mt-0.5 text-[11px] leading-relaxed text-mist-500">
               {health?.message ??
-                "Add SPF / DKIM at your DNS host — we poll Resend until they verify."}
+                "Add SPF / DKIM at your DNS host — we check Resend until they verify."}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void poll()}
-            disabled={loading}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-mist-200 hover:bg-white/5 disabled:opacity-50"
-          >
-            {loading ? <Spinner className="h-3 w-3" /> : null}
-            {loading ? "Checking…" : "Poll"}
-          </button>
+          {loading ? (
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-mist-500">
+              <Spinner className="h-3 w-3" />
+              Checking…
+            </span>
+          ) : null}
         </div>
         {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
         {health && health.records.length > 0 ? (
@@ -205,18 +203,15 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
           </p>
           <p className="mt-1 max-w-xl text-sm text-mist-500">
             {health?.message ??
-              "Paste the records at your registrar. We poll Resend until SPF and DKIM turn green."}
+              "Paste the records at your registrar. We check Resend until SPF and DKIM turn green."}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void poll()}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-ink-900/60 px-4 py-2 text-sm font-medium text-mist-100 transition-transform hover:scale-[1.02] disabled:opacity-50"
-        >
-          {loading ? <Spinner className="h-4 w-4" /> : null}
-          {loading ? "Checking…" : "Poll now"}
-        </button>
+        {loading ? (
+          <span className="inline-flex items-center gap-2 text-sm text-mist-500">
+            <Spinner className="h-4 w-4" />
+            Checking…
+          </span>
+        ) : null}
       </div>
 
       {error && (

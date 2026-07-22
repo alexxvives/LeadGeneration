@@ -37,8 +37,9 @@ export type OutreachProfile = {
    */
   pitches: Partial<Record<OutreachLang, string>>;
   /**
-   * Language flag last chosen in Settings. Persists across visits; labels the
-   * slot the subject/body editors write into. Does not translate content.
+   * Settings preview-language flag. Persists across visits. Changing it only
+   * updates the preview (translate-for-display); editors keep the source
+   * template unchanged.
    */
   templateLang?: OutreachLang;
   /**
@@ -220,49 +221,6 @@ export function primaryPitchLang(p: OutreachProfile): OutreachLang | null {
   }
   const detected = outreachLangFromText(p.pitches[best] ?? "");
   return filled.includes(detected) ? detected : best;
-}
-
-/**
- * Move subject/body onto a new language key without translating. Sign-off is
- * shared and unchanged. Used when the Settings flag changes so editors keep
- * the same text.
- */
-export function rekeyTemplateLang(
-  p: OutreachProfile,
-  to: OutreachLang,
-): OutreachProfile {
-  const from = p.templateLang ?? primaryPitchLang(p) ?? to;
-  if (from === to) {
-    return { ...p, templateLang: to };
-  }
-  const body = (p.pitches[from] ?? pitchForLang(p, from)).trim();
-  const subject =
-    p.subjects[from]?.trim() ||
-    subjectForLang(p, from) ||
-    p.subjectTemplate.trim();
-
-  const pitches: Partial<Record<OutreachLang, string>> = { ...p.pitches };
-  const subjects: Partial<Record<OutreachLang, string>> = { ...p.subjects };
-
-  if (body) pitches[to] = body;
-  else if (!pitches[to]?.trim()) delete pitches[to];
-
-  if (subject) subjects[to] = subject;
-  else if (!subjects[to]?.trim()) delete subjects[to];
-
-  // Drop the old slot when it was just the same canonical template.
-  if (from !== to) {
-    if ((pitches[from] ?? "").trim() === body) delete pitches[from];
-    if ((subjects[from] ?? "").trim() === subject) delete subjects[from];
-  }
-
-  return {
-    ...p,
-    templateLang: to,
-    pitches,
-    subjects,
-    subjectTemplate: subject || p.subjectTemplate.trim(),
-  };
 }
 
 function migrateLegacySingle(raw: string): ProfileStore {

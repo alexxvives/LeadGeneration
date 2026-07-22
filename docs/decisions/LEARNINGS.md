@@ -4,12 +4,23 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Preview-only language flag + Settings test send
+- Flag must not re-key/rebind editors (re-key made the flag look inert). Editors
+  stay on source lang; flag only updates preview (AI translate for display via
+  `/api/ai/translate`, or stored pitch if present).
+- Settings test email: `POST /api/send/test` → `sendTestEmail` (no outreach
+  approval gate; no monthly quota; rate-limited; demo-safe).
+
+### 2026-07-22 — Domain health: drop manual Poll
+- Resend DNS already auto-checks on mount + every 30s until ready; the Poll
+  button was redundant. Kept a quiet “Checking…” indicator only.
+- Resend bounce/reply: auto-registers webhook on BYO key save (not the
+  Maileroo “Optional · bounce / reply tracking” paste UI).
+
 ### 2026-07-22 — Settings template language persists; no content swap
 - Outreach flag was React-only (`previewLang`), so leaving Settings reset it.
   Persisted as `profile.templateLang` (localStorage + workspace JSON).
-- Switching the flag used to bind editors to an empty slot (looked like the
-  template “changed”). Now `rekeyTemplateLang` moves the same subject/body
-  onto the new key with no translation; sign-off stays shared.
+- (Superseded same day: re-key approach replaced by preview-only translate.)
 
 ### 2026-07-22 — Import Stage column + layout tab urgency
 - Spreadsheet Stage/Status mapped via `parseImportCrmStage` (Email Sent→

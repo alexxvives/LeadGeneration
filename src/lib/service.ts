@@ -1280,6 +1280,101 @@ export async function sendApprovedOutreach(
   };
 }
 
+const TEST_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Send a one-off test message to verify workspace transport (Settings).
+ * Explicit user action — not outreach, so no approved-outreach gate.
+ * Does not consume monthly send quota; still uses the send rate window.
+ */
+export async function sendTestEmail(
+  ctx: Ctx,
+  toRaw: string,
+): Promise<{
+  ok: boolean;
+  provider?: "google" | "resend" | "maileroo" | "smtp" | "demo";
+  error?: string;
+  demo?: boolean;
+}> {
+  const to = toRaw.trim().toLowerCase();
+  if (!TEST_EMAIL_RE.test(to) || to.length > 254) {
+    return { ok: false, error: "Enter a valid email address" };
+  }
+
+  const rate = await checkSendRate(ctx.db);
+  if (!rate.allowed) {
+    return {
+      ok: false,
+      error: `Rate limit reached (${rate.limit}/min). Try again shortly.`,
+    };
+  }
+
+  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+  const result = await sendEmail(
+    {
+      to,
+      subject: "HERMES mail — test send",
+      body: [
+        "This is a test email from your HERMES mail workspace.",
+        "",
+        "If you received it, sending is configured correctly.",
+        "",
+        "— HERMES mail",
+      ].join("\n"),
+      tags: [
+        { name: "hermes_ws", value: ctx.workspaceId.slice(0, 256) },
+        { name: "hermes_test", value: "1" },
+      ],
+    },
+    ws
+      ? {
+          fromName: ws.fromName,
+          fromEmail: ws.fromEmail,
+          replyTo: ws.replyTo,
+          physicalAddress: ws.physicalAddress,
+          resendApiKey: ws.resendApiKey,
+          mailerooApiKey: ws.mailerooApiKey,
+          easyEmailProvider: ws.easyEmailProvider,
+          preferredSendPath: ws.preferredSendPath,
+          connectedMailbox: ws.connectedMailbox,
+        }
+      : undefined,
+  );
+
+  if (result.connectedMailbox) {
+    await ctx.db.updateWorkspace(ctx.workspaceId, {
+      connectedMailbox: result.connectedMailbox,
+      updatedAt: nowIso(),
+    });
+  }
+
+  if (result.ok && result.provider === "demo") {
+    if (ctx.metered) {
+      return {
+        ok: false,
+        provider: "demo",
+        error:
+          "No email transport configured. Add a Resend/Maileroo key in Settings → Easy, or Connect Google on Pro.",
+      };
+    }
+    return {
+      ok: true,
+      provider: "demo",
+      demo: true,
+    };
+  }
+
+  if (!result.ok) {
+    return {
+      ok: false,
+      provider: result.provider,
+      error: result.error ?? "Send failed",
+    };
+  }
+
+  return { ok: true, provider: result.provider };
+}
+
 function domainKey(website: string | null | undefined): string | null {
   if (!website || /\[object\s+Object\]/i.test(website)) return null;
   try {
