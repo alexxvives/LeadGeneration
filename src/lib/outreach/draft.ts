@@ -50,20 +50,12 @@ function firstName(lead: Lead): string {
   return "";
 }
 
+/**
+ * Company string for `{company}` placeholders. Keep the full name — chopping on
+ * `. ` broke honorifics ("Dra. Barriga | …" → "Dra").
+ */
 function shortCompany(lead: Lead): string {
-  let name =
-    lead.company
-      .replace(
-        /\b(LLC|Inc|Co|Group|Studio|Partners|Collective|Labs|Academy|Academia)\b\.?/gi,
-        "",
-      )
-      .trim() || lead.company;
-  // Prefer the brand before a subtitle ("Aquatonic. Parc Termal…" → "Aquatonic").
-  const beforeDot = name.split(/\.\s+/)[0]?.trim();
-  if (beforeDot && beforeDot.length >= 3 && beforeDot.length < name.length) {
-    name = beforeDot;
-  }
-  return name;
+  return lead.company.trim();
 }
 
 /** Resolve `{lead_name}` / `{company}` / `{location}` in subject or pitch text. */
@@ -101,12 +93,12 @@ function applyBodyPlaceholders(template: string, lead: Lead): string {
     .trim();
 }
 
-/** Join body + sign-off with a single break (no blank line between them). */
+/** Join body + sign-off with a blank line before the sign-off. */
 function joinBodyParts(parts: string[]): string {
   const cleaned = parts.map((p) => p.trim()).filter((p) => p.length > 0);
   if (cleaned.length === 0) return "";
   const html = cleaned.some(looksLikeHtml);
-  return cleaned.join(html ? "<br>" : "\n");
+  return cleaned.join(html ? "<br><br>" : "\n\n");
 }
 
 /**
@@ -296,7 +288,12 @@ export function generateDraft(
       ? applyBodyPlaceholders(normalizePitchHtml(offerRaw), lead)
       : "";
     const signOffHtml = signOffPlain
-      ? plainToHtmlFragment(signOffPlain)
+      ? applyBodyPlaceholders(
+          looksLikeHtml(signOffPlain)
+            ? normalizePitchHtml(signOffPlain)
+            : plainToHtmlFragment(signOffPlain),
+          lead,
+        )
       : "";
     return { subject, body: joinBodyParts([pitchHtml, signOffHtml]) };
   }
@@ -306,7 +303,12 @@ export function generateDraft(
     lead,
   );
   const signOffHtml = signOffPlain
-    ? plainToHtmlFragment(signOffPlain)
+    ? applyBodyPlaceholders(
+        looksLikeHtml(signOffPlain)
+          ? normalizePitchHtml(signOffPlain)
+          : plainToHtmlFragment(signOffPlain),
+        lead,
+      )
     : "";
 
   const blurb = lead.aboutBlurb?.trim() ?? "";

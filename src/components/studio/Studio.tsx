@@ -1259,11 +1259,7 @@ export function Studio() {
                     <span className="font-semibold text-mist-200">{board!.leads.length}</span>
                   </>
                 ) : null}{" "}
-                lead
-                {(pipelineFilter === "all" ? board!.leads.length : filteredLeads.length) === 1
-                  ? ""
-                  : "s"}{" "}
-                · table, cards, or map
+                leads
               </p>
               <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
                 <LayoutToggle active={layout === "table"} onClick={() => setLayout("table")}>

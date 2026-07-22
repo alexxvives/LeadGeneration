@@ -1782,6 +1782,15 @@ export async function importLeads(
         ];
         if (mergedEmails.length > match.emails.length) patch.emails = mergedEmails;
       }
+      if (!match.companyType && r.companyType) patch.companyType = r.companyType;
+      if (!match.contactName && r.contactName) patch.contactName = r.contactName;
+      if (
+        r.company.trim() &&
+        (match.company === "Unknown company" ||
+          match.company.length < r.company.trim().length)
+      ) {
+        patch.company = r.company.trim();
+      }
       if (Object.keys(patch).length > 0) {
         mergePatches.push({ id: match.id, patch });
         // Keep in-memory maps current for later rows in this chunk.

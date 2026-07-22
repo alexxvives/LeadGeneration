@@ -8,7 +8,12 @@ import { normalizeWebsiteUrl } from "@/lib/website";
 
 /** Normalize header cells for fuzzy column matching (alias fallback). */
 function normHeader(h: string): string {
-  return h.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  return h
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[\s_-]+/g, "");
 }
 
 /** Prefer earlier keys when multiple header aliases exist (e.g. Opportunity > Name). */
@@ -53,8 +58,13 @@ const CONTACT_PREFER = [
 ];
 const TYPE_PREFER = [
   "companytype",
-  "type",
+  "categoria",
+  "categoría",
+  "categorie",
   "category",
+  "type",
+  "tipo",
+  "tipologia",
   "industry",
   "segment",
   "vertical",
@@ -133,13 +143,24 @@ function reconcileColMap(ai: ColMap, alias: ColMap, matrix: string[][]): ColMap 
     out.company = alias.company;
   }
 
-  // Fill gaps from alias when AI omitted a field.
-  if (out.emails < 0) out.emails = alias.emails;
-  if (out.website < 0) out.website = alias.website;
-  if (out.phones < 0) out.phones = alias.phones;
-  if (out.location < 0) out.location = alias.location;
-  if (out.contactName < 0) out.contactName = alias.contactName;
-  if (out.companyType < 0) out.companyType = alias.companyType;
+  // Fill gaps from alias when AI omitted a field; prefer denser alias cols
+  // when AI mapped a sparse/wrong column (e.g. missed Spanish "Categoria").
+  const preferDense = (aiCol: number, aliasCol: number): number => {
+    if (aliasCol < 0) return aiCol;
+    if (aiCol < 0) return aliasCol;
+    if (aiCol === aliasCol) return aiCol;
+    const a = colFill(matrix, aiCol);
+    const b = colFill(matrix, aliasCol);
+    if (b > a * 2 && b >= Math.max(10, a + 20)) return aliasCol;
+    return aiCol;
+  };
+
+  out.emails = preferDense(out.emails, alias.emails);
+  out.website = preferDense(out.website, alias.website);
+  out.phones = preferDense(out.phones, alias.phones);
+  out.location = preferDense(out.location, alias.location);
+  out.contactName = preferDense(out.contactName, alias.contactName);
+  out.companyType = preferDense(out.companyType, alias.companyType);
   if (out.company < 0) out.company = alias.company;
 
   return out;

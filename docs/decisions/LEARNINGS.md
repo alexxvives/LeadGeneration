@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Import TYPE + map + `{company}` = “Dra”
+- LEADS.xlsx type column is **Categoria** (not Type) — alias list missed it;
+  AI sometimes mapped sparse cols. Fix: categoria/tipo aliases + denser-col
+  reconcile. Map: Nominatim often fails long street addresses when filter→1
+  lead and no city hint — geocode now falls back to city/country tails.
+- `{company}` used `shortCompany` split on `. ` → “Dra. Barriga | …” became
+  “Dra”. Placeholders now use the full company string.
+- Import does **not** scrape; missing Website + business email →
+  `websiteFromEmail` invents `https://domain` (AQVA case).
+
 ### 2026-07-22 — Bulk-delete still 400 on live
 - Client chunking was in git but live still saw **one** oversized POST (Worker
   logs: 400, ~242ms CPU — not N×500 chunks). Hardening: `{ boardId }` set-based

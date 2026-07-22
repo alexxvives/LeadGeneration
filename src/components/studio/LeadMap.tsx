@@ -39,7 +39,24 @@ const LEGEND_ORDER: CrmStage[] = [
 const geocodeCache = new Map<string, Coords | null>();
 const geocodeInflight = new Map<string, Promise<Coords | null>>();
 
-async function geocode(query: string): Promise<Coords | null> {
+/** Try full address, then city/country tails — Nominatim often misses long streets. */
+function geocodeCandidates(query: string): string[] {
+  const q = query.trim();
+  if (!q) return [];
+  const parts = q.split(",").map((p) => p.trim()).filter(Boolean);
+  const out: string[] = [q];
+  if (parts.length >= 2) out.push(parts.slice(-2).join(", "));
+  if (parts.length >= 3) out.push(parts.slice(-3).join(", "));
+  // "08037 Barcelona" style token → "Barcelona, Spain" when country present
+  if (parts.length >= 2) {
+    const cityish = parts[parts.length - 2]!.replace(/^\d+\s+/, "").trim();
+    const country = parts[parts.length - 1]!;
+    if (cityish.length >= 2) out.push(`${cityish}, ${country}`);
+  }
+  return [...new Set(out.map((s) => s.trim()).filter(Boolean))];
+}
+
+async function geocodeExact(query: string): Promise<Coords | null> {
   const key = query.trim().toLowerCase();
   if (!key) return null;
   if (geocodeCache.has(key)) return geocodeCache.get(key)!;
@@ -60,6 +77,14 @@ async function geocode(query: string): Promise<Coords | null> {
   })();
   geocodeInflight.set(key, req);
   return req;
+}
+
+async function geocode(query: string): Promise<Coords | null> {
+  for (const candidate of geocodeCandidates(query)) {
+    const coords = await geocodeExact(candidate);
+    if (coords) return coords;
+  }
+  return null;
 }
 
 function jitter(seed: string, radius = 0.035): { dLat: number; dLng: number } {
@@ -316,13 +341,13 @@ export function LeadMap({
           </div>
         )}
         {(error || initError) && (
-          <div className="absolute bottom-4 left-4 right-4 z-[500] rounded-lg border border-amber-400/20 bg-ink-950/90 px-4 py-3 text-sm text-amber-200/90 backdrop-blur">
+          <div className="absolute bottom-4 left-4 right-4 z-[500] rounded-lg border border-amber-400/40 bg-ink-900/95 px-4 py-3 text-sm text-mist-100 shadow-lg backdrop-blur">
             {initError ?? error}
           </div>
         )}
         {ready && !error && !initError && pins.length > 0 && (
           <div
-            className="pointer-events-none absolute right-4 top-4 z-[500] rounded-full border border-white/10 bg-ink-950/80 px-3 py-1.5 text-xs text-mist-300 backdrop-blur"
+            className="pointer-events-none absolute right-4 top-4 z-[500] rounded-full border border-white/10 bg-ink-900/90 px-3 py-1.5 text-xs text-mist-300 shadow backdrop-blur"
             data-testid="map-pin-count"
           >
             {pins.length} pin{pins.length === 1 ? "" : "s"}
@@ -330,7 +355,7 @@ export function LeadMap({
           </div>
         )}
         {pins.length > 0 && (
-          <ul className="pointer-events-none absolute bottom-3 left-1/2 z-[500] flex -translate-x-1/2 flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-full border border-white/10 bg-ink-950/80 px-3 py-1.5 text-[11px] text-mist-400 backdrop-blur">
+          <ul className="pointer-events-none absolute bottom-3 left-1/2 z-[500] flex -translate-x-1/2 flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-full border border-white/10 bg-ink-900/90 px-3 py-1.5 text-[11px] text-mist-400 shadow backdrop-blur">
             {LEGEND_ORDER.map((stage) => {
               const c = STAGE_PIN[stage];
               return (

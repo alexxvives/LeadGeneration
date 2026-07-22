@@ -5,7 +5,6 @@ import {
   createOutreachProfile,
   deleteOutreachProfile,
   loadOutreachProfiles,
-  pitchForLang,
   primaryPitchLang,
   saveSenderProfile,
   setActiveOutreachProfile,
@@ -14,20 +13,13 @@ import {
   type OutreachProfile,
 } from "@/lib/sender-profile";
 import { generateDraft } from "@/lib/outreach/draft-preview";
-import {
-  langLabel,
-  outreachLangFromText,
-  type OutreachLang,
-} from "@/lib/outreach/locale";
+import { langLabel, type OutreachLang } from "@/lib/outreach/locale";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import type { Lead, Run } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import { ChevronDownIcon, HelpIcon, SparkIcon } from "@/components/icons";
 import { PitchEditor } from "@/components/studio/PitchEditor";
-import {
-  PlaceholderInput,
-  PlaceholderTextarea,
-} from "@/components/studio/PlaceholderText";
+import { PlaceholderInput } from "@/components/studio/PlaceholderText";
 
 const EXAMPLE_COMPANY = "Bright Dental";
 const EXAMPLE_NAME = "Maria";
@@ -141,8 +133,6 @@ export function SenderProfileForm() {
   const [genError, setGenError] = useState<string | null>(null);
   const [genProvider, setGenProvider] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [translating, setTranslating] = useState(false);
-  const [translateError, setTranslateError] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const langMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
@@ -239,7 +229,7 @@ export function SenderProfileForm() {
     });
 
   const saveOnBlur = (field: SavedField) => {
-    let lang = previewLang;
+    const lang = previewLang;
     const pitchHtml = (profile.pitches[previewLang] ?? "").trim();
     const pitches: OutreachProfile["pitches"] = {
       ...profile.pitches,
@@ -250,25 +240,8 @@ export function SenderProfileForm() {
       [previewLang]: subjectValue.trim(),
     };
 
-    // If the body is clearly another language and that slot is empty, move it
-    // so drafts/translate use the right flag (English is not required).
-    if (field === "pitch" && pitchHtml) {
-      const plain = pitchHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-      if (plain.length >= 40) {
-        const detected = outreachLangFromText(plain);
-        if (detected !== previewLang && !pitches[detected]?.trim()) {
-          pitches[detected] = pitchHtml;
-          pitches[previewLang] = "";
-          if (subjects[previewLang]?.trim() && !subjects[detected]?.trim()) {
-            subjects[detected] = subjects[previewLang] ?? "";
-            subjects[previewLang] = "";
-          }
-          lang = detected;
-          setPreviewLang(detected);
-        }
-      }
-    }
-
+    // Keep body/subject in the language slot the user chose — never auto-detect
+    // or move text between flags on blur.
     const next: OutreachProfile = {
       ...profile,
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
@@ -288,83 +261,11 @@ export function SenderProfileForm() {
     persist(next, field);
   };
 
-  const switchPreviewLang = async (lang: OutreachLang) => {
+  /** Switch preview flag only — do not auto-translate the template body. */
+  const switchPreviewLang = (lang: OutreachLang) => {
     setLangMenuOpen(false);
     setSavedField(null);
-    setTranslateError(null);
-
-    const hasPitch = Boolean(profile.pitches[lang]?.trim());
-    const hasSubject = Boolean(profile.subjects[lang]?.trim());
-    // Keep current editor/preview text until the new language is ready.
-    if (hasPitch && hasSubject) {
-      setPreviewLang(lang);
-      return;
-    }
-
-    const sourceLang = primaryPitchLang(profile);
-    if (!sourceLang || sourceLang === lang) {
-      setPreviewLang(lang);
-      return;
-    }
-    const sourcePitch = pitchForLang(profile, sourceLang);
-    const sourceSubject = subjectForLang(profile, sourceLang);
-    if (!sourcePitch.trim() && !sourceSubject.trim()) {
-      setPreviewLang(lang);
-      return;
-    }
-
-    setTranslating(true);
-    try {
-      let nextPitch = profile.pitches[lang] ?? "";
-      let nextSubject = profile.subjects[lang] ?? "";
-      if (!hasPitch && sourcePitch.trim()) {
-        const res = await fetch("/api/ai/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: sourcePitch,
-            targetLang: lang,
-            kind: "body",
-          }),
-        });
-        const data = (await res.json()) as { text?: string; error?: string };
-        if (!res.ok || !data.text) {
-          setTranslateError(
-            data.error ??
-              `Could not translate into ${langLabel(lang)} — paste or write that version.`,
-          );
-          return;
-        }
-        nextPitch = data.text;
-      }
-      if (!profile.subjects[lang]?.trim() && sourceSubject.trim()) {
-        const res = await fetch("/api/ai/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: sourceSubject,
-            targetLang: lang,
-            kind: "subject",
-          }),
-        });
-        const data = (await res.json()) as { text?: string; error?: string };
-        if (res.ok && data.text) nextSubject = data.text;
-      }
-      const next: OutreachProfile = {
-        ...profile,
-        pitches: { ...profile.pitches, [lang]: nextPitch },
-        subjects: {
-          ...profile.subjects,
-          ...(nextSubject.trim() ? { [lang]: nextSubject.trim() } : {}),
-        },
-      };
-      persist(next, "pitch");
-      setPreviewLang(lang);
-    } catch {
-      setTranslateError("Network error while translating");
-    } finally {
-      setTranslating(false);
-    }
+    setPreviewLang(lang);
   };
 
   const captureFocus = () => {
@@ -643,9 +544,6 @@ export function SenderProfileForm() {
               </p>
             )}
             {genError && <p className="mt-1.5 text-xs text-rose-300">{genError}</p>}
-            {translateError && (
-              <p className="mt-1.5 text-xs text-amber-200/90">{translateError}</p>
-            )}
           </div>
 
           <label className="block">
@@ -656,14 +554,13 @@ export function SenderProfileForm() {
               <PlaceholderHelp />
               <SavedHint field="signOff" />
             </div>
-            <PlaceholderTextarea
+            <PitchEditor
+              compact
               value={profile.signature}
               onFocus={captureFocus}
-              onChange={(e) => patch({ signature: e.target.value })}
+              onChange={(html) => patch({ signature: html })}
               onBlur={() => saveOnBlur("signOff")}
-              rows={4}
               placeholder={SIGNATURE_PLACEHOLDER}
-              className="w-full rounded-lg border border-white/10 bg-ink-900/60 outline-none focus-within:border-aurora-400/60"
             />
           </label>
         </div>
@@ -718,18 +615,13 @@ export function SenderProfileForm() {
                 <button
                   type="button"
                   onClick={() => setLangMenuOpen((o) => !o)}
-                  disabled={translating}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-ink-950/50 transition-colors hover:border-aurora-400/40 hover:bg-ink-900 disabled:opacity-50"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-ink-950/50 transition-colors hover:border-aurora-400/40 hover:bg-ink-900"
                   aria-label={`Preview language: ${langLabel(previewLang)}`}
                   aria-expanded={langMenuOpen}
                   aria-haspopup="listbox"
-                  title="Preview / translate into other languages"
+                  title="Switch language version (does not auto-translate)"
                 >
-                  {translating ? (
-                    <Spinner className="h-3.5 w-3.5" />
-                  ) : (
-                    <FlagImg cc={activeCc} />
-                  )}
+                  <FlagImg cc={activeCc} />
                 </button>
                 {langMenuOpen ? (
                   <ul
@@ -751,7 +643,7 @@ export function SenderProfileForm() {
                                 ? "bg-aurora-400/10 text-aurora-300"
                                 : "text-mist-200 hover:bg-white/5"
                             }`}
-                            onClick={() => void switchPreviewLang(l.id)}
+                            onClick={() => switchPreviewLang(l.id)}
                           >
                             <FlagImg cc={l.cc} />
                             <span className="flex-1">{langLabel(l.id)}</span>
@@ -768,14 +660,9 @@ export function SenderProfileForm() {
                 ) : null}
               </div>
             </div>
-            {translating ? (
-              <p className="mt-3 text-xs text-aurora-200/90">
-                Translating into {langLabel(previewLang)}…
-              </p>
-            ) : null}
-            {preview.missingPitch && !translating ? (
+            {preview.missingPitch ? (
               <p className="mt-8 text-center text-sm text-mist-500">
-                Preview will appear when the template is filled.
+                Preview will appear when the template is filled for this language.
               </p>
             ) : (
               <>

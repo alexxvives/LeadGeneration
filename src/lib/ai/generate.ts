@@ -179,6 +179,8 @@ export async function mapImportColumns(
       "company = business/account/opportunity name — NOT a person's name.",
       "When both Opportunity (or Account/Company) and Name exist: company→Opportunity/Account/Company, contactName→Name.",
       "contactName = person (Name, Contact, Owner, Full name).",
+      "companyType = category/industry/type/vertical — incl. Spanish Categoria/Categoría, French Catégorie, Tipo.",
+      "location = street address / city / Address column.",
       "Headers may be any language (English, French, Spanish, etc.).",
     ].join(" "),
     `Headers:\n${indexed}`,

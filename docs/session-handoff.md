@@ -9,23 +9,25 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-22 (board clear delete)
+## ⏱️ Status — updated 2026-07-22 (import/map/draft UX)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Bulk-delete hardening: `{ boardId }` set-based clear for full-board wipe
-  (ids path still chunked ≤500). Deployed to Worker after live 400 persisted.
+- Leads UI copy; map geocode city fallback + light-theme empty banner.
+- Import: Categoria→companyType aliases; denser-col reconcile.
+- Drafts: full `{company}`; template lang no longer auto-moves/translates;
+  sign-off rich text; blank line before sign-off; body `{company}` live tint.
+- Prior: board-scoped bulk-delete (deployed).
 
 ### Next
-1. Hard-refresh /app and confirm select-all delete succeeds on large boards.
-2. Optional clean re-import of full ~2482 rows (current board is email-row set).
-3. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
-4. Measure email-found % on live Firecrawl runs.
-5. Optional: ADR 0020 path A (cheap LLM extract) if quality/COGS need it.
-6. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
+1. Deploy this UX batch; hard-refresh. Re-import LUMIA (or patch) for TYPE.
+2. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
+3. Measure email-found % on live Firecrawl runs.
+4. Optional: ADR 0020 path A (cheap LLM extract) if quality/COGS need it.
+5. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 
