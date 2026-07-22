@@ -233,26 +233,28 @@ function ParkedStage({
         <span className="text-xs text-mist-600">{open ? "▾" : "▸"}</span>
       </button>
       {open ? (
-        <div className="flex max-h-[28vh] flex-col gap-2 overflow-y-auto overscroll-contain p-3">
+        <div className="max-h-[28vh] overflow-y-auto overscroll-contain p-3">
           {leads.length === 0 ? (
             <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
               {col.empty}
             </p>
           ) : (
-            [...leads]
-              .sort((a, b) => {
-                const ar = a.outreach?.deliveryStatus === "replied" ? 1 : 0;
-                const br = b.outreach?.deliveryStatus === "replied" ? 1 : 0;
-                return br - ar;
-              })
-              .map((l) => (
-                <DraggablePipelineCard
-                  key={l.id}
-                  lead={l}
-                  onOpen={onOpen}
-                  isDragging={l.id === activeId}
-                />
-              ))
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {[...leads]
+                .sort((a, b) => {
+                  const ar = a.outreach?.deliveryStatus === "replied" ? 1 : 0;
+                  const br = b.outreach?.deliveryStatus === "replied" ? 1 : 0;
+                  return br - ar;
+                })
+                .map((l) => (
+                  <DraggablePipelineCard
+                    key={l.id}
+                    lead={l}
+                    onOpen={onOpen}
+                    isDragging={l.id === activeId}
+                  />
+                ))}
+            </div>
           )}
         </div>
       ) : null}

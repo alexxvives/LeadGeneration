@@ -951,29 +951,49 @@ export function Studio() {
 
   const selected = board?.leads.find((l) => l.id === selectedId) ?? null;
 
-  const filteredLeads = useMemo(() => {
-    const all = board?.leads ?? [];
-    const q = leadSearch.trim().toLowerCase();
-    return all.filter((l) => {
-      if (pipelineFilter !== "all" && (l.crmStage ?? "new") !== pipelineFilter) {
-        return false;
-      }
-      if (!q) return true;
-      const hay = [
+  /** Accent-fold + every token must appear (company, email, location, …). */
+  const leadMatchesSearch = useCallback((l: LeadWithOutreach, raw: string) => {
+    const q = raw.trim();
+    if (!q) return true;
+    const fold = (s: string) =>
+      s
+        .normalize("NFD")
+        .replace(/\p{M}/gu, "")
+        .toLowerCase();
+    const tokens = fold(q).split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return true;
+    const hay = fold(
+      [
         l.company,
         l.location,
         l.companyType,
         l.contactName,
+        l.aboutBlurb,
+        l.notes,
+        l.website,
         ...(l.emails ?? []),
         ...(l.phones ?? []),
-        l.website,
+        ...(l.tags ?? []),
+        ...Object.values(l.customFields ?? {}),
+        ...(l.followUps ?? []).map((f) => f.note),
       ]
         .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
-    });
-  }, [board?.leads, pipelineFilter, leadSearch]);
+        .join(" "),
+    );
+    return tokens.every((t) => hay.includes(t));
+  }, []);
+
+  const searchFilteredLeads = useMemo(() => {
+    const all = board?.leads ?? [];
+    return all.filter((l) => leadMatchesSearch(l, leadSearch));
+  }, [board?.leads, leadSearch, leadMatchesSearch]);
+
+  const filteredLeads = useMemo(() => {
+    if (pipelineFilter === "all") return searchFilteredLeads;
+    return searchFilteredLeads.filter(
+      (l) => (l.crmStage ?? "new") === pipelineFilter,
+    );
+  }, [searchFilteredLeads, pipelineFilter]);
 
   const selectLayout = (next: "table" | "cards" | "map") => {
     setVisitedLayouts((prev) => {
@@ -998,6 +1018,9 @@ export function Studio() {
   /** Pipeline / outreach / leads fill the shell; other views scroll inside it. */
   const fillViewport =
     view === "pipeline" || view === "outreach" || view === "leads";
+  const showLeadSearch =
+    hasLeads &&
+    (view === "leads" || view === "pipeline" || view === "outreach");
 
   const onDeleteLead = async (leadId: string) => {
     // Stop any in-flight CSV import so rows don’t reappear after delete.
@@ -1210,7 +1233,7 @@ export function Studio() {
               </select>
             </label>
           ) : null}
-          {view === "leads" && hasLeads ? (
+          {showLeadSearch ? (
             <label className="relative inline-flex w-full max-w-xs items-center sm:w-56">
               <span className="sr-only">Search leads</span>
               <input
@@ -1296,7 +1319,7 @@ export function Studio() {
       {view === "pipeline" && (
         <div data-tour="pipeline-board" className="min-h-0 flex-1">
           <PipelineView
-            leads={board?.leads ?? []}
+            leads={searchFilteredLeads}
             onOpen={openInfo}
             onMoveStage={onMoveStage}
           />
@@ -1437,7 +1460,7 @@ export function Studio() {
       {view === "outreach" && (
         <div className="min-h-0 flex-1">
           <OutreachView
-            leads={board?.leads ?? []}
+            leads={searchFilteredLeads}
             canSendEmail={!!board?.capabilities.canSendEmail}
             emailVerify={!!board?.capabilities.emailVerify}
             busyId={outreachBusy}

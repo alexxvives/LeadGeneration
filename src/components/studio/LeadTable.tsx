@@ -242,7 +242,7 @@ export function LeadTable({
                   Location{sortMark("location")}
                 </button>
               </th>
-              <th className="px-5 py-3 font-medium">
+              <th className="w-[12rem] max-w-[12rem] px-5 py-3 font-medium">
                 <button
                   type="button"
                   onClick={() => toggleSort("contact")}
@@ -407,8 +407,8 @@ export function LeadTable({
                       {loc}
                     </span>
                   </td>
-                  <td className="px-3 py-3.5 sm:px-5">
-                    {/* Tight viewports: icon + counts. Wider: full contact values. */}
+                  <td className="w-[12rem] max-w-[12rem] overflow-hidden px-3 py-3.5 sm:px-5">
+                    {/* Tight viewports: icon + counts. Wider: capped contact values. */}
                     <div className="flex items-center gap-2.5 text-xs xl:hidden">
                       <span
                         className={`inline-flex items-center gap-1 tabular-nums ${
@@ -429,22 +429,26 @@ export function LeadTable({
                         {l.phones.length || "—"}
                       </span>
                     </div>
-                    <div className="hidden flex-col gap-1 text-xs xl:flex">
+                    <div className="hidden min-w-0 max-w-full flex-col gap-1 text-xs xl:flex">
                       <span
-                        className={`inline-flex min-w-0 items-center gap-1 ${
+                        className={`flex min-w-0 items-center gap-1 ${
                           l.emails.length ? "text-aurora-300" : "text-mist-500"
                         }`}
                       >
                         <MailIcon className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{l.emails[0] ?? "—"}</span>
+                        <span className="truncate" title={l.emails[0] ?? undefined}>
+                          {l.emails[0] ?? "—"}
+                        </span>
                       </span>
                       <span
-                        className={`inline-flex min-w-0 items-center gap-1 ${
+                        className={`flex min-w-0 items-center gap-1 ${
                           l.phones.length ? "text-mist-300" : "text-mist-500"
                         }`}
                       >
                         <PhoneIcon className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{l.phones[0] ?? "—"}</span>
+                        <span className="truncate" title={l.phones[0] ?? undefined}>
+                          {l.phones[0] ?? "—"}
+                        </span>
                       </span>
                     </div>
                   </td>
