@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Leads paint-first nav + layout toggle
+- Entering Leads paints chrome immediately, then mounts table/cards after rAF
+  + transition (skeleton meanwhile). Layout toggle updates highlight sync;
+  first-time pane mount is deferred with skeleton. Lite→full hydrate shows
+  Leads shell + skeleton instead of empty flash.
+
 ### 2026-07-22 — Leads filter/layout UX (deferred + skeletons)
 - Search + pipeline filter use `useDeferredValue` so inputs update immediately;
   list catches up with a content skeleton (~100ms). Layout toggle uses

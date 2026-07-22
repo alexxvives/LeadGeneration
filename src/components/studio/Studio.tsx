@@ -147,6 +147,7 @@ export function Studio() {
   );
   const [pipelineFilter, setPipelineFilter] = useState<CrmStage | "all">("all");
   const [leadSearch, setLeadSearch] = useState("");
+  const [leadsHydrating, setLeadsHydrating] = useState(false);
   const [editLocked, setEditLocked] = useState(false);
   const [lockHolder, setLockHolder] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -271,7 +272,16 @@ export function Studio() {
       view === "board" ||
       view === "runs";
     if (!needsLeads || !boardLiteRef.current) return;
-    void refresh({ forceFull: true }).catch(() => {});
+    let cancelled = false;
+    setLeadsHydrating(true);
+    void refresh({ forceFull: true })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLeadsHydrating(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [view, refresh]);
 
   // Pipeline: pick up webhook reply → In Conversation without a manual refresh.
@@ -997,7 +1007,7 @@ export function Studio() {
   // Input/select update immediately; heavy filter+render catches up via deferred values.
   const deferredLeadSearch = useDeferredValue(leadSearch);
   const deferredPipelineFilter = useDeferredValue(pipelineFilter);
-  const [isLayoutPending, startLayoutTransition] = useTransition();
+  const [, startLayoutTransition] = useTransition();
 
   const searchFilteredLeads = useMemo(() => {
     const all = board?.leads ?? [];
@@ -1013,11 +1023,12 @@ export function Studio() {
 
   const leadsFilterPending =
     leadSearch !== deferredLeadSearch ||
-    pipelineFilter !== deferredPipelineFilter ||
-    isLayoutPending;
-  const showLeadsFilterSkeleton = useDeferredLoading(leadsFilterPending, 100);
+    pipelineFilter !== deferredPipelineFilter;
 
+  /** Toggle highlight updates immediately; first-time mount of a pane is deferred. */
   const selectLayout = (next: "table" | "cards" | "map") => {
+    setLayout(next);
+    if (visitedLayouts.has(next)) return;
     startLayoutTransition(() => {
       setVisitedLayouts((prev) => {
         if (prev.has(next)) return prev;
@@ -1025,7 +1036,6 @@ export function Studio() {
         copy.add(next);
         return copy;
       });
-      setLayout(next);
     });
   };
 
@@ -1033,15 +1043,20 @@ export function Studio() {
   const cardsLeads = useActiveLeads(layout === "cards", filteredLeads);
   const mapLeads = useActiveLeads(layout === "map", filteredLeads);
 
-  const showBoardSkeleton = useDeferredLoading(loading);
-
-  if (loading) {
-    return showBoardSkeleton ? (
-      <StudioViewSkeleton view={view} />
-    ) : (
-      <div className="h-dvh" aria-hidden />
-    );
-  }
+  // Yield one frame so Leads chrome paints before mounting 2k-row table/cards.
+  const [leadsBodyReady, setLeadsBodyReady] = useState(false);
+  const [, startLeadsBodyTransition] = useTransition();
+  useEffect(() => {
+    if (view !== "leads") {
+      setLeadsBodyReady(false);
+      return;
+    }
+    setLeadsBodyReady(false);
+    const id = window.requestAnimationFrame(() => {
+      startLeadsBodyTransition(() => setLeadsBodyReady(true));
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [view]);
 
   const hasLeads = (board?.leads.length ?? 0) > 0;
   const canSearchLive = board?.capabilities.canSearchLive ?? false;
@@ -1051,6 +1066,31 @@ export function Studio() {
   const showLeadSearch =
     hasLeads &&
     (view === "leads" || view === "pipeline" || view === "outreach");
+
+  const layoutPaneReady = visitedLayouts.has(layout);
+  const leadsContentPending =
+    view === "leads" &&
+    (loading ||
+      leadsHydrating ||
+      !board ||
+      (hasLeads &&
+        (!leadsBodyReady || !layoutPaneReady || leadsFilterPending)));
+  // Entering Leads / first layout pane: skeleton immediately. Filter catch-up: slight delay.
+  const leadsSkeletonDelay =
+    loading || leadsHydrating || !leadsBodyReady || !layoutPaneReady ? 0 : 100;
+  const showLeadsContentSkeleton = useDeferredLoading(
+    leadsContentPending,
+    leadsSkeletonDelay,
+  );
+
+  // First board fetch with no data yet — full-page skeleton (real shell isn't useful).
+  const showBootSkeleton = useDeferredLoading(loading && !board, 200);
+  if (loading && !board && showBootSkeleton) {
+    return <StudioViewSkeleton view={view} />;
+  }
+  if (loading && !board) {
+    return <div className="h-dvh" aria-hidden />;
+  }
 
   const onDeleteLead = async (leadId: string) => {
     // Stop any in-flight CSV import so rows don’t reappear after delete.
@@ -1358,18 +1398,59 @@ export function Studio() {
 
       {/* All leads — table / cards / map */}
       {view === "leads" && (
-        hasLeads ? (
+        loading || leadsHydrating || !board ? (
+          <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+            <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
+              <p className="text-xs uppercase tracking-widest text-mist-500">
+                <span className="font-semibold text-mist-200">…</span> leads
+              </p>
+              <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
+                <LayoutToggle active={layout === "table"} onClick={() => selectLayout("table")}>
+                  Table
+                </LayoutToggle>
+                <LayoutToggle active={layout === "cards"} onClick={() => selectLayout("cards")}>
+                  Cards
+                </LayoutToggle>
+                <LayoutToggle active={layout === "map"} onClick={() => selectLayout("map")}>
+                  Map
+                </LayoutToggle>
+              </div>
+              <div className="flex justify-end">
+                <Select
+                  value={pipelineFilter}
+                  onChange={(e) =>
+                    setPipelineFilter(
+                      e.target.value === "all" ? "all" : (e.target.value as CrmStage),
+                    )
+                  }
+                  className="min-w-[9rem] py-1.5 text-xs"
+                  aria-label="Filter by pipeline stage"
+                >
+                  <option value="all">All stages</option>
+                  {CRM_STAGE_FILTERS.map((s) => (
+                    <option key={s} value={s}>
+                      {crmStageLabel(s)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <LeadsLayoutSkeleton layout={layout} />
+            </div>
+          </div>
+        ) : hasLeads ? (
           <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
             <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
               <p className="text-xs uppercase tracking-widest text-mist-500">
                 <span className="font-semibold text-mist-200">
-                  {leadsFilterPending ? "…" : filteredLeads.length}
+                  {leadsFilterPending || !leadsBodyReady ? "…" : filteredLeads.length}
                 </span>
                 {pipelineFilter !== "all" || leadSearch.trim() ? (
                   <>
                     {" "}
                     of{" "}
-                    <span className="font-semibold text-mist-200">{board!.leads.length}</span>
+                    <span className="font-semibold text-mist-200">{board.leads.length}</span>
                   </>
                 ) : null}{" "}
                 leads
@@ -1406,8 +1487,8 @@ export function Studio() {
               </div>
             </div>
             <div className="relative min-h-0 flex-1 overflow-hidden">
-              {/* Keep visited layouts mounted so Table ↔ Cards ↔ Map switches stay instant. */}
-              {visitedLayouts.has("map") ? (
+              {/* Mount heavy panes only after Leads chrome has painted. */}
+              {leadsBodyReady && visitedLayouts.has("map") ? (
                 <div
                   className={
                     layout === "map"
@@ -1418,12 +1499,12 @@ export function Studio() {
                 >
                   <LeadMap
                     leads={mapLeads}
-                    locationHint={board!.run?.location ?? null}
+                    locationHint={board.run?.location ?? null}
                     onOpen={openInfo}
                   />
                 </div>
               ) : null}
-              {visitedLayouts.has("cards") ? (
+              {leadsBodyReady && visitedLayouts.has("cards") ? (
                 <div
                   className={
                     layout === "cards"
@@ -1450,7 +1531,7 @@ export function Studio() {
                   )}
                 </div>
               ) : null}
-              {visitedLayouts.has("table") ? (
+              {leadsBodyReady && visitedLayouts.has("table") ? (
                 <div
                   className={
                     layout === "table"
@@ -1472,12 +1553,12 @@ export function Studio() {
                   />
                 </div>
               ) : null}
-              {showLeadsFilterSkeleton ? (
+              {showLeadsContentSkeleton ? (
                 <div
-                  className="absolute inset-0 z-10 bg-ink-950/70 p-0 backdrop-blur-[1px]"
+                  className="absolute inset-0 z-10 bg-ink-950/80"
                   role="status"
                   aria-busy="true"
-                  aria-label="Updating leads"
+                  aria-label="Loading leads"
                 >
                   <LeadsLayoutSkeleton layout={layout} />
                 </div>
