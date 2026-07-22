@@ -156,35 +156,20 @@ export function PipelineView({
               const colLeads = leads.filter((l) => l.crmStage === col.stage);
               const open = parkedOpen[col.stage] ?? false;
               return (
-                <div key={col.stage} className="min-w-0">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setParkedOpen((prev) => ({ ...prev, [col.stage]: !prev[col.stage] }))
-                    }
-                    className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-ink-950/40 px-3 py-2 text-left transition-colors hover:bg-white/[0.03]"
-                  >
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
-                    <span className="truncate text-sm font-semibold text-mist-100">{col.title}</span>
-                    <span className="ml-auto font-display text-base tabular-nums text-mist-400">
-                      {colLeads.length}
-                    </span>
-                    <span className="text-xs text-mist-600">{open ? "▾" : "▸"}</span>
-                  </button>
-                  {open ? (
-                    <div className="mt-2 max-h-[28vh]">
-                      <PipelineColumn
-                        col={col}
-                        leads={colLeads}
-                        onOpen={openIfClick}
-                        activeId={activeId}
-                        compact
-                      />
-                    </div>
-                  ) : (
-                    <CollapsedDropZone stage={col.stage} />
-                  )}
-                </div>
+                <ParkedStage
+                  key={col.stage}
+                  col={col}
+                  leads={colLeads}
+                  open={open}
+                  onToggle={() =>
+                    setParkedOpen((prev) => ({
+                      ...prev,
+                      [col.stage]: !prev[col.stage],
+                    }))
+                  }
+                  onOpen={openIfClick}
+                  activeId={activeId}
+                />
               );
             })}
           </div>
@@ -205,16 +190,69 @@ export function PipelineView({
   );
 }
 
-function CollapsedDropZone({ stage }: { stage: CrmStage }) {
-  const { setNodeRef, isOver } = useDroppable({ id: stage });
+/** One bordered card: header toggle + droppable body (no second “bucket”). */
+function ParkedStage({
+  col,
+  leads,
+  open,
+  onToggle,
+  onOpen,
+  activeId,
+}: {
+  col: (typeof PARKED_COLUMNS)[number];
+  leads: LeadWithOutreach[];
+  open: boolean;
+  onToggle: () => void;
+  onOpen: (id: string) => void;
+  activeId: string | null;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: col.stage });
   return (
     <div
       ref={setNodeRef}
-      className={`mt-1 h-2 rounded-full transition-colors ${
-        isOver ? "bg-aurora-400/40" : "bg-transparent"
+      className={`min-w-0 overflow-hidden rounded-xl2 border transition-colors ${
+        isOver
+          ? "border-aurora-400/40 bg-aurora-400/5"
+          : "border-white/10 bg-ink-950/40"
       }`}
-      aria-hidden
-    />
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/[0.03]"
+      >
+        <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
+        <span className="truncate text-sm font-semibold text-mist-100">{col.title}</span>
+        <span className="ml-auto font-display text-base tabular-nums text-mist-400">
+          {leads.length}
+        </span>
+        <span className="text-xs text-mist-600">{open ? "▾" : "▸"}</span>
+      </button>
+      {open ? (
+        <div className="max-h-[28vh] space-y-2 overflow-y-auto overscroll-contain border-t border-white/5 p-3">
+          {leads.length === 0 ? (
+            <p className="px-2 py-4 text-center text-xs leading-relaxed text-mist-500">
+              {col.empty}
+            </p>
+          ) : (
+            [...leads]
+              .sort((a, b) => {
+                const ar = a.outreach?.deliveryStatus === "replied" ? 1 : 0;
+                const br = b.outreach?.deliveryStatus === "replied" ? 1 : 0;
+                return br - ar;
+              })
+              .map((l) => (
+                <DraggablePipelineCard
+                  key={l.id}
+                  lead={l}
+                  onOpen={onOpen}
+                  isDragging={l.id === activeId}
+                />
+              ))
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -223,34 +261,27 @@ function PipelineColumn({
   leads,
   onOpen,
   activeId,
-  compact,
 }: {
   col: (typeof MAIN_COLUMNS)[number] | (typeof PARKED_COLUMNS)[number];
   leads: LeadWithOutreach[];
   onOpen: (id: string) => void;
   activeId: string | null;
-  compact?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.stage });
   return (
     <div
       ref={setNodeRef}
       className={`flex h-full min-h-0 min-w-0 flex-col rounded-xl2 border transition-colors ${
-        compact ? "max-h-[28vh]" : ""
-      } ${
         isOver ? "border-aurora-400/40 bg-aurora-400/5" : "border-white/10 bg-ink-950/40"
       }`}
     >
-      {/* Parked accordion already shows the title — skip a second header. */}
-      {!compact ? (
-        <div className="flex min-h-[2.75rem] shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2.5 sm:px-4">
-          <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
-          <h3 className="truncate text-sm font-semibold leading-none text-mist-100">{col.title}</h3>
-          <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
-            {leads.length}
-          </span>
-        </div>
-      ) : null}
+      <div className="flex min-h-[2.75rem] shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2.5 sm:px-4">
+        <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
+        <h3 className="truncate text-sm font-semibold leading-none text-mist-100">{col.title}</h3>
+        <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
+          {leads.length}
+        </span>
+      </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3">
         {leads.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
