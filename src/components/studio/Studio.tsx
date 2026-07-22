@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
@@ -25,7 +25,7 @@ import { OutreachView } from "./OutreachView";
 import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
-import { StudioViewSkeleton, useDeferredLoading } from "./skeletons";
+import { StudioViewSkeleton, LeadsLayoutSkeleton, useDeferredLoading } from "./skeletons";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 import {
   draftFlagsFromProfile,
@@ -78,6 +78,16 @@ function viewFromParams(view: string | null): StudioView {
   if (view === "admin") return "admin";
   if (view === "admin-users") return "admin-users";
   return "board";
+}
+
+/** Keep last leads for inactive panes so filter updates don’t re-render all layouts. */
+function useActiveLeads(
+  active: boolean,
+  leads: LeadWithOutreach[],
+): LeadWithOutreach[] {
+  const ref = useRef(leads);
+  if (active) ref.current = leads;
+  return ref.current;
 }
 
 function queryForView(next: StudioView, boardId?: string | null): string {
@@ -984,27 +994,44 @@ export function Studio() {
     return tokens.every((t) => hay.includes(t));
   }, []);
 
+  // Input/select update immediately; heavy filter+render catches up via deferred values.
+  const deferredLeadSearch = useDeferredValue(leadSearch);
+  const deferredPipelineFilter = useDeferredValue(pipelineFilter);
+  const [isLayoutPending, startLayoutTransition] = useTransition();
+
   const searchFilteredLeads = useMemo(() => {
     const all = board?.leads ?? [];
-    return all.filter((l) => leadMatchesSearch(l, leadSearch));
-  }, [board?.leads, leadSearch, leadMatchesSearch]);
+    return all.filter((l) => leadMatchesSearch(l, deferredLeadSearch));
+  }, [board?.leads, deferredLeadSearch, leadMatchesSearch]);
 
   const filteredLeads = useMemo(() => {
-    if (pipelineFilter === "all") return searchFilteredLeads;
+    if (deferredPipelineFilter === "all") return searchFilteredLeads;
     return searchFilteredLeads.filter(
-      (l) => (l.crmStage ?? "new") === pipelineFilter,
+      (l) => (l.crmStage ?? "new") === deferredPipelineFilter,
     );
-  }, [searchFilteredLeads, pipelineFilter]);
+  }, [searchFilteredLeads, deferredPipelineFilter]);
+
+  const leadsFilterPending =
+    leadSearch !== deferredLeadSearch ||
+    pipelineFilter !== deferredPipelineFilter ||
+    isLayoutPending;
+  const showLeadsFilterSkeleton = useDeferredLoading(leadsFilterPending, 100);
 
   const selectLayout = (next: "table" | "cards" | "map") => {
-    setVisitedLayouts((prev) => {
-      if (prev.has(next)) return prev;
-      const copy = new Set(prev);
-      copy.add(next);
-      return copy;
+    startLayoutTransition(() => {
+      setVisitedLayouts((prev) => {
+        if (prev.has(next)) return prev;
+        const copy = new Set(prev);
+        copy.add(next);
+        return copy;
+      });
+      setLayout(next);
     });
-    setLayout(next);
   };
+
+  const tableLeads = useActiveLeads(layout === "table", filteredLeads);
+  const cardsLeads = useActiveLeads(layout === "cards", filteredLeads);
+  const mapLeads = useActiveLeads(layout === "map", filteredLeads);
 
   const showBoardSkeleton = useDeferredLoading(loading);
 
@@ -1335,7 +1362,9 @@ export function Studio() {
           <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
             <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
               <p className="text-xs uppercase tracking-widest text-mist-500">
-                <span className="font-semibold text-mist-200">{filteredLeads.length}</span>
+                <span className="font-semibold text-mist-200">
+                  {leadsFilterPending ? "…" : filteredLeads.length}
+                </span>
                 {pipelineFilter !== "all" || leadSearch.trim() ? (
                   <>
                     {" "}
@@ -1357,35 +1386,26 @@ export function Studio() {
                 </LayoutToggle>
               </div>
               <div className="flex items-center justify-start gap-2 sm:justify-end">
-                <label className="inline-flex items-center gap-2 text-xs text-mist-500">
-                  <span className="hidden uppercase tracking-widest sm:inline">Pipeline</span>
-                  <Select
-                    value={pipelineFilter}
-                    onChange={(e) =>
-                      setPipelineFilter(
-                        e.target.value === "all" ? "all" : (e.target.value as CrmStage),
-                      )
-                    }
-                    className="min-w-[9rem] py-1.5 text-xs"
-                    aria-label="Filter by pipeline stage"
-                  >
-                    <option value="all">All stages</option>
-                    {CRM_STAGE_FILTERS.map((s) => (
-                      <option key={s} value={s}>
-                        {crmStageLabel(s)}
-                      </option>
-                    ))}
-                  </Select>
-                </label>
+                <Select
+                  value={pipelineFilter}
+                  onChange={(e) =>
+                    setPipelineFilter(
+                      e.target.value === "all" ? "all" : (e.target.value as CrmStage),
+                    )
+                  }
+                  className="min-w-[9rem] py-1.5 text-xs"
+                  aria-label="Filter by pipeline stage"
+                >
+                  <option value="all">All stages</option>
+                  {CRM_STAGE_FILTERS.map((s) => (
+                    <option key={s} value={s}>
+                      {crmStageLabel(s)}
+                    </option>
+                  ))}
+                </Select>
               </div>
             </div>
-            <div
-              className={`relative min-h-0 flex-1 ${
-                layout === "cards"
-                  ? "overflow-y-auto overscroll-contain"
-                  : "overflow-hidden"
-              }`}
-            >
+            <div className="relative min-h-0 flex-1 overflow-hidden">
               {/* Keep visited layouts mounted so Table ↔ Cards ↔ Map switches stay instant. */}
               {visitedLayouts.has("map") ? (
                 <div
@@ -1397,7 +1417,7 @@ export function Studio() {
                   aria-hidden={layout !== "map"}
                 >
                   <LeadMap
-                    leads={filteredLeads}
+                    leads={mapLeads}
                     locationHint={board!.run?.location ?? null}
                     onOpen={openInfo}
                   />
@@ -1407,18 +1427,18 @@ export function Studio() {
                 <div
                   className={
                     layout === "cards"
-                      ? "relative"
-                      : "pointer-events-none invisible absolute inset-0 -z-10 h-0 overflow-hidden"
+                      ? "absolute inset-0 overflow-y-auto overscroll-contain"
+                      : "pointer-events-none invisible absolute inset-0 -z-10 overflow-hidden"
                   }
                   aria-hidden={layout !== "cards"}
                 >
-                  {filteredLeads.length === 0 ? (
+                  {cardsLeads.length === 0 ? (
                     <p className="py-12 text-center text-sm text-mist-500">
                       No leads match this filter.
                     </p>
                   ) : (
                     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                      {filteredLeads.map((lead, i) => (
+                      {cardsLeads.map((lead, i) => (
                         <LeadCard
                           key={lead.id}
                           lead={lead}
@@ -1435,12 +1455,12 @@ export function Studio() {
                   className={
                     layout === "table"
                       ? "absolute inset-0 flex min-h-0 flex-col"
-                      : "pointer-events-none invisible absolute inset-0 -z-10 h-0 overflow-hidden"
+                      : "pointer-events-none invisible absolute inset-0 -z-10 overflow-hidden"
                   }
                   aria-hidden={layout !== "table"}
                 >
                   <LeadTable
-                    leads={filteredLeads}
+                    leads={tableLeads}
                     statusFilter={pipelineFilter}
                     onStatusFilterChange={setPipelineFilter}
                     onOpen={openInfo}
@@ -1450,6 +1470,16 @@ export function Studio() {
                     onDeleteLeads={editLocked ? undefined : onDeleteLeads}
                     editLocked={editLocked}
                   />
+                </div>
+              ) : null}
+              {showLeadsFilterSkeleton ? (
+                <div
+                  className="absolute inset-0 z-10 bg-ink-950/70 p-0 backdrop-blur-[1px]"
+                  role="status"
+                  aria-busy="true"
+                  aria-label="Updating leads"
+                >
+                  <LeadsLayoutSkeleton layout={layout} />
                 </div>
               ) : null}
             </div>

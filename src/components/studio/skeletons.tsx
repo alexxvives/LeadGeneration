@@ -194,6 +194,75 @@ export function LeadsTableSkeleton() {
   );
 }
 
+/** Content-only skeleton for table body (toolbar stays interactive). */
+export function LeadsTableBodySkeleton() {
+  return (
+    <div className="h-full min-h-0 overflow-hidden rounded-xl2 border border-white/10">
+      <div className="border-b border-white/10 px-5 py-3">
+        <div className="flex gap-8">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Bone key={i} className="h-3 w-16" />
+          ))}
+        </div>
+      </div>
+      <div className="divide-y divide-white/5">
+        {Array.from({ length: 10 }, (_, i) => (
+          <div key={i} className="flex items-center gap-6 px-5 py-3.5">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Bone className="h-4 w-40" />
+              <Bone className="h-3 w-28" />
+            </div>
+            <Bone className="hidden h-3 w-24 sm:block" />
+            <Bone className="hidden h-3 w-32 md:block" />
+            <Bone className="h-3 w-28" />
+            <Bone className="h-1.5 w-16 rounded-full" />
+            <Bone className="h-5 w-20 rounded-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function LeadsCardsSkeleton() {
+  return (
+    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 9 }, (_, i) => (
+        <div key={i} className="glass rounded-xl2 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-2">
+              <Bone className="h-5 w-40 max-w-full" />
+              <Bone className="h-3 w-28" />
+            </div>
+            <Bone className="h-5 w-16 rounded-full" />
+          </div>
+          <Bone className="mt-4 h-3 w-full" />
+          <Bone className="mt-2 h-3 w-4/5 max-w-full" />
+          <div className="mt-4 flex gap-2">
+            <Bone className="h-5 w-14 rounded-full" />
+            <Bone className="h-5 w-14 rounded-full" />
+          </div>
+          <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+            <Bone className="h-1.5 w-16 rounded-full" />
+            <Bone className="h-3 w-12" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Active leads layout body skeleton (table / cards / map). */
+export function LeadsLayoutSkeleton({
+  layout,
+}: {
+  layout: "table" | "cards" | "map";
+}) {
+  if (layout === "cards") return <LeadsCardsSkeleton />;
+  if (layout === "map") return <MapSkeleton />;
+  return <LeadsTableBodySkeleton />;
+}
+
 export function OutreachSkeleton() {
   return (
     <div className="grid h-full min-h-0 gap-3 md:grid-cols-3">

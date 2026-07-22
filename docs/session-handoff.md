@@ -9,19 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-22 (skeleton loading)
+## ⏱️ Status — updated 2026-07-22 (leads filter UX)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Skeleton loaders (200ms deferred) on Studio views, Dashboard, Boards, Runs,
-  Admin, Map, Settings route — replace blank spinners for slow loads.
-- Prior: map @2k geocode fast-path; leads table single scroll; contact col cap.
+- Leads: deferred search/stage filter (type/select instant + skeleton); layout
+  toggle via transition + cards skeleton; freeze inactive panes; drop
+  “Pipeline” label. Prior: map geocode fast-path, table single scroll.
 
 ### Next
-1. Deploy; hard-refresh; confirm skeletons on slow board load + no double scroll.
+1. Deploy; hard-refresh; confirm filter/search/layout feel snappy at 2k leads.
 2. Optional: allow importing same-name rows as distinct locations (address key).
 3. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
 4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.

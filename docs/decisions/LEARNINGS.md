@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Leads filter/layout UX (deferred + skeletons)
+- Search + pipeline filter use `useDeferredValue` so inputs update immediately;
+  list catches up with a content skeleton (~100ms). Layout toggle uses
+  `startTransition` + cards skeleton; inactive panes freeze leads (no triple
+  re-render). Card entrance animation capped to first 12. Removed “Pipeline”
+  label beside the stage select.
+
 ### 2026-07-22 — Skeleton loading (200ms deferred)
 - Replaced spinner-only waits with view-shaped `shimmer` skeletons
   (`src/components/studio/skeletons.tsx`). Shown only after **200ms** so fast

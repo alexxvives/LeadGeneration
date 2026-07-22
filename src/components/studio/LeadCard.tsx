@@ -15,11 +15,15 @@ export function LeadCard({
   onOpen: () => void;
 }) {
   const domain = displayWebsite(lead.website);
+  // Stagger only the first row — animating 2k cards freezes the tab.
+  const animateIn = index < 12;
   return (
     <button
       onClick={onOpen}
-      style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
-      className="glass card-hover animate-float-up group flex w-full flex-col rounded-xl2 p-5 text-left"
+      style={animateIn ? { animationDelay: `${Math.min(index * 40, 400)}ms` } : undefined}
+      className={`glass card-hover group flex w-full flex-col rounded-xl2 p-5 text-left ${
+        animateIn ? "animate-float-up" : ""
+      }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
