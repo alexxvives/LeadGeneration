@@ -17,7 +17,7 @@ import { LeadMap } from "./LeadMap";
 import { LeadDrawer } from "./LeadDrawer";
 import { UpgradeModal, UsageBar } from "./UpgradeModal";
 import { VerifyLimitModal } from "./VerifyLimitModal";
-import { Spinner, crmStageLabel } from "@/components/ui";
+import { crmStageLabel } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
 import { PipelineView } from "./PipelineView";
@@ -25,6 +25,7 @@ import { OutreachView } from "./OutreachView";
 import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
+import { StudioViewSkeleton, useDeferredLoading } from "./skeletons";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 import {
   draftFlagsFromProfile,
@@ -1005,11 +1006,13 @@ export function Studio() {
     setLayout(next);
   };
 
+  const showBoardSkeleton = useDeferredLoading(loading);
+
   if (loading) {
-    return (
-      <div className="grid min-h-[60vh] place-items-center">
-        <Spinner className="h-8 w-8 text-aurora-400" />
-      </div>
+    return showBoardSkeleton ? (
+      <StudioViewSkeleton view={view} />
+    ) : (
+      <div className="h-dvh" aria-hidden />
     );
   }
 
@@ -1378,7 +1381,9 @@ export function Studio() {
             </div>
             <div
               className={`relative min-h-0 flex-1 ${
-                layout === "map" ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
+                layout === "cards"
+                  ? "overflow-y-auto overscroll-contain"
+                  : "overflow-hidden"
               }`}
             >
               {/* Keep visited layouts mounted so Table ↔ Cards ↔ Map switches stay instant. */}
@@ -1429,7 +1434,7 @@ export function Studio() {
                 <div
                   className={
                     layout === "table"
-                      ? "relative"
+                      ? "absolute inset-0 flex min-h-0 flex-col"
                       : "pointer-events-none invisible absolute inset-0 -z-10 h-0 overflow-hidden"
                   }
                   aria-hidden={layout !== "table"}

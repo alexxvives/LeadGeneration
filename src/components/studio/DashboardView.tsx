@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { BoardSummary, CrmStage, DashboardStats, WorkspaceSummary } from "@/lib/types";
-import { Spinner } from "@/components/ui";
 import Link from "next/link";
+import { DashboardSkeleton, DeferredSkeleton } from "./skeletons";
 
 const STAGE_LABELS: Record<CrmStage, string> = {
   new: "New",
@@ -102,20 +102,30 @@ export function DashboardView({
 
   const boardOptions = boardsProp ?? data?.boards ?? [];
 
-  if (loading && !data) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Spinner className="h-6 w-6 text-aurora-300" />
-      </div>
-    );
-  }
+  return (
+    <DeferredSkeleton loading={loading && !data} skeleton={<DashboardSkeleton />}>
+      {err || !data ? (
+        <p className="py-12 text-center text-sm text-rose-300">{err ?? "No data"}</p>
+      ) : (
+        <DashboardLoaded
+          data={data}
+          filter={filter}
+          boardOptions={boardOptions}
+        />
+      )}
+    </DeferredSkeleton>
+  );
+}
 
-  if (err || !data) {
-    return (
-      <p className="py-12 text-center text-sm text-rose-300">{err ?? "No data"}</p>
-    );
-  }
-
+function DashboardLoaded({
+  data,
+  filter,
+  boardOptions,
+}: {
+  data: DashboardStats & { workspace: WorkspaceSummary };
+  filter: string;
+  boardOptions: BoardSummary[];
+}) {
   const stageItems = (Object.keys(STAGE_LABELS) as CrmStage[]).map((k) => ({
     label: STAGE_LABELS[k],
     value: data.byCrmStage[k] ?? 0,

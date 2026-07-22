@@ -9,23 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-22 (import skips + studio UX/perf)
+## ⏱️ Status — updated 2026-07-22 (skeleton loading)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Import gap explained: 76/2482 rows skipped as **same company name** (see
-  `import-skipped-rows.csv`). Not website-domain dedupe anymore.
-- `contactMethods[]` multi-select; Contacted missing method = amber prompt;
-  Outreach Contacted → **Register** (no approve/send).
-- Leads: centered usage bars + search; keep-alive table/cards/map; outreach
-  sorted by fit; pipeline click opens info.
-- Dashboard: aggregate queries + lite board load (no 2k lead payload).
+- Skeleton loaders (200ms deferred) on Studio views, Dashboard, Boards, Runs,
+  Admin, Map, Settings route — replace blank spinners for slow loads.
+- Prior: map @2k geocode fast-path; leads table single scroll; contact col cap.
 
 ### Next
-1. Deploy; hard-refresh; confirm Register + multi-method + search UX.
+1. Deploy; hard-refresh; confirm skeletons on slow board load + no double scroll.
 2. Optional: allow importing same-name rows as distinct locations (address key).
 3. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
 4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.

@@ -196,8 +196,8 @@ export function LeadTable({
   };
 
   return (
-    <div className="relative flex max-h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-xl2 border border-white/10">
-      <div className="min-h-0 flex-1 overflow-auto">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl2 border border-white/10">
+      <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="sticky top-0 z-10 bg-ink-950/95 backdrop-blur-sm">
             <tr className="border-b border-white/10 text-left text-xs uppercase tracking-widest text-mist-500">

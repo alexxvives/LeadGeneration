@@ -6,6 +6,7 @@ import { api } from "@/lib/client-api";
 import type { BoardInvite, BoardMember, BoardSummary } from "@/lib/types";
 import { Spinner } from "@/components/ui";
 import { PencilIcon, UsersIcon, XIcon } from "@/components/icons";
+import { BoardsSkeleton, Bone, useDeferredLoading } from "./skeletons";
 
 export function BoardsView({
   onSelectBoard,
@@ -100,11 +101,14 @@ export function BoardsView({
     }
   }
 
+  const showSkeleton = useDeferredLoading(loading);
   if (loading) {
-    return (
-      <div className="flex justify-center py-24">
-        <Spinner className="h-6 w-6 text-aurora-300" />
+    return showSkeleton ? (
+      <div role="status" aria-busy="true" aria-label="Loading boards">
+        <BoardsSkeleton />
       </div>
+    ) : (
+      <div className="min-h-[50vh]" aria-hidden />
     );
   }
 
@@ -657,9 +661,13 @@ function BoardInviteModal({
             People on this board
           </h3>
           {loading ? (
-            <div className="flex justify-center py-6">
-              <Spinner className="h-5 w-5 text-aurora-300" />
-            </div>
+            <ul className="mt-3 space-y-2">
+              {Array.from({ length: 3 }, (_, i) => (
+                <li key={i}>
+                  <Bone className="h-10 w-full rounded-lg" />
+                </li>
+              ))}
+            </ul>
           ) : (
             <ul className="mt-3 max-h-52 space-y-2 overflow-y-auto">
               <li className="flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-ink-950/60 px-3 py-2.5 text-sm">

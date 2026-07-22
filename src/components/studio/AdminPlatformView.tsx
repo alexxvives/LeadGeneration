@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { AdminPlatformStats, AdminUserRow, PlanId } from "@/lib/types";
 import { getPlan, isPaidPlan } from "@/lib/plans";
-import { Spinner } from "@/components/ui";
+import { AdminPlatformSkeleton, useDeferredLoading } from "./skeletons";
 import { Select } from "@/components/ui/Select";
 
 function StatCard({
@@ -310,6 +310,8 @@ export function AdminPlatformView() {
       .slice(0, 6);
   }, [users]);
 
+  const showPlatformSkeleton = useDeferredLoading(!data && !err);
+
   if (err) {
     return (
       <div className="rounded-xl2 border border-rose-400/20 bg-rose-400/5 px-5 py-4 text-sm text-rose-200">
@@ -319,10 +321,12 @@ export function AdminPlatformView() {
   }
 
   if (!data) {
-    return (
-      <div className="flex items-center gap-2 text-mist-500">
-        <Spinner className="h-4 w-4" /> Loading platform…
+    return showPlatformSkeleton ? (
+      <div role="status" aria-busy="true" aria-label="Loading platform">
+        <AdminPlatformSkeleton />
       </div>
+    ) : (
+      <div className="min-h-[40vh]" aria-hidden />
     );
   }
 

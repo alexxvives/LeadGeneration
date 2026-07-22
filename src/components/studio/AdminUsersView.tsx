@@ -7,6 +7,7 @@ import { ADMIN_PLAN_ORDER, getPlan } from "@/lib/plans";
 import { Spinner } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import { TrashIcon, XIcon } from "@/components/icons";
+import { AdminUsersSkeleton, useDeferredLoading } from "./skeletons";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
 
@@ -80,6 +81,7 @@ export function AdminUsersView() {
     });
   }, [users, q, planFilter, accountFilter]);
 
+  const showUsersSkeleton = useDeferredLoading(!users && !err);
   if (err && !users) {
     return (
       <div className="rounded-xl2 border border-rose-400/20 bg-rose-400/5 px-5 py-4 text-sm text-rose-200">
@@ -89,10 +91,12 @@ export function AdminUsersView() {
   }
 
   if (!users) {
-    return (
-      <div className="flex items-center gap-2 text-mist-500">
-        <Spinner className="h-4 w-4" /> Loading users…
+    return showUsersSkeleton ? (
+      <div role="status" aria-busy="true" aria-label="Loading users">
+        <AdminUsersSkeleton />
       </div>
+    ) : (
+      <div className="min-h-[40vh]" aria-hidden />
     );
   }
 

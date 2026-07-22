@@ -4,6 +4,19 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Skeleton loading (200ms deferred)
+- Replaced spinner-only waits with view-shaped `shimmer` skeletons
+  (`src/components/studio/skeletons.tsx`). Shown only after **200ms** so fast
+  loads don’t flash. Wired: Studio board load, Dashboard, Boards, Runs, Admin
+  platform/users, Map overlay, `/app` + settings route `loading.tsx`.
+
+### 2026-07-22 — Map speed @2k leads + table single scroll
+- Map was geocoding **every unique street** via Nominatim (`Promise.all`) —
+  normal to hang for minutes at 2k addresses. Fast path: 1× board location +
+  jitter, then refine ≤60 city keys with concurrency 3; canvas `circleMarker`.
+- Leads table double-scroll: outer `overflow-y-auto` + table `max-h` scroller.
+  Table now fills flex slot (`absolute inset-0` / `h-full`); only inner scroll.
+
 ### 2026-07-22 — Import skips + studio UX/perf pass
 - LEADS.xlsx: **2482** data rows → **2406** unique by normalized company name;
   **76** skipped as same-name duplicates (3 accent/punctuation variants).

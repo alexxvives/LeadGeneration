@@ -3,8 +3,11 @@
 /**
  * LeadMap — Leaflet map of board leads.
  *
- * Nominatim (/api/geocode) takes place-name strings ("barcelona"), not lat/lng.
- * Pins jitter around the search Location when leads share a city string.
+ * Nominatim (/api/geocode) is slow and rate-limited. With 2k+ street addresses,
+ * geocoding every unique string stalls the map for minutes. Strategy:
+ *   1. Geocode the board location hint once → place every pin with jitter (fast).
+ *   2. Optionally refine by city/region key (last 2 comma parts), concurrency-
+ *      limited, so pins settle near their city without thousands of API calls.
  *
  * Important: Leaflet mutates the DOM node passed to L.map(). We keep a nested
  * `mapEl` that React never reconciles children into, and we clear `_leaflet_id`
@@ -14,7 +17,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CrmStage, LeadWithOutreach } from "@/lib/types";
 import { api } from "@/lib/client-api";
-import { Spinner } from "@/components/ui";
+import { useDeferredLoading } from "./skeletons";
 
 type Coords = { lat: number; lng: number };
 type Pin = { id: string; company: string; coords: Coords; crmStage: CrmStage };
@@ -36,6 +39,10 @@ const LEGEND_ORDER: CrmStage[] = [
   "not_interested",
 ];
 
+/** Cap city-level refine lookups — enough for regional boards, not street-level spam. */
+const MAX_CITY_GEOCODES = 60;
+const GEOCODE_CONCURRENCY = 3;
+
 const geocodeCache = new Map<string, Coords | null>();
 const geocodeInflight = new Map<string, Promise<Coords | null>>();
 
@@ -54,6 +61,16 @@ function geocodeCandidates(query: string): string[] {
     if (cityish.length >= 2) out.push(`${cityish}, ${country}`);
   }
   return [...new Set(out.map((s) => s.trim()).filter(Boolean))];
+}
+
+/** City/region key for grouping pins (avoids geocoding every street). */
+function cityKey(loc: string): string {
+  const parts = loc
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) return parts.slice(-2).join(", ").toLowerCase();
+  return loc.trim().toLowerCase();
 }
 
 async function geocodeExact(query: string): Promise<Coords | null> {
@@ -87,6 +104,21 @@ async function geocode(query: string): Promise<Coords | null> {
   return null;
 }
 
+async function mapPool<T>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  let i = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (i < items.length) {
+      const idx = i++;
+      await fn(items[idx]!);
+    }
+  });
+  await Promise.all(workers);
+}
+
 function jitter(seed: string, radius = 0.035): { dLat: number; dLng: number } {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
@@ -105,9 +137,30 @@ function ensureLeafletCss() {
   document.head.appendChild(link);
 }
 
-function pinIconHtml(stage: CrmStage): string {
-  const c = STAGE_PIN[stage] ?? STAGE_PIN.new;
-  return `<span style="display:block;width:14px;height:14px;border-radius:9999px;background:${c.fill};box-shadow:0 0 0 4px ${c.glow};border:2px solid #060a12"></span>`;
+function buildPinsAround(
+  leads: LeadWithOutreach[],
+  centers: Map<string, Coords>,
+  fallback: Coords | null,
+  hintLower: string,
+): Pin[] {
+  const next: Pin[] = [];
+  for (const l of leads) {
+    const loc = (l.location?.trim() || hintLower).trim();
+    const key = loc ? cityKey(loc) : "";
+    let coords = key ? centers.get(key) ?? null : null;
+    if (!coords) coords = fallback;
+    if (!coords) continue;
+
+    const sameAsHint = !loc || loc.toLowerCase() === hintLower;
+    const j = jitter(l.id || l.company, sameAsHint ? 0.02 : 0.028);
+    next.push({
+      id: l.id,
+      company: l.company,
+      coords: { lat: coords.lat + j.dLat, lng: coords.lng + j.dLng },
+      crmStage: l.crmStage ?? "new",
+    });
+  }
+  return next;
 }
 
 export function LeadMap({
@@ -130,7 +183,10 @@ export function LeadMap({
   const [error, setError] = useState<string | null>(null);
   const [pins, setPins] = useState<Pin[]>([]);
   const [loadingPins, setLoadingPins] = useState(true);
+  const [refining, setRefining] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const mapBusy = (!ready || loadingPins) && !initError;
+  const showMapSkeleton = useDeferredLoading(mapBusy);
 
   const mapLeads = leads;
 
@@ -142,60 +198,60 @@ export function LeadMap({
     [locationHint, mapLeads],
   );
 
-  const leadKey = useMemo(
-    () => mapLeads.map((l) => `${l.id}:${l.location ?? ""}:${l.crmStage ?? "new"}`).join("|"),
-    [mapLeads],
-  );
+  // Compact content hash — O(n) CPU, O(1) string (avoid joining 2k addresses).
+  const leadKey = useMemo(() => {
+    let h = mapLeads.length >>> 0;
+    for (const l of mapLeads) {
+      const s = `${l.id}\0${l.location ?? ""}\0${l.crmStage ?? "new"}`;
+      for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0;
+    }
+    return String(h);
+  }, [mapLeads]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoadingPins(true);
+      setRefining(false);
+      const hintLower = hint.trim().toLowerCase();
       const base = hint ? await geocode(hint) : null;
       if (cancelled) return;
 
-      const uniqueLocs = new Set<string>();
-      for (const l of mapLeads) {
-        const loc = (l.location?.trim() || hint).trim();
-        if (loc) uniqueLocs.add(loc);
-      }
-      const resolved = new Map<string, Coords | null>();
-      await Promise.all(
-        [...uniqueLocs].map(async (loc) => {
-          resolved.set(loc, await geocode(loc));
-        }),
-      );
-      if (cancelled) return;
+      // Fast path: one geocode → all pins visible immediately.
+      const centers = new Map<string, Coords>();
+      if (base && hintLower) centers.set(cityKey(hint), base);
 
-      const next: Pin[] = [];
-      for (const l of mapLeads) {
-        const loc = (l.location?.trim() || hint).trim();
-        let coords = loc ? resolved.get(loc) ?? null : null;
-        if (!coords && base) {
-          const j = jitter(l.id || l.company);
-          coords = { lat: base.lat + j.dLat, lng: base.lng + j.dLng };
-        } else if (coords && loc.toLowerCase() === hint.toLowerCase() && base) {
-          const j = jitter(l.id || l.company, 0.02);
-          coords = { lat: coords.lat + j.dLat, lng: coords.lng + j.dLng };
-        }
-        if (coords) {
-          next.push({
-            id: l.id,
-            company: l.company,
-            coords,
-            crmStage: l.crmStage ?? "new",
-          });
-        }
-      }
-
-      if (cancelled) return;
-      setPins(next);
+      const immediate = buildPinsAround(mapLeads, centers, base, hintLower);
+      setPins(immediate);
       setError(
-        next.length === 0
+        immediate.length === 0
           ? "Couldn't place leads on the map. Add a Location to your search, or wait for scraped addresses."
           : null,
       );
       setLoadingPins(false);
+
+      // Refine: unique city/region keys only (not every street), capped + pooled.
+      const cities = new Set<string>();
+      for (const l of mapLeads) {
+        const loc = l.location?.trim();
+        if (!loc) continue;
+        const key = cityKey(loc);
+        if (key && key !== cityKey(hint) && !centers.has(key)) cities.add(key);
+      }
+      const toResolve = [...cities].slice(0, MAX_CITY_GEOCODES);
+      if (toResolve.length === 0 || !base) return;
+
+      setRefining(true);
+      await mapPool(toResolve, GEOCODE_CONCURRENCY, async (key) => {
+        if (cancelled) return;
+        const coords = await geocode(key);
+        if (coords) centers.set(key, coords);
+      });
+      if (cancelled) return;
+
+      const refined = buildPinsAround(mapLeads, centers, base, hintLower);
+      setPins(refined);
+      setRefining(false);
     })();
     return () => {
       cancelled = true;
@@ -227,9 +283,11 @@ export function LeadMap({
           el.replaceChildren();
         }
 
+        // Canvas renderer: 2k circle markers stay usable; DivIcon DOM pins do not.
         const map = L.map(el, {
           zoomControl: true,
           attributionControl: true,
+          preferCanvas: true,
         }).setView([20, 0], 2);
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -291,14 +349,15 @@ export function LeadMap({
 
       const latLngs: import("leaflet").LatLngExpression[] = [];
       for (const pin of pins) {
-        const icon = L.divIcon({
-          className: "leadify-map-pin",
-          html: pinIconHtml(pin.crmStage),
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
+        const c = STAGE_PIN[pin.crmStage] ?? STAGE_PIN.new;
+        const marker = L.circleMarker([pin.coords.lat, pin.coords.lng], {
+          radius: 6,
+          color: "#060a12",
+          weight: 1.5,
+          fillColor: c.fill,
+          fillOpacity: 0.95,
         });
-        const marker = L.marker([pin.coords.lat, pin.coords.lng], { icon });
-        const stageLabel = STAGE_PIN[pin.crmStage]?.label ?? pin.crmStage;
+        const stageLabel = c.label;
         marker.bindTooltip(`${pin.company} · ${stageLabel}`, {
           direction: "top",
           offset: [0, -8],
@@ -335,11 +394,18 @@ export function LeadMap({
           ref={mapElRef}
           className="h-full w-full min-h-[240px] [&_.leaflet-tile-pane]:brightness-[0.72] [&_.leaflet-tile-pane]:contrast-[1.05] [&_.leaflet-tile-pane]:saturate-[0.85]"
         />
-        {(!ready || loadingPins) && !initError && (
-          <div className="absolute inset-0 z-[500] grid place-items-center bg-ink-900/70">
-            <Spinner className="h-7 w-7 text-aurora-400" />
+        {mapBusy && showMapSkeleton ? (
+          <div
+            className="absolute inset-0 z-[500] overflow-hidden bg-ink-900"
+            role="status"
+            aria-busy="true"
+            aria-label="Loading map"
+          >
+            <div className="absolute inset-0 shimmer" />
+            <div className="absolute right-4 top-4 h-7 w-28 rounded-full border border-white/5 bg-ink-950/40 shimmer" />
+            <div className="absolute bottom-3 left-1/2 h-6 w-56 -translate-x-1/2 rounded-full border border-white/5 bg-ink-950/40 shimmer sm:w-72" />
           </div>
-        )}
+        ) : null}
         {(error || initError) && (
           <div className="absolute bottom-4 left-4 right-4 z-[500] rounded-lg border border-amber-400/40 bg-ink-900/95 px-4 py-3 text-sm text-mist-100 shadow-lg backdrop-blur">
             {initError ?? error}
@@ -352,6 +418,7 @@ export function LeadMap({
           >
             {pins.length} pin{pins.length === 1 ? "" : "s"}
             {hint ? ` · ${hint}` : ""}
+            {refining ? " · refining…" : ""}
           </div>
         )}
         {pins.length > 0 && (
