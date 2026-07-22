@@ -190,7 +190,7 @@ export function PipelineView({
   );
 }
 
-/** One bordered card: header toggle + droppable body (no second “bucket”). */
+/** Same chrome as main columns: header + body, one border, divider line only. */
 function ParkedStage({
   col,
   leads,
@@ -210,7 +210,7 @@ function ParkedStage({
   return (
     <div
       ref={setNodeRef}
-      className={`min-w-0 overflow-hidden rounded-xl2 border transition-colors ${
+      className={`flex min-w-0 flex-col overflow-hidden rounded-xl2 border transition-colors ${
         isOver
           ? "border-aurora-400/40 bg-aurora-400/5"
           : "border-white/10 bg-ink-950/40"
@@ -219,19 +219,23 @@ function ParkedStage({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/[0.03]"
+        className={`flex min-h-[2.75rem] w-full shrink-0 items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.03] sm:px-4 ${
+          open ? "border-b border-white/5" : ""
+        }`}
       >
         <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
-        <span className="truncate text-sm font-semibold text-mist-100">{col.title}</span>
-        <span className="ml-auto font-display text-base tabular-nums text-mist-400">
+        <span className="truncate text-sm font-semibold leading-none text-mist-100">
+          {col.title}
+        </span>
+        <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
           {leads.length}
         </span>
         <span className="text-xs text-mist-600">{open ? "▾" : "▸"}</span>
       </button>
       {open ? (
-        <div className="max-h-[28vh] space-y-2 overflow-y-auto overscroll-contain border-t border-white/5 p-3">
+        <div className="flex max-h-[28vh] flex-col gap-2 overflow-y-auto overscroll-contain p-3">
           {leads.length === 0 ? (
-            <p className="px-2 py-4 text-center text-xs leading-relaxed text-mist-500">
+            <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
               {col.empty}
             </p>
           ) : (
