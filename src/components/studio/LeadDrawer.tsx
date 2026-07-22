@@ -20,10 +20,7 @@ import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
-import {
-  contactMethodLabel,
-  toggleContactMethod,
-} from "@/lib/contact-methods";
+import { toggleContactMethod } from "@/lib/contact-methods";
 
 function sameDraft(
   a: { subject: string; body: string; toEmail: string },
@@ -398,43 +395,38 @@ export function LeadDrawer(props: DrawerProps) {
                     : "border border-white/10 bg-white/[0.03]"
                 }`}
               >
-                <p
-                  className={`text-xs font-medium ${
-                    needsMethod ? "text-amber-300" : "text-mist-400"
-                  }`}
-                >
-                  {needsMethod
-                    ? "How did you reach them? (pick one or more)"
-                    : "Reached via (tap to toggle)"}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {CONTACT_METHODS.map(({ method, label }) => {
-                    const on = contactMethods.includes(method);
-                    return (
-                      <button
-                        key={method}
-                        type="button"
-                        onClick={() => void toggleMethod(method)}
-                        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                          on
-                            ? needsMethod
-                              ? "bg-amber-400 text-on-accent"
-                              : "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40"
-                            : needsMethod
-                              ? "border border-amber-400/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
-                              : "border border-white/15 text-mist-400 hover:bg-white/5"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {contactMethods.length > 0 ? (
-                  <p className="mt-1.5 text-[11px] text-mist-500">
-                    {contactMethods.map(contactMethodLabel).join(" · ")}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p
+                    className={`shrink-0 text-xs font-medium ${
+                      needsMethod ? "text-amber-300" : "text-mist-400"
+                    }`}
+                  >
+                    {needsMethod ? "How did you reach them?" : "Reached via"}
                   </p>
-                ) : null}
+                  <div className="flex flex-wrap justify-end gap-1.5">
+                    {CONTACT_METHODS.map(({ method, label }) => {
+                      const on = contactMethods.includes(method);
+                      return (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => void toggleMethod(method)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                            on
+                              ? needsMethod
+                                ? "bg-amber-400 text-on-accent"
+                                : "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40"
+                              : needsMethod
+                                ? "border border-amber-400/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
+                                : "border border-white/15 text-mist-400 hover:bg-white/5"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </section>

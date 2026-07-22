@@ -241,11 +241,7 @@ function ParkedStage({
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
               {[...leads]
-                .sort((a, b) => {
-                  const ar = a.outreach?.deliveryStatus === "replied" ? 1 : 0;
-                  const br = b.outreach?.deliveryStatus === "replied" ? 1 : 0;
-                  return br - ar;
-                })
+                .sort((a, b) => b.fitScore - a.fitScore)
                 .map((l) => (
                   <DraggablePipelineCard
                     key={l.id}
@@ -295,20 +291,7 @@ function PipelineColumn({
           </p>
         ) : (
           [...leads]
-            .sort((a, b) => {
-              const ar = a.outreach?.deliveryStatus === "replied" ? 1 : 0;
-              const br = b.outreach?.deliveryStatus === "replied" ? 1 : 0;
-              if (br !== ar) return br - ar;
-              const an =
-                a.crmStage === "contacted" && !(a.contactMethods?.length)
-                  ? 1
-                  : 0;
-              const bn =
-                b.crmStage === "contacted" && !(b.contactMethods?.length)
-                  ? 1
-                  : 0;
-              return bn - an;
-            })
+            .sort((a, b) => b.fitScore - a.fitScore)
             .map((l) => (
               <DraggablePipelineCard
                 key={l.id}
