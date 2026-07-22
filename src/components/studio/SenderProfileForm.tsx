@@ -2,20 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  canonicalTemplateSource,
   createOutreachProfile,
   deleteOutreachProfile,
   hydrateOutreachProfilesFromServer,
   loadOutreachProfiles,
-  pitchForLang,
-  primaryPitchLang,
   saveSenderProfile,
   setActiveOutreachProfile,
-  subjectForLang,
   SIGNATURE_PLACEHOLDER,
   type OutreachProfile,
 } from "@/lib/sender-profile";
 import { generateDraft } from "@/lib/outreach/draft-preview";
-import { langLabel, type OutreachLang } from "@/lib/outreach/locale";
+import {
+  langLabel,
+  outreachLangFromText,
+  type OutreachLang,
+} from "@/lib/outreach/locale";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import type { Lead, Run } from "@/lib/types";
 import { Spinner } from "@/components/ui";
@@ -99,26 +101,52 @@ const PREVIEW_RUN: Run = {
 function previewDraft(
   profile: OutreachProfile,
   lang: OutreachLang,
-  opts?: { pitch?: string; subject?: string },
+  pitch: string,
+  subject: string,
 ): { subject: string; body: string; missingPitch: boolean } {
-  const pitch = (opts?.pitch ?? pitchForLang(profile, lang)).trim();
-  const missingPitch = !pitch;
-  if (missingPitch) {
+  const pitchTrim = pitch.trim();
+  if (!pitchTrim) {
     return { subject: "", body: "", missingPitch: true };
   }
-  const subjectTpl =
-    opts?.subject?.trim() ||
-    subjectForLang(profile, lang) ||
-    profile.subjectTemplate.trim();
   const draft = generateDraft(PREVIEW_LEAD, PREVIEW_RUN, {
     forceLang: lang,
     signOff: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-    offerNotes: pitch,
-    subjectTemplate: subjectTpl || null,
+    offerNotes: pitchTrim,
+    subjectTemplate: subject.trim() || null,
     aiPersonalize: false,
     staticBody: true,
   });
   return { ...draft, missingPitch: false };
+}
+
+/** Persist subject/body as a single source slot — drop stale per-flag copies. */
+function withCanonicalTemplate(
+  profile: OutreachProfile,
+  opts: {
+    subject: string;
+    pitch: string;
+    previewLang: OutreachLang;
+    signature?: string;
+  },
+): OutreachProfile {
+  const subject = opts.subject.trim();
+  const pitch = opts.pitch.trim();
+  const prev = canonicalTemplateSource(profile);
+  // Keep the existing source slot stable while editing. Only detect language
+  // for a brand-new empty template (never from the preview flag).
+  const lang = prev.pitch.trim() || prev.subject.trim()
+    ? prev.lang
+    : pitch.length >= 40
+      ? outreachLangFromText(pitch)
+      : "en";
+  return {
+    ...profile,
+    templateLang: opts.previewLang,
+    signature: opts.signature ?? profile.signature,
+    subjectTemplate: subject,
+    subjects: subject ? { [lang]: subject } : {},
+    pitches: pitch ? { [lang]: pitch } : {},
+  };
 }
 
 async function translateForPreview(
@@ -152,9 +180,7 @@ export function SenderProfileForm() {
   const [profiles, setProfiles] = useState<OutreachProfile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [savedField, setSavedField] = useState<SavedField>(null);
-  /** Language the left editors write into — stable across flag changes. */
-  const [editorLang, setEditorLang] = useState<OutreachLang>("en");
-  /** Flag on the preview panel only. */
+  /** Flag on the preview panel only — never selects editor text. */
   const [previewLang, setPreviewLang] = useState<OutreachLang>("en");
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [websitePrompt, setWebsitePrompt] = useState(false);
@@ -164,7 +190,6 @@ export function SenderProfileForm() {
   const [genProvider, setGenProvider] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
-  const [previewNote, setPreviewNote] = useState<string | null>(null);
   const [translatedPreview, setTranslatedPreview] = useState<{
     subject: string;
     pitch: string;
@@ -173,6 +198,7 @@ export function SenderProfileForm() {
   } | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const translateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const langMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const focusSnapshot = useRef<string | null>(null);
@@ -195,14 +221,12 @@ export function SenderProfileForm() {
     })();
   }, []);
 
-  // Lock editors to the source template; restore preview flag separately.
+  // Restore preview flag only — never touch editor content on mount/refresh.
   useEffect(() => {
     if (!profile) return;
-    const source = primaryPitchLang(profile) ?? "en";
-    setEditorLang(source);
-    setPreviewLang(profile.templateLang ?? source);
+    const source = canonicalTemplateSource(profile);
+    setPreviewLang(profile.templateLang ?? source.lang);
     setTranslatedPreview(null);
-    setPreviewNote(null);
     // Only when switching profiles — not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
@@ -211,6 +235,7 @@ export function SenderProfileForm() {
     return () => {
       if (savedTimer.current) clearTimeout(savedTimer.current);
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+      if (translateTimer.current) clearTimeout(translateTimer.current);
     };
   }, []);
 
@@ -231,44 +256,23 @@ export function SenderProfileForm() {
     return () => document.removeEventListener("mousedown", onDown);
   }, [langMenuOpen, profileMenuOpen]);
 
-  // Source template the editors maintain (never follows the preview flag).
-  const sourcePitch = profile
-    ? profile.pitches[editorLang] !== undefined
-      ? (profile.pitches[editorLang] ?? "")
-      : pitchForLang(profile, editorLang)
-    : "";
-  const sourceSubject = profile
-    ? profile.subjects[editorLang] !== undefined
-      ? (profile.subjects[editorLang] ?? "")
-      : subjectForLang(profile, editorLang) || profile.subjectTemplate || ""
-    : "";
-  const sourceKey = `${editorLang}|${sourceSubject.trim()}|${sourcePitch.trim()}`;
+  // Live editor values — always the canonical template the user typed.
+  const source = profile ? canonicalTemplateSource(profile) : null;
+  const sourcePitch = source?.pitch ?? "";
+  const sourceSubject = source?.subject ?? "";
+  const sourceLang = source?.lang ?? "en";
+  const sourceKey = `${sourceLang}|${sourceSubject.trim()}|${sourcePitch.trim()}`;
 
-  // Translate preview when the flag differs from the source template language.
+  // Preview translate from *live* source only (never stale pitches[flag]).
   useEffect(() => {
     if (!profile) return;
-    if (previewLang === editorLang) {
+    if (previewLang === sourceLang) {
       setTranslatedPreview(null);
-      setPreviewNote(null);
-      setPreviewBusy(false);
-      return;
-    }
-    const storedPitch = profile.pitches[previewLang]?.trim();
-    const storedSubject = profile.subjects[previewLang]?.trim();
-    if (storedPitch) {
-      setTranslatedPreview({
-        subject: storedSubject || sourceSubject.trim(),
-        pitch: storedPitch,
-        lang: previewLang,
-        sourceKey,
-      });
-      setPreviewNote(null);
       setPreviewBusy(false);
       return;
     }
     if (!sourcePitch.trim()) {
       setTranslatedPreview(null);
-      setPreviewNote(null);
       setPreviewBusy(false);
       return;
     }
@@ -280,65 +284,57 @@ export function SenderProfileForm() {
       return;
     }
 
+    if (translateTimer.current) clearTimeout(translateTimer.current);
     let cancelled = false;
     setPreviewBusy(true);
-    setPreviewNote(null);
-    void (async () => {
-      const [subj, body] = await Promise.all([
-        translateForPreview(sourceSubject, previewLang, "subject"),
-        translateForPreview(sourcePitch, previewLang, "body"),
-      ]);
-      if (cancelled) return;
-      setPreviewBusy(false);
-      if (subj === null && body === null) {
-        setTranslatedPreview(null);
-        setPreviewNote(
-          "Showing your original template — preview translation isn’t available right now.",
-        );
-        return;
-      }
-      setTranslatedPreview({
-        subject: (subj ?? sourceSubject).trim(),
-        pitch: (body ?? sourcePitch).trim(),
-        lang: previewLang,
-        sourceKey,
-      });
-      setPreviewNote("Preview only — your template on the left is unchanged.");
-    })();
+    translateTimer.current = setTimeout(() => {
+      void (async () => {
+        const [subj, body] = await Promise.all([
+          translateForPreview(sourceSubject, previewLang, "subject"),
+          translateForPreview(sourcePitch, previewLang, "body"),
+        ]);
+        if (cancelled) return;
+        setPreviewBusy(false);
+        if (subj === null && body === null) {
+          setTranslatedPreview(null);
+          return;
+        }
+        setTranslatedPreview({
+          subject: (subj ?? sourceSubject).trim(),
+          pitch: (body ?? sourcePitch).trim(),
+          lang: previewLang,
+          sourceKey,
+        });
+      })();
+    }, 350);
+
     return () => {
       cancelled = true;
+      if (translateTimer.current) clearTimeout(translateTimer.current);
     };
-    // translatedPreview intentionally omitted — compared inside to avoid loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, editorLang, previewLang, sourceKey, sourcePitch, sourceSubject]);
+  }, [profile, sourceLang, previewLang, sourceKey, sourcePitch, sourceSubject]);
 
   const preview = useMemo(() => {
     if (!profile) return null;
-    if (previewLang === editorLang) {
-      return previewDraft(profile, editorLang, {
-        pitch: sourcePitch,
-        subject: sourceSubject,
-      });
-    }
     if (
+      previewLang !== sourceLang &&
       translatedPreview &&
       translatedPreview.lang === previewLang &&
       translatedPreview.sourceKey === sourceKey
     ) {
-      return previewDraft(profile, previewLang, {
-        pitch: translatedPreview.pitch,
-        subject: translatedPreview.subject,
-      });
+      return previewDraft(
+        profile,
+        previewLang,
+        translatedPreview.pitch,
+        translatedPreview.subject,
+      );
     }
-    // While translating (or if AI unavailable), still show the source template
-    // so the panel never goes blank when the flag changes.
-    return previewDraft(profile, previewLang, {
-      pitch: sourcePitch,
-      subject: sourceSubject,
-    });
+    // Same language, or translating / AI unavailable — show live source.
+    return previewDraft(profile, previewLang, sourcePitch, sourceSubject);
   }, [
     profile,
-    editorLang,
+    sourceLang,
     previewLang,
     sourcePitch,
     sourceSubject,
@@ -399,35 +395,21 @@ export function SenderProfileForm() {
     JSON.stringify({
       subject: subjectValue.trim(),
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-      pitch: (profile.pitches[editorLang] ?? "").trim(),
+      pitch: sourcePitch.trim(),
       name: profile.name.trim(),
     });
 
   const saveOnBlur = (field: SavedField) => {
-    const lang = editorLang;
-    const pitchHtml = (profile.pitches[editorLang] ?? "").trim();
-    const pitches: OutreachProfile["pitches"] = {
-      ...profile.pitches,
-      [editorLang]: pitchHtml,
-    };
-    const subjects: OutreachProfile["subjects"] = {
-      ...profile.subjects,
-      [editorLang]: subjectValue.trim(),
-    };
-
-    const next: OutreachProfile = {
-      ...profile,
-      // Keep the preview flag as chosen; editors stay on editorLang.
-      templateLang: previewLang,
+    const next = withCanonicalTemplate(profile, {
+      subject: subjectValue,
+      pitch: pitchValue,
+      previewLang,
       signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-      subjects,
-      subjectTemplate: subjectValue.trim() || profile.subjectTemplate.trim(),
-      pitches,
-    };
+    });
     const serialized = JSON.stringify({
-      subject: next.subjects[lang] ?? "",
+      subject: next.subjectTemplate,
       signature: next.signature,
-      pitch: next.pitches[lang] ?? "",
+      pitch: Object.values(next.pitches)[0] ?? "",
       name: next.name.trim(),
     });
     if (focusSnapshot.current !== null && focusSnapshot.current === serialized) {
@@ -442,6 +424,7 @@ export function SenderProfileForm() {
     setPreviewLang(lang);
     const current = profileRef.current;
     if (!current) return;
+    // Only persist the flag — leave subject/body/sign-off untouched.
     persist({ ...current, templateLang: lang }, null);
     setSavedField(null);
   };
@@ -481,13 +464,15 @@ export function SenderProfileForm() {
       }
       if (data.pitch) {
         if (data.provider) setGenProvider(data.provider);
-        const next: OutreachProfile = {
-          ...profile,
-          website: site.trim(),
-          templateLang: previewLang,
-          signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
-          pitches: { ...profile.pitches, [editorLang]: data.pitch },
-        };
+        const next = withCanonicalTemplate(
+          { ...profile, website: site.trim() },
+          {
+            subject: subjectValue,
+            pitch: data.pitch,
+            previewLang,
+            signature: profile.signature.trim() || SIGNATURE_PLACEHOLDER,
+          },
+        );
         persist(next, "pitch");
         setWebsitePrompt(false);
         setWebsiteDraft("");
@@ -637,15 +622,11 @@ export function SenderProfileForm() {
               onChange={(e) => {
                 if (!profile) return;
                 schedulePersist(
-                  {
-                    ...profile,
-                    templateLang: previewLang,
-                    subjects: {
-                      ...profile.subjects,
-                      [editorLang]: e.target.value,
-                    },
-                    subjectTemplate: e.target.value,
-                  },
+                  withCanonicalTemplate(profile, {
+                    subject: e.target.value,
+                    pitch: pitchValue,
+                    previewLang,
+                  }),
                   "subject",
                 );
               }}
@@ -720,11 +701,11 @@ export function SenderProfileForm() {
               onChange={(html) => {
                 if (!profile) return;
                 schedulePersist(
-                  {
-                    ...profile,
-                    templateLang: previewLang,
-                    pitches: { ...profile.pitches, [editorLang]: html },
-                  },
+                  withCanonicalTemplate(profile, {
+                    subject: subjectValue,
+                    pitch: html,
+                    previewLang,
+                  }),
                   "pitch",
                 );
               }}
@@ -855,9 +836,6 @@ export function SenderProfileForm() {
                 ) : null}
               </div>
             </div>
-            {previewNote ? (
-              <p className="mt-2 text-[11px] text-mist-500">{previewNote}</p>
-            ) : null}
             {preview.missingPitch ? (
               <p className="mt-8 text-center text-sm text-mist-500">
                 Preview will appear when the email body template is filled in.

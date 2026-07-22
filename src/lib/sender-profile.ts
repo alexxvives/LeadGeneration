@@ -195,32 +195,55 @@ export function resolveDraftLang(
 }
 
 /**
- * Primary pitch language = the template slot the user is maintaining.
- * Prefer the Settings flag (`templateLang`) when that slot has content;
- * otherwise the longest filled slot (with a light text-language hint).
+ * Language of the user-maintained template body.
+ * Ignores `templateLang` (that is the Settings *preview* flag only).
  */
 export function primaryPitchLang(p: OutreachProfile): OutreachLang | null {
-  if (p.templateLang && p.pitches[p.templateLang]?.trim()) {
-    return p.templateLang;
-  }
   const filled = OUTREACH_LANGS.filter((lang) => p.pitches[lang]?.trim());
-  if (filled.length === 0) {
-    // Flag chosen but body still empty — still treat flag as the active slot.
-    return p.templateLang ?? null;
-  }
+  if (filled.length === 0) return null;
   if (filled.length === 1) return filled[0]!;
 
-  let best = filled[0]!;
+  // Prefer slots whose text language matches the key (avoids stale preview
+  // translations in other keys stealing the editors after refresh).
+  const matching = filled.filter(
+    (lang) => outreachLangFromText(p.pitches[lang] ?? "") === lang,
+  );
+  const subjLang = outreachLangFromText(
+    p.subjectTemplate.trim() || Object.values(p.subjects).find((s) => s?.trim()) || "",
+  );
+  if (matching.includes(subjLang)) return subjLang;
+  if (matching.length === 1) return matching[0]!;
+
+  const pool = matching.length > 0 ? matching : filled;
+  let best = pool[0]!;
   let bestLen = 0;
-  for (const lang of filled) {
+  for (const lang of pool) {
     const text = (p.pitches[lang] ?? "").replace(/<[^>]+>/g, " ").trim();
     if (text.length > bestLen) {
       bestLen = text.length;
       best = lang;
     }
   }
-  const detected = outreachLangFromText(p.pitches[best] ?? "");
-  return filled.includes(detected) ? detected : best;
+  return best;
+}
+
+/** Canonical subject + body the Settings editors should show (never preview flag). */
+export function canonicalTemplateSource(p: OutreachProfile): {
+  lang: OutreachLang;
+  pitch: string;
+  subject: string;
+} {
+  const lang = primaryPitchLang(p) ?? "en";
+  const pitch =
+    p.pitches[lang] !== undefined
+      ? (p.pitches[lang] ?? "")
+      : pitchForLang(p, lang);
+  const subject =
+    p.subjectTemplate.trim() ||
+    p.subjects[lang]?.trim() ||
+    subjectForLang(p, lang) ||
+    "";
+  return { lang, pitch, subject };
 }
 
 function migrateLegacySingle(raw: string): ProfileStore {

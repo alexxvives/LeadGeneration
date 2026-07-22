@@ -4,12 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
-### 2026-07-22 — Preview-only language flag + Settings test send
-- Flag must not re-key/rebind editors (re-key made the flag look inert). Editors
-  stay on source lang; flag only updates preview (AI translate for display via
-  `/api/ai/translate`, or stored pitch if present).
-- Settings test email: `POST /api/send/test` → `sendTestEmail` (no outreach
-  approval gate; no monthly quota; rate-limited; demo-safe).
+### 2026-07-22 — Settings template is canonical; flag is preview-only
+- `templateLang` must never choose editor text (`primaryPitchLang` ignores it).
+- Stale `pitches[en]` from old re-key made preview ignore live Spanish edits and
+  flipped the left editors to English on refresh. Fix: editors use
+  `canonicalTemplateSource`; saves collapse to one language slot; preview
+  always translates from live source (never stored flag slot).
+- Settings test email: `POST /api/send/test` → `sendTestEmail`.
 
 ### 2026-07-22 — Domain health: drop manual Poll
 - Resend DNS already auto-checks on mount + every 30s until ready; the Poll

@@ -9,19 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-22 (preview flag + test email)
+## ⏱️ Status — updated 2026-07-22 (canonical template fix)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Settings flag = preview only (template editors unchanged; preview may translate).
-- Settings → Sending: **Send a test email** (`POST /api/send/test`).
-- Prior: Domain health Poll removed; templateLang persist; import Stage→CRM.
+- Settings: template text is canonical (no language swap on refresh); flag =
+  preview translate from live source only; removed preview helper note.
+- Prior: test email; Domain health Poll removed.
 
 ### Next
-1. Hard-refresh Settings: flip flag → preview updates, left template stays.
+1. Hard-refresh Settings: Spanish template must stay Spanish; edit → preview follows.
 2. Send a test email to a real inbox (needs Easy/Pro transport).
 3. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
 4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
