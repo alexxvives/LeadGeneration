@@ -9,11 +9,14 @@ import type {
   Run,
   Workspace,
   PlanId,
-  ContactMethod,
   FollowUp,
   DeliveryStatus,
 } from "@/lib/types";
 import { normalizeCrmStage } from "@/lib/types";
+import {
+  parseContactMethods,
+  serializeContactMethods,
+} from "@/lib/contact-methods";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -287,7 +290,7 @@ function rowToLead(r: LeadRow): Lead {
     sourceUrl: r.source_url,
     status: r.status,
     crmStage: normalizeCrmStage(r.crm_stage),
-    contactMethod: (r.contact_method as ContactMethod) ?? null,
+    contactMethods: parseContactMethods(r.contact_method),
     notes: r.notes ?? null,
     followUps: parseFollowUps(r.follow_ups),
     customFields: parseCustomFields(r.custom_fields),
@@ -1063,7 +1066,7 @@ export class D1Store implements LeadRepository {
           l.sourceUrl,
           l.status,
           l.crmStage ?? "new",
-          l.contactMethod ?? null,
+          serializeContactMethods(l.contactMethods),
           l.notes ?? null,
           JSON.stringify(l.followUps ?? []),
           JSON.stringify(l.customFields ?? {}),
@@ -1092,7 +1095,9 @@ export class D1Store implements LeadRepository {
     if ("sourceUrl" in patch) row.source_url = patch.sourceUrl;
     if ("status" in patch) row.status = patch.status;
     if ("crmStage" in patch) row.crm_stage = patch.crmStage;
-    if ("contactMethod" in patch) row.contact_method = patch.contactMethod ?? null;
+    if ("contactMethods" in patch) {
+      row.contact_method = serializeContactMethods(patch.contactMethods);
+    }
     if ("notes" in patch) row.notes = patch.notes ?? null;
     if ("followUps" in patch) row.follow_ups = JSON.stringify(patch.followUps ?? []);
     if ("customFields" in patch) row.custom_fields = JSON.stringify(patch.customFields ?? {});
@@ -1260,6 +1265,94 @@ export class D1Store implements LeadRepository {
       .bind(this.workspaceId)
       .first<{ n: number }>();
     return Number(row?.n ?? 0);
+  }
+
+  async summarizeLeads(filter?: LeadListFilter): Promise<{
+    total: number;
+    byCrmStage: Record<string, number>;
+    byStatus: Record<string, number>;
+    avgFitScore: number;
+  }> {
+    const where =
+      filter?.boardId != null
+        ? `WHERE workspace_id = ? AND board_id = ?`
+        : `WHERE workspace_id = ?`;
+    const binds =
+      filter?.boardId != null
+        ? [this.workspaceId, filter.boardId]
+        : [this.workspaceId];
+
+    const [stageRows, statusRows, agg] = await Promise.all([
+      this.db
+        .prepare(
+          `SELECT COALESCE(crm_stage, 'new') AS k, COUNT(*) AS n FROM leads ${where} GROUP BY COALESCE(crm_stage, 'new')`,
+        )
+        .bind(...binds)
+        .all<{ k: string; n: number }>(),
+      this.db
+        .prepare(
+          `SELECT status AS k, COUNT(*) AS n FROM leads ${where} GROUP BY status`,
+        )
+        .bind(...binds)
+        .all<{ k: string; n: number }>(),
+      this.db
+        .prepare(
+          `SELECT COUNT(*) AS total, COALESCE(AVG(fit_score), 0) AS avgFit FROM leads ${where}`,
+        )
+        .bind(...binds)
+        .first<{ total: number; avgFit: number }>(),
+    ]);
+
+    const byCrmStage: Record<string, number> = {};
+    for (const r of stageRows.results ?? []) {
+      byCrmStage[r.k] = Number(r.n) || 0;
+    }
+    const byStatus: Record<string, number> = {};
+    for (const r of statusRows.results ?? []) {
+      byStatus[r.k] = Number(r.n) || 0;
+    }
+    return {
+      total: Number(agg?.total ?? 0),
+      byCrmStage,
+      byStatus,
+      avgFitScore: Math.round(Number(agg?.avgFit ?? 0)),
+    };
+  }
+
+  async summarizeOutreach(boardId?: string | null): Promise<{
+    sentCount: number;
+    draftedCount: number;
+  }> {
+    if (boardId) {
+      const row = await this.db
+        .prepare(
+          `SELECT
+             SUM(CASE WHEN o.status = 'sent' THEN 1 ELSE 0 END) AS sentCount,
+             SUM(CASE WHEN o.status IN ('draft', 'approved') THEN 1 ELSE 0 END) AS draftedCount
+           FROM outreach o
+           INNER JOIN leads l ON l.id = o.lead_id
+           WHERE o.workspace_id = ? AND l.board_id = ?`,
+        )
+        .bind(this.workspaceId, boardId)
+        .first<{ sentCount: number; draftedCount: number }>();
+      return {
+        sentCount: Number(row?.sentCount ?? 0),
+        draftedCount: Number(row?.draftedCount ?? 0),
+      };
+    }
+    const row = await this.db
+      .prepare(
+        `SELECT
+           SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sentCount,
+           SUM(CASE WHEN status IN ('draft', 'approved') THEN 1 ELSE 0 END) AS draftedCount
+         FROM outreach WHERE workspace_id = ?`,
+      )
+      .bind(this.workspaceId)
+      .first<{ sentCount: number; draftedCount: number }>();
+    return {
+      sentCount: Number(row?.sentCount ?? 0),
+      draftedCount: Number(row?.draftedCount ?? 0),
+    };
   }
 
   // ---- Outreach ----

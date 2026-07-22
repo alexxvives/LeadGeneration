@@ -10,7 +10,10 @@ export async function GET(req: Request) {
   const ctx = await getCtx();
   const url = new URL(req.url);
   const boardParam = url.searchParams.get("boardId");
-  const board = await getLatestBoard(ctx, boardParam);
+  const lite = url.searchParams.get("lite") === "1";
+  const board = await getLatestBoard(ctx, boardParam, {
+    includeLeads: !lite,
+  });
   const workspace = await getWorkspaceSummary(ctx);
   const ws = await ctx.db.getWorkspace(ctx.workspaceId);
   const caps = getCapabilities();

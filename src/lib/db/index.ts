@@ -132,6 +132,23 @@ export interface LeadRepository {
   listLeads(filter?: LeadListFilter): Promise<Lead[]>;
   /** Fast count for import progress (avoids loading every lead row). */
   countLeads(filter?: LeadListFilter): Promise<number>;
+  /**
+   * Aggregate CRM/status/fit for dashboard — avoids loading every lead body.
+   */
+  summarizeLeads(filter?: LeadListFilter): Promise<{
+    total: number;
+    byCrmStage: Record<string, number>;
+    byStatus: Record<string, number>;
+    avgFitScore: number;
+  }>;
+  /**
+   * Outreach status counts for dashboard. When `boardId` is set, only outreach
+   * whose lead is on that board is counted.
+   */
+  summarizeOutreach(boardId?: string | null): Promise<{
+    sentCount: number;
+    draftedCount: number;
+  }>;
   /** Deletes the lead and its outreach row(s). */
   deleteLead(id: string): Promise<boolean>;
   /** Bulk delete leads + their outreach. Returns number removed. */

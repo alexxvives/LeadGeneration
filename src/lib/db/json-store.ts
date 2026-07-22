@@ -12,6 +12,7 @@ import {
   type Run,
   type Workspace,
 } from "@/lib/types";
+import { parseContactMethods } from "@/lib/contact-methods";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -72,7 +73,11 @@ function normalizeLead(l: Lead): Lead {
     companyType:
       typeof raw.companyType === "string" ? raw.companyType : null,
     crmStage: normalizeCrmStage(raw.crmStage),
-    contactMethod: (raw.contactMethod as Lead["contactMethod"] | undefined) ?? null,
+    contactMethods: parseContactMethods(
+      Array.isArray(raw.contactMethods)
+        ? raw.contactMethods
+        : (raw.contactMethod ?? null),
+    ),
     notes: (raw.notes as Lead["notes"] | undefined) ?? null,
     followUps: (raw.followUps as Lead["followUps"] | undefined) ?? [],
     customFields:
@@ -598,6 +603,60 @@ export class JsonStore implements LeadRepository {
       if (filter?.boardId && (l.boardId || "") !== filter.boardId) return false;
       return true;
     }).length;
+  }
+
+  async summarizeLeads(filter?: LeadListFilter): Promise<{
+    total: number;
+    byCrmStage: Record<string, number>;
+    byStatus: Record<string, number>;
+    avgFitScore: number;
+  }> {
+    const data = await this.read();
+    const leads = data.leads.filter((l) => {
+      if (!this.inScope(l)) return false;
+      if (filter?.runId && l.runId !== filter.runId) return false;
+      if (filter?.boardId && (l.boardId || "") !== filter.boardId) return false;
+      return true;
+    });
+    const byCrmStage: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+    let fitSum = 0;
+    for (const l of leads) {
+      const stage = l.crmStage ?? "new";
+      byCrmStage[stage] = (byCrmStage[stage] ?? 0) + 1;
+      byStatus[l.status] = (byStatus[l.status] ?? 0) + 1;
+      fitSum += l.fitScore ?? 0;
+    }
+    return {
+      total: leads.length,
+      byCrmStage,
+      byStatus,
+      avgFitScore: leads.length === 0 ? 0 : Math.round(fitSum / leads.length),
+    };
+  }
+
+  async summarizeOutreach(boardId?: string | null): Promise<{
+    sentCount: number;
+    draftedCount: number;
+  }> {
+    const data = await this.read();
+    let leadIds: Set<string> | null = null;
+    if (boardId) {
+      leadIds = new Set(
+        data.leads
+          .filter((l) => this.inScope(l) && (l.boardId || "") === boardId)
+          .map((l) => l.id),
+      );
+    }
+    let sentCount = 0;
+    let draftedCount = 0;
+    for (const o of data.outreach) {
+      if (!this.inScope(o)) continue;
+      if (leadIds && !leadIds.has(o.leadId)) continue;
+      if (o.status === "sent") sentCount++;
+      if (o.status === "draft" || o.status === "approved") draftedCount++;
+    }
+    return { sentCount, draftedCount };
   }
 
   deleteLead(id: string): Promise<boolean> {

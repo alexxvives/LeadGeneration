@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
 import { FitMeter, Spinner } from "@/components/ui";
 import {
@@ -16,7 +16,8 @@ type OutreachBucket = "review" | "ready" | "contacted";
 /** Any pipeline stage past New counts as contacted in the Outreach queue. */
 function isContacted(lead: LeadWithOutreach): boolean {
   if (lead.outreach?.status === "sent") return true;
-  if (lead.contactMethod === "phone" || lead.contactMethod === "contact_form") {
+  const methods = lead.contactMethods ?? [];
+  if (methods.includes("phone") || methods.includes("contact_form")) {
     return true;
   }
   const stage = lead.crmStage;
@@ -57,6 +58,10 @@ function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   return null;
 }
 
+function byFitDesc(a: LeadWithOutreach, b: LeadWithOutreach): number {
+  return (b.fitScore ?? 0) - (a.fitScore ?? 0);
+}
+
 const BUCKET_META: Record<
   OutreachBucket,
   { title: string; hint: string; empty: string }
@@ -73,7 +78,7 @@ const BUCKET_META: Record<
   },
   contacted: {
     title: "Contacted",
-    hint: "Prospects you have already reached",
+    hint: "Prospects you have already reached — register how if needed",
     empty: "No contacts logged yet.",
   },
 };
@@ -81,6 +86,7 @@ const BUCKET_META: Record<
 /**
  * Compact 3-column send queue: Review → Ready → Contacted.
  * Phone-only leads land in Ready (no email draft required).
+ * Cards within each column are sorted by fit (highest first).
  */
 export function OutreachView({
   leads,
@@ -113,15 +119,21 @@ export function OutreachView({
     opts?: { promptNote?: boolean },
   ) => Promise<void>;
 }) {
-  const groups: Record<OutreachBucket, LeadWithOutreach[]> = {
-    review: [],
-    ready: [],
-    contacted: [],
-  };
-  for (const lead of leads) {
-    const b = bucketOf(lead);
-    if (b) groups[b].push(lead);
-  }
+  const groups = useMemo(() => {
+    const next: Record<OutreachBucket, LeadWithOutreach[]> = {
+      review: [],
+      ready: [],
+      contacted: [],
+    };
+    for (const lead of leads) {
+      const b = bucketOf(lead);
+      if (b) next[b].push(lead);
+    }
+    for (const key of Object.keys(next) as OutreachBucket[]) {
+      next[key].sort(byFitDesc);
+    }
+    return next;
+  }, [leads]);
 
   const columns: OutreachBucket[] = ["review", "ready", "contacted"];
 
@@ -250,9 +262,16 @@ function OutreachRow({
   const phone = leadPhone(lead);
   const phoneOnly = !email && Boolean(phone);
   const [pickingMethod, setPickingMethod] = useState(false);
+  const methods = lead.contactMethods ?? [];
+  const needsMethod = bucket === "contacted" && methods.length === 0;
+  const sent = lead.outreach?.status === "sent";
 
   const hasDraft = Boolean(lead.outreach);
   const openComposer = () => {
+    if (bucket === "contacted") {
+      onOpenInfo();
+      return;
+    }
     if (phoneOnly) {
       onOpenInfo();
       return;
@@ -269,7 +288,7 @@ function OutreachRow({
     <li
       className={`flex items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03] ${
         showDivider ? "border-t border-white/10" : ""
-      }`}
+      } ${needsMethod ? "bg-amber-400/[0.06]" : ""}`}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1">
@@ -283,9 +302,17 @@ function OutreachRow({
           <button
             type="button"
             onClick={onOpenInfo}
-            className="shrink-0 rounded p-0.5 text-mist-500 outline-none hover:bg-white/10 hover:text-mist-100 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
-            aria-label={`Lead info for ${lead.company}`}
-            title="Lead info"
+            className={`shrink-0 rounded p-0.5 outline-none focus-visible:ring-1 focus-visible:ring-aurora-400/50 ${
+              needsMethod
+                ? "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40 hover:bg-amber-400/30"
+                : "text-mist-500 hover:bg-white/10 hover:text-mist-100"
+            }`}
+            aria-label={
+              needsMethod
+                ? `Register how you contacted ${lead.company}`
+                : `Lead info for ${lead.company}`
+            }
+            title={needsMethod ? "How contacted?" : "Lead info"}
           >
             <InfoIcon className="h-3 w-3" />
           </button>
@@ -307,6 +334,11 @@ function OutreachRow({
         ) : (
           <p className="mt-0.5 text-[11px] text-mist-600">No email or phone</p>
         )}
+        {needsMethod ? (
+          <p className="mt-1 text-[10px] font-medium text-amber-300/90">
+            How contacted? — open to register
+          </p>
+        ) : null}
         {lead.outreach?.status === "failed" && lead.outreach.error ? (
           <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
         ) : null}
@@ -441,13 +473,17 @@ function OutreachRow({
             ) : null}
           </div>
         )}
-        {bucket === "contacted" && email ? (
+        {bucket === "contacted" ? (
           <button
             type="button"
-            onClick={onOpenDraft}
-            className={`${ACTION_BTN} border border-white/15 text-mist-400 hover:bg-white/5`}
+            onClick={onOpenInfo}
+            className={`${ACTION_BTN} ${
+              needsMethod
+                ? "border border-amber-400/40 bg-amber-400/15 text-amber-100"
+                : "border border-white/15 text-mist-400 hover:bg-white/5"
+            }`}
           >
-            View
+            {sent ? "View" : "Register"}
           </button>
         ) : null}
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -82,14 +82,16 @@ export function PipelineView({
   onMoveStage: (
     leadId: string,
     stage: CrmStage,
-    contactMethod?: ContactMethod | null,
+    contactMethods?: ContactMethod[] | null,
   ) => void;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const dragStartedRef = useRef(false);
   const [parkedOpen, setParkedOpen] = useState<Record<string, boolean>>({
     not_interested: false,
   });
 
+  // 8px before drag activates — plain click still fires and opens the lead.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
@@ -97,11 +99,16 @@ export function PipelineView({
   const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
 
   function handleDragStart(event: DragStartEvent) {
+    dragStartedRef.current = true;
     setActiveId(String(event.active.id));
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
+    // Suppress the trailing click that browsers fire after a drag.
+    window.setTimeout(() => {
+      dragStartedRef.current = false;
+    }, 0);
     const { active, over } = event;
     if (!over) return;
     const lead = leads.find((l) => l.id === active.id);
@@ -110,11 +117,16 @@ export function PipelineView({
     onMoveStage(String(active.id), newStage);
   }
 
+  const openIfClick = (id: string) => {
+    if (dragStartedRef.current) return;
+    onOpen(id);
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
-        {leads.length === 1 ? "" : "s"} · drag to move between stages
+        {leads.length === 1 ? "" : "s"} · click for info · drag to move
       </p>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -132,7 +144,7 @@ export function PipelineView({
                   key={col.stage}
                   col={col}
                   leads={colLeads}
-                  onOpen={onOpen}
+                  onOpen={openIfClick}
                   activeId={activeId}
                 />
               );
@@ -164,7 +176,7 @@ export function PipelineView({
                       <PipelineColumn
                         col={col}
                         leads={colLeads}
-                        onOpen={onOpen}
+                        onOpen={openIfClick}
                         activeId={activeId}
                         compact
                       />
@@ -229,14 +241,16 @@ function PipelineColumn({
         isOver ? "border-aurora-400/40 bg-aurora-400/5" : "border-white/10 bg-ink-950/40"
       }`}
     >
-      <div className="flex min-h-[2.75rem] shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2.5 sm:px-4">
-        <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
-        <h3 className="truncate text-sm font-semibold leading-none text-mist-100">{col.title}</h3>
-        <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
-          {leads.length}
-        </span>
-      </div>
-      {/* min-h-0 is required so flex children can scroll instead of clipping */}
+      {/* Parked accordion already shows the title — skip a second header. */}
+      {!compact ? (
+        <div className="flex min-h-[2.75rem] shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2.5 sm:px-4">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
+          <h3 className="truncate text-sm font-semibold leading-none text-mist-100">{col.title}</h3>
+          <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
+            {leads.length}
+          </span>
+        </div>
+      ) : null}
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3">
         {leads.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
@@ -245,10 +259,18 @@ function PipelineColumn({
         ) : (
           [...leads]
             .sort((a, b) => {
-              // Webhook replies float to the top of In Conversation.
               const ar = a.outreach?.deliveryStatus === "replied" ? 1 : 0;
               const br = b.outreach?.deliveryStatus === "replied" ? 1 : 0;
-              return br - ar;
+              if (br !== ar) return br - ar;
+              const an =
+                a.crmStage === "contacted" && !(a.contactMethods?.length)
+                  ? 1
+                  : 0;
+              const bn =
+                b.crmStage === "contacted" && !(b.contactMethods?.length)
+                  ? 1
+                  : 0;
+              return bn - an;
             })
             .map((l) => (
               <DraggablePipelineCard
@@ -261,6 +283,16 @@ function PipelineColumn({
         )}
       </div>
     </div>
+  );
+}
+
+function MethodIcons({ methods }: { methods: ContactMethod[] }) {
+  return (
+    <>
+      {methods.includes("email") && <MailIcon className="h-2.5 w-2.5" />}
+      {methods.includes("phone") && <PhoneIcon className="h-2.5 w-2.5" />}
+      {methods.includes("contact_form") && <FormIcon className="h-2.5 w-2.5" />}
+    </>
   );
 }
 
@@ -277,22 +309,24 @@ function DraggablePipelineCard({
   const pendingFollowUps = lead.followUps?.filter((f) => !f.done).length ?? 0;
   const subtitle = cardSubtitle(lead);
   const replied = lead.outreach?.deliveryStatus === "replied";
-  const needsMethod =
-    lead.crmStage === "contacted" && !lead.contactMethod;
-  // Meta only on Contacted+ — keeps New cards compact after a round-trip.
+  const methods = lead.contactMethods ?? [];
+  const needsMethod = lead.crmStage === "contacted" && methods.length === 0;
   const showMeta =
     lead.crmStage !== "new" &&
-    (pendingFollowUps > 0 || !!lead.contactMethod || replied);
+    (pendingFollowUps > 0 || methods.length > 0 || replied || needsMethod);
 
   return (
     <div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      onClick={() => onOpen(lead.id)}
       className={`group flex h-auto cursor-grab touch-none items-start gap-1 rounded-xl px-3 py-2.5 transition-all active:cursor-grabbing ${
         replied
           ? "border border-sky-400/50 bg-sky-400/10 shadow-[0_0_0_1px_rgba(56,189,248,0.25)] ring-1 ring-sky-400/30 hover:bg-sky-400/15"
-          : "border border-white/5 bg-ink-900/60 hover:bg-white/[0.03]"
+          : needsMethod
+            ? "border border-amber-400/50 bg-amber-400/10 ring-1 ring-amber-400/30 hover:bg-amber-400/15"
+            : "border border-white/5 bg-ink-900/60 hover:bg-white/[0.03]"
       } ${isDragging ? "opacity-30" : ""}`}
     >
       <div className="min-w-0 flex-1">
@@ -300,6 +334,11 @@ function DraggablePipelineCard({
           {replied ? (
             <span
               className="pulse-ring relative inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400"
+              aria-hidden
+            />
+          ) : needsMethod ? (
+            <span
+              className="pulse-ring relative inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400"
               aria-hidden
             />
           ) : null}
@@ -320,25 +359,22 @@ function DraggablePipelineCard({
                 Replied
               </span>
             )}
+            {needsMethod && (
+              <span className="rounded-full bg-amber-400/25 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
+                How contacted?
+              </span>
+            )}
             {pendingFollowUps > 0 && (
               <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
                 {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
               </span>
             )}
-            {lead.contactMethod && (
+            {methods.length > 0 && (
               <span
                 className="inline-flex items-center gap-1 rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-300 ring-1 ring-ink-600/40"
-                title={
-                  lead.contactMethod === "email"
-                    ? "Contacted by email"
-                    : lead.contactMethod === "phone"
-                      ? "Contacted by phone"
-                      : "Contacted via form"
-                }
+                title={methods.join(", ")}
               >
-                {lead.contactMethod === "email" && <MailIcon className="h-2.5 w-2.5" />}
-                {lead.contactMethod === "phone" && <PhoneIcon className="h-2.5 w-2.5" />}
-                {lead.contactMethod === "contact_form" && <FormIcon className="h-2.5 w-2.5" />}
+                <MethodIcons methods={methods} />
               </span>
             )}
           </div>

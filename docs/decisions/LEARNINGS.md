@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Import skips + studio UX/perf pass
+- LEADS.xlsx: **2482** data rows → **2406** unique by normalized company name;
+  **76** skipped as same-name duplicates (3 accent/punctuation variants).
+  Report: `import-skipped-rows.csv` / `import-skip-analysis.json`.
+- Contact method is now **multi-select** (`contactMethods[]`); TEXT column
+  stores single value or JSON. Contacted without methods = amber highlight.
+- Contacted in Outreach: **Register** (info) instead of draft/approve/send.
+- Leads view: keep visited table/cards/map mounted; usage bars centered;
+  header search filters leads. Pipeline card click opens info (drag still 8px).
+- Dashboard: SQL/`summarizeLeads` aggregates + `?lite=1` board skip leads.
+
 ### 2026-07-22 — Outreach CRM sync, phone Ready, settings save race
 - Pipeline stages past New (`contacted`…`not_interested`) now count as
   **Contacted** in Outreach (`isContacted`).

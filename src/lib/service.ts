@@ -54,10 +54,15 @@ import type {
   ImportLeadRow,
   Workspace,
 } from "@/lib/types";
+import { normalizeCrmStage } from "@/lib/types";
 
 const LOCK_TTL_MS = 150_000; // 2.5 minutes
 import { mailboxPublicStatus } from "@/lib/email/mailbox";
 import { scoreImportedLead } from "@/lib/fit-score";
+import {
+  contactMethodsEqual,
+  contactMethodsFollowUpNote,
+} from "@/lib/contact-methods";
 import {
   companyGuessFromEmail,
   isFreeMailDomain,
@@ -675,7 +680,7 @@ export async function createAndRunSearch(
       sourceUrl: l.sourceUrl,
       status: "new",
       crmStage: "new",
-      contactMethod: null,
+      contactMethods: [],
       notes: null,
       followUps: [],
       customFields: {},
@@ -787,6 +792,7 @@ export async function getRunWithLeads(
 export async function getLatestBoard(
   ctx: Ctx,
   boardId?: string | null,
+  opts?: { includeLeads?: boolean },
 ): Promise<{
   run: Run | null;
   leads: LeadWithOutreach[];
@@ -807,6 +813,18 @@ export async function getLatestBoard(
     const access = await resolveBoardAccess(ctx, active);
     if (access) leadDb = access.db;
     boardLock = await getBoardLockStatus(ctx, active);
+  }
+
+  const includeLeads = opts?.includeLeads !== false;
+
+  if (!includeLeads) {
+    return {
+      run: null,
+      leads: [],
+      boards,
+      activeBoardId: active,
+      boardLock,
+    };
   }
 
   const runs = await leadDb.listRuns();
@@ -839,16 +857,12 @@ export async function getDashboardStats(
       ? boardId
       : null;
 
-  const [allLeads, runs, outreach] = await Promise.all([
-    ctx.db.listLeads(active ? { boardId: active } : undefined),
+  const filter = active ? { boardId: active } : undefined;
+  const [leadSummary, outreachSummary, runs] = await Promise.all([
+    ctx.db.summarizeLeads(filter),
+    ctx.db.summarizeOutreach(active),
     ctx.db.listRuns(),
-    ctx.db.listOutreach(),
   ]);
-
-  const leadIds = new Set(allLeads.map((l) => l.id));
-  const scopedOutreach = active
-    ? outreach.filter((o) => leadIds.has(o.leadId))
-    : outreach;
 
   const byCrmStage: Record<CrmStage, number> = {
     new: 0,
@@ -857,28 +871,20 @@ export async function getDashboardStats(
     closed: 0,
     not_interested: 0,
   };
-  const byStatus: Record<string, number> = {};
-  for (const l of allLeads) {
-    byCrmStage[l.crmStage] = (byCrmStage[l.crmStage] ?? 0) + 1;
-    byStatus[l.status] = (byStatus[l.status] ?? 0) + 1;
+  for (const [k, n] of Object.entries(leadSummary.byCrmStage)) {
+    const stage = normalizeCrmStage(k);
+    byCrmStage[stage] = (byCrmStage[stage] ?? 0) + n;
   }
 
-  const avgFitScore =
-    allLeads.length === 0
-      ? 0
-      : Math.round(allLeads.reduce((s, l) => s + l.fitScore, 0) / allLeads.length);
-
   return {
-    totalLeads: allLeads.length,
+    totalLeads: leadSummary.total,
     byCrmStage,
-    byStatus,
-    sentCount: scopedOutreach.filter((o) => o.status === "sent").length,
-    draftedCount: scopedOutreach.filter(
-      (o) => o.status === "draft" || o.status === "approved",
-    ).length,
+    byStatus: leadSummary.byStatus,
+    sentCount: outreachSummary.sentCount,
+    draftedCount: outreachSummary.draftedCount,
     boards,
     recentRuns: runs.slice(0, 8),
-    avgFitScore,
+    avgFitScore: leadSummary.avgFitScore,
     activeBoardId: active,
   };
 }
@@ -1233,7 +1239,9 @@ export async function sendApprovedOutreach(
     const crmPatch: Partial<Lead> = { status: "sent" };
     if (lead) {
       if (lead.crmStage === "new") crmPatch.crmStage = "contacted";
-      if (!lead.contactMethod) crmPatch.contactMethod = "email";
+      if (!lead.contactMethods.includes("email")) {
+        crmPatch.contactMethods = [...lead.contactMethods, "email"];
+      }
     }
     if (lead) {
       const existing = lead.followUps ?? [];
@@ -1355,7 +1363,9 @@ export async function setOutreachDeliveryStatus(
       if (lead.crmStage !== "in_conversation") {
         patch.crmStage = "in_conversation";
       }
-      if (!lead.contactMethod) patch.contactMethod = "email";
+      if (!lead.contactMethods.includes("email")) {
+        patch.contactMethods = [...lead.contactMethods, "email"];
+      }
       const today = nowIso().slice(0, 10);
       const existing = lead.followUps ?? [];
       const hasReplyNote = existing.some(
@@ -1564,7 +1574,7 @@ export async function updateLeadCrm(
   leadId: string,
   patch: {
     crmStage?: CrmStage;
-    contactMethod?: ContactMethod | null;
+    contactMethods?: ContactMethod[];
     notes?: string | null;
     companyType?: string | null;
     company?: string;
@@ -1600,10 +1610,10 @@ export async function updateLeadCrm(
 
   // When the user explicitly sets how they contacted, journal a follow-up note.
   if (
-    patch.contactMethod &&
-    patch.contactMethod !== lead.contactMethod
+    patch.contactMethods &&
+    !contactMethodsEqual(patch.contactMethods, lead.contactMethods)
   ) {
-    const note = contactMethodFollowUpNote(patch.contactMethod);
+    const note = contactMethodsFollowUpNote(patch.contactMethods);
     const today = nowIso().slice(0, 10);
     const existing = patch.followUps ?? lead.followUps ?? [];
     const already = existing.some(
@@ -1621,12 +1631,6 @@ export async function updateLeadCrm(
   }
 
   return db.updateLead(leadId, next);
-}
-
-function contactMethodFollowUpNote(method: ContactMethod): string {
-  if (method === "email") return "Contacted by email";
-  if (method === "phone") return "Contacted by phone";
-  return "Contacted via contact form";
 }
 
 /** Row shape for CSV/Excel import (flexible mapping happens client-side). */
@@ -1946,7 +1950,7 @@ export async function importLeads(
         sourceUrl: website || "import",
         status: "new" as const,
         crmStage: "new" as const,
-        contactMethod: null,
+        contactMethods: [],
         notes: null,
         followUps: [],
         customFields: {},

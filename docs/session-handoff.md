@@ -9,26 +9,26 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-22 (outreach UX + settings persist)
+## ⏱️ Status — updated 2026-07-22 (import skips + studio UX/perf)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Outreach: CRM past New → Contacted bucket; phone-only Ready + note prompt;
-  Create uses lead-country language; empty pipeline/outreach show columns.
-- Settings: fix pitch/flag save race (hydrate vs local write) + autosave.
-- Leads: Type read-only in table; default sort = import/`created_at`; nicer
-  delete progress; no Load demo on empty board.
-- Prior: map drawer z-index; import name-only dedupe.
+- Import gap explained: 76/2482 rows skipped as **same company name** (see
+  `import-skipped-rows.csv`). Not website-domain dedupe anymore.
+- `contactMethods[]` multi-select; Contacted missing method = amber prompt;
+  Outreach Contacted → **Register** (no approve/send).
+- Leads: centered usage bars + search; keep-alive table/cards/map; outreach
+  sorted by fit; pipeline click opens info.
+- Dashboard: aggregate queries + lite board load (no 2k lead payload).
 
 ### Next
-1. Deploy; hard-refresh; re-import LEADS onto LUMIA if still missing rows.
-2. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
-3. Measure email-found % on live Firecrawl runs.
-4. Optional: ADR 0020 path A (cheap LLM extract) if quality/COGS need it.
-5. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
+1. Deploy; hard-refresh; confirm Register + multi-method + search UX.
+2. Optional: allow importing same-name rows as distinct locations (address key).
+3. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
+4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 

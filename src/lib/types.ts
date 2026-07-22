@@ -379,7 +379,11 @@ export interface Lead {
   status: LeadStatus;
   // CRM fields — user-managed relationship tracking
   crmStage: CrmStage;
-  contactMethod: ContactMethod | null; // set when first contacted
+  /**
+   * How the prospect was reached (phone / email / form). Multi-select —
+   * empty when unknown. Persisted in `contact_method` TEXT (single value or JSON).
+   */
+  contactMethods: ContactMethod[];
   notes: string | null; // legacy freeform; prefer dated followUps journal
   followUps: FollowUp[]; // dated notes / follow-up journal entries
   /** User-defined table column values (column id → string). */

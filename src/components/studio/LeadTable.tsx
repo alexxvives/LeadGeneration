@@ -47,7 +47,7 @@ export function LeadTable({
   onMoveStage?: (
     leadId: string,
     stage: CrmStage,
-    contactMethod?: ContactMethod | null,
+    contactMethods?: ContactMethod[] | null,
   ) => void;
   onUpdateLead?: (
     leadId: string,

@@ -99,12 +99,14 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  board: (boardId?: string | null) => {
-    const q =
-      boardId && boardId !== "all"
-        ? `?boardId=${encodeURIComponent(boardId)}`
-        : "?boardId=all";
-    return jsonFetch<BoardResponse>(`/api/board${q}`);
+  board: (boardId?: string | null, opts?: { lite?: boolean }) => {
+    const params = new URLSearchParams();
+    params.set(
+      "boardId",
+      boardId && boardId !== "all" ? boardId : "all",
+    );
+    if (opts?.lite) params.set("lite", "1");
+    return jsonFetch<BoardResponse>(`/api/board?${params.toString()}`);
   },
 
   listBoards: () => jsonFetch<{ boards: BoardSummary[] }>("/api/boards"),
@@ -293,7 +295,7 @@ export const api = {
     id: string,
     patch: {
       crmStage?: CrmStage;
-      contactMethod?: ContactMethod | null;
+      contactMethods?: ContactMethod[];
       notes?: string | null;
       companyType?: string | null;
       company?: string;

@@ -20,6 +20,10 @@ import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
+import {
+  contactMethodLabel,
+  toggleContactMethod,
+} from "@/lib/contact-methods";
 
 function sameDraft(
   a: { subject: string; body: string; toEmail: string },
@@ -78,7 +82,7 @@ interface DrawerProps {
     leadId: string,
     patch: {
       crmStage?: CrmStage;
-      contactMethod?: ContactMethod | null;
+      contactMethods?: ContactMethod[];
       notes?: string | null;
       companyType?: string | null;
       company?: string;
@@ -145,7 +149,9 @@ export function LeadDrawer(props: DrawerProps) {
 
   // CRM state (local, synced on changes)
   const [crmStage, setCrmStage] = useState<CrmStage>(lead.crmStage ?? "new");
-  const [contactMethod, setContactMethod] = useState<ContactMethod | null>(lead.contactMethod ?? null);
+  const [contactMethods, setContactMethods] = useState<ContactMethod[]>(
+    lead.contactMethods ?? [],
+  );
   const [followUps, setFollowUps] = useState<FollowUp[]>(lead.followUps ?? []);
   const [showAddNote, setShowAddNote] = useState(promptNote);
   const [newNoteDate, setNewNoteDate] = useState(todayIsoDate);
@@ -174,7 +180,7 @@ export function LeadDrawer(props: DrawerProps) {
 
   useEffect(() => {
     setCrmStage(lead.crmStage ?? "new");
-    setContactMethod(lead.contactMethod ?? null);
+    setContactMethods(lead.contactMethods ?? []);
     setFollowUps(lead.followUps ?? []);
     if (promptNote) {
       setShowAddNote(true);
@@ -185,7 +191,7 @@ export function LeadDrawer(props: DrawerProps) {
       setNewNoteDate(todayIsoDate());
       setNewNoteText("");
     }
-  }, [lead.id, lead.crmStage, lead.contactMethod, lead.followUps, promptNote]);
+  }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, promptNote]);
 
   useEffect(() => {
     if (!promptNote || !showAddNote) return;
@@ -232,21 +238,37 @@ export function LeadDrawer(props: DrawerProps) {
 
   // ── CRM stage change ──
   const handleStageClick = (stage: CrmStage) => {
-    // Moving to New clears method; Contacted no longer forces a method popup.
-    const nextMethod = stage === "new" ? null : contactMethod;
-    void commitStage(stage, nextMethod);
+    // Moving to New clears methods; Contacted no longer forces a method popup.
+    const nextMethods = stage === "new" ? [] : contactMethods;
+    void commitStage(stage, nextMethods);
   };
 
-  const commitStage = async (stage: CrmStage, method: ContactMethod | null) => {
+  const commitStage = async (stage: CrmStage, methods: ContactMethod[]) => {
     setCrmStage(stage);
-    setContactMethod(method);
-    await props.onUpdateCrm(lead.id, { crmStage: stage, contactMethod: method });
+    setContactMethods(methods);
+    await props.onUpdateCrm(lead.id, {
+      crmStage: stage,
+      contactMethods: methods,
+    });
   };
 
-  /** Set contact method for a lead already in Contacted. */
-  const commitContactMethod = async (method: ContactMethod) => {
-    await commitStage(crmStage === "new" ? "contacted" : crmStage, method);
+  /** Toggle a contact method (multi-select). */
+  const toggleMethod = async (method: ContactMethod) => {
+    const next = toggleContactMethod(contactMethods, method);
+    const stage =
+      next.length > 0 && crmStage === "new" ? "contacted" : crmStage;
+    await commitStage(stage, next);
   };
+
+  const isPastNew =
+    crmStage === "contacted" ||
+    crmStage === "in_conversation" ||
+    crmStage === "closed" ||
+    crmStage === "not_interested";
+  const needsMethod = isPastNew && contactMethods.length === 0;
+  const outreachSent = outreach?.status === "sent";
+  /** Pipeline/CRM contacted — log methods/notes, don't push email approve/send. */
+  const registerOnly = isPastNew && !outreachSent;
 
   // ── Dated notes (journal) ──
   const addNote = async () => {
@@ -367,30 +389,53 @@ export function LeadDrawer(props: DrawerProps) {
               ))}
             </div>
 
-            {/* Optional method when already Contacted without one set */}
-            {crmStage === "contacted" && !contactMethod && (
-              <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2.5">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <p className="text-xs font-medium text-amber-300">How did you reach them?</p>
-                  {CONTACT_METHODS.map(({ method, label }) => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => void commitContactMethod(method)}
-                      className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs text-amber-200 transition-colors hover:bg-amber-400/20"
-                    >
-                      {label}
-                    </button>
-                  ))}
+            {/* How contacted — multi-select; amber when Contacted+ with none set */}
+            {crmStage !== "new" && (
+              <div
+                className={`mt-3 rounded-xl px-3 py-2.5 ${
+                  needsMethod
+                    ? "border border-amber-400/40 bg-amber-400/10 ring-1 ring-amber-400/20"
+                    : "border border-white/10 bg-white/[0.03]"
+                }`}
+              >
+                <p
+                  className={`text-xs font-medium ${
+                    needsMethod ? "text-amber-300" : "text-mist-400"
+                  }`}
+                >
+                  {needsMethod
+                    ? "How did you reach them? (pick one or more)"
+                    : "Reached via (tap to toggle)"}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {CONTACT_METHODS.map(({ method, label }) => {
+                    const on = contactMethods.includes(method);
+                    return (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => void toggleMethod(method)}
+                        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                          on
+                            ? needsMethod
+                              ? "bg-amber-400 text-on-accent"
+                              : "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40"
+                            : needsMethod
+                              ? "border border-amber-400/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
+                              : "border border-white/15 text-mist-400 hover:bg-white/5"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
+                {contactMethods.length > 0 ? (
+                  <p className="mt-1.5 text-[11px] text-mist-500">
+                    {contactMethods.map(contactMethodLabel).join(" · ")}
+                  </p>
+                ) : null}
               </div>
-            )}
-
-            {contactMethod && crmStage !== "new" && (
-              <p className="mt-1.5 text-[11px] text-mist-500">
-                Reached by{" "}
-                <span className="text-mist-300">{contactMethod.replace("_", " ")}</span>
-              </p>
             )}
           </section>
 
@@ -631,11 +676,13 @@ export function LeadDrawer(props: DrawerProps) {
             </>
           ) : (
             <>
-          {/* Draft-only composer — flat; popup shell already provides the surface */}
+          {/* Draft / register composer */}
           <section>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-lg font-semibold">Email</h3>
-              {outreach && !sent ? (
+              <h3 className="font-display text-lg font-semibold">
+                {registerOnly ? "Outreach log" : "Email"}
+              </h3>
+              {outreach && !sent && !registerOnly ? (
                 <button
                   onClick={() =>
                     run("draft", async () => {
@@ -652,7 +699,53 @@ export function LeadDrawer(props: DrawerProps) {
               ) : null}
             </div>
 
-            {!outreach ? (
+            {registerOnly && !outreach ? (
+              <div className="space-y-3">
+                <p className="text-sm text-mist-300">
+                  This lead is already contacted in the pipeline. Log how you
+                  reached them below — no email draft, approve, or send.
+                </p>
+                <div
+                  className={`rounded-xl px-3 py-2.5 ${
+                    needsMethod
+                      ? "border border-amber-400/40 bg-amber-400/10"
+                      : "border border-white/10 bg-white/[0.03]"
+                  }`}
+                >
+                  <p
+                    className={`text-xs font-medium ${
+                      needsMethod ? "text-amber-300" : "text-mist-400"
+                    }`}
+                  >
+                    {needsMethod
+                      ? "Select how you reached them"
+                      : "Contact channels"}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {CONTACT_METHODS.map(({ method, label }) => {
+                      const on = contactMethods.includes(method);
+                      return (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => void toggleMethod(method)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                            on
+                              ? "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40"
+                              : "border border-white/15 text-mist-400 hover:bg-white/5"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <p className="text-xs text-mist-500">
+                  Use Lead info (i) to add dated notes anytime.
+                </p>
+              </div>
+            ) : !outreach ? (
               <div className="text-center">
                 <p className="text-sm text-mist-300">
                   No draft yet. Generate a personalized first email for this lead.
@@ -769,7 +862,15 @@ export function LeadDrawer(props: DrawerProps) {
                   </p>
                 )}
 
-                {!sent && (
+                {!sent && registerOnly ? (
+                  <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-mist-400">
+                    Pipeline already marks this lead as contacted — use the
+                    channels above to register how you reached them. Approve /
+                    send stay available only for New → Ready email flow.
+                  </p>
+                ) : null}
+
+                {!sent && !registerOnly && (
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                     <button
                       type="button"
@@ -836,7 +937,7 @@ export function LeadDrawer(props: DrawerProps) {
                   </div>
                 )}
 
-                {!capabilities.canSendEmail && !sent && (
+                {!capabilities.canSendEmail && !sent && !registerOnly && (
                   <p className="text-xs text-mist-500">
                     No email provider configured — sending is simulated and won&apos;t
                     actually deliver. Add a Resend or SMTP key in Settings.

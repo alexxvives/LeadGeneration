@@ -1,0 +1,619 @@
+{
+  "summary": {
+    "totalData": 2482,
+    "uniqueWouldImport": 2406,
+    "skippedDupes": 76,
+    "noUsable": 0
+  },
+  "skipped": [
+    {
+      "xlsx_row": 692,
+      "company": "Laser Therapy Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 139,
+      "kept_company": "Laser Therapy Barcelona"
+    },
+    {
+      "xlsx_row": 954,
+      "company": "Clínica Depilación Tulaser El Corte Inglés Plaza Cataluña",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 68,
+      "kept_company": "Clínica Depilación Tulaser El Corte Inglés Plaza Cataluña"
+    },
+    {
+      "xlsx_row": 1019,
+      "company": "Derma centro de terapias",
+      "email": "contacto@esteticaderma.com",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 571,
+      "kept_company": "Derma centro de terapias"
+    },
+    {
+      "xlsx_row": 1305,
+      "company": "TOTAL LASER",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 827,
+      "kept_company": "TOTAL LASER"
+    },
+    {
+      "xlsx_row": 1543,
+      "company": "Dr Alvaro Chaux",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 579,
+      "kept_company": "Dr Alvaro Chaux"
+    },
+    {
+      "xlsx_row": 1957,
+      "company": "Salon De Belleza",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 794,
+      "kept_company": "Salón de belleza"
+    },
+    {
+      "xlsx_row": 2083,
+      "company": "0 calvicie Diagonal",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1329,
+      "kept_company": "0 calvicie Diagonal"
+    },
+    {
+      "xlsx_row": 2084,
+      "company": "Belleza capilar Daniel Bonachera",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1431,
+      "kept_company": "Belleza capilar Daniel Bonachera"
+    },
+    {
+      "xlsx_row": 2085,
+      "company": "Biotricologia® Cosmética Capilar Natural Avanzada",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1434,
+      "kept_company": "Biotricologia® Cosmética Capilar Natural Avanzada"
+    },
+    {
+      "xlsx_row": 2086,
+      "company": "Bliss Capilar Center",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1435,
+      "kept_company": "Bliss Capilar Center"
+    },
+    {
+      "xlsx_row": 2087,
+      "company": "CCCI Centro de Cirugia Capilar Internacional",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1450,
+      "kept_company": "CCCI Centro de Cirugia Capilar Internacional"
+    },
+    {
+      "xlsx_row": 2088,
+      "company": "CHARA CAPILAR",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1452,
+      "kept_company": "CHARA CAPILAR"
+    },
+    {
+      "xlsx_row": 2089,
+      "company": "CLINICANA",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1454,
+      "kept_company": "CLINICANA"
+    },
+    {
+      "xlsx_row": 2090,
+      "company": "CapilClinic Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1462,
+      "kept_company": "CapilClinic Barcelona"
+    },
+    {
+      "xlsx_row": 2091,
+      "company": "Capilar Professionals",
+      "email": "roberto@capilarprofessionals.com",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1463,
+      "kept_company": "Capilar Professionals"
+    },
+    {
+      "xlsx_row": 2092,
+      "company": "Carreras Centre Capilar Oncològic",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1470,
+      "kept_company": "Carreras Centre Capilar Oncològic"
+    },
+    {
+      "xlsx_row": 2093,
+      "company": "Centre de Tecnologia Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1476,
+      "kept_company": "Centre de Tecnologia Capilar"
+    },
+    {
+      "xlsx_row": 2094,
+      "company": "Centros Beltrán Barcelona – Pelucas naturales y prótesis capilares",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1479,
+      "kept_company": "Centros Beltrán Barcelona – Pelucas naturales y prótesis capilares"
+    },
+    {
+      "xlsx_row": 2095,
+      "company": "Clínica Capil·lar a Barcelona | Trasplantament o Ingert | Instituto del Pelo | Institut Català de Tricologia",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1488,
+      "kept_company": "Clínica Capil·lar a Barcelona | Trasplantament o Ingert | Instituto del Pelo | Institut Català de Tricologia"
+    },
+    {
+      "xlsx_row": 2096,
+      "company": "Clínica Novum - Medicina Estética, Medicina Capilar y Estética Avanzada",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1507,
+      "kept_company": "Clínica Novum - Medicina Estética, Medicina Capilar y Estética Avanzada"
+    },
+    {
+      "xlsx_row": 2097,
+      "company": "Clínica Renace | Micropigmentación Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1509,
+      "kept_company": "Clínica Renace | Micropigmentación Capilar"
+    },
+    {
+      "xlsx_row": 2098,
+      "company": "DENSIFY capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1526,
+      "kept_company": "DENSIFY capilar"
+    },
+    {
+      "xlsx_row": 2099,
+      "company": "Davelyn Micropigmentacion Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1532,
+      "kept_company": "Davelyn Micropigmentacion Capilar"
+    },
+    {
+      "xlsx_row": 2100,
+      "company": "Doctor Merlos Clínica de injerto capilar en Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1541,
+      "kept_company": "Doctor Merlos Clínica de injerto capilar en Barcelona"
+    },
+    {
+      "xlsx_row": 2101,
+      "company": "Dr. Daniela Fajardo - Spanish, Catalan & English speaking Trichology & Capillary Surgeon - Turó Park Clinics Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1545,
+      "kept_company": "Dr. Daniela Fajardo - Spanish, Catalan & English speaking Trichology & Capillary Surgeon - Turó Park Clinics Barcelona"
+    },
+    {
+      "xlsx_row": 2102,
+      "company": "Dr. Maria Carrera - Medicina Estética, láser y Tricología",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1552,
+      "kept_company": "Dr. Maria Carrera - Medicina Estética, láser y Tricología"
+    },
+    {
+      "xlsx_row": 2103,
+      "company": "EL TALLER CAPILAR BARCELONA",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1569,
+      "kept_company": "EL TALLER CAPILAR BARCELONA"
+    },
+    {
+      "xlsx_row": 2104,
+      "company": "Fuchisimo: Restauración de Tatuajes, Covers y Micropigmentación Capilar",
+      "email": "raquelgarab@gmail.com",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1599,
+      "kept_company": "Fuchisimo: Restauración de Tatuajes, Covers y Micropigmentación Capilar"
+    },
+    {
+      "xlsx_row": 2105,
+      "company": "Gournay Clínica Capilar en Barcelona - Instituto Quirúrgico Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1609,
+      "kept_company": "Gournay Clínica Capilar en Barcelona - Instituto Quirúrgico Capilar"
+    },
+    {
+      "xlsx_row": 2106,
+      "company": "Hair Inspira® Expertos en Prótesis Capilares en Barcelona",
+      "email": "hello@hairinspira.com",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1624,
+      "kept_company": "Hair Inspira® Expertos en Prótesis Capilares en Barcelona"
+    },
+    {
+      "xlsx_row": 2107,
+      "company": "Hair Solution Clínica Salud y Estética Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1626,
+      "kept_company": "Hair Solution Clínica Salud y Estética Capilar"
+    },
+    {
+      "xlsx_row": 2108,
+      "company": "HairBack Clinic - Injerto Capilar en Barcelona, España",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1631,
+      "kept_company": "HairBack Clinic - Injerto Capilar en Barcelona, España"
+    },
+    {
+      "xlsx_row": 2109,
+      "company": "ISTITUTO DERMATOLOGICO TRICOLOGICO ROMANO",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1645,
+      "kept_company": "ISTITUTO DERMATOLOGICO TRICOLOGICO ROMANO"
+    },
+    {
+      "xlsx_row": 2110,
+      "company": "Injerto Capilar Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1649,
+      "kept_company": "Injerto Capilar Barcelona"
+    },
+    {
+      "xlsx_row": 2111,
+      "company": "Injerto capilar Barcelona - Renacek Cirugía Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1650,
+      "kept_company": "Injerto capilar Barcelona - Renacek Cirugía Capilar"
+    },
+    {
+      "xlsx_row": 2112,
+      "company": "Inktenza Micropigmentación Capilar",
+      "email": "inktenza@inktenza.com",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1651,
+      "kept_company": "Inktenza Micropigmentación Capilar"
+    },
+    {
+      "xlsx_row": 2113,
+      "company": "Insparya® | Clínica salud capilar Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1652,
+      "kept_company": "Insparya® | Clínica salud capilar Barcelona"
+    },
+    {
+      "xlsx_row": 2114,
+      "company": "Instituto Capilar Saint Antoine de París",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1655,
+      "kept_company": "Instituto Capilar Saint Antoine de París"
+    },
+    {
+      "xlsx_row": 2115,
+      "company": "Instituto Quirúrgico Capilar - Unidad Capilar I Gournay",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1657,
+      "kept_company": "Instituto Quirúrgico Capilar - Unidad Capilar I Gournay"
+    },
+    {
+      "xlsx_row": 2116,
+      "company": "Istituto Giglio Centro di Tricologia Reggio Emilia",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1660,
+      "kept_company": "Istituto Giglio Centro di Tricologia Reggio Emilia"
+    },
+    {
+      "xlsx_row": 2117,
+      "company": "Istituto Giglio Centro di Tricologia Roma",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1661,
+      "kept_company": "Istituto Giglio Centro di Tricologia Roma"
+    },
+    {
+      "xlsx_row": 2118,
+      "company": "LEAL´S MICROPIGMENTACIÓN CAPILAR",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1690,
+      "kept_company": "LEAL´S MICROPIGMENTACIÓN CAPILAR"
+    },
+    {
+      "xlsx_row": 2119,
+      "company": "LGSESPANA Micropigmentaion Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1692,
+      "kept_company": "LGSESPANA Micropigmentaion Capilar"
+    },
+    {
+      "xlsx_row": 2120,
+      "company": "Luis Giraldo | Mesoterapia Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1726,
+      "kept_company": "Luis Giraldo | Mesoterapia Capilar"
+    },
+    {
+      "xlsx_row": 2121,
+      "company": "Manoli Hernández - Micropigmentación Capilar",
+      "email": "info@manolihernandez.com",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1742,
+      "kept_company": "Manoli Hernández - Micropigmentación Capilar"
+    },
+    {
+      "xlsx_row": 2122,
+      "company": "May Clínica Médica Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1760,
+      "kept_company": "May Clínica Médica Capilar"
+    },
+    {
+      "xlsx_row": 2123,
+      "company": "Medical Hair Barcelona - Clínica Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1767,
+      "kept_company": "Medical Hair Barcelona - Clínica Capilar"
+    },
+    {
+      "xlsx_row": 2124,
+      "company": "Merlos y Caraza Clinica medicina estética y capilar",
+      "email": "atencion@merloscaraza.com",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1773,
+      "kept_company": "Merlos y Caraza Clinica medicina estética y capilar"
+    },
+    {
+      "xlsx_row": 2125,
+      "company": "Micropigmentacion Capilar Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1777,
+      "kept_company": "Micropigmentacion Capilar Barcelona"
+    },
+    {
+      "xlsx_row": 2126,
+      "company": "Micropigmentació Capilar Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1778,
+      "kept_company": "Micropigmentació Capilar Barcelona"
+    },
+    {
+      "xlsx_row": 2127,
+      "company": "Micropigmentació Capilar Densitat Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1779,
+      "kept_company": "Micropigmentació Capilar Densitat Barcelona"
+    },
+    {
+      "xlsx_row": 2128,
+      "company": "Mímate+ Hospitalet Estética y Spa Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1792,
+      "kept_company": "Mímate+ Hospitalet Estética y Spa Capilar"
+    },
+    {
+      "xlsx_row": 2129,
+      "company": "Newman - Centro Capilar Unisex",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1796,
+      "kept_company": "Newman - Centro Capilar Unisex"
+    },
+    {
+      "xlsx_row": 2130,
+      "company": "Oscar Arango | Micropigmentación Capilar Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1813,
+      "kept_company": "Oscar Arango | Micropigmentación Capilar Barcelona"
+    },
+    {
+      "xlsx_row": 2131,
+      "company": "Pelucas Danien Centro Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1831,
+      "kept_company": "Pelucas Danien Centro Capilar"
+    },
+    {
+      "xlsx_row": 2132,
+      "company": "PlusCapilar & Estética",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1913,
+      "kept_company": "PlusCapilar & Estética"
+    },
+    {
+      "xlsx_row": 2133,
+      "company": "Remind Hair | Clínica capilar Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1930,
+      "kept_company": "Remind Hair | Clínica capilar Barcelona"
+    },
+    {
+      "xlsx_row": 2134,
+      "company": "Rueber Centro Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1940,
+      "kept_company": "Rueber Centro Capilar"
+    },
+    {
+      "xlsx_row": 2135,
+      "company": "SANIGER Centro Capilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1945,
+      "kept_company": "SANIGER Centro Capilar"
+    },
+    {
+      "xlsx_row": 2136,
+      "company": "SIMONE TRICHOLOGY",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1948,
+      "kept_company": "SIMONE TRICHOLOGY"
+    },
+    {
+      "xlsx_row": 2137,
+      "company": "Sanantur - Implante capilar en Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1978,
+      "kept_company": "Sanantur - Implante capilar en Barcelona"
+    },
+    {
+      "xlsx_row": 2138,
+      "company": "Società Italiana di Tricologia",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1988,
+      "kept_company": "Società Italiana di Tricologia"
+    },
+    {
+      "xlsx_row": 2139,
+      "company": "Svenson - Clínica capilar en Barcelona - Muntaner",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 1997,
+      "kept_company": "Svenson - Clínica capilar en Barcelona - Muntaner"
+    },
+    {
+      "xlsx_row": 2140,
+      "company": "Trasplante Capilar SIN rapar Dra Lorena Barboza",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2023,
+      "kept_company": "Trasplante Capilar SIN rapar Dra Lorena Barboza"
+    },
+    {
+      "xlsx_row": 2141,
+      "company": "Trasplante Capilar Turquía | Global Health | Hair in Istanbul",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2024,
+      "kept_company": "Trasplante Capilar Turquía | Global Health | Hair in Istanbul"
+    },
+    {
+      "xlsx_row": 2142,
+      "company": "Tricologia e Cura dei Capelli a Lecce - Istituto Tricholos",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2025,
+      "kept_company": "Tricologia e Cura dei Capelli a Lecce - Istituto Tricholos"
+    },
+    {
+      "xlsx_row": 2143,
+      "company": "TricologiaMir | Unidad de Tricología Médico-Quirúrgica",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2026,
+      "kept_company": "TricologiaMir | Unidad de Tricología Médico-Quirúrgica"
+    },
+    {
+      "xlsx_row": 2144,
+      "company": "Tricomedical | Centro Medico Tricologico Milano",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2027,
+      "kept_company": "Tricomedical | Centro Medico Tricologico Milano"
+    },
+    {
+      "xlsx_row": 2145,
+      "company": "Wunderbar Hair Clinic – Trasplante Capilar Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2061,
+      "kept_company": "Wunderbar Hair Clinic – Trasplante Capilar Barcelona"
+    },
+    {
+      "xlsx_row": 2146,
+      "company": "ZonaCapilar",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2066,
+      "kept_company": "ZonaCapilar"
+    },
+    {
+      "xlsx_row": 2147,
+      "company": "clinica capilar gracia",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2069,
+      "kept_company": "clinica capilar gracia"
+    },
+    {
+      "xlsx_row": 2148,
+      "company": "ÁNGEL SMP - MICROPIGMENTACIÓN CAPILAR",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2077,
+      "kept_company": "ÁNGEL SMP - MICROPIGMENTACIÓN CAPILAR"
+    },
+    {
+      "xlsx_row": 2149,
+      "company": "▷ Aslan Capilar - Clínica Capilar en Barcelona",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2080,
+      "kept_company": "▷ Aslan Capilar - Clínica Capilar en Barcelona"
+    },
+    {
+      "xlsx_row": 2238,
+      "company": "Centro de bienestar POWER - FIT",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2205,
+      "kept_company": "CENTRO DE BIENESTAR POWER FIT"
+    },
+    {
+      "xlsx_row": 2287,
+      "company": "Hammam Al Ándalus",
+      "email": "",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 2286,
+      "kept_company": "Hammam Al Andalus"
+    },
+    {
+      "xlsx_row": 2359,
+      "company": "Moon Relax Spa",
+      "email": "hello@moonrelaxspa.com",
+      "why": "duplicate_company_name",
+      "kept_xlsx_row": 744,
+      "kept_company": "Moon Relax Spa"
+    }
+  ],
+  "noUsable": []
+}

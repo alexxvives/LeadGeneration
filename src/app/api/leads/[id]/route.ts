@@ -17,7 +17,9 @@ const PatchSchema = z.object({
       "not_interested",
     ])
     .optional(),
-  contactMethod: z.enum(["email", "phone", "contact_form"]).nullable().optional(),
+  contactMethods: z
+    .array(z.enum(["email", "phone", "contact_form"]))
+    .optional(),
   notes: z.string().nullable().optional(),
   companyType: z.string().max(120).nullable().optional(),
   company: z.string().min(1).max(200).optional(),

@@ -71,7 +71,7 @@ const PREVIEW_LEAD: Lead = {
   sourceUrl: `https://${EXAMPLE_HOST}`,
   status: "new",
   crmStage: "new",
-  contactMethod: null,
+  contactMethods: [],
   notes: null,
   followUps: [],
   customFields: {},

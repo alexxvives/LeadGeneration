@@ -130,7 +130,12 @@ export function Studio() {
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
   const [drawerPromptNote, setDrawerPromptNote] = useState(false);
   const [layout, setLayout] = useState<"table" | "cards" | "map">("table");
+  /** Keep each layout mounted after first visit so switching stays instant. */
+  const [visitedLayouts, setVisitedLayouts] = useState<Set<"table" | "cards" | "map">>(
+    () => new Set(["table"]),
+  );
   const [pipelineFilter, setPipelineFilter] = useState<CrmStage | "all">("all");
+  const [leadSearch, setLeadSearch] = useState("");
   const [editLocked, setEditLocked] = useState(false);
   const [lockHolder, setLockHolder] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -166,6 +171,9 @@ export function Studio() {
   const verifyLimitShownRef = useRef(false);
   const filterBoardIdRef = useRef<string | null>(filterBoardId);
   filterBoardIdRef.current = filterBoardId;
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const boardLiteRef = useRef(false);
 
   const setView = useCallback(
     (next: StudioView) => {
@@ -194,11 +202,19 @@ export function Studio() {
     [toast],
   );
 
-  const refresh = useCallback(async () => {
-    const data = await api.board(filterBoardIdRef.current);
+  const refresh = useCallback(async (opts?: { forceFull?: boolean }) => {
+    const v = viewRef.current;
+    const lite =
+      !opts?.forceFull &&
+      (v === "dashboard" ||
+        v === "boards" ||
+        v === "admin" ||
+        v === "admin-users");
+    const data = await api.board(filterBoardIdRef.current, { lite });
+    boardLiteRef.current = lite;
     setBoards(data.boards ?? []);
     const pinned = activeRunIdRef.current;
-    if (pinned && pinned !== data.run?.id) {
+    if (!lite && pinned && pinned !== data.run?.id) {
       try {
         const { run, leads } = await api.runWithLeads(pinned);
         const merged = { ...data, run, leads };
@@ -234,6 +250,18 @@ export function Studio() {
         if (first) setLoading(false);
       });
   }, [filterBoardId, boardParam, refresh, toast]);
+
+  // Leaving dashboard/boards/admin → reload full lead payload for pipeline/etc.
+  useEffect(() => {
+    const needsLeads =
+      view === "pipeline" ||
+      view === "leads" ||
+      view === "outreach" ||
+      view === "board" ||
+      view === "runs";
+    if (!needsLeads || !boardLiteRef.current) return;
+    void refresh({ forceFull: true }).catch(() => {});
+  }, [view, refresh]);
 
   // Pipeline: pick up webhook reply → In Conversation without a manual refresh.
   useEffect(() => {
@@ -583,30 +611,6 @@ export function Studio() {
     }
   };
 
-  const onMarkContacted = async (
-    leadId: string,
-    method: ContactMethod,
-    opts?: { promptNote?: boolean },
-  ) => {
-    setOutreachBusy(leadId);
-    try {
-      await onMoveStage(leadId, "contacted", method);
-      toast(
-        "ok",
-        method === "phone"
-          ? "Logged as called — moved to Contacted."
-          : "Logged contact form — moved to Contacted.",
-      );
-      if (opts?.promptNote) {
-        setDrawerPromptNote(true);
-        setDrawerMode("info");
-        setSelectedId(leadId);
-      }
-    } finally {
-      setOutreachBusy(null);
-    }
-  };
-
   const findLeadByOutreach = (outreachId: string) =>
     board?.leads.find((l) => l.outreach?.id === outreachId);
 
@@ -773,15 +777,20 @@ export function Studio() {
   const onMoveStage = async (
     leadId: string,
     stage: CrmStage,
-    contactMethod?: ContactMethod | null,
+    contactMethods?: ContactMethod[] | null,
   ) => {
-    const patch: { crmStage: CrmStage; contactMethod?: ContactMethod | null } = {
+    const patch: {
+      crmStage: CrmStage;
+      contactMethods?: ContactMethod[];
+    } = {
       crmStage: stage,
     };
-    if (contactMethod !== undefined) patch.contactMethod = contactMethod;
-    // Moving back to New clears contact method so cards don’t keep Contacted chrome.
-    if (stage === "new" && contactMethod === undefined) {
-      patch.contactMethod = null;
+    if (contactMethods !== undefined) {
+      patch.contactMethods = contactMethods ?? [];
+    }
+    // Moving back to New clears contact methods so cards don’t keep Contacted chrome.
+    if (stage === "new" && contactMethods === undefined) {
+      patch.contactMethods = [];
     }
     // Optimistic update first for instant feel.
     patchLeadLocal(leadId, patch);
@@ -792,6 +801,30 @@ export function Studio() {
       // Revert on failure by refreshing.
       await refresh();
       toast("err", (e as Error).message);
+    }
+  };
+
+  const onMarkContacted = async (
+    leadId: string,
+    method: ContactMethod,
+    opts?: { promptNote?: boolean },
+  ) => {
+    setOutreachBusy(leadId);
+    try {
+      await onMoveStage(leadId, "contacted", [method]);
+      toast(
+        "ok",
+        method === "phone"
+          ? "Logged as called — moved to Contacted."
+          : "Logged contact form — moved to Contacted.",
+      );
+      if (opts?.promptNote) {
+        setDrawerPromptNote(true);
+        setDrawerMode("info");
+        setSelectedId(leadId);
+      }
+    } finally {
+      setOutreachBusy(null);
     }
   };
 
@@ -920,9 +953,37 @@ export function Studio() {
 
   const filteredLeads = useMemo(() => {
     const all = board?.leads ?? [];
-    if (pipelineFilter === "all") return all;
-    return all.filter((l) => (l.crmStage ?? "new") === pipelineFilter);
-  }, [board?.leads, pipelineFilter]);
+    const q = leadSearch.trim().toLowerCase();
+    return all.filter((l) => {
+      if (pipelineFilter !== "all" && (l.crmStage ?? "new") !== pipelineFilter) {
+        return false;
+      }
+      if (!q) return true;
+      const hay = [
+        l.company,
+        l.location,
+        l.companyType,
+        l.contactName,
+        ...(l.emails ?? []),
+        ...(l.phones ?? []),
+        l.website,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [board?.leads, pipelineFilter, leadSearch]);
+
+  const selectLayout = (next: "table" | "cards" | "map") => {
+    setVisitedLayouts((prev) => {
+      if (prev.has(next)) return prev;
+      const copy = new Set(prev);
+      copy.add(next);
+      return copy;
+    });
+    setLayout(next);
+  };
 
   if (loading) {
     return (
@@ -1001,7 +1062,7 @@ export function Studio() {
 
   return (
     <main className="mx-auto flex h-dvh max-w-[90rem] flex-col overflow-hidden px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-3 sm:pt-8">
-      <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[1fr_auto]">
+      <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -1060,6 +1121,65 @@ export function Studio() {
           ) : null}
         </div>
 
+        {!isAdmin &&
+        view !== "dashboard" &&
+        view !== "boards" &&
+        view !== "admin" &&
+        view !== "admin-users" &&
+        board?.workspace ? (
+          <div className="hidden min-w-[16rem] max-w-md flex-col gap-1 justify-self-center sm:flex sm:min-w-[22rem]">
+            <div
+              className={`grid gap-4 ${
+                board.capabilities.emailVerify &&
+                board.workspace.emailVerifyEnabled !== false
+                  ? "grid-cols-3"
+                  : "grid-cols-2"
+              }`}
+            >
+              {board.workspace.planId === "insider" ? (
+                <UsageBar
+                  label="Leads"
+                  title="Firecrawl credits"
+                  unavailable={
+                    board.workspace.firecrawlCreditsRemaining == null
+                  }
+                  remaining={
+                    board.workspace.firecrawlCreditsRemaining ?? undefined
+                  }
+                />
+              ) : (
+                <UsageBar
+                  label="Leads"
+                  used={board.workspace.leadsUsed}
+                  limit={board.workspace.leadsLimit}
+                />
+              )}
+              <UsageBar
+                label="Sends"
+                used={board.workspace.unlimitedSends ? 0 : board.workspace.sendsUsed}
+                limit={
+                  board.workspace.unlimitedSends ? 0 : board.workspace.sendsLimit
+                }
+              />
+              {board.capabilities.emailVerify &&
+              board.workspace.emailVerifyEnabled !== false ? (
+                <UsageBar
+                  label="Verifies"
+                  used={board.workspace.verifiesUsed}
+                  limit={board.workspace.verifiesLimit}
+                />
+              ) : null}
+            </div>
+            {!board.workspace.metered && (
+              <p className="text-center text-[10px] text-mist-500">
+                Local preview — quotas enforced on the live app
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="hidden sm:block" aria-hidden />
+        )}
+
         <div className="flex flex-wrap items-center justify-start gap-3 sm:justify-end">
           {view === "dashboard" ? (
             <label className="inline-flex items-center">
@@ -1090,62 +1210,18 @@ export function Studio() {
               </select>
             </label>
           ) : null}
-          {!isAdmin &&
-            view !== "dashboard" &&
-            view !== "boards" &&
-            view !== "admin" &&
-            view !== "admin-users" &&
-            board?.workspace && (
-            <div className="hidden min-w-[18rem] flex-col gap-1 sm:flex sm:min-w-[26rem]">
-              <div
-                className={`grid gap-4 ${
-                  board.capabilities.emailVerify &&
-                  board.workspace.emailVerifyEnabled !== false
-                    ? "grid-cols-3"
-                    : "grid-cols-2"
-                }`}
-              >
-                {board.workspace.planId === "insider" ? (
-                  <UsageBar
-                    label="Leads"
-                    title="Firecrawl credits"
-                    unavailable={
-                      board.workspace.firecrawlCreditsRemaining == null
-                    }
-                    remaining={
-                      board.workspace.firecrawlCreditsRemaining ?? undefined
-                    }
-                  />
-                ) : (
-                  <UsageBar
-                    label="Leads"
-                    used={board.workspace.leadsUsed}
-                    limit={board.workspace.leadsLimit}
-                  />
-                )}
-                <UsageBar
-                  label="Sends"
-                  used={board.workspace.unlimitedSends ? 0 : board.workspace.sendsUsed}
-                  limit={
-                    board.workspace.unlimitedSends ? 0 : board.workspace.sendsLimit
-                  }
-                />
-                {board.capabilities.emailVerify &&
-                board.workspace.emailVerifyEnabled !== false ? (
-                  <UsageBar
-                    label="Verifies"
-                    used={board.workspace.verifiesUsed}
-                    limit={board.workspace.verifiesLimit}
-                  />
-                ) : null}
-              </div>
-              {!board.workspace.metered && (
-                <p className="text-[10px] text-mist-500">
-                  Local preview — quotas enforced on the live app
-                </p>
-              )}
-            </div>
-          )}
+          {view === "leads" && hasLeads ? (
+            <label className="relative inline-flex w-full max-w-xs items-center sm:w-56">
+              <span className="sr-only">Search leads</span>
+              <input
+                type="search"
+                value={leadSearch}
+                onChange={(e) => setLeadSearch(e.target.value)}
+                placeholder="Search leads…"
+                className="w-full rounded-xl border border-white/10 bg-ink-900/60 py-2 pl-3 pr-3 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/50"
+              />
+            </label>
+          ) : null}
         </div>
       </div>
 
@@ -1234,7 +1310,7 @@ export function Studio() {
             <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
               <p className="text-xs uppercase tracking-widest text-mist-500">
                 <span className="font-semibold text-mist-200">{filteredLeads.length}</span>
-                {pipelineFilter !== "all" ? (
+                {pipelineFilter !== "all" || leadSearch.trim() ? (
                   <>
                     {" "}
                     of{" "}
@@ -1244,13 +1320,13 @@ export function Studio() {
                 leads
               </p>
               <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
-                <LayoutToggle active={layout === "table"} onClick={() => setLayout("table")}>
+                <LayoutToggle active={layout === "table"} onClick={() => selectLayout("table")}>
                   Table
                 </LayoutToggle>
-                <LayoutToggle active={layout === "cards"} onClick={() => setLayout("cards")}>
+                <LayoutToggle active={layout === "cards"} onClick={() => selectLayout("cards")}>
                   Cards
                 </LayoutToggle>
-                <LayoutToggle active={layout === "map"} onClick={() => setLayout("map")}>
+                <LayoutToggle active={layout === "map"} onClick={() => selectLayout("map")}>
                   Map
                 </LayoutToggle>
               </div>
@@ -1282,45 +1358,71 @@ export function Studio() {
                 layout === "map" ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
               }`}
             >
-              {/* Keep map mounted while on Leads so Leaflet/geocode warm in the background. */}
-              <div
-                className={
-                  layout === "map"
-                    ? "absolute inset-0"
-                    : "pointer-events-none invisible absolute inset-0 -z-10"
-                }
-                aria-hidden={layout !== "map"}
-              >
-                <LeadMap
-                  leads={filteredLeads}
-                  locationHint={board!.run?.location ?? null}
-                  onOpen={openInfo}
-                />
-              </div>
-              {layout === "cards" ? (
-                filteredLeads.length === 0 ? (
-                  <p className="py-12 text-center text-sm text-mist-500">
-                    No leads in this pipeline stage.
-                  </p>
-                ) : (
-                  <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                    {filteredLeads.map((lead, i) => (
-                      <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => openInfo(lead.id)} />
-                    ))}
-                  </div>
-                )
-              ) : layout === "table" ? (
-                <LeadTable
-                  leads={filteredLeads}
-                  statusFilter={pipelineFilter}
-                  onStatusFilterChange={setPipelineFilter}
-                  onOpen={openInfo}
-                  onMoveStage={editLocked ? undefined : onMoveStage}
-                  onUpdateLead={editLocked ? undefined : onUpdateLeadCrm}
-                  onDeleteLead={editLocked ? undefined : (id) => void onDeleteLead(id)}
-                  onDeleteLeads={editLocked ? undefined : onDeleteLeads}
-                  editLocked={editLocked}
-                />
+              {/* Keep visited layouts mounted so Table ↔ Cards ↔ Map switches stay instant. */}
+              {visitedLayouts.has("map") ? (
+                <div
+                  className={
+                    layout === "map"
+                      ? "absolute inset-0"
+                      : "pointer-events-none invisible absolute inset-0 -z-10"
+                  }
+                  aria-hidden={layout !== "map"}
+                >
+                  <LeadMap
+                    leads={filteredLeads}
+                    locationHint={board!.run?.location ?? null}
+                    onOpen={openInfo}
+                  />
+                </div>
+              ) : null}
+              {visitedLayouts.has("cards") ? (
+                <div
+                  className={
+                    layout === "cards"
+                      ? "relative"
+                      : "pointer-events-none invisible absolute inset-0 -z-10 h-0 overflow-hidden"
+                  }
+                  aria-hidden={layout !== "cards"}
+                >
+                  {filteredLeads.length === 0 ? (
+                    <p className="py-12 text-center text-sm text-mist-500">
+                      No leads match this filter.
+                    </p>
+                  ) : (
+                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredLeads.map((lead, i) => (
+                        <LeadCard
+                          key={lead.id}
+                          lead={lead}
+                          index={i}
+                          onOpen={() => openInfo(lead.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+              {visitedLayouts.has("table") ? (
+                <div
+                  className={
+                    layout === "table"
+                      ? "relative"
+                      : "pointer-events-none invisible absolute inset-0 -z-10 h-0 overflow-hidden"
+                  }
+                  aria-hidden={layout !== "table"}
+                >
+                  <LeadTable
+                    leads={filteredLeads}
+                    statusFilter={pipelineFilter}
+                    onStatusFilterChange={setPipelineFilter}
+                    onOpen={openInfo}
+                    onMoveStage={editLocked ? undefined : onMoveStage}
+                    onUpdateLead={editLocked ? undefined : onUpdateLeadCrm}
+                    onDeleteLead={editLocked ? undefined : (id) => void onDeleteLead(id)}
+                    onDeleteLeads={editLocked ? undefined : onDeleteLeads}
+                    editLocked={editLocked}
+                  />
+                </div>
               ) : null}
             </div>
           </div>
