@@ -98,13 +98,23 @@ export function StudioShell({
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
   const inviteRedirectTried = useRef(false);
+  /** Optimistic sidebar highlight — set on click, cleared when URL catches up. */
+  const [pendingNavView, setPendingNavView] = useState<string | null>(null);
 
   const view = searchParams.get("view");
+  const urlView = view ?? "";
+  const displayView = pendingNavView ?? urlView;
   const boardParam = searchParams.get("board");
   const userId =
     session?.userId ??
     session?.user?.id ??
     (session?.user?.email ? `user_${session.user.email}` : null);
+
+  useEffect(() => {
+    if (pendingNavView !== null && pendingNavView === urlView) {
+      setPendingNavView(null);
+    }
+  }, [urlView, pendingNavView]);
 
   const refreshBoards = useCallback(() => {
     api
@@ -257,6 +267,7 @@ export function StudioShell({
   const displayName = (session?.user?.name as string | undefined) ?? null;
   const userEmail = (session?.user?.email as string | undefined) ?? null;
   const settingsActive = pathname.startsWith("/app/settings");
+  const onApp = pathname === "/app";
 
   // Admins operate the platform — not a personal lead studio.
   const navSections: {
@@ -276,13 +287,13 @@ export function StudioShell({
               href: "/app?view=admin",
               label: "Dashboard",
               icon: ShieldIcon,
-              active: pathname === "/app" && (view === "admin" || !view),
+              active: onApp && (displayView === "admin" || displayView === ""),
             },
             {
               href: "/app?view=admin-users",
               label: "Users",
               icon: UsersIcon,
-              active: pathname === "/app" && view === "admin-users",
+              active: onApp && displayView === "admin-users",
             },
           ],
         },
@@ -295,7 +306,7 @@ export function StudioShell({
               href: "/app?view=dashboard",
               label: "Dashboard",
               icon: DashboardIcon,
-              active: pathname === "/app" && view === "dashboard",
+              active: onApp && displayView === "dashboard",
             },
           ],
         },
@@ -306,13 +317,13 @@ export function StudioShell({
               href: "/app",
               label: "Search",
               icon: SearchIcon,
-              active: pathname === "/app" && !view,
+              active: onApp && displayView === "",
             },
             {
               href: "/app?view=leads",
               label: "Leads",
               icon: UsersIcon,
-              active: pathname === "/app" && view === "leads",
+              active: onApp && displayView === "leads",
             },
           ],
         },
@@ -323,13 +334,13 @@ export function StudioShell({
               href: "/app?view=pipeline",
               label: "Pipeline",
               icon: PipelineIcon,
-              active: pathname === "/app" && view === "pipeline",
+              active: onApp && displayView === "pipeline",
             },
             {
               href: "/app?view=outreach",
               label: "Outreach",
               icon: MailIcon,
-              active: pathname === "/app" && view === "outreach",
+              active: onApp && displayView === "outreach",
             },
           ],
         },
@@ -340,13 +351,13 @@ export function StudioShell({
               href: "/app?view=boards",
               label: "Boards",
               icon: BoardsIcon,
-              active: pathname === "/app" && view === "boards",
+              active: onApp && displayView === "boards",
             },
             {
               href: "/app?view=runs",
               label: "Runs",
               icon: HistoryIcon,
-              active: pathname === "/app" && view === "runs",
+              active: onApp && displayView === "runs",
             },
           ],
         },
@@ -383,10 +394,16 @@ export function StudioShell({
               </p>
               {section.items.map((item) => {
                 const Icon = item.icon;
+                const viewKey = (() => {
+                  const q = item.href.indexOf("?");
+                  if (q < 0) return "";
+                  return new URLSearchParams(item.href.slice(q + 1)).get("view") ?? "";
+                })();
                 return (
                   <Link
                     key={item.href}
                     href={boardHref(item.href)}
+                    onClick={() => setPendingNavView(viewKey)}
                     className={`group flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors sm:justify-start ${
                       item.active
                         ? "bg-aurora-400/10 text-aurora-300"

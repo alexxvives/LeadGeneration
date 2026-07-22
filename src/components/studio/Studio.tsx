@@ -1043,12 +1043,26 @@ export function Studio() {
   const cardsLeads = useActiveLeads(layout === "cards", filteredLeads);
   const mapLeads = useActiveLeads(layout === "map", filteredLeads);
 
-  // Yield one frame so Leads chrome paints before mounting 2k-row table/cards.
+  // Yield one frame so Leads chrome paints before mounting heavy table/cards.
+  // Warm revisits (data + current layout already known) skip the blank frame.
   const [leadsBodyReady, setLeadsBodyReady] = useState(false);
   const [, startLeadsBodyTransition] = useTransition();
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  const visitedLayoutsRef = useRef(visitedLayouts);
+  visitedLayoutsRef.current = visitedLayouts;
+  const boardLeadsLenRef = useRef(board?.leads.length ?? 0);
+  boardLeadsLenRef.current = board?.leads.length ?? 0;
   useEffect(() => {
     if (view !== "leads") {
       setLeadsBodyReady(false);
+      return;
+    }
+    const warm =
+      visitedLayoutsRef.current.has(layoutRef.current) &&
+      boardLeadsLenRef.current > 0;
+    if (warm) {
+      setLeadsBodyReady(true);
       return;
     }
     setLeadsBodyReady(false);
@@ -1068,20 +1082,15 @@ export function Studio() {
     (view === "leads" || view === "pipeline" || view === "outreach");
 
   const layoutPaneReady = visitedLayouts.has(layout);
+  // Skeleton for hydrate / first body / first layout pane only — not filter lag
+  // (stale rows stay visible while useDeferredValue catches up).
   const leadsContentPending =
     view === "leads" &&
     (loading ||
       leadsHydrating ||
       !board ||
-      (hasLeads &&
-        (!leadsBodyReady || !layoutPaneReady || leadsFilterPending)));
-  // Entering Leads / first layout pane: skeleton immediately. Filter catch-up: slight delay.
-  const leadsSkeletonDelay =
-    loading || leadsHydrating || !leadsBodyReady || !layoutPaneReady ? 0 : 100;
-  const showLeadsContentSkeleton = useDeferredLoading(
-    leadsContentPending,
-    leadsSkeletonDelay,
-  );
+      (hasLeads && (!leadsBodyReady || !layoutPaneReady)));
+  const showLeadsContentSkeleton = useDeferredLoading(leadsContentPending, 0);
 
   // First board fetch with no data yet — full-page skeleton (real shell isn't useful).
   const showBootSkeleton = useDeferredLoading(loading && !board, 200);
@@ -1396,180 +1405,149 @@ export function Studio() {
         </div>
       )}
 
-      {/* All leads — table / cards / map */}
+      {/* All leads — one chrome tree; skeleton/empty only in the body slot */}
       {view === "leads" && (
-        loading || leadsHydrating || !board ? (
-          <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-            <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
-              <p className="text-xs uppercase tracking-widest text-mist-500">
-                <span className="font-semibold text-mist-200">…</span> leads
-              </p>
-              <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
-                <LayoutToggle active={layout === "table"} onClick={() => selectLayout("table")}>
-                  Table
-                </LayoutToggle>
-                <LayoutToggle active={layout === "cards"} onClick={() => selectLayout("cards")}>
-                  Cards
-                </LayoutToggle>
-                <LayoutToggle active={layout === "map"} onClick={() => selectLayout("map")}>
-                  Map
-                </LayoutToggle>
-              </div>
-              <div className="flex justify-end">
-                <Select
-                  value={pipelineFilter}
-                  onChange={(e) =>
-                    setPipelineFilter(
-                      e.target.value === "all" ? "all" : (e.target.value as CrmStage),
-                    )
-                  }
-                  className="min-w-[9rem] py-1.5 text-xs"
-                  aria-label="Filter by pipeline stage"
-                >
-                  <option value="all">All stages</option>
-                  {CRM_STAGE_FILTERS.map((s) => (
-                    <option key={s} value={s}>
-                      {crmStageLabel(s)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+        <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+          <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
+            <p className="text-xs uppercase tracking-widest text-mist-500">
+              <span className="font-semibold text-mist-200">
+                {loading ||
+                leadsHydrating ||
+                !board ||
+                leadsFilterPending ||
+                (hasLeads && !leadsBodyReady)
+                  ? "…"
+                  : filteredLeads.length}
+              </span>
+              {board &&
+              hasLeads &&
+              (pipelineFilter !== "all" || leadSearch.trim()) ? (
+                <>
+                  {" "}
+                  of{" "}
+                  <span className="font-semibold text-mist-200">{board.leads.length}</span>
+                </>
+              ) : null}{" "}
+              leads
+            </p>
+            <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
+              <LayoutToggle active={layout === "table"} onClick={() => selectLayout("table")}>
+                Table
+              </LayoutToggle>
+              <LayoutToggle active={layout === "cards"} onClick={() => selectLayout("cards")}>
+                Cards
+              </LayoutToggle>
+              <LayoutToggle active={layout === "map"} onClick={() => selectLayout("map")}>
+                Map
+              </LayoutToggle>
             </div>
-            <div className="relative min-h-0 flex-1 overflow-hidden">
+            <div className="flex items-center justify-start gap-2 sm:justify-end">
+              <Select
+                value={pipelineFilter}
+                onChange={(e) =>
+                  setPipelineFilter(
+                    e.target.value === "all" ? "all" : (e.target.value as CrmStage),
+                  )
+                }
+                className="min-w-[9rem] py-1.5 text-xs"
+                aria-label="Filter by pipeline stage"
+              >
+                <option value="all">All stages</option>
+                {CRM_STAGE_FILTERS.map((s) => (
+                  <option key={s} value={s}>
+                    {crmStageLabel(s)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            {loading || leadsHydrating || !board ? (
               <LeadsLayoutSkeleton layout={layout} />
-            </div>
+            ) : !hasLeads ? (
+              <EmptyState />
+            ) : (
+              <>
+                {/* Mount heavy panes only after Leads chrome has painted. */}
+                {leadsBodyReady && visitedLayouts.has("map") ? (
+                  <div
+                    className={
+                      layout === "map"
+                        ? "absolute inset-0"
+                        : "pointer-events-none invisible absolute inset-0 -z-10"
+                    }
+                    aria-hidden={layout !== "map"}
+                  >
+                    <LeadMap
+                      leads={mapLeads}
+                      locationHint={board.run?.location ?? null}
+                      onOpen={openInfo}
+                    />
+                  </div>
+                ) : null}
+                {leadsBodyReady && visitedLayouts.has("cards") ? (
+                  <div
+                    className={
+                      layout === "cards"
+                        ? "absolute inset-0 overflow-y-auto overscroll-contain"
+                        : "pointer-events-none invisible absolute inset-0 -z-10 overflow-hidden"
+                    }
+                    aria-hidden={layout !== "cards"}
+                  >
+                    {cardsLeads.length === 0 ? (
+                      <p className="py-12 text-center text-sm text-mist-500">
+                        No leads match this filter.
+                      </p>
+                    ) : (
+                      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                        {cardsLeads.map((lead, i) => (
+                          <LeadCard
+                            key={lead.id}
+                            lead={lead}
+                            index={i}
+                            onOpen={() => openInfo(lead.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+                {leadsBodyReady && visitedLayouts.has("table") ? (
+                  <div
+                    className={
+                      layout === "table"
+                        ? "absolute inset-0 flex min-h-0 flex-col"
+                        : "pointer-events-none invisible absolute inset-0 -z-10 overflow-hidden"
+                    }
+                    aria-hidden={layout !== "table"}
+                  >
+                    <LeadTable
+                      leads={tableLeads}
+                      statusFilter={pipelineFilter}
+                      onStatusFilterChange={setPipelineFilter}
+                      onOpen={openInfo}
+                      onMoveStage={editLocked ? undefined : onMoveStage}
+                      onUpdateLead={editLocked ? undefined : onUpdateLeadCrm}
+                      onDeleteLead={editLocked ? undefined : (id) => void onDeleteLead(id)}
+                      onDeleteLeads={editLocked ? undefined : onDeleteLeads}
+                      editLocked={editLocked}
+                    />
+                  </div>
+                ) : null}
+                {showLeadsContentSkeleton ? (
+                  <div
+                    className="absolute inset-0 z-10 bg-ink-950/80"
+                    role="status"
+                    aria-busy="true"
+                    aria-label="Loading leads"
+                  >
+                    <LeadsLayoutSkeleton layout={layout} />
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
-        ) : hasLeads ? (
-          <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-            <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
-              <p className="text-xs uppercase tracking-widest text-mist-500">
-                <span className="font-semibold text-mist-200">
-                  {leadsFilterPending || !leadsBodyReady ? "…" : filteredLeads.length}
-                </span>
-                {pipelineFilter !== "all" || leadSearch.trim() ? (
-                  <>
-                    {" "}
-                    of{" "}
-                    <span className="font-semibold text-mist-200">{board.leads.length}</span>
-                  </>
-                ) : null}{" "}
-                leads
-              </p>
-              <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
-                <LayoutToggle active={layout === "table"} onClick={() => selectLayout("table")}>
-                  Table
-                </LayoutToggle>
-                <LayoutToggle active={layout === "cards"} onClick={() => selectLayout("cards")}>
-                  Cards
-                </LayoutToggle>
-                <LayoutToggle active={layout === "map"} onClick={() => selectLayout("map")}>
-                  Map
-                </LayoutToggle>
-              </div>
-              <div className="flex items-center justify-start gap-2 sm:justify-end">
-                <Select
-                  value={pipelineFilter}
-                  onChange={(e) =>
-                    setPipelineFilter(
-                      e.target.value === "all" ? "all" : (e.target.value as CrmStage),
-                    )
-                  }
-                  className="min-w-[9rem] py-1.5 text-xs"
-                  aria-label="Filter by pipeline stage"
-                >
-                  <option value="all">All stages</option>
-                  {CRM_STAGE_FILTERS.map((s) => (
-                    <option key={s} value={s}>
-                      {crmStageLabel(s)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-            <div className="relative min-h-0 flex-1 overflow-hidden">
-              {/* Mount heavy panes only after Leads chrome has painted. */}
-              {leadsBodyReady && visitedLayouts.has("map") ? (
-                <div
-                  className={
-                    layout === "map"
-                      ? "absolute inset-0"
-                      : "pointer-events-none invisible absolute inset-0 -z-10"
-                  }
-                  aria-hidden={layout !== "map"}
-                >
-                  <LeadMap
-                    leads={mapLeads}
-                    locationHint={board.run?.location ?? null}
-                    onOpen={openInfo}
-                  />
-                </div>
-              ) : null}
-              {leadsBodyReady && visitedLayouts.has("cards") ? (
-                <div
-                  className={
-                    layout === "cards"
-                      ? "absolute inset-0 overflow-y-auto overscroll-contain"
-                      : "pointer-events-none invisible absolute inset-0 -z-10 overflow-hidden"
-                  }
-                  aria-hidden={layout !== "cards"}
-                >
-                  {cardsLeads.length === 0 ? (
-                    <p className="py-12 text-center text-sm text-mist-500">
-                      No leads match this filter.
-                    </p>
-                  ) : (
-                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                      {cardsLeads.map((lead, i) => (
-                        <LeadCard
-                          key={lead.id}
-                          lead={lead}
-                          index={i}
-                          onOpen={() => openInfo(lead.id)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : null}
-              {leadsBodyReady && visitedLayouts.has("table") ? (
-                <div
-                  className={
-                    layout === "table"
-                      ? "absolute inset-0 flex min-h-0 flex-col"
-                      : "pointer-events-none invisible absolute inset-0 -z-10 overflow-hidden"
-                  }
-                  aria-hidden={layout !== "table"}
-                >
-                  <LeadTable
-                    leads={tableLeads}
-                    statusFilter={pipelineFilter}
-                    onStatusFilterChange={setPipelineFilter}
-                    onOpen={openInfo}
-                    onMoveStage={editLocked ? undefined : onMoveStage}
-                    onUpdateLead={editLocked ? undefined : onUpdateLeadCrm}
-                    onDeleteLead={editLocked ? undefined : (id) => void onDeleteLead(id)}
-                    onDeleteLeads={editLocked ? undefined : onDeleteLeads}
-                    editLocked={editLocked}
-                  />
-                </div>
-              ) : null}
-              {showLeadsContentSkeleton ? (
-                <div
-                  className="absolute inset-0 z-10 bg-ink-950/80"
-                  role="status"
-                  aria-busy="true"
-                  aria-label="Loading leads"
-                >
-                  <LeadsLayoutSkeleton layout={layout} />
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <div data-tour="leads-table" className="min-h-0 flex-1">
-            <EmptyState />
-          </div>
-        )
+        </div>
       )}
 
       {/* Outreach queue — draft / approve / send */}

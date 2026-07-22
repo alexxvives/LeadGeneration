@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Leads instant chrome + virtualized table
+- Unified Leads toolbar (no remount on hydrate). Skeleton only in body;
+  filter lag keeps stale rows (no overlay). `useDeferredLoading(delay≤0)`
+  shows sync. Warm Leads revisits skip `leadsBodyReady` blank frame.
+  Sidebar nav uses pending view for instant highlight. Table rows windowed
+  via `@tanstack/react-virtual` (~2k leads).
+
 ### 2026-07-22 — Leads paint-first nav + layout toggle
 - Entering Leads paints chrome immediately, then mounts table/cards after rAF
   + transition (skeleton meanwhile). Layout toggle updates highlight sync;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { CrmStagePill, FitMeter, StatusPill, crmStageLabel } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
@@ -25,6 +26,9 @@ const STAGE_ORDER: Record<CrmStage, number> = {
   new: 3,
   not_interested: 4,
 };
+
+/** Approx row height (py-3.5 + two-line company/contact). */
+const ROW_ESTIMATE_PX = 56;
 
 type SortKey = "company" | "location" | "contact" | "fit" | "status" | "companyType" | "created";
 
@@ -74,9 +78,12 @@ export function LeadTable({
   });
   const menuRef = useRef<HTMLDivElement | null>(null);
   const pipelineMenuRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const { customCols, vis } = useLeadColumnState();
   const visibleCustom = customCols.filter((c) => !!vis.custom[c.id]);
   const canDelete = Boolean(onDeleteLead || onDeleteLeads) && !editLocked;
+  const colCount =
+    (canDelete ? 1 : 0) + 8 + visibleCustom.length;
 
   const sortedLeads = useMemo(() => {
     const dir = sort.dir === "asc" ? 1 : -1;
@@ -116,6 +123,17 @@ export function LeadTable({
       return cmp * dir;
     });
   }, [leads, sort]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: sortedLeads.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_ESTIMATE_PX,
+    overscan: 16,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  const padTop = virtualRows[0]?.start ?? 0;
+  const padBottom = Math.max(0, totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0));
 
   const allSelected =
     sortedLeads.length > 0 && selected.size === sortedLeads.length;
@@ -197,7 +215,7 @@ export function LeadTable({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl2 border border-white/10">
-      <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto overscroll-contain">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="sticky top-0 z-10 bg-ink-950/95 backdrop-blur-sm">
             <tr className="border-b border-white/10 text-left text-xs uppercase tracking-widest text-mist-500">
@@ -356,7 +374,16 @@ export function LeadTable({
             </tr>
           </thead>
           <tbody>
-            {sortedLeads.map((l) => {
+            {padTop > 0 ? (
+              <tr aria-hidden>
+                <td
+                  colSpan={colCount}
+                  style={{ height: padTop, padding: 0, border: 0 }}
+                />
+              </tr>
+            ) : null}
+            {virtualRows.map((virtualRow) => {
+              const l = sortedLeads[virtualRow.index];
               const domain = displayWebsite(l.website);
               const loc = shortLocation(l.location) ?? "—";
               const stage = l.crmStage ?? "new";
@@ -365,6 +392,7 @@ export function LeadTable({
               return (
                 <tr
                   key={l.id}
+                  data-index={virtualRow.index}
                   onClick={() => onOpen(l.id)}
                   className={`group cursor-pointer border-b border-white/10 transition-colors last:border-0 hover:bg-white/5 ${
                     isChecked ? "bg-aurora-400/[0.04]" : ""
@@ -583,6 +611,14 @@ export function LeadTable({
                 </tr>
               );
             })}
+            {padBottom > 0 ? (
+              <tr aria-hidden>
+                <td
+                  colSpan={colCount}
+                  style={{ height: padBottom, padding: 0, border: 0 }}
+                />
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

@@ -2,17 +2,23 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
-/** Show skeleton only after `delayMs` of continuous loading (avoids flash on fast loads). */
+/** Show skeleton only after `delayMs` of continuous loading (avoids flash on fast loads).
+ *  `delayMs <= 0` shows immediately (no empty frame before the effect tick). */
 export function useDeferredLoading(loading: boolean, delayMs = 200): boolean {
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(() => loading && delayMs <= 0);
   useEffect(() => {
     if (!loading) {
       setShow(false);
       return;
     }
+    if (delayMs <= 0) {
+      setShow(true);
+      return;
+    }
     const t = window.setTimeout(() => setShow(true), delayMs);
     return () => window.clearTimeout(t);
   }, [loading, delayMs]);
+  if (loading && delayMs <= 0) return true;
   return show;
 }
 
