@@ -1200,7 +1200,7 @@ export class D1Store implements LeadRepository {
       const { results } = await this.db
         .prepare(
           `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? AND board_id = ?
-           ORDER BY fit_score DESC`,
+           ORDER BY created_at ASC`,
         )
         .bind(this.workspaceId, filter.runId, filter.boardId)
         .all<LeadRow>();
@@ -1209,7 +1209,7 @@ export class D1Store implements LeadRepository {
     if (filter?.runId) {
       const { results } = await this.db
         .prepare(
-          `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? ORDER BY fit_score DESC`,
+          `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? ORDER BY created_at ASC`,
         )
         .bind(this.workspaceId, filter.runId)
         .all<LeadRow>();
@@ -1218,14 +1218,14 @@ export class D1Store implements LeadRepository {
     if (filter?.boardId) {
       const { results } = await this.db
         .prepare(
-          `SELECT * FROM leads WHERE workspace_id = ? AND board_id = ? ORDER BY fit_score DESC`,
+          `SELECT * FROM leads WHERE workspace_id = ? AND board_id = ? ORDER BY created_at ASC`,
         )
         .bind(this.workspaceId, filter.boardId)
         .all<LeadRow>();
       return results.map(rowToLead);
     }
     const { results } = await this.db
-      .prepare(`SELECT * FROM leads WHERE workspace_id = ? ORDER BY fit_score DESC`)
+      .prepare(`SELECT * FROM leads WHERE workspace_id = ? ORDER BY created_at ASC`)
       .bind(this.workspaceId)
       .all<LeadRow>();
     return results.map(rowToLead);

@@ -191,6 +191,26 @@ function nicheTokens(niche: string): string[] {
     "company",
     "business",
     "businesses",
+    // Romance / Germanic articles that leak into niche strings
+    "el",
+    "la",
+    "los",
+    "las",
+    "del",
+    "una",
+    "uno",
+    "der",
+    "die",
+    "das",
+    "und",
+    "den",
+    "dem",
+    "les",
+    "des",
+    "une",
+    "aux",
+    "dei",
+    "delle",
   ]);
   return niche
     .split(/[^a-z0-9à-ÿ]+/i)

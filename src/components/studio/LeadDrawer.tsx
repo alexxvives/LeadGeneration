@@ -62,6 +62,8 @@ interface DrawerProps {
   capabilities: Capabilities;
   /** info = CRM/profile only; draft = outreach composer only */
   mode?: "info" | "draft";
+  /** Open the dated-note composer (today preselected) — phone contact flow. */
+  promptNote?: boolean;
   onClose: () => void;
   onDraft: (leadId: string) => Promise<void | boolean | string | null>;
   onSaveDraft: (
@@ -127,6 +129,7 @@ const CONTACT_METHODS: { method: ContactMethod; label: string }[] = [
 export function LeadDrawer(props: DrawerProps) {
   const { lead, capabilities, onClose } = props;
   const mode = props.mode ?? "info";
+  const promptNote = props.promptNote ?? false;
   const outreach = lead.outreach;
 
   const initialTo = outreach?.toEmail ?? lead.emails[0] ?? "";
@@ -144,9 +147,10 @@ export function LeadDrawer(props: DrawerProps) {
   const [crmStage, setCrmStage] = useState<CrmStage>(lead.crmStage ?? "new");
   const [contactMethod, setContactMethod] = useState<ContactMethod | null>(lead.contactMethod ?? null);
   const [followUps, setFollowUps] = useState<FollowUp[]>(lead.followUps ?? []);
-  const [showAddNote, setShowAddNote] = useState(false);
+  const [showAddNote, setShowAddNote] = useState(promptNote);
   const [newNoteDate, setNewNoteDate] = useState(todayIsoDate);
   const [newNoteText, setNewNoteText] = useState("");
+  const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const dirty = useMemo(
     () => !sameDraft({ subject, body, toEmail }, savedDraft),
@@ -172,10 +176,22 @@ export function LeadDrawer(props: DrawerProps) {
     setCrmStage(lead.crmStage ?? "new");
     setContactMethod(lead.contactMethod ?? null);
     setFollowUps(lead.followUps ?? []);
-    setShowAddNote(false);
-    setNewNoteDate(todayIsoDate());
-    setNewNoteText("");
-  }, [lead.id, lead.crmStage, lead.contactMethod, lead.followUps]);
+    if (promptNote) {
+      setShowAddNote(true);
+      setNewNoteDate(todayIsoDate());
+      setNewNoteText("");
+    } else {
+      setShowAddNote(false);
+      setNewNoteDate(todayIsoDate());
+      setNewNoteText("");
+    }
+  }, [lead.id, lead.crmStage, lead.contactMethod, lead.followUps, promptNote]);
+
+  useEffect(() => {
+    if (!promptNote || !showAddNote) return;
+    const t = window.setTimeout(() => noteInputRef.current?.focus(), 80);
+    return () => window.clearTimeout(t);
+  }, [promptNote, showAddNote, lead.id]);
 
   const requestClose = () => {
     if (
@@ -551,6 +567,7 @@ export function LeadDrawer(props: DrawerProps) {
                     className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
                   />
                   <textarea
+                    ref={noteInputRef}
                     value={newNoteText}
                     onChange={(e) => setNewNoteText(e.target.value)}
                     rows={3}

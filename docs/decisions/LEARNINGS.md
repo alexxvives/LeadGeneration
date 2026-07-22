@@ -4,6 +4,18 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Outreach CRM sync, phone Ready, settings save race
+- Pipeline stages past New (`contacted`…`not_interested`) now count as
+  **Contacted** in Outreach (`isContacted`).
+- Phone-only leads start in **Ready**; green arrow logs call + opens info
+  notes with today selected. No Edit without email.
+- Create draft language prefers **lead location/country**, not Settings flag.
+- Settings pitch/flag “lost on refresh”: hydrate could overwrite a fresh
+  localStorage save; fixed with `updatedAt` + skip stale hydrate + debounced
+  autosave + flush on flag switch.
+- Lead list default order: `created_at ASC` (import order), not fit DESC.
+- Type column read-only in table; niche stopwords include `die`/articles.
+
 ### 2026-07-22 — Import dedupe = company name; map drawer under Leaflet
 - LEADS→LUMIA gap (~206) was import merge on **website host / email**.
   Aggregators (Instagram, Facebook, Doctoralia, Booksy `help.es@…`) collapsed

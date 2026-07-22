@@ -128,6 +128,7 @@ export function Studio() {
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
+  const [drawerPromptNote, setDrawerPromptNote] = useState(false);
   const [layout, setLayout] = useState<"table" | "cards" | "map">("table");
   const [pipelineFilter, setPipelineFilter] = useState<CrmStage | "all">("all");
   const [editLocked, setEditLocked] = useState(false);
@@ -376,32 +377,6 @@ export function Studio() {
     setAssignOpen(true);
   };
 
-  const loadDemo = async () => {
-    setRunning(true);
-    activeRunIdRef.current = null;
-    setActiveRunId(null);
-    try {
-      const def = boards.find((b) => b.isDefault)?.id ?? boards[0]?.id;
-      await api.createRun({
-        niche: "boutique dental clinics",
-        location: "Austin, TX",
-        offerNotes:
-          "We build booking sites that turn website visitors into scheduled appointments.",
-        demo: true,
-        autoDraft: true,
-        maxLeads: 6,
-        boardId: def,
-      });
-      await refresh();
-      toast("ok", "Demo board loaded — no provider credits used.");
-      setView("pipeline");
-    } catch (e) {
-      handleError(e);
-    } finally {
-      setRunning(false);
-    }
-  };
-
   // Tour (and other chrome) can seed/refresh the board without a full remount.
   useEffect(() => {
     const onRefresh = () => {
@@ -608,7 +583,11 @@ export function Studio() {
     }
   };
 
-  const onMarkContacted = async (leadId: string, method: ContactMethod) => {
+  const onMarkContacted = async (
+    leadId: string,
+    method: ContactMethod,
+    opts?: { promptNote?: boolean },
+  ) => {
     setOutreachBusy(leadId);
     try {
       await onMoveStage(leadId, "contacted", method);
@@ -618,6 +597,11 @@ export function Studio() {
           ? "Logged as called — moved to Contacted."
           : "Logged contact form — moved to Contacted.",
       );
+      if (opts?.promptNote) {
+        setDrawerPromptNote(true);
+        setDrawerMode("info");
+        setSelectedId(leadId);
+      }
     } finally {
       setOutreachBusy(null);
     }
@@ -922,10 +906,12 @@ export function Studio() {
   };
 
   const openInfo = (id: string) => {
+    setDrawerPromptNote(false);
     setDrawerMode("info");
     setSelectedId(id);
   };
   const openDraft = (id: string) => {
+    setDrawerPromptNote(false);
     setDrawerMode("draft");
     setSelectedId(id);
   };
@@ -1233,15 +1219,11 @@ export function Studio() {
       {/* Pipeline view — CRM kanban only */}
       {view === "pipeline" && (
         <div data-tour="pipeline-board" className="min-h-0 flex-1">
-          {hasLeads ? (
-            <PipelineView
-              leads={board!.leads}
-              onOpen={openInfo}
-              onMoveStage={onMoveStage}
-            />
-          ) : (
-            <EmptyState onLoadDemo={loadDemo} running={running} />
-          )}
+          <PipelineView
+            leads={board?.leads ?? []}
+            onOpen={openInfo}
+            onMoveStage={onMoveStage}
+          />
         </div>
       )}
 
@@ -1344,37 +1326,31 @@ export function Studio() {
           </div>
         ) : (
           <div data-tour="leads-table" className="min-h-0 flex-1">
-            <EmptyState onLoadDemo={loadDemo} running={running} />
+            <EmptyState />
           </div>
         )
       )}
 
       {/* Outreach queue — draft / approve / send */}
       {view === "outreach" && (
-        hasLeads ? (
-          <div className="min-h-0 flex-1">
-            <OutreachView
-              leads={board!.leads}
-              canSendEmail={!!board!.capabilities.canSendEmail}
-              emailVerify={!!board!.capabilities.emailVerify}
-              busyId={outreachBusy}
-              onOpenInfo={openInfo}
-              onOpenDraft={openDraft}
-              onCreateDraft={createAndOpenDraft}
-              onApprove={approveContactDraft}
-              onSend={async (outreachId) => {
-                await requestSend(outreachId);
-              }}
-              onDraftAll={onDraftAllOutreach}
-              onSendAll={onSendAllOutreach}
-              onMarkContacted={onMarkContacted}
-            />
-          </div>
-        ) : (
-          <div data-tour="outreach-queue" className="min-h-0 flex-1">
-            <EmptyState onLoadDemo={loadDemo} running={running} />
-          </div>
-        )
+        <div className="min-h-0 flex-1">
+          <OutreachView
+            leads={board?.leads ?? []}
+            canSendEmail={!!board?.capabilities.canSendEmail}
+            emailVerify={!!board?.capabilities.emailVerify}
+            busyId={outreachBusy}
+            onOpenInfo={openInfo}
+            onOpenDraft={openDraft}
+            onCreateDraft={createAndOpenDraft}
+            onApprove={approveContactDraft}
+            onSend={async (outreachId) => {
+              await requestSend(outreachId);
+            }}
+            onDraftAll={onDraftAllOutreach}
+            onSendAll={onSendAllOutreach}
+            onMarkContacted={onMarkContacted}
+          />
+        </div>
       )}
 
       {/* Runs view */}
@@ -1387,8 +1363,12 @@ export function Studio() {
         <LeadDrawer
           lead={selected}
           mode={drawerMode}
+          promptNote={drawerPromptNote}
           capabilities={board.capabilities}
-          onClose={() => setSelectedId(null)}
+          onClose={() => {
+            setDrawerPromptNote(false);
+            setSelectedId(null);
+          }}
           onDraft={onDraft}
           onSaveDraft={onSaveDraft}
           onDecide={onDecide}
@@ -1406,35 +1386,39 @@ export function Studio() {
         title="Deleting leads…"
         className="max-w-sm border-aurora-400/20"
       >
-        <div className="flex items-center gap-3">
-          <Spinner className="h-5 w-5 shrink-0 text-aurora-400" />
-          <div className="min-w-0 flex-1">
-            {deleteProgress && deleteProgress.total > 1 ? (
+        <div className="space-y-3">
+          <p className="text-sm text-mist-300">
+            {deleteProgress ? (
               <>
-                <p className="text-sm text-mist-300">
-                  <span className="tabular-nums text-mist-100">
-                    {deleteProgress.done}
-                  </span>
-                  {" / "}
-                  <span className="tabular-nums">{deleteProgress.total}</span>
-                </p>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-950/60">
-                  <div
-                    className="h-full rounded-full bg-aurora-400 transition-[width] duration-300 ease-out"
-                    style={{
+                <span className="tabular-nums text-mist-100">
+                  {deleteProgress.done}
+                </span>
+                {" / "}
+                <span className="tabular-nums">{deleteProgress.total}</span>
+                {" leads"}
+              </>
+            ) : (
+              "Removing from the board…"
+            )}
+          </p>
+          <div className="h-2 overflow-hidden rounded-full bg-ink-950/60">
+            <div
+              className={`h-full rounded-full bg-aurora-400 transition-[width] duration-300 ease-out ${
+                !deleteProgress || deleteProgress.done === 0
+                  ? "animate-pulse w-1/3"
+                  : ""
+              }`}
+              style={
+                deleteProgress && deleteProgress.total > 0 && deleteProgress.done > 0
+                  ? {
                       width: `${Math.min(
                         100,
                         (deleteProgress.done / deleteProgress.total) * 100,
                       )}%`,
-                    }}
-                  />
-                </div>
-              </>
-            ) : (
-              <p className="text-sm font-medium text-mist-100">
-                Removing from the board…
-              </p>
-            )}
+                    }
+                  : undefined
+              }
+            />
           </div>
         </div>
       </Modal>

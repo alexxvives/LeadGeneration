@@ -587,7 +587,7 @@ export class JsonStore implements LeadRepository {
       if (filter?.boardId && (l.boardId || "") !== filter.boardId) return false;
       return true;
     });
-    return [...leads].map(normalizeLead).sort((a, b) => b.fitScore - a.fitScore);
+    return [...leads].map(normalizeLead).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
   async countLeads(filter?: LeadListFilter): Promise<number> {

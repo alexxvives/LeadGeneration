@@ -26,30 +26,14 @@ export function LayoutToggle({
 }
 
 /** Compact empty CTA — no full-bleed image/gradient (that bled into Search). */
-export function EmptyState({
-  onLoadDemo,
-  running,
-}: {
-  onLoadDemo: () => void;
-  running: boolean;
-}) {
+export function EmptyState() {
   return (
     <div className="rounded-xl2 border border-dashed border-white/10 px-6 py-10 text-center sm:px-8">
       <SparkIcon className="mx-auto h-7 w-7 text-aurora-300" />
       <h2 className="mt-3 font-display text-xl font-semibold text-mist-100">Your board is clear</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-mist-300">
-        Run a search above, or load sample leads to try approve → send without spending provider
-        credits.
+        Run a search or import a list to add leads to this board.
       </p>
-      <button
-        type="button"
-        onClick={onLoadDemo}
-        disabled={running}
-        className="mt-5 inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.03] disabled:opacity-50"
-      >
-        {running ? <Spinner className="h-4 w-4" /> : <SparkIcon className="h-4 w-4" />}
-        Load demo data
-      </button>
     </div>
   );
 }

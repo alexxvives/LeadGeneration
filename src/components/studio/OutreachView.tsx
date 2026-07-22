@@ -8,22 +8,42 @@ import {
   CheckIcon,
   InfoIcon,
   MailIcon,
+  PhoneIcon,
 } from "@/components/icons";
 
 type OutreachBucket = "review" | "ready" | "contacted";
 
+/** Any pipeline stage past New counts as contacted in the Outreach queue. */
 function isContacted(lead: LeadWithOutreach): boolean {
   if (lead.outreach?.status === "sent") return true;
   if (lead.contactMethod === "phone" || lead.contactMethod === "contact_form") {
     return true;
   }
-  return lead.crmStage === "contacted";
+  const stage = lead.crmStage;
+  return (
+    stage === "contacted" ||
+    stage === "in_conversation" ||
+    stage === "closed" ||
+    stage === "not_interested"
+  );
+}
+
+function leadEmail(lead: LeadWithOutreach): string | null {
+  return lead.outreach?.toEmail ?? lead.emails[0] ?? null;
+}
+
+function leadPhone(lead: LeadWithOutreach): string | null {
+  return lead.phones[0] ?? null;
 }
 
 function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   if (isContacted(lead)) return "contacted";
+  const email = leadEmail(lead);
+  const phone = leadPhone(lead);
+  // Phone-only: start in Ready — call, then green-arrow → Contacted + notes.
+  if (!email && phone) return "ready";
+
   const o = lead.outreach;
-  // Ready after Approve (or send-in-flight / last send failed).
   if (
     o?.status === "approved" ||
     o?.status === "sending" ||
@@ -31,7 +51,6 @@ function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   ) {
     return "ready";
   }
-  // Draft, undeliverable (needs a new To address), or no outreach yet.
   if (!o || o.status === "draft" || o.status === "rejected") {
     return "review";
   }
@@ -49,7 +68,7 @@ const BUCKET_META: Record<
   },
   ready: {
     title: "Ready to Contact",
-    hint: "Approved drafts — edit if needed, then send",
+    hint: "Approved drafts — edit if needed, then send. Phone-only: call, then →",
     empty: "Approve a draft in Contact Draft to move it here.",
   },
   contacted: {
@@ -61,7 +80,7 @@ const BUCKET_META: Record<
 
 /**
  * Compact 3-column send queue: Review → Ready → Contacted.
- * No-email leads can be marked contacted via phone / contact form (Ready).
+ * Phone-only leads land in Ready (no email draft required).
  */
 export function OutreachView({
   leads,
@@ -79,19 +98,20 @@ export function OutreachView({
 }: {
   leads: LeadWithOutreach[];
   canSendEmail: boolean;
-  /** When true, busy send shows verify copy. */
   emailVerify?: boolean;
   busyId: string | null;
   onOpenInfo: (id: string) => void;
   onOpenDraft: (id: string) => void;
-  /** Contact Draft: draft from latest profile, then open composer. */
   onCreateDraft: (id: string) => Promise<void>;
-  /** Yellow arrow: approve draft → Ready (creates draft first if needed). */
   onApprove: (leadId: string) => Promise<void>;
   onSend: (outreachId: string) => Promise<void>;
   onDraftAll: () => Promise<void>;
   onSendAll: () => Promise<void>;
-  onMarkContacted: (leadId: string, method: ContactMethod) => Promise<void>;
+  onMarkContacted: (
+    leadId: string,
+    method: ContactMethod,
+    opts?: { promptNote?: boolean },
+  ) => Promise<void>;
 }) {
   const groups: Record<OutreachBucket, LeadWithOutreach[]> = {
     review: [],
@@ -103,97 +123,92 @@ export function OutreachView({
     if (b) groups[b].push(lead);
   }
 
-  const total = groups.review.length + groups.ready.length + groups.contacted.length;
   const columns: OutreachBucket[] = ["review", "ready", "contacted"];
 
   return (
     <div data-tour="outreach-queue" className="flex h-full min-h-0 flex-col gap-3">
-      {total === 0 ? (
-        <p className="rounded-xl2 border border-white/10 bg-ink-900/40 px-5 py-8 text-center text-sm text-mist-400">
-          No outreach yet. Run a search or import a list — drafts appear here to review.
-        </p>
-      ) : (
-        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
-          {columns.map((key) => {
-            const meta = BUCKET_META[key];
-            const rows = groups[key];
-            return (
-              <section
-                key={key}
-                className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
-              >
-                <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
-                  <div className="min-w-0">
-                    <h3 className="text-[11px] font-semibold uppercase tracking-widest text-mist-500">
-                      {meta.title}
-                      <span className="ml-1.5 tabular-nums text-mist-400">{rows.length}</span>
-                    </h3>
-                    <p className="mt-0.5 text-[11px] text-mist-600">{meta.hint}</p>
-                  </div>
-                  {key === "review" && rows.some((l) => !l.outreach) ? (
-                    <button
-                      type="button"
-                      onClick={() => void onDraftAll()}
-                      disabled={busyId === "draft-all"}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                    >
-                      {busyId === "draft-all" ? (
-                        <Spinner className="h-3 w-3" />
-                      ) : (
-                        <CheckIcon className="h-3 w-3" />
-                      )}
-                      Draft all
-                    </button>
-                  ) : null}
-                  {key === "ready" && rows.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => void onSendAll()}
-                      disabled={busyId === "send-all"}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                    >
-                      {busyId === "send-all" ? (
-                        <Spinner className="h-3 w-3" />
-                      ) : (
-                        <ArrowIcon className="h-3 w-3" />
-                      )}
-                      Send all
-                    </button>
-                  ) : null}
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
+        {columns.map((key) => {
+          const meta = BUCKET_META[key];
+          const rows = groups[key];
+          return (
+            <section
+              key={key}
+              className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
+            >
+              <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
+                <div className="min-w-0">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-widest text-mist-500">
+                    {meta.title}
+                    <span className="ml-1.5 tabular-nums text-mist-400">{rows.length}</span>
+                  </h3>
+                  <p className="mt-0.5 text-[11px] text-mist-600">{meta.hint}</p>
                 </div>
+                {key === "review" && rows.some((l) => !l.outreach) ? (
+                  <button
+                    type="button"
+                    onClick={() => void onDraftAll()}
+                    disabled={busyId === "draft-all"}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
+                  >
+                    {busyId === "draft-all" ? (
+                      <Spinner className="h-3 w-3" />
+                    ) : (
+                      <CheckIcon className="h-3 w-3" />
+                    )}
+                    Draft all
+                  </button>
+                ) : null}
+                {key === "ready" && rows.some((l) => leadEmail(l)) ? (
+                  <button
+                    type="button"
+                    onClick={() => void onSendAll()}
+                    disabled={busyId === "send-all"}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
+                  >
+                    {busyId === "send-all" ? (
+                      <Spinner className="h-3 w-3" />
+                    ) : (
+                      <ArrowIcon className="h-3 w-3" />
+                    )}
+                    Send all
+                  </button>
+                ) : null}
+              </div>
 
-                <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                  {rows.length === 0 ? (
-                    <li className="px-3 py-6 text-center text-[11px] text-mist-600">
-                      {meta.empty}
-                    </li>
-                  ) : (
-                    rows.map((lead, i) => (
-                      <OutreachRow
-                        key={lead.id}
-                        lead={lead}
-                        bucket={key}
-                        busy={busyId === lead.id || busyId === lead.outreach?.id}
-                        canSendEmail={canSendEmail}
-                        emailVerify={emailVerify}
-                        showDivider={i > 0}
-                        onOpenInfo={() => onOpenInfo(lead.id)}
-                        onOpenDraft={() => onOpenDraft(lead.id)}
-                        onCreateDraft={() => onCreateDraft(lead.id)}
-                        onApprove={() => onApprove(lead.id)}
-                        onSend={() =>
-                          lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
-                        }
-                        onMarkContacted={(method) => onMarkContacted(lead.id, method)}
-                      />
-                    ))
-                  )}
-                </ul>
-              </section>
-            );
-          })}
-        </div>
-      )}
+              <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                {rows.length === 0 ? (
+                  <li className="px-3 py-6 text-center text-[11px] text-mist-600">
+                    {meta.empty}
+                  </li>
+                ) : (
+                  rows.map((lead, i) => (
+                    <OutreachRow
+                      key={lead.id}
+                      lead={lead}
+                      bucket={key}
+                      busy={busyId === lead.id || busyId === lead.outreach?.id}
+                      canSendEmail={canSendEmail}
+                      emailVerify={emailVerify}
+                      showDivider={i > 0}
+                      onOpenInfo={() => onOpenInfo(lead.id)}
+                      onOpenDraft={() => onOpenDraft(lead.id)}
+                      onCreateDraft={() => onCreateDraft(lead.id)}
+                      onApprove={() => onApprove(lead.id)}
+                      onSend={() =>
+                        lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
+                      }
+                      onMarkContacted={(method, opts) =>
+                        onMarkContacted(lead.id, method, opts)
+                      }
+                    />
+                  ))
+                )}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -226,15 +241,22 @@ function OutreachRow({
   onCreateDraft: () => Promise<void>;
   onApprove: () => Promise<void>;
   onSend: () => Promise<void>;
-  onMarkContacted: (method: ContactMethod) => Promise<void>;
+  onMarkContacted: (
+    method: ContactMethod,
+    opts?: { promptNote?: boolean },
+  ) => Promise<void>;
 }) {
-  const email = lead.outreach?.toEmail ?? lead.emails[0] ?? null;
+  const email = leadEmail(lead);
+  const phone = leadPhone(lead);
+  const phoneOnly = !email && Boolean(phone);
   const [pickingMethod, setPickingMethod] = useState(false);
 
   const hasDraft = Boolean(lead.outreach);
-  // Contact Draft: create when missing; reopen existing unapproved drafts.
-  // Ready/Contacted: open existing.
   const openComposer = () => {
+    if (phoneOnly) {
+      onOpenInfo();
+      return;
+    }
     if (bucket === "review") {
       if (hasDraft) onOpenDraft();
       else void onCreateDraft();
@@ -268,14 +290,23 @@ function OutreachRow({
             <InfoIcon className="h-3 w-3" />
           </button>
         </div>
-        <button
-          type="button"
-          onClick={openComposer}
-          className="mt-0.5 flex w-full min-w-0 items-center gap-1 truncate rounded-md text-left text-[11px] text-mist-500 outline-none hover:text-mist-300 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
-        >
-          <MailIcon className="h-3 w-3 shrink-0" />
-          <span className="truncate">{email ?? "No email"}</span>
-        </button>
+        {email ? (
+          <button
+            type="button"
+            onClick={openComposer}
+            className="mt-0.5 flex w-full min-w-0 items-center gap-1 truncate rounded-md text-left text-[11px] text-mist-500 outline-none hover:text-mist-300 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
+          >
+            <MailIcon className="h-3 w-3 shrink-0" />
+            <span className="truncate">{email}</span>
+          </button>
+        ) : phone ? (
+          <p className="mt-0.5 flex min-w-0 items-center gap-1 truncate text-[11px] text-mist-500">
+            <PhoneIcon className="h-3 w-3 shrink-0" />
+            <span className="truncate">{phone}</span>
+          </p>
+        ) : (
+          <p className="mt-0.5 text-[11px] text-mist-600">No email or phone</p>
+        )}
         {lead.outreach?.status === "failed" && lead.outreach.error ? (
           <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
         ) : null}
@@ -326,13 +357,15 @@ function OutreachRow({
         {bucket === "ready" && (
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center justify-end gap-1">
-              <button
-                type="button"
-                onClick={onOpenDraft}
-                className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
-              >
-                Edit
-              </button>
+              {email && !phoneOnly ? (
+                <button
+                  type="button"
+                  onClick={onOpenDraft}
+                  className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
+                >
+                  Edit
+                </button>
+              ) : null}
               {email ? (
                 <button
                   type="button"
@@ -356,6 +389,17 @@ function OutreachRow({
                 >
                   {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
                 </button>
+              ) : phoneOnly ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onMarkContacted("phone", { promptNote: true })}
+                  aria-label="Mark called — move to Contacted"
+                  title="After you call — move to Contacted and add a note"
+                  className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
+                >
+                  {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
+                </button>
               ) : (
                 <button
                   type="button"
@@ -367,7 +411,7 @@ function OutreachRow({
                 </button>
               )}
             </div>
-            {pickingMethod && !email ? (
+            {pickingMethod && !email && !phoneOnly ? (
               <div className="flex flex-wrap justify-end gap-1">
                 {(
                   [
@@ -381,7 +425,7 @@ function OutreachRow({
                     disabled={busy}
                     onClick={() => {
                       setPickingMethod(false);
-                      void onMarkContacted(method);
+                      void onMarkContacted(method, { promptNote: true });
                     }}
                     className={`${ACTION_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-100 disabled:opacity-50`}
                   >
@@ -397,7 +441,7 @@ function OutreachRow({
             ) : null}
           </div>
         )}
-        {bucket === "contacted" && (
+        {bucket === "contacted" && email ? (
           <button
             type="button"
             onClick={onOpenDraft}
@@ -405,7 +449,7 @@ function OutreachRow({
           >
             View
           </button>
-        )}
+        ) : null}
       </div>
     </li>
   );

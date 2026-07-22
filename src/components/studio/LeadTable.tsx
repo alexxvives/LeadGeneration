@@ -26,7 +26,7 @@ const STAGE_ORDER: Record<CrmStage, number> = {
   not_interested: 4,
 };
 
-type SortKey = "company" | "location" | "contact" | "fit" | "status" | "companyType";
+type SortKey = "company" | "location" | "contact" | "fit" | "status" | "companyType" | "created";
 
 export function LeadTable({
   leads,
@@ -69,8 +69,8 @@ export function LeadTable({
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
-    key: "fit",
-    dir: "desc",
+    key: "created",
+    dir: "asc",
   });
   const menuRef = useRef<HTMLDivElement | null>(null);
   const pipelineMenuRef = useRef<HTMLDivElement | null>(null);
@@ -98,6 +98,9 @@ export function LeadTable({
           break;
         case "fit":
           cmp = a.fitScore - b.fitScore;
+          break;
+        case "created":
+          cmp = a.createdAt.localeCompare(b.createdAt);
           break;
         case "companyType":
           cmp = (a.companyType ?? "").localeCompare(b.companyType ?? "", undefined, {
@@ -395,24 +398,9 @@ export function LeadTable({
                     className="min-w-[7rem] max-w-[11rem] px-3 py-3.5 sm:px-5"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {editLocked ? (
-                      <span className="truncate text-xs text-mist-300" title={l.companyType ?? undefined}>
-                        {l.companyType?.trim() || "—"}
-                      </span>
-                    ) : (
-                      <input
-                        defaultValue={l.companyType ?? ""}
-                        key={`${l.id}-type-${l.companyType ?? ""}`}
-                        onBlur={(e) => {
-                          const next = e.target.value.trim();
-                          if (next !== (l.companyType ?? "")) {
-                            onUpdateLead?.(l.id, { companyType: next || null });
-                          }
-                        }}
-                        placeholder="—"
-                        className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs text-mist-200 outline-none placeholder:text-mist-600 hover:border-white/10 focus:border-aurora-400/50 focus:bg-ink-950/40"
-                      />
-                    )}
+                    <span className="truncate text-xs text-mist-300" title={l.companyType ?? undefined}>
+                      {l.companyType?.trim() || "—"}
+                    </span>
                   </td>
                   <td className="min-w-[8rem] max-w-[14rem] px-3 py-3.5 text-mist-300 sm:px-5">
                     <span className="line-clamp-1" title={l.location ?? undefined}>

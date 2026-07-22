@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createOutreachProfile,
   deleteOutreachProfile,
+  hydrateOutreachProfilesFromServer,
   loadOutreachProfiles,
   primaryPitchLang,
   saveSenderProfile,
@@ -134,11 +135,15 @@ export function SenderProfileForm() {
   const [genProvider, setGenProvider] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const langMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const focusSnapshot = useRef<string | null>(null);
+  /** Always-current profile for flag-switch / debounce save (avoids stale closures). */
+  const profileRef = useRef<OutreachProfile | null>(null);
 
   const profile = profiles.find((p) => p.id === activeId) ?? profiles[0] ?? null;
+  profileRef.current = profile;
 
   const reload = () => {
     const store = loadOutreachProfiles();
@@ -147,7 +152,10 @@ export function SenderProfileForm() {
   };
 
   useEffect(() => {
-    reload();
+    void (async () => {
+      await hydrateOutreachProfilesFromServer();
+      reload();
+    })();
   }, []);
 
   // Open the flag that already has a body (any language — not English-only).
@@ -162,6 +170,7 @@ export function SenderProfileForm() {
   useEffect(() => {
     return () => {
       if (savedTimer.current) clearTimeout(savedTimer.current);
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
   }, []);
 
@@ -202,15 +211,33 @@ export function SenderProfileForm() {
   };
 
   const persist = (next: OutreachProfile, field: SavedField) => {
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
     saveSenderProfile(next);
     setProfiles((prev) => prev.map((p) => (p.id === next.id ? next : p)));
     setActiveId(next.id);
     if (field) flashSaved(field);
   };
 
-  const patch = (partial: Partial<OutreachProfile>) => {
+  const schedulePersist = (next: OutreachProfile, field: SavedField) => {
     setProfiles((prev) =>
-      prev.map((p) => (p.id === profile.id ? { ...p, ...partial } : p)),
+      prev.map((p) => (p.id === next.id ? next : p)),
+    );
+    setActiveId(next.id);
+    setSavedField(null);
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      persist(next, field);
+    }, 600);
+  };
+
+  const patch = (partial: Partial<OutreachProfile>) => {
+    if (!profile) return;
+    const next = { ...profile, ...partial };
+    setProfiles((prev) =>
+      prev.map((p) => (p.id === profile.id ? next : p)),
     );
     setSavedField(null);
   };
@@ -261,9 +288,28 @@ export function SenderProfileForm() {
     persist(next, field);
   };
 
-  /** Switch preview flag only — do not auto-translate the template body. */
+  /** Switch preview flag — flush current slot first so edits are not lost. */
   const switchPreviewLang = (lang: OutreachLang) => {
     setLangMenuOpen(false);
+    const current = profileRef.current;
+    if (current && lang !== previewLang) {
+      const next: OutreachProfile = {
+        ...current,
+        signature: current.signature.trim() || SIGNATURE_PLACEHOLDER,
+        subjects: {
+          ...current.subjects,
+          [previewLang]: (current.subjects[previewLang] ?? current.subjectTemplate ?? "").trim(),
+        },
+        subjectTemplate:
+          (current.subjects[previewLang] ?? current.subjectTemplate ?? "").trim() ||
+          current.subjectTemplate.trim(),
+        pitches: {
+          ...current.pitches,
+          [previewLang]: (current.pitches[previewLang] ?? "").trim(),
+        },
+      };
+      persist(next, "pitch");
+    }
     setSavedField(null);
     setPreviewLang(lang);
   };
@@ -455,12 +501,17 @@ export function SenderProfileForm() {
             <PlaceholderInput
               value={subjectValue}
               onFocus={captureFocus}
-              onChange={(e) =>
-                patch({
-                  subjects: { ...profile.subjects, [previewLang]: e.target.value },
-                  subjectTemplate: e.target.value,
-                })
-              }
+              onChange={(e) => {
+                if (!profile) return;
+                schedulePersist(
+                  {
+                    ...profile,
+                    subjects: { ...profile.subjects, [previewLang]: e.target.value },
+                    subjectTemplate: e.target.value,
+                  },
+                  "subject",
+                );
+              }}
               onBlur={() => saveOnBlur("subject")}
               placeholder="Quick note for {company}"
               className="w-full rounded-lg border border-white/10 bg-ink-900/60 outline-none focus-within:border-aurora-400/60"
@@ -530,9 +581,14 @@ export function SenderProfileForm() {
               value={pitchValue}
               onFocus={captureFocus}
               onChange={(html) => {
-                patch({
-                  pitches: { ...profile.pitches, [previewLang]: html },
-                });
+                if (!profile) return;
+                schedulePersist(
+                  {
+                    ...profile,
+                    pitches: { ...profile.pitches, [previewLang]: html },
+                  },
+                  "pitch",
+                );
               }}
               onBlur={() => saveOnBlur("pitch")}
               placeholder="Write your email body…"

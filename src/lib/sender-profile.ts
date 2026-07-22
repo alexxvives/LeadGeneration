@@ -53,7 +53,13 @@ export type SenderProfile = OutreachProfile;
 type ProfileStore = {
   profiles: OutreachProfile[];
   activeId: string | null;
+  /** ISO timestamp of last local write — used to win hydrate races. */
+  updatedAt?: string;
 };
+
+/** Monotonic local write clock so a slow hydrate cannot clobber a fresh save. */
+let lastLocalWriteMs = 0;
+let hydrateGeneration = 0;
 
 /** Default sign-off shown as placeholder + empty-state resolve target. */
 export const SIGNATURE_PLACEHOLDER = [
@@ -152,14 +158,17 @@ export function subjectForLang(
 
 /**
  * Language for drafting from the active profile.
- * Prefer the profile's primary filled template slot so drafts match what the
- * user is editing — not a stale secondary language from an old translate.
+ * Prefer the lead's country/location so Create matches the prospect — not the
+ * flag currently open in Settings.
  */
 export function resolveDraftLang(
   p: OutreachProfile,
   location: string | null | undefined,
 ): OutreachLang {
-  return primaryPitchLang(p) ?? outreachLangFromLocation(location ?? null);
+  if (location?.trim()) {
+    return outreachLangFromLocation(location);
+  }
+  return primaryPitchLang(p) ?? "en";
 }
 
 /**
@@ -286,31 +295,74 @@ function normalizeProfile(p: Partial<OutreachProfile> & { defaultOffer?: string 
 }
 
 function writeStore(store: ProfileStore): void {
-  localStorage.setItem(KEY, JSON.stringify(store));
-  // Write-through to workspace (best-effort; demo/local still works offline).
+  const updatedAt = new Date().toISOString();
+  const next: ProfileStore = { ...store, updatedAt };
+  lastLocalWriteMs = Date.now();
+  localStorage.setItem(KEY, JSON.stringify(next));
+  // Write-through to workspace — do not silently drop errors (refresh needs server).
   if (typeof window !== "undefined") {
     void fetch("/api/workspace/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ outreachProfilesJson: JSON.stringify(store) }),
-    }).catch(() => {});
+      body: JSON.stringify({ outreachProfilesJson: JSON.stringify(next) }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          console.error(
+            "[outreach-profiles] PATCH failed",
+            res.status,
+            await res.text().catch(() => ""),
+          );
+        }
+      })
+      .catch((err) => {
+        console.error("[outreach-profiles] PATCH network error", err);
+      });
   }
 }
 
 /**
  * Hydrate local cache from the workspace row. One-time migrate: if the server
  * has nothing and localStorage does, push local up.
+ * Skips overwrite when a local save happened after this hydrate started.
  */
 export async function hydrateOutreachProfilesFromServer(): Promise<void> {
   if (typeof window === "undefined") return;
+  const gen = ++hydrateGeneration;
+  const startedAt = Date.now();
   try {
     const res = await fetch("/api/workspace/settings", { cache: "no-store" });
     if (!res.ok) return;
+    if (gen !== hydrateGeneration || lastLocalWriteMs > startedAt) return;
+
     const data = (await res.json()) as { outreachProfilesJson?: string | null };
     const raw = data.outreachProfilesJson?.trim();
     if (raw) {
       const parsed = JSON.parse(raw) as ProfileStore;
       if (Array.isArray(parsed.profiles) && parsed.profiles.length > 0) {
+        if (gen !== hydrateGeneration || lastLocalWriteMs > startedAt) return;
+        const localRaw = localStorage.getItem(KEY);
+        if (localRaw) {
+          try {
+            const local = JSON.parse(localRaw) as ProfileStore;
+            if (
+              local.updatedAt &&
+              parsed.updatedAt &&
+              local.updatedAt > parsed.updatedAt
+            ) {
+              return;
+            }
+            if (
+              local.updatedAt &&
+              !parsed.updatedAt &&
+              lastLocalWriteMs > startedAt - 15_000
+            ) {
+              return;
+            }
+          } catch {
+            /* ignore bad local */
+          }
+        }
         localStorage.setItem(KEY, JSON.stringify(parsed));
         return;
       }
