@@ -9,19 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-21 (bulk-delete chunking)
+## ⏱️ Status — updated 2026-07-22 (board clear delete)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Bulk-delete: client chunks past API max(500); optimistic hide + progress
-  modal so large “select all” deletes don’t 400 or flash rows back.
-- Prior: import quality / free-mail invent; D1 repair from LEADS.xlsx.
+- Bulk-delete hardening: `{ boardId }` set-based clear for full-board wipe
+  (ids path still chunked ≤500). Deployed to Worker after live 400 persisted.
 
 ### Next
-1. Deploy bulk-delete chunking + prior import quality/speed fixes.
+1. Hard-refresh /app and confirm select-all delete succeeds on large boards.
 2. Optional clean re-import of full ~2482 rows (current board is email-row set).
 3. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
 4. Measure email-found % on live Firecrawl runs.

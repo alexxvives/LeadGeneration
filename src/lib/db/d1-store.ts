@@ -1177,6 +1177,24 @@ export class D1Store implements LeadRepository {
     return deleted;
   }
 
+  async deleteLeadsByBoard(boardId: string): Promise<number> {
+    if (!boardId) return 0;
+    // Prefer set-based deletes so we never ship thousands of ids over the wire.
+    await this.db
+      .prepare(
+        `DELETE FROM outreach WHERE workspace_id = ? AND lead_id IN (
+           SELECT id FROM leads WHERE workspace_id = ? AND board_id = ?
+         )`,
+      )
+      .bind(this.workspaceId, this.workspaceId, boardId)
+      .run();
+    const result = await this.db
+      .prepare(`DELETE FROM leads WHERE workspace_id = ? AND board_id = ?`)
+      .bind(this.workspaceId, boardId)
+      .run();
+    return result.meta?.changes ?? 0;
+  }
+
   async listLeads(filter?: LeadListFilter): Promise<Lead[]> {
     if (filter?.runId && filter?.boardId) {
       const { results } = await this.db

@@ -311,13 +311,31 @@ export const api = {
     jsonFetch<{ ok: boolean }>(`/api/leads/${id}`, { method: "DELETE" }),
 
   /**
-   * Bulk-delete. Server accepts at most 500 ids per request — we chunk here
-   * so “select all” on large boards doesn’t 400.
+   * Bulk-delete. Prefer `boardId` (set-based clear) when wiping a whole board —
+   * the ids path is capped at 500/request and is chunked here as a fallback.
    */
   deleteLeads: async (
     ids: string[],
-    opts?: { onProgress?: (done: number, total: number) => void },
+    opts?: {
+      boardId?: string | null;
+      /** When true + boardId set, clear the board in one request (no id list). */
+      clearBoard?: boolean;
+      onProgress?: (done: number, total: number) => void;
+    },
   ) => {
+    if (opts?.clearBoard && opts.boardId) {
+      opts.onProgress?.(0, Math.max(ids.length, 1));
+      const result = await jsonFetch<{ deleted: number }>(
+        "/api/leads/bulk-delete",
+        {
+          method: "POST",
+          body: JSON.stringify({ boardId: opts.boardId }),
+        },
+      );
+      opts.onProgress?.(ids.length || result.deleted, ids.length || result.deleted);
+      return result;
+    }
+
     const CHUNK = 500;
     const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
     let deleted = 0;
@@ -331,7 +349,10 @@ export const api = {
         },
       );
       deleted += result.deleted;
-      opts?.onProgress?.(Math.min(i + chunk.length, unique.length), unique.length);
+      opts?.onProgress?.(
+        Math.min(i + chunk.length, unique.length),
+        unique.length,
+      );
     }
     return { deleted };
   },

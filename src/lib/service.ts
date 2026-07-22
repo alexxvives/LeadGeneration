@@ -1486,6 +1486,22 @@ export async function deleteLeads(
   return { deleted };
 }
 
+/**
+ * Delete every lead on a board (set-based). Prefer this for “select all” /
+ * clear-board so the client never POSTs thousands of ids (API max 500 → 400).
+ */
+export async function clearBoardLeads(
+  ctx: Ctx,
+  boardId: string,
+): Promise<{ deleted: number }> {
+  const access = await resolveBoardAccess(ctx, boardId);
+  if (!access) throw new Error("Board not found");
+  await assertBoardEditable(ctx, boardId);
+  await cancelRunningImportRuns(ctx);
+  const deleted = await access.db.deleteLeadsByBoard(boardId);
+  return { deleted };
+}
+
 /** Mark every running import as failed so late chunks stop writing. */
 export async function cancelRunningImportRuns(ctx: Ctx): Promise<number> {
   const runs = await ctx.db.listRuns();

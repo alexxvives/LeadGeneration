@@ -136,6 +136,8 @@ export interface LeadRepository {
   deleteLead(id: string): Promise<boolean>;
   /** Bulk delete leads + their outreach. Returns number removed. */
   deleteLeads(ids: string[]): Promise<number>;
+  /** Delete every lead (and outreach) on a board. Returns number removed. */
+  deleteLeadsByBoard(boardId: string): Promise<number>;
 
   // Outreach
   upsertOutreach(outreach: Outreach): Promise<Outreach>;

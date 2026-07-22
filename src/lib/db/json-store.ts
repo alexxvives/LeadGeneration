@@ -629,6 +629,22 @@ export class JsonStore implements LeadRepository {
     });
   }
 
+  deleteLeadsByBoard(boardId: string): Promise<number> {
+    if (!boardId) return Promise.resolve(0);
+    return this.mutate((data) => {
+      const remove = new Set(
+        data.leads
+          .filter((l) => this.inScope(l) && l.boardId === boardId)
+          .map((l) => l.id),
+      );
+      if (remove.size === 0) return { data, result: 0 };
+      const before = data.leads.length;
+      data.leads = data.leads.filter((l) => !remove.has(l.id));
+      data.outreach = data.outreach.filter((o) => !remove.has(o.leadId));
+      return { data, result: before - data.leads.length };
+    });
+  }
+
   // ---- Outreach ----
   upsertOutreach(outreach: Outreach): Promise<Outreach> {
     return this.mutate((data) => {

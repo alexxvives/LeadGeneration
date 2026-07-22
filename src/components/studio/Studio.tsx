@@ -969,16 +969,33 @@ export function Studio() {
 
   const onDeleteLeads = async (leadIds: string[]) => {
     const idSet = new Set(leadIds);
+    const boardLeads = board?.leads ?? [];
+    // Full wipe of the filtered board view → one set-based API call (avoids
+    // the 500-id cap / huge POST that was 400’ing on production).
+    const clearingBoard =
+      Boolean(filterBoardId) &&
+      boardLeads.length > 0 &&
+      leadIds.length >= boardLeads.length &&
+      boardLeads.every((l) => idSet.has(l.id));
     importAbortRef.current?.abort();
     setDeletingLeads(true);
     setDeleteProgress({ done: 0, total: leadIds.length });
     // Optimistic — hide rows immediately so large deletes don’t feel stuck.
     setBoard((b) =>
-      b ? { ...b, leads: b.leads.filter((l) => !idSet.has(l.id)) } : b,
+      b
+        ? {
+            ...b,
+            leads: clearingBoard
+              ? []
+              : b.leads.filter((l) => !idSet.has(l.id)),
+          }
+        : b,
     );
     setSelectedId((cur) => (cur && idSet.has(cur) ? null : cur));
     try {
       const { deleted } = await api.deleteLeads(leadIds, {
+        boardId: filterBoardId,
+        clearBoard: clearingBoard,
         onProgress: (done, total) => setDeleteProgress({ done, total }),
       });
       toast(

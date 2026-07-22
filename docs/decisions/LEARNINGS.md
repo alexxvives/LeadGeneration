@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Bulk-delete still 400 on live
+- Client chunking was in git but live still saw **one** oversized POST (Worker
+  logs: 400, ~242ms CPU — not N×500 chunks). Hardening: `{ boardId }` set-based
+  clear (D1 `DELETE … WHERE board_id`) for full-board wipe; ids path kept as
+  chunked fallback. Deploy required for the browser to pick it up.
+
 ### 2026-07-21 — Bulk-delete 400 on “select all”
 - `/api/leads/bulk-delete` zod-maxes `ids` at **500**. Selecting all on a
   ~600+ lead board POSTed one body → 400; optimistic hide then `refresh()`
