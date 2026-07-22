@@ -389,6 +389,7 @@ export const api = {
         location: number;
         contactName: number;
         companyType: number;
+        crmStage: number;
       }> | null;
     }>("/api/ai/map-columns", {
       method: "POST",

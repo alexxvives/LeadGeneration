@@ -155,6 +155,7 @@ export type ImportColumnField =
   | "location"
   | "contactName"
   | "companyType"
+  | "crmStage"
   | "ignore";
 
 /**
@@ -173,13 +174,14 @@ export async function mapImportColumns(
     [
       "Map spreadsheet column headers to CRM import fields.",
       "Return JSON only, no markdown.",
-      "Keys: company, emails, website, phones, location, contactName, companyType.",
+      "Keys: company, emails, website, phones, location, contactName, companyType, crmStage.",
       "Values: 0-based column index (integer), or omit the key if no column fits.",
       "Pick at most one column per key. Prefer work email over personal when unsure.",
       "company = business/account/opportunity name — NOT a person's name.",
       "When both Opportunity (or Account/Company) and Name exist: company→Opportunity/Account/Company, contactName→Name.",
       "contactName = person (Name, Contact, Owner, Full name).",
       "companyType = category/industry/type/vertical — incl. Spanish Categoria/Categoría, French Catégorie, Tipo.",
+      "crmStage = sales pipeline stage / status (Stage, Status, Pipeline, Deal stage) — NOT email delivery status.",
       "location = street address / city / Address column.",
       "Headers may be any language (English, French, Spanish, etc.).",
     ].join(" "),
@@ -198,6 +200,7 @@ export async function mapImportColumns(
       "location",
       "contactName",
       "companyType",
+      "crmStage",
     ];
     const result: Partial<Record<ImportColumnField, number>> = {};
     for (const f of fields) {

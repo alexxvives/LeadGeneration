@@ -15,6 +15,13 @@ const RowSchema = z.object({
   contactName: z.string().max(120).nullable().optional(),
   location: z.string().max(400).nullable().optional(),
   companyType: z.string().max(120).nullable().optional(),
+  crmStage: z
+    .enum(["new", "contacted", "in_conversation", "closed", "not_interested"])
+    .optional(),
+  contactMethods: z
+    .array(z.enum(["email", "phone", "contact_form"]))
+    .max(3)
+    .optional(),
 });
 
 const BodySchema = z

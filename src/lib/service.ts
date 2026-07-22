@@ -1675,6 +1675,7 @@ export async function importLeads(
   });
 
   const { normalizeWebsiteUrl } = await import("@/lib/website");
+  const { preferCrmStage } = await import("@/lib/import-crm-stage");
 
   const cleaned = rows
     .map((r) => ({
@@ -1685,6 +1686,8 @@ export async function importLeads(
       contactName: r.contactName?.trim() || null,
       location: r.location?.trim() || null,
       companyType: r.companyType?.trim() || null,
+      crmStage: r.crmStage ?? null,
+      contactMethods: (r.contactMethods ?? []).filter(Boolean),
     }))
     .filter((r) => r.company.length > 0 || r.emails.length > 0);
 
@@ -1818,6 +1821,20 @@ export async function importLeads(
             prev.contactName = r.contactName;
             changed = true;
           }
+          if (r.crmStage) {
+            const nextStage = preferCrmStage(prev.crmStage ?? "new", r.crmStage);
+            if (nextStage !== (prev.crmStage ?? "new")) {
+              prev.crmStage = nextStage;
+              changed = true;
+            }
+            if (
+              r.contactMethods.length > 0 &&
+              (prev.contactMethods?.length ?? 0) === 0
+            ) {
+              prev.contactMethods = r.contactMethods;
+              changed = true;
+            }
+          }
           if (
             r.company.trim() &&
             prev.company.length < r.company.trim().length
@@ -1852,6 +1869,18 @@ export async function importLeads(
       }
       if (!match.companyType && r.companyType) patch.companyType = r.companyType;
       if (!match.contactName && r.contactName) patch.contactName = r.contactName;
+      if (r.crmStage) {
+        const nextStage = preferCrmStage(match.crmStage ?? "new", r.crmStage);
+        if (nextStage !== (match.crmStage ?? "new")) {
+          patch.crmStage = nextStage;
+        }
+        if (
+          r.contactMethods.length > 0 &&
+          (match.contactMethods?.length ?? 0) === 0
+        ) {
+          patch.contactMethods = r.contactMethods;
+        }
+      }
       if (
         r.company.trim() &&
         (match.company === "Unknown company" ||
@@ -1949,8 +1978,8 @@ export async function importLeads(
         fitReasons: scored.reasons,
         sourceUrl: website || "import",
         status: "new" as const,
-        crmStage: "new" as const,
-        contactMethods: [],
+        crmStage: r.crmStage ?? ("new" as const),
+        contactMethods: r.contactMethods ?? [],
         notes: null,
         followUps: [],
         customFields: {},

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Spinner } from "@/components/ui";
 import { api } from "@/lib/client-api";
 import type { ImportLeadRow } from "@/lib/types";
+import { parseImportCrmStage } from "@/lib/import-crm-stage";
 import { normalizeWebsiteUrl } from "@/lib/website";
 
 /** Normalize header cells for fuzzy column matching (alias fallback). */
@@ -71,6 +72,17 @@ const TYPE_PREFER = [
   "businesstype",
   "venue",
 ];
+const STAGE_PREFER = [
+  "stage",
+  "crmstage",
+  "pipelinestage",
+  "dealstage",
+  "salesstage",
+  "pipeline",
+  "status",
+  "leadstatus",
+  "dealstatus",
+];
 
 type ColMap = {
   company: number;
@@ -80,6 +92,7 @@ type ColMap = {
   location: number;
   contactName: number;
   companyType: number;
+  crmStage: number;
 };
 
 function pickColPreferred(headers: string[], preferred: string[]): number {
@@ -100,6 +113,7 @@ function aliasColMap(headers: string[]): ColMap {
     location: pickColPreferred(headers, LOCATION_PREFER),
     contactName: pickColPreferred(headers, CONTACT_PREFER),
     companyType: pickColPreferred(headers, TYPE_PREFER),
+    crmStage: pickColPreferred(headers, STAGE_PREFER),
   };
 }
 
@@ -161,6 +175,7 @@ function reconcileColMap(ai: ColMap, alias: ColMap, matrix: string[][]): ColMap 
   out.location = preferDense(out.location, alias.location);
   out.contactName = preferDense(out.contactName, alias.contactName);
   out.companyType = preferDense(out.companyType, alias.companyType);
+  out.crmStage = preferDense(out.crmStage, alias.crmStage);
   if (out.company < 0) out.company = alias.company;
 
   return out;
@@ -184,6 +199,7 @@ async function resolveColMap(
         location: mapping.location ?? -1,
         contactName: mapping.contactName ?? -1,
         companyType: mapping.companyType ?? -1,
+        crmStage: mapping.crmStage ?? -1,
       };
       return reconcileColMap(ai, alias, matrix);
     }
@@ -262,6 +278,10 @@ async function rowsFromMatrix(matrix: string[][]): Promise<ImportLeadRow[]> {
             .map(normalizePhone)
             .filter((p) => p.replace(/\D/g, "").length >= 6)
         : [];
+    const stageParsed =
+      cols.crmStage >= 0
+        ? parseImportCrmStage(cellStr(row[cols.crmStage]))
+        : null;
     out.push({
       company,
       emails,
@@ -275,6 +295,12 @@ async function rowsFromMatrix(matrix: string[][]): Promise<ImportLeadRow[]> {
         cols.contactName >= 0 ? cellStr(row[cols.contactName]) || null : null,
       companyType:
         cols.companyType >= 0 ? cellStr(row[cols.companyType]) || null : null,
+      ...(stageParsed
+        ? {
+            crmStage: stageParsed.crmStage,
+            contactMethods: stageParsed.contactMethods,
+          }
+        : {}),
     });
   }
   return out;

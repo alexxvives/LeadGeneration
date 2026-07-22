@@ -141,6 +141,8 @@ export function Studio() {
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
   const [drawerPromptNote, setDrawerPromptNote] = useState(false);
   const [layout, setLayout] = useState<"table" | "cards" | "map">("table");
+  /** Toggle highlight — updates urgently; `layout` (pane) may lag in a transition. */
+  const [layoutTab, setLayoutTab] = useState<"table" | "cards" | "map">("table");
   /** Keep each layout mounted after first visit so switching stays instant. */
   const [visitedLayouts, setVisitedLayouts] = useState<Set<"table" | "cards" | "map">>(
     () => new Set(["table"]),
@@ -1025,11 +1027,12 @@ export function Studio() {
     leadSearch !== deferredLeadSearch ||
     pipelineFilter !== deferredPipelineFilter;
 
-  /** Toggle highlight updates immediately; first-time mount of a pane is deferred. */
+  /** Tab highlight updates immediately; pane mount/swap is deferred. */
   const selectLayout = (next: "table" | "cards" | "map") => {
-    setLayout(next);
-    if (visitedLayouts.has(next)) return;
+    setLayoutTab(next);
+    if (next === layout && visitedLayouts.has(next)) return;
     startLayoutTransition(() => {
+      setLayout(next);
       setVisitedLayouts((prev) => {
         if (prev.has(next)) return prev;
         const copy = new Set(prev);
@@ -1047,8 +1050,8 @@ export function Studio() {
   // Warm revisits (data + current layout already known) skip the blank frame.
   const [leadsBodyReady, setLeadsBodyReady] = useState(false);
   const [, startLeadsBodyTransition] = useTransition();
-  const layoutRef = useRef(layout);
-  layoutRef.current = layout;
+  const layoutTabRef = useRef(layoutTab);
+  layoutTabRef.current = layoutTab;
   const visitedLayoutsRef = useRef(visitedLayouts);
   visitedLayoutsRef.current = visitedLayouts;
   const boardLeadsLenRef = useRef(board?.leads.length ?? 0);
@@ -1059,7 +1062,7 @@ export function Studio() {
       return;
     }
     const warm =
-      visitedLayoutsRef.current.has(layoutRef.current) &&
+      visitedLayoutsRef.current.has(layoutTabRef.current) &&
       boardLeadsLenRef.current > 0;
     if (warm) {
       setLeadsBodyReady(true);
@@ -1081,9 +1084,8 @@ export function Studio() {
     hasLeads &&
     (view === "leads" || view === "pipeline" || view === "outreach");
 
-  const layoutPaneReady = visitedLayouts.has(layout);
-  // Skeleton for hydrate / first body / first layout pane only — not filter lag
-  // (stale rows stay visible while useDeferredValue catches up).
+  // Skeleton for hydrate / first body / first visit to a layout tab only.
+  const layoutPaneReady = visitedLayouts.has(layoutTab);
   const leadsContentPending =
     view === "leads" &&
     (loading ||
@@ -1431,13 +1433,13 @@ export function Studio() {
               leads
             </p>
             <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
-              <LayoutToggle active={layout === "table"} onClick={() => selectLayout("table")}>
+              <LayoutToggle active={layoutTab === "table"} onClick={() => selectLayout("table")}>
                 Table
               </LayoutToggle>
-              <LayoutToggle active={layout === "cards"} onClick={() => selectLayout("cards")}>
+              <LayoutToggle active={layoutTab === "cards"} onClick={() => selectLayout("cards")}>
                 Cards
               </LayoutToggle>
-              <LayoutToggle active={layout === "map"} onClick={() => selectLayout("map")}>
+              <LayoutToggle active={layoutTab === "map"} onClick={() => selectLayout("map")}>
                 Map
               </LayoutToggle>
             </div>
@@ -1463,7 +1465,7 @@ export function Studio() {
           </div>
           <div className="relative min-h-0 flex-1 overflow-hidden">
             {loading || leadsHydrating || !board ? (
-              <LeadsLayoutSkeleton layout={layout} />
+              <LeadsLayoutSkeleton layout={layoutTab} />
             ) : !hasLeads ? (
               <EmptyState />
             ) : (
@@ -1541,9 +1543,9 @@ export function Studio() {
                     aria-busy="true"
                     aria-label="Loading leads"
                   >
-                    <LeadsLayoutSkeleton layout={layout} />
-                  </div>
-                ) : null}
+                  <LeadsLayoutSkeleton layout={layoutTab} />
+                </div>
+              ) : null}
               </>
             )}
           </div>

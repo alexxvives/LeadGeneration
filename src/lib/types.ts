@@ -108,6 +108,10 @@ export interface ImportLeadRow {
   location?: string | null;
   /** Venue / business category (Pharmacy, SPA, …). */
   companyType?: string | null;
+  /** Pipeline stage from spreadsheet (Email Sent, Called, CLIENT, …). */
+  crmStage?: CrmStage;
+  /** Contact channels implied by stage (e.g. Email Sent → email). */
+  contactMethods?: ContactMethod[];
 }
 
 /**

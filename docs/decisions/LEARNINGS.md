@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Import Stage column + layout tab urgency
+- Spreadsheet Stage/Status mapped via `parseImportCrmStage` (Email Sent→
+  contacted+email, Called→contacted+phone, CLIENT→closed, etc.). Import API
+  accepts crmStage/contactMethods; merges upgrade stage only.
+- Layout toggle: `layoutTab` highlights urgently; pane `layout` + first mount
+  stay in `startTransition` (skeleton on first visit).
+
 ### 2026-07-22 — Leads instant chrome + virtualized table
 - Unified Leads toolbar (no remount on hydrate). Skeleton only in body;
   filter lag keeps stale rows (no overlay). `useDeferredLoading(delay≤0)`
