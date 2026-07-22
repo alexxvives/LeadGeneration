@@ -516,7 +516,7 @@ export function Studio() {
       const parts = [
         imported ? `Added ${imported} new` : null,
         merged
-          ? `updated ${merged} already in workspace (same email/website)`
+          ? `updated ${merged} already in workspace (same company name)`
           : null,
         skipped
           ? `${skipped} already in workspace — no new fields`
@@ -1576,7 +1576,7 @@ export function Studio() {
         subtitle={
           assignMode === "search"
             ? "Search results will be added to the board you pick."
-            : "Rows land on this board. If an email or website already exists anywhere in your workspace, that lead is updated instead of duplicated."
+            : "Rows land on this board. If the same company name already exists anywhere in your workspace, that lead is updated instead of duplicated."
         }
         boards={boards.length ? boards : board?.boards ?? []}
         preferredBoardId={filterBoardId}

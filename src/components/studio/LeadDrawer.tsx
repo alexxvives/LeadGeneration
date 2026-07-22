@@ -255,7 +255,8 @@ export function LeadDrawer(props: DrawerProps) {
   const sent = outreach?.status === "sent";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    // Above Leaflet panes/controls (marker ~600, control ~1000).
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 sm:p-6">
       <div
         className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
         onClick={requestClose}

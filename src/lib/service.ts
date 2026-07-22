@@ -1292,6 +1292,23 @@ function domainKey(website: string | null | undefined): string | null {
   }
 }
 
+/**
+ * Import dedupe key — company name only.
+ * Aggregators (Booksy, Instagram, Facebook, Doctoralia…) share emails/domains
+ * across unrelated locations, so website/email must not collapse those rows.
+ */
+function companyKey(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const trimmed = name.trim();
+  if (!trimmed || /^unknown company$/i.test(trimmed)) return null;
+  const key = trimmed
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^a-z0-9]+/g, "");
+  return key.length >= 2 ? key : null;
+}
+
 /** Rank delivery outcomes so webhooks don't clobber a stronger signal. */
 function deliveryRank(s: DeliveryStatus): number {
   switch (s) {
@@ -1741,27 +1758,74 @@ export async function importLeads(
 
   try {
     const prior = await db.listLeads();
-    const byEmail = new Map<string, Lead>();
-    const byDomain = new Map<string, Lead>();
+    // Name-only: shared aggregator emails/domains must not collapse locations.
+    const byCompany = new Map<string, Lead>();
     for (const l of prior) {
-      for (const e of l.emails) byEmail.set(e.toLowerCase(), l);
-      const d = domainKey(l.website);
-      if (d) byDomain.set(d, l);
+      const ck = companyKey(l.company);
+      if (ck) byCompany.set(ck, l);
     }
 
     const freshRows: typeof cleaned = [];
+    /** Same-chunk name collisions merge into the first fresh row (no Lead id yet). */
+    const freshByCompany = new Map<string, number>();
     const mergePatches: Array<{ id: string; patch: Partial<Lead> }> = [];
     let skipped = 0;
 
     for (const r of cleaned) {
-      const d = domainKey(r.website);
-      const match =
-        r.emails.map((e) => byEmail.get(e)).find(Boolean) ??
-        (d ? byDomain.get(d) : undefined) ??
-        null;
+      const ck = companyKey(r.company);
+      const match = ck ? byCompany.get(ck) ?? null : null;
 
       if (!match) {
+        if (ck && freshByCompany.has(ck)) {
+          const idx = freshByCompany.get(ck)!;
+          const prev = freshRows[idx]!;
+          let changed = false;
+          if ((!prev.website || /\[object\s+Object\]/i.test(prev.website)) && r.website) {
+            prev.website = r.website;
+            changed = true;
+          }
+          if (!prev.location && r.location) {
+            prev.location = r.location;
+            changed = true;
+          } else if (
+            r.location &&
+            prev.location &&
+            r.location.length > prev.location.length
+          ) {
+            prev.location = r.location;
+            changed = true;
+          }
+          if (r.phones.length && prev.phones.length === 0) {
+            prev.phones = r.phones;
+            changed = true;
+          }
+          if (r.emails.length) {
+            const mergedEmails = [...new Set([...prev.emails, ...r.emails])];
+            if (mergedEmails.length > prev.emails.length) {
+              prev.emails = mergedEmails;
+              changed = true;
+            }
+          }
+          if (!prev.companyType && r.companyType) {
+            prev.companyType = r.companyType;
+            changed = true;
+          }
+          if (!prev.contactName && r.contactName) {
+            prev.contactName = r.contactName;
+            changed = true;
+          }
+          if (
+            r.company.trim() &&
+            prev.company.length < r.company.trim().length
+          ) {
+            prev.company = r.company.trim();
+            changed = true;
+          }
+          if (!changed) skipped++;
+          continue;
+        }
         freshRows.push(r);
+        if (ck) freshByCompany.set(ck, freshRows.length - 1);
         continue;
       }
 
@@ -1793,11 +1857,10 @@ export async function importLeads(
       }
       if (Object.keys(patch).length > 0) {
         mergePatches.push({ id: match.id, patch });
-        // Keep in-memory maps current for later rows in this chunk.
+        // Keep in-memory map current for later rows in this chunk.
         const next = { ...match, ...patch };
-        for (const e of next.emails) byEmail.set(e.toLowerCase(), next);
-        const nd = domainKey(next.website);
-        if (nd) byDomain.set(nd, next);
+        const nextKey = companyKey(next.company) ?? ck;
+        if (nextKey) byCompany.set(nextKey, next);
       } else {
         skipped++;
       }
@@ -1898,11 +1961,11 @@ export async function importLeads(
     const boardCount = await db.countLeads({ boardId });
     const parts: string[] = [];
     if (merged > 0) {
-      parts.push(`updated ${merged} already in workspace (same email/website)`);
+      parts.push(`updated ${merged} already in workspace (same company name)`);
     }
     if (skipped > 0) {
       parts.push(
-        `${skipped} already in workspace — no new fields (same email/website)`,
+        `${skipped} already in workspace — no new fields (same company name)`,
       );
     }
 

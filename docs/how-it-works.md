@@ -68,11 +68,12 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
   - **Search** (default / no `?view=`) — always-expanded search form + CSV/Excel
     import. Search and import open a board-picker modal; leads land on the
-    chosen board (workspace **Default** if none). Live search when Firecrawl
-    is configured; otherwise load demo data. After a run, the app redirects to
-    Pipeline. Integration status lives in Settings (no mode banner).
-    **Find leads** can be paused per account by an admin — the Find leads
-    button stays disabled (no pause banner); **Import stays available**.
+    chosen board (workspace **Default** if none). Import dedupes by **company
+    name** only (not website/email — aggregators share those). Live search
+    when Firecrawl is configured; otherwise load demo data. After a run, the
+    app redirects to Pipeline. Integration status lives in Settings (no mode
+    banner). **Find leads** can be paused per account by an admin — the Find
+    leads button stays disabled (no pause banner); **Import stays available**.
 
   - **Admin Users** (`?view=admin-users`) — tenant table: plan override, Find
     leads toggle, typed `DELETE` account wipe (cancels Stripe when configured).

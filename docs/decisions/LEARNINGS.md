@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-22 — Import dedupe = company name; map drawer under Leaflet
+- LEADS→LUMIA gap (~206) was import merge on **website host / email**.
+  Aggregators (Instagram, Facebook, Doctoralia, Booksy `help.es@…`) collapsed
+  unrelated locations. Import now dedupes on **normalized company name only**.
+- Map lead click opened LeadDrawer under the map: Leaflet panes/controls use
+  z-index ~600–1000; drawer was `z-50`. Raised drawer to `z-[1100]`.
+
 ### 2026-07-22 — Import TYPE + map + `{company}` = “Dra”
 - LEADS.xlsx type column is **Categoria** (not Type) — alias list missed it;
   AI sometimes mapped sparse cols. Fix: categoria/tipo aliases + denser-col
@@ -451,8 +458,8 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   score contactability + niche token hits + location (`scoreImportedLead` for CSV).
 - Bulk delete must abort client import + mark running import runs failed, or a
   leftover CSV upload can recreate leads after ?board is clear?.
-- ?Skipped N unchanged? = same email/website already in workspace with no new
-  fields ? not ?file empty?.
+- “Skipped N unchanged” = same company name already in workspace with no new
+  fields — not “file empty”. (Was email/website until 2026-07-22.)
 
 ### 2026-07-16 ? Rich pitch HTML + From ? sign-off
 - Pitch editor HTML (`b`/`i`/`u`/lists) is preserved in `generateDraft`, Settings
