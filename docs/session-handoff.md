@@ -9,22 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-26 (outreach skeleton + sent history)
+## ⏱️ Status — updated 2026-07-26 (deployed outreach + send fixes)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
+**Deployed:** Worker `835d3332-583f-47f2-ae8b-3130ced97a04` (outreach skeleton,
+sent patch, empty-To heal).
 
 ### This pass
-- Outreach: skeleton while loading; backfill hint; Contacted = sent-mail
-  history (sort by `sentAt`, Sent stamp, open draft pane).
-- Send success patches board in place (no page-1 wipe on large boards).
-- Soft refresh merges into already-paged leads.
-- Prior: empty-To heal + Farmàcia To restored in D1.
+- Deployed outreach loading/Contacted fixes + empty-To heal.
+- Clarified: Easy Resend send does **not** land in Hostinger Sent (API path).
 
 ### Next
-1. Deploy (empty-To heal + outreach loading/sent fixes).
-2. Confirm Farmàcia in Outreach → Contacted after deploy/refresh.
+1. Confirm Farmàcia in Outreach → Contacted after hard refresh.
+2. If Hostinger Sent is required: send via Hostinger SMTP (not Resend API).
 3. Smoke Draft all on a board with dozens of undrafted leads.
 4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
