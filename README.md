@@ -60,7 +60,7 @@ Copy `.env.example` → `.env.local` and fill in what you have. All are optional
 | `OUTREACH_FROM_NAME` / `OUTREACH_FROM_EMAIL` | Sender identity | Placeholder identity |
 | `OUTREACH_REPLY_TO` | Reply-to address | Falls back to from email |
 | `OUTREACH_PHYSICAL_ADDRESS` | CAN-SPAM mailing address in footer | Placeholder |
-| `SEND_RATE_PER_MINUTE` | Outbound rate limit (default 5) | 5 |
+| `SEND_RATE_PER_MINUTE` | Outbound rate limit (default 30) | 30 |
 | `ENABLE_CONTACT_FORM_AUTOMATION` | Feature flag (see below) | `false` (off) |
 | `AUTH_SECRET` | **Enables + enforces auth/metering** (Auth.js) | Open studio, unmetered (demo) |
 | `AUTH_RESEND_KEY` | Resend key for magic-link login (prod) | Dev uses any email+password |

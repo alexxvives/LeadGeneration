@@ -95,10 +95,11 @@ export const env = {
     const name = process.env.OUTREACH_FROM_NAME?.trim() || "HERMES mail";
     return `${name} <${raw}>`;
   },
-  // Compliance: how many sends allowed per rolling minute.
+  // HITL batches: enough for ~20 quick sends; still caps stampeding.
+  // Override with SEND_RATE_PER_MINUTE (env / Wrangler var).
   sendRatePerMinute: () => {
     const n = Number(process.env.SEND_RATE_PER_MINUTE);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 5;
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 30;
   },
   smtp: () => ({
     host: process.env.SMTP_HOST?.trim() ?? "",

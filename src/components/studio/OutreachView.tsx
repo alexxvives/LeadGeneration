@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
+import { warmupStatus } from "@/lib/email/warmup";
 import { FitMeter, Spinner } from "@/components/ui";
 import {
   ArrowIcon,
@@ -10,6 +11,20 @@ import {
   MailIcon,
   PhoneIcon,
 } from "@/components/icons";
+
+/** Emails with outreach.sentAt on the local calendar day (board truth). */
+function countEmailsSentToday(leads: LeadWithOutreach[]): number {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const t0 = start.getTime();
+  let n = 0;
+  for (const lead of leads) {
+    const o = lead.outreach;
+    if (o?.status !== "sent" || !o.sentAt) continue;
+    if (new Date(o.sentAt).getTime() >= t0) n += 1;
+  }
+  return n;
+}
 
 type OutreachBucket = "review" | "ready" | "contacted";
 
@@ -91,6 +106,18 @@ const BUCKET_META: Record<
   },
 };
 
+function contactedDayHint(
+  sentToday: number,
+  softCap: number,
+  loadingMore: boolean,
+): string {
+  const n = `${sentToday}${loadingMore ? "…" : ""} sent today`;
+  if (sentToday >= softCap) {
+    return `${n} · over ~${softCap}/day suggest`;
+  }
+  return `${n} · ~${softCap}/day suggest`;
+}
+
 /**
  * Compact 3-column send queue: Review → Ready → Contacted.
  * Phone-only leads land in Ready (no email draft required).
@@ -150,6 +177,10 @@ export function OutreachView({
     return next;
   }, [leads]);
 
+  const sentToday = useMemo(() => countEmailsSentToday(leads), [leads]);
+  const softCap = warmupStatus().softCap;
+  const overSoftCap = sentToday >= softCap;
+
   const columns: OutreachBucket[] = ["review", "ready", "contacted"];
 
   return (
@@ -188,7 +219,22 @@ export function OutreachView({
                     {meta.title}
                     <span className="ml-1.5 tabular-nums text-mist-400">{rows.length}</span>
                   </h3>
-                  <p className="mt-0.5 text-[11px] text-mist-600">{meta.hint}</p>
+                  <p
+                    className={`mt-0.5 text-[11px] ${
+                      key === "contacted" && overSoftCap
+                        ? "text-amber-300/90"
+                        : "text-mist-600"
+                    }`}
+                    title={
+                      key === "contacted"
+                        ? "Soft recommend from Settings → mailbox age. Warning only — not a hard block."
+                        : undefined
+                    }
+                  >
+                    {key === "contacted"
+                      ? contactedDayHint(sentToday, softCap, backfilling)
+                      : meta.hint}
+                  </p>
                 </div>
                 {key === "review" && rows.some((l) => !l.outreach) ? (
                   <button

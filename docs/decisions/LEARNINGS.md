@@ -4,6 +4,18 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-26 — Contacted shows sent-today vs soft daily suggest
+- Outreach → Contacted header: `N sent today · ~Y/day suggest` (amber when
+  over). Count = outreach `sentAt` on local calendar day; Y from Settings
+  mailbox age soft warmup (15/25/40/80). ~20/day is a good personal max for
+  a newer Hostinger inbox.
+
+### 2026-07-26 — Send-all too slow at 5/min
+- Default `SEND_RATE_PER_MINUTE` was 5 and Send-all was sequential — felt
+  slower than hand-sending from the mailbox. Raised default to **30**/min;
+  Send-all now uses concurrency **3** (still retries on 429). Soft daily
+  warmup caps unchanged. Override via env/Wrangler if needed.
+
 ### 2026-07-26 — Workspace BYO SMTP (Hostinger Sent)
 - Resend API sends never appear in Hostinger `INBOX.Sent`. Easy now has
   provider **SMTP** (host/port/user/pass per workspace, migration 0026).

@@ -1151,44 +1151,66 @@ export function Studio() {
     }
 
     setOutreachBusy("send-all");
+    // Modest pool — faster than 1-by-1; SMTP + rate limit still apply.
+    const concurrency = 3;
+    let cursor = 0;
     let sent = 0;
     let failed = 0;
     let hitVerifyLimit = false;
-    try {
-      for (let i = 0; i < targets.length; i++) {
-        const l = targets[i]!;
-        if (!l.outreach) continue;
-        let attempts = 0;
-        for (;;) {
-          try {
-            if (l.outreach.status !== "approved") {
-              await onDecide(l.outreach.id, "approved", { silent: true });
-            }
-            await api.send(l.outreach.id);
-            recordWarmupSend();
-            sent += 1;
-            break;
-          } catch (e) {
-            if (e instanceof QuotaExceededError && e.kind === "verifies") {
-              hitVerifyLimit = true;
-              setVerifyLimitPlan(e.planId);
-              break;
-            }
-            if (e instanceof RateLimitedError && attempts < 8) {
-              attempts += 1;
+    let rateToastAt = 0;
+
+    const sendOne = async (l: (typeof targets)[number]) => {
+      if (!l.outreach || hitVerifyLimit) return;
+      let attempts = 0;
+      for (;;) {
+        if (hitVerifyLimit) return;
+        try {
+          if (l.outreach.status !== "approved") {
+            await onDecide(l.outreach.id, "approved", { silent: true });
+          }
+          await api.send(l.outreach.id);
+          recordWarmupSend();
+          sent += 1;
+          return;
+        } catch (e) {
+          if (e instanceof QuotaExceededError && e.kind === "verifies") {
+            hitVerifyLimit = true;
+            setVerifyLimitPlan(e.planId);
+            return;
+          }
+          if (e instanceof RateLimitedError && attempts < 8) {
+            attempts += 1;
+            const now = Date.now();
+            if (now - rateToastAt > 4_000) {
+              rateToastAt = now;
               toast(
                 "ok",
                 `Pausing for rate limit… ${sent} of ${targets.length} sent`,
               );
-              await new Promise((r) => setTimeout(r, e.retryAfterMs));
-              continue;
             }
-            failed += 1;
-            break;
+            await new Promise((r) => setTimeout(r, e.retryAfterMs));
+            continue;
           }
+          failed += 1;
+          return;
         }
-        if (hitVerifyLimit) break;
       }
+    };
+
+    const worker = async () => {
+      while (!hitVerifyLimit) {
+        const i = cursor++;
+        if (i >= targets.length) return;
+        await sendOne(targets[i]!);
+      }
+    };
+
+    try {
+      await Promise.all(
+        Array.from({ length: Math.min(concurrency, targets.length) }, () =>
+          worker(),
+        ),
+      );
       await refresh();
       if (sent > 0) {
         toast(
