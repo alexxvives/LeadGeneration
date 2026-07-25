@@ -34,7 +34,22 @@ const PatchSchema = z.object({
   ),
   resendApiKey: optionalKey,
   mailerooApiKey: optionalKey,
-  easyEmailProvider: z.enum(["resend", "maileroo"]).optional(),
+  smtpHost: z.preprocess(
+    emptyToNull,
+    z.string().max(253).nullable().optional(),
+  ),
+  smtpPort: z.preprocess((v) => {
+    if (v === undefined) return undefined;
+    if (v === null || v === "") return null;
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : v;
+  }, z.number().int().min(1).max(65535).nullable().optional()),
+  smtpUser: z.preprocess(
+    emptyToNull,
+    z.string().max(254).nullable().optional(),
+  ),
+  smtpPass: optionalKey,
+  easyEmailProvider: z.enum(["resend", "maileroo", "smtp"]).optional(),
   preferredSendPath: z.enum(["easy", "pro"]).nullable().optional(),
   /** MyEmailVerifier list-hygiene at send (requires server verify key). */
   emailVerifyEnabled: z.boolean().optional(),
@@ -42,6 +57,8 @@ const PatchSchema = z.object({
   clearResendApiKey: z.boolean().optional(),
   /** When true, clear Maileroo key (explicit wipe). */
   clearMailerooApiKey: z.boolean().optional(),
+  /** When true, clear SMTP password (host/user unchanged unless also patched). */
+  clearSmtpPass: z.boolean().optional(),
   /** Drafting profiles JSON (profiles + activeId). */
   outreachProfilesJson: z.string().max(200_000).nullable().optional(),
 });
@@ -105,6 +122,13 @@ export async function PATCH(req: Request) {
   if (data.clearMailerooApiKey) patch.mailerooApiKey = null;
   else if (data.mailerooApiKey !== undefined && data.mailerooApiKey !== null) {
     patch.mailerooApiKey = data.mailerooApiKey;
+  }
+  if (data.smtpHost !== undefined) patch.smtpHost = data.smtpHost;
+  if (data.smtpPort !== undefined) patch.smtpPort = data.smtpPort;
+  if (data.smtpUser !== undefined) patch.smtpUser = data.smtpUser;
+  if (data.clearSmtpPass) patch.smtpPass = null;
+  else if (data.smtpPass !== undefined && data.smtpPass !== null) {
+    patch.smtpPass = data.smtpPass;
   }
   if (data.outreachProfilesJson !== undefined) {
     patch.outreachProfilesJson = data.outreachProfilesJson;

@@ -96,7 +96,13 @@ export interface SavedIcp {
 export type PlanId = "free" | "starter" | "pro" | "agency" | "insider";
 
 /** Easy-path transactional sender (Settings). Pro = mailbox OAuth. */
-export type EasyEmailProvider = "resend" | "maileroo";
+export type EasyEmailProvider = "resend" | "maileroo" | "smtp";
+
+/** Normalize persisted / client Easy provider strings. */
+export function normalizeEasyEmailProvider(raw: unknown): EasyEmailProvider {
+  if (raw === "maileroo" || raw === "smtp") return raw;
+  return "resend";
+}
 
 /** Spreadsheet / CSV row after client-side column mapping (import API). */
 export interface ImportLeadRow {
@@ -187,6 +193,14 @@ export interface Workspace {
   resendWebhookSecret: string | null;
   /** Optional BYO Maileroo sending key (Easy peer to Resend — ADR 0011). */
   mailerooApiKey: string | null;
+  /**
+   * Optional BYO SMTP (Hostinger / Zoho / etc.) for Easy send.
+   * Password never sent to the client — only `hasSmtpPass` in Settings.
+   */
+  smtpHost: string | null;
+  smtpPort: number | null;
+  smtpUser: string | null;
+  smtpPass: string | null;
   /** Which Easy transactional provider the workspace prefers. */
   easyEmailProvider: EasyEmailProvider;
   /**

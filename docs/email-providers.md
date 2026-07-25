@@ -103,10 +103,11 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 
 ## How this maps to code
 
-- `src/lib/email/sender.ts`: Google mailbox → workspace Resend/Maileroo →
-  platform Resend → SMTP → demo. Outbound sends tag `leadify_ws` +
-  `leadify_outreach` for webhooks (legacy `lodestar_*` still matched).
-  Bodies are sent as drafted — no STOP / mailing-address auto-footer.
+- `src/lib/email/sender.ts`: Google mailbox → workspace Resend / Maileroo /
+  **BYO SMTP** (Hostinger etc.) → platform Resend → platform SMTP → demo.
+  Outbound sends tag `leadify_ws` + `leadify_outreach` for webhooks (legacy
+  `lodestar_*` still matched). Bodies are sent as drafted — no STOP /
+  mailing-address auto-footer.
 - `src/lib/email/maileroo.ts`: Maileroo HTTP send (`smtp.maileroo.com/api/v2`).
 - `src/lib/email/domain-health.ts` + `POST /api/providers/resend/domain-health`:
   live SPF/DKIM rows from Resend Domains API (demo-safe when no key).
@@ -117,13 +118,20 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   still strips. Plan daily verify caps in Settings + studio; provider
   balance: `GET /api/providers/verify/usage` (alias `/api/providers/zeruh/usage`).
 - Quotas + rate limits in `service.ts`.
-- Settings → Easy: Resend **or** Maileroo + **Verify emails before sending**
-  (MyEmailVerifier) toggle; Pro mailbox Connect Google (`SendSetupPanel`).
+- Settings → Easy: Resend, Maileroo, or **SMTP** (Hostinger / Zoho / etc.) +
+  **Verify emails before sending** (MyEmailVerifier) toggle; Pro mailbox
+  Connect Google (`SendSetupPanel`). Workspace SMTP fields: `smtpHost`,
+  `smtpPort`, `smtpUser`, `smtpPass` (migration 0026). Password never
+  echoed — Settings gets `hasSmtpPass` only. Platform `SMTP_*` env stays
+  auth / last-resort fallback, not tenant mailboxes.
   **Send a test email** (`POST /api/send/test`) hits the same `sendEmail()`
   path without an approved outreach. Workspace `preferredSendPath` chooses
   Easy vs Pro at send time.
   API keys are stored server-side; Settings only receives `hasResendKey` /
-  `hasMailerooKey` flags.
+  `hasMailerooKey` / `hasSmtpPass` flags.
+- **Hostinger Sent:** API sends (Resend/Maileroo) never appear in
+  Hostinger webmail Sent. Easy → SMTP through `smtp.hostinger.com` uses
+  that mailbox; copies often show in Sent (IMAP APPEND not implemented).
 - Stay pluggable: swapping providers is config, not a rewrite.
 - **Webhooks:** `POST /api/webhooks/resend` and `POST /api/webhooks/maileroo`
   (public) — prefer tags (`leadify_ws` + `leadify_outreach`), else latest sent
@@ -135,7 +143,9 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   Warmup: free DIY slow ramp; paid partner optional — no free automated network.
 - **Registrar note:** Domain at Hostinger/GoDaddy/etc. is fine for Easy path —
   add Resend's DNS records there (or at the DNS host if nameservers differ).
-  Resend does not require moving the domain away from the registrar.
+  Resend does not require moving the domain away from the registrar. For
+  Easy → SMTP via Hostinger, SPF should authorize Hostinger’s mail servers
+  (avoid a Resend-only SPF if you leave Resend half-configured).
 
 **Bottom line:** Resend is the right **API shape** for v1 BYO sending;
 **MyEmailVerifier** is the **verify** layer (ADR 0016). Deliverability still

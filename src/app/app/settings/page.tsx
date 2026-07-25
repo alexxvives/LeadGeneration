@@ -65,16 +65,18 @@ export default async function SettingsPage({
     caps.canSendEmail ||
     !!ws?.resendApiKey?.trim() ||
     !!ws?.mailerooApiKey?.trim() ||
+    !!(ws?.smtpHost?.trim() && ws?.smtpUser?.trim() && ws?.smtpPass) ||
     !!ws?.connectedMailbox;
 
-  // Prefer Easy when Maileroo is the Easy provider or user last chose Easy.
+  // Prefer Easy when Maileroo/SMTP is the Easy provider or user last chose Easy.
   const defaultPath: "easy" | "pro" =
     mailboxFlag === "connected"
       ? "pro"
       : ws?.preferredSendPath === "easy" ||
           ws?.preferredSendPath === "pro"
         ? ws.preferredSendPath
-        : ws?.easyEmailProvider === "maileroo"
+        : ws?.easyEmailProvider === "maileroo" ||
+            ws?.easyEmailProvider === "smtp"
           ? "easy"
           : mailbox.connected
             ? "pro"
@@ -187,6 +189,10 @@ export default async function SettingsPage({
             preferredSendPath: ws?.preferredSendPath ?? null,
             hasResendKey: !!ws?.resendApiKey?.trim(),
             hasMailerooKey: !!ws?.mailerooApiKey?.trim(),
+            hasSmtpPass: !!ws?.smtpPass?.trim(),
+            smtpHost: ws?.smtpHost ?? null,
+            smtpPort: ws?.smtpPort ?? null,
+            smtpUser: ws?.smtpUser ?? null,
           }}
           defaults={{
             fromName: env.fromName(),

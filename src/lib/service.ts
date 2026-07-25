@@ -1272,6 +1272,10 @@ export async function sendApprovedOutreach(
           physicalAddress: wsForEmail.physicalAddress,
           resendApiKey: wsForEmail.resendApiKey,
           mailerooApiKey: wsForEmail.mailerooApiKey,
+          smtpHost: wsForEmail.smtpHost,
+          smtpPort: wsForEmail.smtpPort,
+          smtpUser: wsForEmail.smtpUser,
+          smtpPass: wsForEmail.smtpPass,
           easyEmailProvider: wsForEmail.easyEmailProvider,
           preferredSendPath: wsForEmail.preferredSendPath,
           connectedMailbox: wsForEmail.connectedMailbox,
@@ -1282,7 +1286,7 @@ export async function sendApprovedOutreach(
   // Production (metered): never treat demo/no-transport as a real send.
   if (result.ok && result.provider === "demo" && ctx.metered) {
     const msg =
-      "No email transport configured. Add a Resend/Maileroo key in Settings → Easy, or Connect Google on Pro.";
+      "No email transport configured. Add Resend, Maileroo, or SMTP in Settings → Easy, or Connect Google on Pro.";
     const updated = await db.updateOutreach(outreachId, {
       status: "failed",
       error: msg,
@@ -1409,6 +1413,10 @@ export async function sendTestEmail(
           physicalAddress: ws.physicalAddress,
           resendApiKey: ws.resendApiKey,
           mailerooApiKey: ws.mailerooApiKey,
+          smtpHost: ws.smtpHost,
+          smtpPort: ws.smtpPort,
+          smtpUser: ws.smtpUser,
+          smtpPass: ws.smtpPass,
           easyEmailProvider: ws.easyEmailProvider,
           preferredSendPath: ws.preferredSendPath,
           connectedMailbox: ws.connectedMailbox,
@@ -1429,7 +1437,7 @@ export async function sendTestEmail(
         ok: false,
         provider: "demo",
         error:
-          "No email transport configured. Add a Resend/Maileroo key in Settings → Easy, or Connect Google on Pro.",
+          "No email transport configured. Add Resend, Maileroo, or SMTP in Settings → Easy, or Connect Google on Pro.",
       };
     }
     return {
@@ -1565,6 +1573,10 @@ export async function updateWorkspaceEmailSettings(
     physicalAddress?: string | null;
     resendApiKey?: string | null;
     mailerooApiKey?: string | null;
+    smtpHost?: string | null;
+    smtpPort?: number | null;
+    smtpUser?: string | null;
+    smtpPass?: string | null;
     easyEmailProvider?: EasyEmailProvider;
     preferredSendPath?: "easy" | "pro" | null;
     emailVerifyEnabled?: boolean;
@@ -2503,7 +2515,11 @@ export async function listAdminUsers(ctx: Ctx): Promise<AdminUserRow[]> {
         runCount: counts.runs[w.id] ?? 0,
         stripeCustomerId: w.stripeCustomerId,
         hasMailbox: Boolean(w.connectedMailbox),
-        hasEasySendKey: Boolean(w.resendApiKey || w.mailerooApiKey),
+        hasEasySendKey: Boolean(
+          w.resendApiKey ||
+            w.mailerooApiKey ||
+            (w.smtpHost?.trim() && w.smtpUser?.trim() && w.smtpPass),
+        ),
         emailVerifyEnabled: w.emailVerifyEnabled !== false,
         findLeadsEnabled: w.findLeadsEnabled !== false,
         createdAt: w.createdAt,

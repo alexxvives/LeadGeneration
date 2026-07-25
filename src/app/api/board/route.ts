@@ -46,6 +46,7 @@ export async function GET(req: Request) {
     caps.canSendEmail ||
     !!ws?.resendApiKey?.trim() ||
     !!ws?.mailerooApiKey?.trim() ||
+    !!(ws?.smtpHost?.trim() && ws?.smtpUser?.trim() && ws?.smtpPass) ||
     !!ws?.connectedMailbox;
   // Effective verify = server key present AND workspace opted in.
   const emailVerify =

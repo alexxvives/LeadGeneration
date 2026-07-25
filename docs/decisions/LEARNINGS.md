@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-26 — Workspace BYO SMTP (Hostinger Sent)
+- Resend API sends never appear in Hostinger `INBOX.Sent`. Easy now has
+  provider **SMTP** (host/port/user/pass per workspace, migration 0026).
+  Platform `SMTP_*` stays auth/fallback only. Prefill hints for
+  `smtp.hostinger.com:465`. No IMAP APPEND yet — rely on Hostinger storing
+  SMTP sends when it does.
+
 ### 2026-07-26 — Outreach empty stages + missing sent history
 - Outreach had no skeleton while board hydrate → three empty columns.
 - Sent leads belong in **Contacted** (not Runs). On 2k+ boards, page-1

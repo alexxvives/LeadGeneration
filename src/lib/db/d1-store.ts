@@ -12,7 +12,7 @@ import type {
   FollowUp,
   DeliveryStatus,
 } from "@/lib/types";
-import { normalizeCrmStage } from "@/lib/types";
+import { normalizeCrmStage, normalizeEasyEmailProvider } from "@/lib/types";
 import {
   parseContactMethods,
   serializeContactMethods,
@@ -82,6 +82,10 @@ type WorkspaceRow = {
   resend_webhook_id: string | null;
   resend_webhook_secret: string | null;
   maileroo_api_key: string | null;
+  smtp_host: string | null;
+  smtp_port: number | null;
+  smtp_user: string | null;
+  smtp_pass: string | null;
   easy_email_provider: string | null;
   preferred_send_path: string | null;
   // Connected mailbox JSON (migration 0008)
@@ -209,7 +213,12 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
     resendWebhookId: r.resend_webhook_id ?? null,
     resendWebhookSecret: r.resend_webhook_secret ?? null,
     mailerooApiKey: r.maileroo_api_key ?? null,
-    easyEmailProvider: r.easy_email_provider === "maileroo" ? "maileroo" : "resend",
+    smtpHost: r.smtp_host ?? null,
+    smtpPort:
+      typeof r.smtp_port === "number" && r.smtp_port > 0 ? r.smtp_port : null,
+    smtpUser: r.smtp_user ?? null,
+    smtpPass: r.smtp_pass ?? null,
+    easyEmailProvider: normalizeEasyEmailProvider(r.easy_email_provider),
     preferredSendPath:
       r.preferred_send_path === "pro" || r.preferred_send_path === "easy"
         ? r.preferred_send_path
@@ -447,7 +456,13 @@ export class D1Store implements LeadRepository {
       row.resend_webhook_secret = patch.resendWebhookSecret ?? null;
     }
     if ("mailerooApiKey" in patch) row.maileroo_api_key = patch.mailerooApiKey ?? null;
-    if ("easyEmailProvider" in patch) row.easy_email_provider = patch.easyEmailProvider ?? "resend";
+    if ("smtpHost" in patch) row.smtp_host = patch.smtpHost ?? null;
+    if ("smtpPort" in patch) row.smtp_port = patch.smtpPort ?? null;
+    if ("smtpUser" in patch) row.smtp_user = patch.smtpUser ?? null;
+    if ("smtpPass" in patch) row.smtp_pass = patch.smtpPass ?? null;
+    if ("easyEmailProvider" in patch) {
+      row.easy_email_provider = normalizeEasyEmailProvider(patch.easyEmailProvider);
+    }
     if ("preferredSendPath" in patch) {
       row.preferred_send_path = patch.preferredSendPath ?? null;
     }

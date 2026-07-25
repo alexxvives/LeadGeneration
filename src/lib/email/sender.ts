@@ -6,7 +6,11 @@ import {
   richToPlain,
   toEmailHtmlDocument,
 } from "@/lib/outreach/rich-text";
-import type { ConnectedMailbox, EasyEmailProvider } from "@/lib/types";
+import {
+  normalizeEasyEmailProvider,
+  type ConnectedMailbox,
+  type EasyEmailProvider,
+} from "@/lib/types";
 
 export interface SendInput {
   to: string;
@@ -31,6 +35,11 @@ export interface WorkspaceEmailSettings {
   resendApiKey?: string | null;
   /** User's own Maileroo sending key (custom domain). */
   mailerooApiKey?: string | null;
+  /** BYO SMTP (Hostinger / Zoho / etc.) — Easy path. */
+  smtpHost?: string | null;
+  smtpPort?: number | null;
+  smtpUser?: string | null;
+  smtpPass?: string | null;
   /** Preferred Easy provider when both keys could exist. */
   easyEmailProvider?: EasyEmailProvider | null;
   /** Settings tab: Easy vs Pro. Google only when `"pro"`. */
@@ -106,7 +115,7 @@ function resolveSendPath(ws?: WorkspaceEmailSettings): "easy" | "pro" {
  *
  * Priority depends on Settings preferred path:
  *   • Pro → Google mailbox first (when connected), then workspace Easy key
- *   • Easy → workspace Resend or Maileroo only (selected provider; no cross-fallback)
+ *   • Easy → workspace Resend / Maileroo / SMTP (selected provider; no cross-fallback)
  * Then (no workspace Easy key): platform Resend → SMTP → demo.
  *
  * Workspace identity (fromName, fromEmail etc.) overrides env vars so each
@@ -153,8 +162,13 @@ export async function sendEmail(
 
   const wsResendKey = ws?.resendApiKey?.trim() || "";
   const wsMailerooKey = ws?.mailerooApiKey?.trim() || "";
-  const preferred: EasyEmailProvider =
-    ws?.easyEmailProvider === "maileroo" ? "maileroo" : "resend";
+  const wsSmtpHost = ws?.smtpHost?.trim() || "";
+  const wsSmtpUser = ws?.smtpUser?.trim() || "";
+  const wsSmtpPass = ws?.smtpPass ?? "";
+  const wsSmtpReady = Boolean(wsSmtpHost && wsSmtpUser && wsSmtpPass);
+  const preferred: EasyEmailProvider = normalizeEasyEmailProvider(
+    ws?.easyEmailProvider,
+  );
 
   const tryMaileroo = async (): Promise<SendResult | null> => {
     if (!wsMailerooKey) return null;
@@ -190,20 +204,45 @@ export async function sendEmail(
     });
   };
 
+  const tryWorkspaceSmtp = async (): Promise<SendResult | null> => {
+    if (!wsSmtpReady) return null;
+    const port =
+      typeof ws?.smtpPort === "number" && ws.smtpPort > 0 ? ws.smtpPort : 465;
+    return sendWithSmtp({
+      host: wsSmtpHost,
+      port,
+      user: wsSmtpUser,
+      pass: wsSmtpPass,
+      from,
+      to: input.to,
+      subject: input.subject,
+      text,
+      html,
+      replyTo: replyToHeader,
+    });
+  };
+
   /**
-   * Easy BYO: use the selected provider when its key exists.
-   * Do not cross-fallback to the other provider on failure — that surfaces
-   * Resend domain errors while the user has Maileroo selected (and vice versa).
-   * Only try the other key if the preferred key is missing.
+   * Easy BYO: use the selected provider when its credentials exist.
+   * Do not cross-fallback on failure — that surfaces the wrong provider's
+   * errors. Only try another transport if the preferred one is missing.
    */
   const tryEasyKeys = async (): Promise<SendResult | null> => {
+    if (preferred === "smtp") {
+      if (wsSmtpReady) return tryWorkspaceSmtp();
+      if (wsResendKey) return tryResend();
+      if (wsMailerooKey) return tryMaileroo();
+      return null;
+    }
     if (preferred === "maileroo") {
       if (wsMailerooKey) return tryMaileroo();
       if (wsResendKey) return tryResend();
+      if (wsSmtpReady) return tryWorkspaceSmtp();
       return null;
     }
     if (wsResendKey) return tryResend();
     if (wsMailerooKey) return tryMaileroo();
+    if (wsSmtpReady) return tryWorkspaceSmtp();
     return null;
   };
 
@@ -238,27 +277,19 @@ export async function sendEmail(
 
   // Platform SMTP (self-hosted fallback — Maileroo, SES, Postfix, etc.).
   if (caps.smtp) {
-    try {
-      const nodemailer = await import("nodemailer");
-      const { host, port, user, pass } = env.smtp();
-      const transport = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        auth: { user, pass },
-      });
-      const info = await transport.sendMail({
-        from,
-        to: input.to,
-        subject: input.subject,
-        text,
-        ...(html ? { html } : {}),
-        ...(replyToHeader ? { replyTo: replyToHeader } : {}),
-      });
-      return { ok: true, provider: "smtp", id: info.messageId };
-    } catch (err) {
-      return { ok: false, provider: "smtp", error: errMsg(err) };
-    }
+    const { host, port, user, pass } = env.smtp();
+    return sendWithSmtp({
+      host,
+      port,
+      user,
+      pass,
+      from,
+      to: input.to,
+      subject: input.subject,
+      text,
+      html,
+      replyTo: replyToHeader,
+    });
   }
 
   if (proGoogleFail) return proGoogleFail;
@@ -268,6 +299,40 @@ export async function sendEmail(
     `[email:demo] Would send to ${input.to} — subject: "${input.subject}" (no provider configured)`,
   );
   return { ok: true, provider: "demo", id: `demo_${Date.now()}` };
+}
+
+async function sendWithSmtp(opts: {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+  replyTo?: string;
+}): Promise<SendResult> {
+  try {
+    const nodemailer = await import("nodemailer");
+    const transport = nodemailer.createTransport({
+      host: opts.host,
+      port: opts.port,
+      secure: opts.port === 465,
+      auth: { user: opts.user, pass: opts.pass },
+    });
+    const info = await transport.sendMail({
+      from: opts.from,
+      to: opts.to,
+      subject: opts.subject,
+      text: opts.text,
+      ...(opts.html ? { html: opts.html } : {}),
+      ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+    });
+    return { ok: true, provider: "smtp", id: info.messageId };
+  } catch (err) {
+    return { ok: false, provider: "smtp", error: errMsg(err) };
+  }
 }
 
 function errMsg(err: unknown): string {

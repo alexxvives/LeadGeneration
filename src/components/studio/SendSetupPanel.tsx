@@ -20,7 +20,7 @@ import type { EasyEmailProvider, MailboxPublicStatus } from "@/lib/types";
 type PathId = "easy" | "pro";
 
 /**
- * Dual send-path framing: Easy (Resend or Maileroo) is the default wizard;
+ * Dual send-path framing: Easy (Resend / Maileroo / SMTP) is the default wizard;
  * Pro mailbox connect (ADR 0010 — Google first; Microsoft coming).
  */
 export function SendSetupPanel({
@@ -85,7 +85,7 @@ export function SendSetupPanel({
     }
   }
 
-  const isMaileroo = easyProvider === "maileroo";
+  const showResendDns = easyProvider === "resend";
   const softCap = recommendedDailySoftCap(
     mailbox.connected
       ? loadWarmupProfile()
@@ -107,7 +107,7 @@ export function SendSetupPanel({
         ageBand: null,
         volumeBand: null,
       });
-      setMsg("Mailbox disconnected. Easy (Resend / Maileroo) still works.");
+      setMsg("Mailbox disconnected. Easy (Resend / Maileroo / SMTP) still works.");
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Disconnect failed");
     } finally {
@@ -167,8 +167,8 @@ export function SendSetupPanel({
             How do you want to send?
           </h2>
           <p className="text-sm text-mist-500">
-            Easy = any domain via Resend or Maileroo. Pro = send through your real Google
-            mailbox.
+            Easy = Resend, Maileroo, or SMTP (Hostinger). Pro = send through your real
+            Google mailbox.
           </p>
         </div>
         <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-ink-900/60 p-1">
@@ -212,7 +212,7 @@ export function SendSetupPanel({
             easyProvider={easyProvider}
             onEasyProviderChange={setEasyProvider}
           />
-          {!isMaileroo ? (
+          {showResendDns ? (
             <div className="mt-4">
               <DomainHealthPanel compact />
             </div>
@@ -233,7 +233,7 @@ export function SendSetupPanel({
               Pro mailbox connect is for{" "}
               <span className="text-mist-100">Gmail / Google Workspace</span> only right now
               (Microsoft soon). If your mail is hosted elsewhere (Zoho, Hostinger, generic
-              SMTP), use Easy (Resend or Maileroo) with your domain DNS instead.
+              SMTP), use Easy → SMTP with that mailbox, or Resend/Maileroo + DNS.
             </p>
 
             {mailbox.connected ? (

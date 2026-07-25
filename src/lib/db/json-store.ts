@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import {
   normalizeCrmStage,
+  normalizeEasyEmailProvider,
   type Board,
   type BoardInvite,
   type BoardLock,
@@ -40,10 +41,14 @@ function normalizeWorkspace(w: Workspace): Workspace {
     resendWebhookId: (raw.resendWebhookId as string | undefined) ?? null,
     resendWebhookSecret: (raw.resendWebhookSecret as string | undefined) ?? null,
     mailerooApiKey: (raw.mailerooApiKey as string | undefined) ?? null,
-    easyEmailProvider:
-      (raw.easyEmailProvider as Workspace["easyEmailProvider"] | undefined) === "maileroo"
-        ? "maileroo"
-        : "resend",
+    smtpHost: (raw.smtpHost as string | undefined) ?? null,
+    smtpPort:
+      typeof raw.smtpPort === "number" && raw.smtpPort > 0
+        ? raw.smtpPort
+        : null,
+    smtpUser: (raw.smtpUser as string | undefined) ?? null,
+    smtpPass: (raw.smtpPass as string | undefined) ?? null,
+    easyEmailProvider: normalizeEasyEmailProvider(raw.easyEmailProvider),
     preferredSendPath:
       (raw.preferredSendPath as Workspace["preferredSendPath"] | undefined) === "pro" ||
       (raw.preferredSendPath as Workspace["preferredSendPath"] | undefined) === "easy"
