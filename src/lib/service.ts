@@ -1013,15 +1013,20 @@ export async function editOutreach(
   };
   // Recovery after verify undeliverable: new To → back to draft + restore lead email.
   const newTo = patch.toEmail?.trim();
-  if (newTo && existing.status === "rejected") {
-    nextPatch.status = "draft";
+  if (newTo && (existing.status === "rejected" || !existing.toEmail)) {
+    if (existing.status === "rejected") {
+      nextPatch.status = "draft";
+    }
     nextPatch.error = null;
     const lead = await ctx.db.getLead(existing.leadId);
     if (lead) {
       const emails = lead.emails.some((e) => e.toLowerCase() === newTo.toLowerCase())
         ? lead.emails
         : [...lead.emails, newTo];
-      await ctx.db.updateLead(lead.id, { emails, status: "queued" });
+      await ctx.db.updateLead(lead.id, {
+        emails,
+        status: existing.status === "rejected" ? "queued" : lead.status,
+      });
     }
   }
 
@@ -1047,9 +1052,15 @@ export async function setOutreachDecision(
   const allowedFrom = new Set(["draft", "rejected", "failed", "approved"]);
   if (!allowedFrom.has(existing.status)) return existing;
 
+  let restoredTo: string | null | undefined;
+  if (decision === "approved" && !existing.toEmail) {
+    const lead = await db.getLead(existing.leadId);
+    restoredTo = lead?.emails.find((e) => e.trim())?.trim() || null;
+  }
   const outreach = await db.updateOutreach(outreachId, {
     status: decision,
     error: decision === "approved" ? null : existing.error,
+    ...(restoredTo ? { toEmail: restoredTo } : {}),
     updatedAt: nowIso(),
   });
   if (outreach) {
@@ -1119,9 +1130,21 @@ export async function sendApprovedOutreach(
   };
 
   const outreach = claimed;
-  if (!outreach.toEmail) {
-    await releaseClaim("No recipient email on this lead");
-    return { ok: false, error: "No recipient email on this lead" };
+  // Prior verify hard-cleanups (or a re-added CRM email) can leave outreach.To
+  // empty while the lead still has an address — heal before failing the send.
+  let toEmail = outreach.toEmail?.trim() ?? "";
+  if (!toEmail) {
+    const lead = await db.getLead(outreach.leadId);
+    toEmail = lead?.emails.find((e) => e.trim())?.trim() ?? "";
+    if (!toEmail) {
+      await releaseClaim("No recipient email on this lead");
+      return { ok: false, error: "No recipient email on this lead" };
+    }
+    await db.updateOutreach(outreachId, {
+      toEmail,
+      error: null,
+      updatedAt: nowIso(),
+    });
   }
 
   // List hygiene — verify at send only (not on enrich).
@@ -1133,7 +1156,7 @@ export async function sendApprovedOutreach(
     const plan = getPlan(verifyWs.planId);
     const hasVerifyProvider =
       Boolean(env.myEmailVerifierKey()) || Boolean(env.zeruhVerifyKey());
-    const cached = getCachedVerify(outreach.toEmail);
+    const cached = getCachedVerify(toEmail);
     const verifyLimit =
       verifyWs.planId === "insider"
         ? INSIDER_SHARED_POOL.verifiesPerDay
@@ -1152,7 +1175,7 @@ export async function sendApprovedOutreach(
       });
     }
 
-    const verified = await verifyEmail(outreach.toEmail);
+    const verified = await verifyEmail(toEmail);
     if (verified.billed) {
       await db.incrementWorkspaceUsage(ctx.workspaceId, { verifies: 1 });
     }
@@ -1161,7 +1184,7 @@ export async function sendApprovedOutreach(
       // address (MEV false-positives on info@ + greylisted SMBs are common).
       if (verified.hardFail) {
         const lead = await db.getLead(outreach.leadId);
-        const bad = outreach.toEmail.toLowerCase();
+        const bad = toEmail.toLowerCase();
         if (lead) {
           const emails = lead.emails.filter((e) => e.toLowerCase() !== bad);
           await db.updateLead(lead.id, { emails, status: "rejected" });
@@ -1190,9 +1213,9 @@ export async function sendApprovedOutreach(
         error: `Verifier isn't sure this address can receive mail (${detail}). You can send anyway if you trust it.`,
       };
     }
-  } else if (opts?.skipVerify && outreach.toEmail) {
+  } else if (opts?.skipVerify) {
     // Force path — drop a soft-block cache entry so a later normal send rechecks.
-    clearCachedVerify(outreach.toEmail);
+    clearCachedVerify(toEmail);
   }
 
   if (ctx.metered) {
@@ -1230,7 +1253,7 @@ export async function sendApprovedOutreach(
   const cleanBody = stripLegacyCompliance(outreach.body);
   const result = await sendEmail(
     {
-      to: outreach.toEmail,
+      to: toEmail,
       subject: outreach.subject,
       body: cleanBody,
       tags: [

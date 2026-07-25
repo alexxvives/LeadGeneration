@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-26 — Send 400 with verify off = empty outreach.To
+- `/api/send` 400 after disabling verify was **not** verify: outreach
+  `to_email` was null (`No recipient email on this lead`) while the lead
+  still had `info@…` (re-added after earlier strip, or approve without To).
+- Fix: on approve/send, if outreach.To is empty, heal from `lead.emails[0]`.
+  Draft edit with a new To also clears that error when To was empty.
+
 ### 2026-07-26 — Verify soft-block (stop stripping good emails)
 - `/api/send` 400 + “removed it from this lead” was MEV returning **Invalid**
   on real SMB/`info@` addresses, then our hard cleanup stripping the email.
