@@ -31,6 +31,7 @@ import {
   StudioViewSkeleton,
   LeadsLayoutSkeleton,
   OutreachSkeleton,
+  PipelineSkeleton,
   useDeferredLoading,
 } from "./skeletons";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
@@ -1442,13 +1443,9 @@ export function Studio() {
       (hasLeads && (!leadsBodyReady || !layoutPaneReady)));
   const showLeadsContentSkeleton = useDeferredLoading(leadsContentPending, 0);
 
-  // First board fetch with no data yet — full-page skeleton (real shell isn't useful).
-  const showBootSkeleton = useDeferredLoading(loading && !board, 200);
-  if (loading && !board && showBootSkeleton) {
-    return <StudioViewSkeleton view={view} />;
-  }
+  // First board fetch with no data yet — full-page skeleton immediately.
   if (loading && !board) {
-    return <div className="h-dvh" aria-hidden />;
+    return <StudioViewSkeleton view={view} />;
   }
 
   const onDeleteLead = async (leadId: string) => {
@@ -1746,26 +1743,35 @@ export function Studio() {
       {/* Pipeline view — CRM kanban only */}
       {view === "pipeline" && (
         <div data-tour="pipeline-board" className="min-h-0 flex-1">
-          {leadsBackfilling ? (
-            <p
-              className="mb-2 text-[11px] text-mist-500"
-              role="status"
-              aria-live="polite"
-            >
-              Loading leads{" "}
-              <span className="tabular-nums text-mist-300">
-                {board?.leads.length ?? 0}
-                {board?.leadsTotal != null ? `/${board.leadsTotal}` : ""}
-              </span>
-              … column totals are from the database.
-            </p>
-          ) : null}
-          <PipelineView
-            leads={searchFilteredLeads}
-            stageCounts={board?.crmStageCounts}
-            onOpen={openInfo}
-            onMoveStage={onMoveStage}
-          />
+          {loading || leadsHydrating || !board ? (
+            <div role="status" aria-busy="true" aria-label="Loading pipeline">
+              <PipelineSkeleton />
+            </div>
+          ) : (
+            <>
+              {leadsBackfilling ? (
+                <p
+                  className="mb-2 text-[11px] text-mist-500"
+                  role="status"
+                  aria-live="polite"
+                >
+                  Loading more{" "}
+                  <span className="tabular-nums text-mist-300">
+                    {board.leads.length}
+                    {board.leadsTotal != null ? `/${board.leadsTotal}` : ""}
+                  </span>
+                  … top cards first
+                </p>
+              ) : null}
+              <PipelineView
+                leads={searchFilteredLeads}
+                stageCounts={board.crmStageCounts}
+                backfilling={leadsBackfilling}
+                onOpen={openInfo}
+                onMoveStage={onMoveStage}
+              />
+            </>
+          )}
         </div>
       )}
 

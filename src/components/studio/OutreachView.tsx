@@ -11,6 +11,7 @@ import {
   MailIcon,
   PhoneIcon,
 } from "@/components/icons";
+import { useStableDuringLoad } from "./skeletons";
 
 type OutreachBucket = "review" | "ready" | "contacted";
 
@@ -155,7 +156,7 @@ export function OutreachView({
     opts?: { promptNote?: boolean },
   ) => Promise<void>;
 }) {
-  const groups = useMemo(() => {
+  const grouped = useMemo(() => {
     const next: Record<OutreachBucket, LeadWithOutreach[]> = {
       review: [],
       ready: [],
@@ -165,11 +166,29 @@ export function OutreachView({
       const b = bucketOf(lead);
       if (b) next[b].push(lead);
     }
-    next.review.sort(byFitThenCompany);
-    next.ready.sort(byFitThenCompany);
-    next.contacted.sort(byContactedRecent);
     return next;
   }, [leads]);
+
+  const reviewRows = useStableDuringLoad(
+    grouped.review,
+    byFitThenCompany,
+    backfilling,
+  );
+  const readyRows = useStableDuringLoad(
+    grouped.ready,
+    byFitThenCompany,
+    backfilling,
+  );
+  const contactedRows = useStableDuringLoad(
+    grouped.contacted,
+    byContactedRecent,
+    backfilling,
+  );
+  const groups: Record<OutreachBucket, LeadWithOutreach[]> = {
+    review: reviewRows,
+    ready: readyRows,
+    contacted: contactedRows,
+  };
 
   const softCap = warmupStatus().softCap;
   const overSoftCap = sendsToday >= softCap;
@@ -184,7 +203,7 @@ export function OutreachView({
           role="status"
           aria-live="polite"
         >
-          Loading leads
+          Loading more
           {loadedCount != null ? (
             <>
               {" "}
@@ -194,7 +213,7 @@ export function OutreachView({
               </span>
             </>
           ) : null}
-          … sent mail appears in Contacted as rows arrive.
+          … top of each column first
         </p>
       ) : null}
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">

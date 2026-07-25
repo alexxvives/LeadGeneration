@@ -1222,12 +1222,20 @@ export class D1Store implements LeadRepository {
     // Pagination only when `limit` is set (Studio progressive hydrate).
     const pageSql = limit != null ? ` LIMIT ? OFFSET ?` : "";
     const pageBind = limit != null ? [limit, offset] : [];
+    // Recent sends first (Pipeline Contacted top), then high-fit (Contact Draft),
+    // so progressive pages fill the top of columns before the bottom.
+    const orderSql = `ORDER BY
+         CASE WHEN o.status = 'sent' THEN o.sent_at ELSE NULL END DESC,
+         l.fit_score DESC,
+         l.created_at DESC`;
 
     if (filter?.runId && filter?.boardId) {
       const { results } = await this.db
         .prepare(
-          `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? AND board_id = ?
-           ORDER BY created_at ASC${pageSql}`,
+          `SELECT l.* FROM leads l
+           LEFT JOIN outreach o ON o.lead_id = l.id
+           WHERE l.workspace_id = ? AND l.run_id = ? AND l.board_id = ?
+           ${orderSql}${pageSql}`,
         )
         .bind(this.workspaceId, filter.runId, filter.boardId, ...pageBind)
         .all<LeadRow>();
@@ -1236,7 +1244,10 @@ export class D1Store implements LeadRepository {
     if (filter?.runId) {
       const { results } = await this.db
         .prepare(
-          `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? ORDER BY created_at ASC${pageSql}`,
+          `SELECT l.* FROM leads l
+           LEFT JOIN outreach o ON o.lead_id = l.id
+           WHERE l.workspace_id = ? AND l.run_id = ?
+           ${orderSql}${pageSql}`,
         )
         .bind(this.workspaceId, filter.runId, ...pageBind)
         .all<LeadRow>();
@@ -1245,7 +1256,10 @@ export class D1Store implements LeadRepository {
     if (filter?.boardId) {
       const { results } = await this.db
         .prepare(
-          `SELECT * FROM leads WHERE workspace_id = ? AND board_id = ? ORDER BY created_at ASC${pageSql}`,
+          `SELECT l.* FROM leads l
+           LEFT JOIN outreach o ON o.lead_id = l.id
+           WHERE l.workspace_id = ? AND l.board_id = ?
+           ${orderSql}${pageSql}`,
         )
         .bind(this.workspaceId, filter.boardId, ...pageBind)
         .all<LeadRow>();
@@ -1253,7 +1267,10 @@ export class D1Store implements LeadRepository {
     }
     const { results } = await this.db
       .prepare(
-        `SELECT * FROM leads WHERE workspace_id = ? ORDER BY created_at ASC${pageSql}`,
+        `SELECT l.* FROM leads l
+         LEFT JOIN outreach o ON o.lead_id = l.id
+         WHERE l.workspace_id = ?
+         ${orderSql}${pageSql}`,
       )
       .bind(this.workspaceId, ...pageBind)
       .all<LeadRow>();

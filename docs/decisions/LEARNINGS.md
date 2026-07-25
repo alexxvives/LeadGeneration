@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-26 — Skeleton back; load top-of-column first
+- Pipeline hydrate had dropped to spinners/text — restored `PipelineSkeleton`
+  (+ immediate boot skeleton). Progressive `listLeads` now orders
+  sent_at DESC → fit DESC so page-1 fills column tops; during backfill
+  `useStableDuringLoad` appends newcomers at the bottom (no top pop-in).
+
 ### 2026-07-26 — Pipeline Contacted “only 4” was client paging wipe
 - D1 truth: LUMIA had **169** contacted + **17** sends with “Email sent”
   notes; UI showed a handful. Cause: Pipeline filters `board.leads` only, and

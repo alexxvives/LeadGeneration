@@ -1,6 +1,49 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+
+/**
+ * While `loadingMore`, keep the first-seen order and append newcomers at the
+ * end — prevents cards jumping into the top of a column mid-backfill.
+ */
+export function useStableDuringLoad<T extends { id: string }>(
+  items: T[],
+  compare: (a: T, b: T) => number,
+  loadingMore: boolean,
+): T[] {
+  const frozenIdsRef = useRef<string[] | null>(null);
+
+  useEffect(() => {
+    if (loadingMore) {
+      if (frozenIdsRef.current === null && items.length > 0) {
+        frozenIdsRef.current = [...items].sort(compare).map((i) => i.id);
+      }
+    } else {
+      frozenIdsRef.current = null;
+    }
+  }, [loadingMore, items, compare]);
+
+  return useMemo(() => {
+    const sorted = [...items].sort(compare);
+    const frozen = frozenIdsRef.current;
+    if (!loadingMore || !frozen) return sorted;
+    const byId = new Map(items.map((i) => [i.id, i]));
+    const head: T[] = [];
+    for (const id of frozen) {
+      const item = byId.get(id);
+      if (item) head.push(item);
+    }
+    const seen = new Set(head.map((i) => i.id));
+    const tail = sorted.filter((i) => !seen.has(i.id));
+    return [...head, ...tail];
+  }, [items, loadingMore, compare]);
+}
 
 /** Show skeleton only after `delayMs` of continuous loading (avoids flash on fast loads).
  *  `delayMs <= 0` shows immediately (no empty frame before the effect tick). */

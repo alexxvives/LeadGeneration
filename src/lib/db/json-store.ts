@@ -597,9 +597,21 @@ export class JsonStore implements LeadRepository {
       if (filter?.boardId && (l.boardId || "") !== filter.boardId) return false;
       return true;
     });
+    const dataFull = data;
+    const sentAt = (id: string) => {
+      const o = dataFull.outreach.find((x) => x.leadId === id);
+      return o?.status === "sent" ? o.sentAt ?? "" : "";
+    };
     const sorted = [...leads]
       .map(normalizeLead)
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      .sort((a, b) => {
+        const aSent = sentAt(a.id);
+        const bSent = sentAt(b.id);
+        if (aSent !== bSent) return bSent.localeCompare(aSent);
+        const fit = (b.fitScore ?? 0) - (a.fitScore ?? 0);
+        if (fit !== 0) return fit;
+        return b.createdAt.localeCompare(a.createdAt);
+      });
     const offset = Math.max(0, filter?.offset ?? 0);
     if (filter?.limit != null && filter.limit >= 0) {
       return sorted.slice(offset, offset + filter.limit);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -16,6 +16,7 @@ import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
 import { FitMeter } from "@/components/ui";
 import { displayWebsite } from "@/lib/website";
+import { Bone, useStableDuringLoad } from "./skeletons";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
 
@@ -72,11 +73,8 @@ function cardSubtitle(lead: LeadWithOutreach): string | null {
 
 // ─── Pipeline (CRM kanban with drag-and-drop) ─────────────────────────────────
 
-function sortColumnLeads(
-  stage: CrmStage,
-  leads: LeadWithOutreach[],
-): LeadWithOutreach[] {
-  return [...leads].sort((a, b) => {
+function compareColumnLeads(stage: CrmStage) {
+  return (a: LeadWithOutreach, b: LeadWithOutreach) => {
     if (stage === "contacted") {
       const aSent = a.outreach?.sentAt ?? "";
       const bSent = b.outreach?.sentAt ?? "";
@@ -85,18 +83,94 @@ function sortColumnLeads(
     const fit = b.fitScore - a.fitScore;
     if (fit !== 0) return fit;
     return a.company.localeCompare(b.company, undefined, { sensitivity: "base" });
-  });
+  };
+}
+
+function useStageLeads(
+  allLeads: LeadWithOutreach[],
+  stage: CrmStage,
+  backfilling: boolean,
+): LeadWithOutreach[] {
+  const raw = useMemo(
+    () => allLeads.filter((l) => l.crmStage === stage),
+    [allLeads, stage],
+  );
+  const compare = useCallback(compareColumnLeads(stage), [stage]);
+  return useStableDuringLoad(raw, compare, backfilling);
+}
+
+function MainStageColumn({
+  col,
+  allLeads,
+  stageCount,
+  backfilling,
+  onOpen,
+  activeId,
+}: {
+  col: (typeof MAIN_COLUMNS)[number];
+  allLeads: LeadWithOutreach[];
+  stageCount?: number;
+  backfilling: boolean;
+  onOpen: (id: string) => void;
+  activeId: string | null;
+}) {
+  const colLeads = useStageLeads(allLeads, col.stage, backfilling);
+  return (
+    <PipelineColumn
+      col={col}
+      leads={colLeads}
+      count={stageCount ?? colLeads.length}
+      onOpen={onOpen}
+      activeId={activeId}
+    />
+  );
+}
+
+function ParkedStageColumn({
+  col,
+  allLeads,
+  stageCount,
+  backfilling,
+  open,
+  onToggle,
+  onOpen,
+  activeId,
+}: {
+  col: (typeof PARKED_COLUMNS)[number];
+  allLeads: LeadWithOutreach[];
+  stageCount?: number;
+  backfilling: boolean;
+  open: boolean;
+  onToggle: () => void;
+  onOpen: (id: string) => void;
+  activeId: string | null;
+}) {
+  const colLeads = useStageLeads(allLeads, col.stage, backfilling);
+  return (
+    <ParkedStage
+      col={col}
+      leads={colLeads}
+      count={stageCount ?? colLeads.length}
+      open={open}
+      onToggle={onToggle}
+      onOpen={onOpen}
+      activeId={activeId}
+    />
+  );
 }
 
 export function PipelineView({
   leads,
   stageCounts,
+  backfilling = false,
   onOpen,
   onMoveStage,
 }: {
   leads: LeadWithOutreach[];
   /** DB totals — column badges stay honest while leads are still paging in. */
   stageCounts?: Record<CrmStage, number>;
+  /** While true, new cards append at column bottoms (no top pop-in). */
+  backfilling?: boolean;
   onOpen: (id: string) => void;
   onMoveStage: (
     leadId: string,
@@ -156,53 +230,38 @@ export function PipelineView({
               gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(11rem, 1fr))`,
             }}
           >
-            {MAIN_COLUMNS.map((col) => {
-              const colLeads = sortColumnLeads(
-                col.stage,
-                leads.filter((l) => l.crmStage === col.stage),
-              );
-              const badge =
-                stageCounts?.[col.stage] ?? colLeads.length;
-              return (
-                <PipelineColumn
-                  key={col.stage}
-                  col={col}
-                  leads={colLeads}
-                  count={badge}
-                  onOpen={openIfClick}
-                  activeId={activeId}
-                />
-              );
-            })}
+            {MAIN_COLUMNS.map((col) => (
+              <MainStageColumn
+                key={col.stage}
+                col={col}
+                allLeads={leads}
+                stageCount={stageCounts?.[col.stage]}
+                backfilling={backfilling}
+                onOpen={openIfClick}
+                activeId={activeId}
+              />
+            ))}
           </div>
 
           <div className="grid shrink-0 gap-2 sm:grid-cols-1">
-            {PARKED_COLUMNS.map((col) => {
-              const colLeads = sortColumnLeads(
-                col.stage,
-                leads.filter((l) => l.crmStage === col.stage),
-              );
-              const open = parkedOpen[col.stage] ?? false;
-              const badge =
-                stageCounts?.[col.stage] ?? colLeads.length;
-              return (
-                <ParkedStage
-                  key={col.stage}
-                  col={col}
-                  leads={colLeads}
-                  count={badge}
-                  open={open}
-                  onToggle={() =>
-                    setParkedOpen((prev) => ({
-                      ...prev,
-                      [col.stage]: !prev[col.stage],
-                    }))
-                  }
-                  onOpen={openIfClick}
-                  activeId={activeId}
-                />
-              );
-            })}
+            {PARKED_COLUMNS.map((col) => (
+              <ParkedStageColumn
+                key={col.stage}
+                col={col}
+                allLeads={leads}
+                stageCount={stageCounts?.[col.stage]}
+                backfilling={backfilling}
+                open={parkedOpen[col.stage] ?? false}
+                onToggle={() =>
+                  setParkedOpen((prev) => ({
+                    ...prev,
+                    [col.stage]: !prev[col.stage],
+                  }))
+                }
+                onOpen={openIfClick}
+                activeId={activeId}
+              />
+            ))}
           </div>
         </div>
 
@@ -319,20 +378,32 @@ function PipelineColumn({
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3">
         {leads.length === 0 ? (
-          <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
-            {count > 0
-              ? "Still loading these cards…"
-              : col.empty}
-          </p>
+          count > 0 ? (
+            <div className="flex flex-col gap-2" aria-hidden>
+              {Array.from({ length: Math.min(3, count) }, (_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-white/8 bg-ink-950/50 p-3"
+                >
+                  <Bone className="h-4 w-3/4 max-w-[12rem]" />
+                  <Bone className="mt-2 h-3 w-1/2 max-w-[8rem]" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
+              {col.empty}
+            </p>
+          )
         ) : (
           leads.map((l) => (
-              <DraggablePipelineCard
-                key={l.id}
-                lead={l}
-                onOpen={onOpen}
-                isDragging={l.id === activeId}
-              />
-            ))
+            <DraggablePipelineCard
+              key={l.id}
+              lead={l}
+              onOpen={onOpen}
+              isDragging={l.id === activeId}
+            />
+          ))
         )}
       </div>
     </div>
