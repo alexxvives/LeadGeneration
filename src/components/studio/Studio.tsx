@@ -27,7 +27,12 @@ import { OutreachView } from "./OutreachView";
 import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
-import { StudioViewSkeleton, LeadsLayoutSkeleton, useDeferredLoading } from "./skeletons";
+import {
+  StudioViewSkeleton,
+  LeadsLayoutSkeleton,
+  OutreachSkeleton,
+  useDeferredLoading,
+} from "./skeletons";
 import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
 import {
   draftFlagsFromProfile,
@@ -300,6 +305,26 @@ export function Studio() {
         setActiveRunId(null);
       }
     }
+    // Soft refresh while a large board is still paging: merge page-1 updates
+    // into already-loaded leads so Contacted/sent rows don’t disappear.
+    const keepPaged =
+      !!prev &&
+      sameBoard &&
+      !haveComplete &&
+      prev.leads.length > data.leads.length &&
+      data.leadsHasMore === true;
+
+    if (keepPaged) {
+      const patch = new Map(data.leads.map((l) => [l.id, l]));
+      setBoard({
+        ...data,
+        leads: prev.leads.map((l) => patch.get(l.id) ?? l),
+        leadsTotal: data.leadsTotal ?? prev.leadsTotal,
+        leadsHasMore: true,
+      });
+      return data;
+    }
+
     setBoard(data);
 
     // Progressive: show first page, keep loading the rest without blocking UI.
@@ -809,7 +834,34 @@ export function Studio() {
     try {
       const result = await api.send(outreachId, opts);
       recordWarmupSend();
-      await refresh();
+      // Patch in place — a full refresh on a large board reloads page 1 only
+      // and can hide the just-sent lead from Outreach → Contacted.
+      if (result.outreach) {
+        const sent = result.outreach;
+        setBoard((b) => {
+          if (!b) return b;
+          return {
+            ...b,
+            leads: b.leads.map((l) => {
+              if (l.outreach?.id !== outreachId && l.id !== sent.leadId) {
+                return l;
+              }
+              const methods = l.contactMethods.includes("email")
+                ? l.contactMethods
+                : ([...l.contactMethods, "email"] as ContactMethod[]);
+              return {
+                ...l,
+                status: "sent" as const,
+                crmStage: l.crmStage === "new" ? "contacted" : l.crmStage,
+                contactMethods: methods,
+                outreach: sent,
+              };
+            }),
+          };
+        });
+      } else {
+        await refresh();
+      }
       toast(
         "ok",
         result.provider === "demo"
@@ -1808,22 +1860,31 @@ export function Studio() {
       {/* Outreach queue — draft / approve / send */}
       {view === "outreach" && (
         <div className="min-h-0 flex-1">
-          <OutreachView
-            leads={searchFilteredLeads}
-            canSendEmail={!!board?.capabilities.canSendEmail}
-            emailVerify={!!board?.capabilities.emailVerify}
-            busyId={outreachBusy}
-            onOpenInfo={openInfo}
-            onOpenDraft={openDraft}
-            onCreateDraft={createAndOpenDraft}
-            onApprove={approveContactDraft}
-            onSend={async (outreachId) => {
-              await requestSend(outreachId);
-            }}
-            onDraftAll={onDraftAllOutreach}
-            onSendAll={onSendAllOutreach}
-            onMarkContacted={onMarkContacted}
-          />
+          {loading || leadsHydrating || !board ? (
+            <div role="status" aria-busy="true" aria-label="Loading outreach">
+              <OutreachSkeleton />
+            </div>
+          ) : (
+            <OutreachView
+              leads={searchFilteredLeads}
+              canSendEmail={!!board.capabilities.canSendEmail}
+              emailVerify={!!board.capabilities.emailVerify}
+              busyId={outreachBusy}
+              backfilling={leadsBackfilling}
+              loadedCount={board.leads.length}
+              totalCount={board.leadsTotal ?? board.leads.length}
+              onOpenInfo={openInfo}
+              onOpenDraft={openDraft}
+              onCreateDraft={createAndOpenDraft}
+              onApprove={approveContactDraft}
+              onSend={async (outreachId) => {
+                await requestSend(outreachId);
+              }}
+              onDraftAll={onDraftAllOutreach}
+              onSendAll={onSendAllOutreach}
+              onMarkContacted={onMarkContacted}
+            />
+          )}
         </div>
       )}
 

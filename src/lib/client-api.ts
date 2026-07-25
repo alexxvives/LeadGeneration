@@ -333,6 +333,7 @@ export const api = {
     jsonFetch<{
       ok: boolean;
       error?: string;
+      outreach?: Outreach;
       provider?: "google" | "resend" | "maileroo" | "smtp" | "demo";
       verifyBlocked?: boolean;
       canForce?: boolean;

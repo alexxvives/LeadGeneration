@@ -271,7 +271,7 @@ export function LeadsLayoutSkeleton({
 
 export function OutreachSkeleton() {
   return (
-    <div className="grid h-full min-h-0 gap-3 md:grid-cols-3">
+    <div className="grid h-full min-h-0 gap-3 lg:grid-cols-3">
       {Array.from({ length: 3 }, (_, i) => (
         <div
           key={i}

@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-26 — Outreach empty stages + missing sent history
+- Outreach had no skeleton while board hydrate → three empty columns.
+- Sent leads belong in **Contacted** (not Runs). On 2k+ boards, page-1
+  refresh after send wiped later pages so Farmàcia disappeared until
+  backfill. Fix: local patch after send; soft-refresh merges page 1 into
+  already-loaded leads; skeleton + backfill hint; Contacted sorts by
+  `sentAt` and shows Sent · timestamp.
+
 ### 2026-07-26 — Send 400 with verify off = empty outreach.To
 - `/api/send` 400 after disabling verify was **not** verify: outreach
   `to_email` was null (`No recipient email on this lead`) while the lead

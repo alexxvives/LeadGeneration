@@ -62,6 +62,14 @@ function byFitDesc(a: LeadWithOutreach, b: LeadWithOutreach): number {
   return (b.fitScore ?? 0) - (a.fitScore ?? 0);
 }
 
+/** Contacted: newest sends first, then fit. */
+function byContactedRecent(a: LeadWithOutreach, b: LeadWithOutreach): number {
+  const aSent = a.outreach?.sentAt ?? "";
+  const bSent = b.outreach?.sentAt ?? "";
+  if (aSent !== bSent) return bSent.localeCompare(aSent);
+  return byFitDesc(a, b);
+}
+
 const BUCKET_META: Record<
   OutreachBucket,
   { title: string; hint: string; empty: string }
@@ -78,7 +86,7 @@ const BUCKET_META: Record<
   },
   contacted: {
     title: "Contacted",
-    hint: "Prospects you have already reached — register how if needed",
+    hint: "Sent emails and logged contacts — open a row to view the message",
     empty: "No contacts logged yet.",
   },
 };
@@ -93,6 +101,9 @@ export function OutreachView({
   canSendEmail,
   emailVerify = false,
   busyId,
+  backfilling = false,
+  loadedCount,
+  totalCount,
   onOpenInfo,
   onOpenDraft,
   onCreateDraft,
@@ -106,6 +117,10 @@ export function OutreachView({
   canSendEmail: boolean;
   emailVerify?: boolean;
   busyId: string | null;
+  /** Large boards page in — Contacted may gain rows until this finishes. */
+  backfilling?: boolean;
+  loadedCount?: number;
+  totalCount?: number;
   onOpenInfo: (id: string) => void;
   onOpenDraft: (id: string) => void;
   onCreateDraft: (id: string) => Promise<void>;
@@ -129,9 +144,9 @@ export function OutreachView({
       const b = bucketOf(lead);
       if (b) next[b].push(lead);
     }
-    for (const key of Object.keys(next) as OutreachBucket[]) {
-      next[key].sort(byFitDesc);
-    }
+    next.review.sort(byFitDesc);
+    next.ready.sort(byFitDesc);
+    next.contacted.sort(byContactedRecent);
     return next;
   }, [leads]);
 
@@ -139,6 +154,25 @@ export function OutreachView({
 
   return (
     <div data-tour="outreach-queue" className="flex h-full min-h-0 flex-col gap-3">
+      {backfilling ? (
+        <p
+          className="shrink-0 text-[11px] text-mist-500"
+          role="status"
+          aria-live="polite"
+        >
+          Loading leads
+          {loadedCount != null ? (
+            <>
+              {" "}
+              <span className="tabular-nums text-mist-300">
+                {loadedCount}
+                {totalCount != null ? `/${totalCount}` : ""}
+              </span>
+            </>
+          ) : null}
+          … sent mail appears in Contacted as rows arrive.
+        </p>
+      ) : null}
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
         {columns.map((key) => {
           const meta = BUCKET_META[key];
@@ -191,7 +225,9 @@ export function OutreachView({
               <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {rows.length === 0 ? (
                   <li className="px-3 py-6 text-center text-[11px] text-mist-600">
-                    {meta.empty}
+                    {backfilling && key === "contacted"
+                      ? "Loading contacted leads…"
+                      : meta.empty}
                   </li>
                 ) : (
                   rows.map((lead, i) => (
@@ -269,7 +305,9 @@ function OutreachRow({
   const hasDraft = Boolean(lead.outreach);
   const openComposer = () => {
     if (bucket === "contacted") {
-      onOpenInfo();
+      // Sent → draft pane (shows message + Sent stamp); otherwise CRM info.
+      if (sent) onOpenDraft();
+      else onOpenInfo();
       return;
     }
     if (phoneOnly) {
@@ -337,6 +375,14 @@ function OutreachRow({
         {needsMethod ? (
           <p className="mt-1 text-[10px] font-medium text-amber-300/90">
             How contacted? — open to register
+          </p>
+        ) : null}
+        {bucket === "contacted" && sent ? (
+          <p className="mt-1 text-[10px] font-medium text-aurora-300/90">
+            Sent
+            {lead.outreach?.sentAt
+              ? ` · ${new Date(lead.outreach.sentAt).toLocaleString()}`
+              : ""}
           </p>
         ) : null}
         {lead.outreach?.status === "failed" && lead.outreach.error ? (
@@ -476,14 +522,16 @@ function OutreachRow({
         {bucket === "contacted" ? (
           <button
             type="button"
-            onClick={onOpenInfo}
+            onClick={openComposer}
             className={`${ACTION_BTN} ${
               needsMethod
                 ? "border border-amber-400/40 bg-amber-400/15 text-amber-100"
-                : "border border-white/15 text-mist-400 hover:bg-white/5"
+                : sent
+                  ? "border border-aurora-400/30 bg-aurora-400/10 text-aurora-200 hover:bg-aurora-400/15"
+                  : "border border-white/15 text-mist-400 hover:bg-white/5"
             }`}
           >
-            {sent ? "View" : "Register"}
+            {sent ? "Email" : "Register"}
           </button>
         ) : null}
       </div>
