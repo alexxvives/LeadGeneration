@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-26 — Verify soft-block (stop stripping good emails)
+- `/api/send` 400 + “removed it from this lead” was MEV returning **Invalid**
+  on real SMB/`info@` addresses, then our hard cleanup stripping the email.
+- Fix: MEV/Zeruh **Invalid** = soft block (keep address, outreach stays
+  approved, UI “Send anyway” → `skipVerify`). Only disposable / no-reply /
+  bad format hard-fail and strip. Fail-open on MEV `status:false` (credits /
+  auth) and empty Status; greylist/catch-all stay okToSend.
+- Console: `[email-verify] MEV Invalid (soft-block):` logs Diagnosis for ops.
+
 ### 2026-07-25 — Draft all: parallel + progress modal
 - Outreach “Draft all” was sequential + one toast per lead. Now runs a
   concurrency pool (8 template / 4 with AI personalize), silent per-lead

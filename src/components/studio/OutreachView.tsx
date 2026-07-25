@@ -68,12 +68,12 @@ const BUCKET_META: Record<
 > = {
   review: {
     title: "Contact Draft",
-    hint: "Create or review a draft — Approve moves it to Ready",
+    hint: "Create or review a draft",
     empty: "All leads here are approved or already contacted.",
   },
   ready: {
     title: "Ready to Contact",
-    hint: "Approved drafts — edit if needed, then send. Phone-only: call, then →",
+    hint: "Approved drafts",
     empty: "Approve a draft in Contact Draft to move it here.",
   },
   contacted: {

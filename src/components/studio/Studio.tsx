@@ -187,6 +187,11 @@ export function Studio() {
     todayCount: number;
     softCap: number;
   } | null>(null);
+  const [verifyWarn, setVerifyWarn] = useState<{
+    outreachId: string;
+    message: string;
+    reason: string | null;
+  } | null>(null);
   const [pendingSearch, setPendingSearch] = useState<SearchValues | null>(null);
   const [pendingImport, setPendingImport] = useState<ImportLeadRow[] | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
@@ -800,9 +805,9 @@ export function Studio() {
     }
   };
 
-  const onSend = async (outreachId: string) => {
+  const onSend = async (outreachId: string, opts?: { skipVerify?: boolean }) => {
     try {
-      const result = await api.send(outreachId);
+      const result = await api.send(outreachId, opts);
       recordWarmupSend();
       await refresh();
       toast(
@@ -817,8 +822,21 @@ export function Studio() {
         setVerifyLimitPlan(e.planId);
         return;
       }
-      const err = e as Error & { undeliverableRemoved?: boolean };
+      const err = e as Error & {
+        undeliverableRemoved?: boolean;
+        verifyBlocked?: boolean;
+        canForce?: boolean;
+        verifyReason?: string | null;
+      };
       const msg = err.message;
+      if (err.verifyBlocked && err.canForce && !opts?.skipVerify) {
+        setVerifyWarn({
+          outreachId,
+          message: msg,
+          reason: err.verifyReason ?? null,
+        });
+        return;
+      }
       if (err.undeliverableRemoved || /isn.?t real|can.?t receive mail|undeliverable/i.test(msg)) {
         toast("err", msg);
       } else if (/must be approved/i.test(msg)) {
@@ -834,10 +852,13 @@ export function Studio() {
     }
   };
 
-  const runSend = async (outreachId: string) => {
+  const runSend = async (
+    outreachId: string,
+    opts?: { skipVerify?: boolean },
+  ) => {
     setOutreachBusy(outreachId);
     try {
-      await onSend(outreachId);
+      await onSend(outreachId, opts);
     } finally {
       setOutreachBusy(null);
     }
@@ -880,6 +901,13 @@ export function Studio() {
     setWarmupWarn(null);
     if (!id) return;
     await runSend(id);
+  };
+
+  const confirmVerifyForceSend = async () => {
+    const id = verifyWarn?.outreachId;
+    setVerifyWarn(null);
+    if (!id) return;
+    await runSend(id, { skipVerify: true });
   };
 
   const onSetDelivery = async (
@@ -2029,6 +2057,40 @@ export function Studio() {
               <button
                 type="button"
                 onClick={() => void confirmWarmupSend()}
+                className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-[1.03]"
+              >
+                Send anyway
+              </button>
+            </div>
+          </>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={!!verifyWarn}
+        onClose={() => setVerifyWarn(null)}
+        title="Verifier unsure"
+        className="max-w-md border-amber-400/20"
+      >
+        {verifyWarn ? (
+          <>
+            <p className="text-sm text-mist-300">{verifyWarn.message}</p>
+            {verifyWarn.reason ? (
+              <p className="mt-2 text-xs text-mist-500">
+                Provider detail: {verifyWarn.reason}
+              </p>
+            ) : null}
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setVerifyWarn(null)}
+                className="rounded-full px-4 py-2 text-sm font-medium text-mist-400 hover:text-mist-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmVerifyForceSend()}
                 className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-[1.03]"
               >
                 Send anyway

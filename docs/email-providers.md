@@ -112,9 +112,10 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   live SPF/DKIM rows from Resend Domains API (demo-safe when no key).
 - `src/lib/email/verify.ts`: **MyEmailVerifier** (preferred) then legacy
   Zeruh — **at send** only (`sendApprovedOutreach`) when
-  `emailVerifyEnabled` is on. Plan daily verify caps in Settings + studio;
-  provider balance: `GET /api/providers/verify/usage` (alias
-  `/api/providers/zeruh/usage`).
+  `emailVerifyEnabled` is on. Soft “Invalid” / greylist → warn + optional
+  `skipVerify` force-send (address kept). Hard junk (disposable / no-reply)
+  still strips. Plan daily verify caps in Settings + studio; provider
+  balance: `GET /api/providers/verify/usage` (alias `/api/providers/zeruh/usage`).
 - Quotas + rate limits in `service.ts`.
 - Settings → Easy: Resend **or** Maileroo + **Verify emails before sending**
   (MyEmailVerifier) toggle; Pro mailbox Connect Google (`SendSetupPanel`).

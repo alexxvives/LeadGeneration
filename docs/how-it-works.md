@@ -34,12 +34,14 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
    natural — no STOP / mailing-address auto-footer (ADR 0012).
 4. **Approve** — Open a lead (pipeline card, table row, or map pin) to see the
    detail drawer. Edit subject/body/recipient, then **Approve**. There is no
-   Reject-draft control — bad addresses are removed automatically at verify
-   (status **Undeliverable**). Nothing sends on approval alone. **Outreach**
-   can draft-all / approve-selected; **send stays per-lead** (Art. I.1).
+   Reject-draft control — only clear junk (disposable / no-reply) is stripped
+   at verify; soft “Invalid” keeps the address and offers **Send anyway**.
+   Nothing sends on approval alone. **Outreach** can draft-all /
+   approve-selected; **send stays per-lead** (Art. I.1).
 5. **Send** — From the drawer, Approve then Send. From the Outreach queue,
    Send may auto-approve the draft first (the click is the per-lead human
-   gate). Status flows `draft → approved → sending → sent` (or `failed`).
+   gate). Soft verify blocks show a confirm modal; hard junk removes the
+   address. Status flows `draft → approved → sending → sent` (or `failed`).
    Successful send advances CRM stage to **Contacted**.
 
 ## 3. Screens

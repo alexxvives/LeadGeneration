@@ -10,7 +10,11 @@ import {
 import { sendEmail } from "@/lib/email/sender";
 import { checkSendRate } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
-import { getCachedVerify, verifyEmail } from "@/lib/email/verify";
+import {
+  clearCachedVerify,
+  getCachedVerify,
+  verifyEmail,
+} from "@/lib/email/verify";
 import {
   getPlan,
   INSIDER_SHARED_POOL,
@@ -1063,10 +1067,17 @@ export interface SendOutcome {
   rateLimited?: boolean;
   retryAfterMs?: number;
   /**
-   * True when verify failed and we stripped the bad address + rejected the
-   * outreach so the lead leaves the Outreach queue (still under Leads).
+   * True when verify hard-failed (disposable / no-reply) and we stripped the
+   * address + rejected the outreach. Soft Invalid never sets this.
    */
   undeliverableRemoved?: boolean;
+  /**
+   * Soft verify block — address kept, outreach stays approved. Client may
+   * retry with skipVerify after the user confirms.
+   */
+  verifyBlocked?: boolean;
+  canForce?: boolean;
+  verifyReason?: string | null;
   /** Transport that delivered (or would have, for local demo). */
   provider?: "google" | "resend" | "maileroo" | "smtp" | "demo";
 }
@@ -1075,7 +1086,7 @@ export interface SendOutcome {
  * Send a single APPROVED outreach. Enforces (in order):
  *  - atomic claim approved→sending (prevents double-send)
  *  - a valid recipient
- *  - email verify (optional) + undeliverable cleanup
+ *  - email verify (optional) — soft-block on Invalid, strip only hard junk
  *  - monthly send quota (metered workspaces only) — throws QuotaError → 402
  *  - rate limiting
  * Studio Send may auto-approve a draft first (per-lead human gate = Send click).
@@ -1083,6 +1094,7 @@ export interface SendOutcome {
 export async function sendApprovedOutreach(
   ctx: Ctx,
   outreachId: string,
+  opts?: { skipVerify?: boolean },
 ): Promise<SendOutcome> {
   const db = ctx.db;
   const claimed = await db.claimOutreachForSend(outreachId);
@@ -1114,7 +1126,8 @@ export async function sendApprovedOutreach(
 
   // List hygiene — verify at send only (not on enrich).
   const wsForVerify = await db.getWorkspace(ctx.workspaceId);
-  const verifyOn = wsForVerify?.emailVerifyEnabled !== false;
+  const verifyOn =
+    !opts?.skipVerify && wsForVerify?.emailVerifyEnabled !== false;
   if (verifyOn && wsForVerify) {
     const verifyWs = await ensureVerifyWindow(db, wsForVerify);
     const plan = getPlan(verifyWs.planId);
@@ -1144,25 +1157,42 @@ export async function sendApprovedOutreach(
       await db.incrementWorkspaceUsage(ctx.workspaceId, { verifies: 1 });
     }
     if (!verified.okToSend) {
-      const lead = await db.getLead(outreach.leadId);
-      const bad = outreach.toEmail.toLowerCase();
-      if (lead) {
-        const emails = lead.emails.filter((e) => e.toLowerCase() !== bad);
-        await db.updateLead(lead.id, { emails, status: "rejected" });
+      // Hard junk only — disposable / no-reply / empty. Soft Invalid keeps the
+      // address (MEV false-positives on info@ + greylisted SMBs are common).
+      if (verified.hardFail) {
+        const lead = await db.getLead(outreach.leadId);
+        const bad = outreach.toEmail.toLowerCase();
+        if (lead) {
+          const emails = lead.emails.filter((e) => e.toLowerCase() !== bad);
+          await db.updateLead(lead.id, { emails, status: "rejected" });
+        }
+        await db.updateOutreach(outreachId, {
+          status: "rejected",
+          toEmail: null,
+          error: "invalid_email_removed",
+          updatedAt: nowIso(),
+        });
+        return {
+          ok: false,
+          undeliverableRemoved: true,
+          error:
+            "That email isn't real or can't receive mail. We removed it from this lead and took them out of Outreach — they're still under Leads without that address.",
+        };
       }
-      await db.updateOutreach(outreachId, {
-        status: "rejected",
-        toEmail: null,
-        error: "invalid_email_removed",
-        updatedAt: nowIso(),
-      });
+
+      const detail = verified.reason?.trim() || "marked undeliverable";
+      await releaseClaim(`verify_blocked:${detail}`);
       return {
         ok: false,
-        undeliverableRemoved: true,
-        error:
-          "That email isn't real or can't receive mail. We removed it from this lead and took them out of Outreach — they're still under Leads without that address.",
+        verifyBlocked: true,
+        canForce: true,
+        verifyReason: verified.reason,
+        error: `Verifier isn't sure this address can receive mail (${detail}). You can send anyway if you trust it.`,
       };
     }
+  } else if (opts?.skipVerify && outreach.toEmail) {
+    // Force path — drop a soft-block cache entry so a later normal send rechecks.
+    clearCachedVerify(outreach.toEmail);
   }
 
   if (ctx.metered) {

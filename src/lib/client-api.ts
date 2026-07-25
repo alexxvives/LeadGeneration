@@ -85,6 +85,9 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
       error?: string;
       quota?: { kind: "leads" | "sends" | "verifies"; planId: PlanId };
       undeliverableRemoved?: boolean;
+      verifyBlocked?: boolean;
+      canForce?: boolean;
+      verifyReason?: string | null;
       rateLimited?: boolean;
       retryAfterMs?: number;
     };
@@ -105,9 +108,15 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
     }
     const e = new Error(err.error ?? `Request failed (${res.status})`) as Error & {
       undeliverableRemoved?: boolean;
+      verifyBlocked?: boolean;
+      canForce?: boolean;
+      verifyReason?: string | null;
       locked?: boolean;
     };
     if (err.undeliverableRemoved) e.undeliverableRemoved = true;
+    if (err.verifyBlocked) e.verifyBlocked = true;
+    if (err.canForce) e.canForce = true;
+    if (err.verifyReason != null) e.verifyReason = err.verifyReason;
     if (res.status === 423) e.locked = true;
     throw e;
   }
@@ -320,14 +329,19 @@ export const api = {
       body: JSON.stringify(patch),
     }),
 
-  send: (outreachId: string) =>
+  send: (outreachId: string, opts?: { skipVerify?: boolean }) =>
     jsonFetch<{
       ok: boolean;
       error?: string;
       provider?: "google" | "resend" | "maileroo" | "smtp" | "demo";
+      verifyBlocked?: boolean;
+      canForce?: boolean;
     }>("/api/send", {
       method: "POST",
-      body: JSON.stringify({ outreachId }),
+      body: JSON.stringify({
+        outreachId,
+        ...(opts?.skipVerify ? { skipVerify: true } : {}),
+      }),
     }),
 
   createLead: (opts?: { boardId?: string | null }) =>

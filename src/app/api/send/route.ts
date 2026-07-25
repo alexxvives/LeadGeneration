@@ -7,7 +7,11 @@ import { isAuthError, isQuotaError } from "@/lib/errors";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SendSchema = z.object({ outreachId: z.string().min(1) });
+const SendSchema = z.object({
+  outreachId: z.string().min(1),
+  /** Skip soft verify after user confirms "Send anyway". */
+  skipVerify: z.boolean().optional(),
+});
 
 export async function POST(req: Request) {
   let body: unknown;
@@ -24,7 +28,9 @@ export async function POST(req: Request) {
 
   try {
     const ctx = await getCtx();
-    const result = await sendApprovedOutreach(ctx, parsed.data.outreachId);
+    const result = await sendApprovedOutreach(ctx, parsed.data.outreachId, {
+      skipVerify: parsed.data.skipVerify === true,
+    });
     if (!result.ok) {
       const status = result.rateLimited
         ? 429
@@ -34,8 +40,9 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           ...result,
-          // Surface cleanup flag so the client can show friendlier copy.
           undeliverableRemoved: result.undeliverableRemoved === true,
+          verifyBlocked: result.verifyBlocked === true,
+          canForce: result.canForce === true,
         },
         { status },
       );

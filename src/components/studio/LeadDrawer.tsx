@@ -851,7 +851,9 @@ export function LeadDrawer(props: DrawerProps) {
                     {outreach.status === "failed" ? "Send failed: " : ""}
                     {outreach.error === "invalid_email_removed"
                       ? "That address couldn't receive mail — we removed it from this lead."
-                      : outreach.error}
+                      : outreach.error.startsWith("verify_blocked:")
+                        ? `Verifier isn't sure this address can receive mail (${outreach.error.slice("verify_blocked:".length)}). You can send anyway if you trust it.`
+                        : outreach.error}
                   </p>
                 )}
 

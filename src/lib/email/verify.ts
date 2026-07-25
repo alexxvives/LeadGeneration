@@ -4,6 +4,10 @@
  * Prefer MyEmailVerifier (MYEMAILVERIFIER_API_KEY) — 100 free credits/day.
  * Fall back to Zeruh / Maileroo Verify (MAILEROO_VERIFY_API_KEY / ZERUH_API_KEY).
  * No key → local heuristic (demo / zero-key; never blocks).
+ *
+ * Policy: only hard-block clear junk (disposable / no-reply / bad format).
+ * MEV "Invalid" is a soft block — SMTP probes false-positive often on
+ * info@/contact@ and greylisted SMB domains. Caller may force-send.
  */
 
 import { env } from "@/lib/config";
@@ -24,10 +28,15 @@ export interface EmailVerifyResult {
   reason: string | null;
   /** True when it is safe enough to send (or we could not verify). */
   okToSend: boolean;
+  /**
+   * True only for high-confidence junk (disposable / no-reply / bad format).
+   * Soft "Invalid" from MEV stays false so we never auto-strip the address.
+   */
+  hardFail: boolean;
   provider: EmailVerifyProvider;
   /**
    * True when this call hit a live provider (counts against plan + provider
-   * credits). False for cache hits and local heuristic.
+   * credits). False for cache hits, auth/credit errors, and local heuristic.
    */
   billed: boolean;
 }
@@ -44,6 +53,7 @@ function heuristic(email: string): EmailVerifyResult {
       score: 0,
       reason: "invalid_format",
       okToSend: false,
+      hardFail: true,
       provider: "heuristic",
       billed: false,
     };
@@ -56,6 +66,7 @@ function heuristic(email: string): EmailVerifyResult {
       score: 10,
       reason: "no_reply",
       okToSend: false,
+      hardFail: true,
       provider: "heuristic",
       billed: false,
     };
@@ -66,6 +77,7 @@ function heuristic(email: string): EmailVerifyResult {
     score: null,
     reason: "no_verify_key",
     okToSend: true,
+    hardFail: false,
     provider: "heuristic",
     billed: false,
   };
@@ -82,10 +94,17 @@ function softUnknown(
     score: null,
     reason,
     okToSend: true,
+    hardFail: false,
     provider,
     // Auth/HTTP failures usually did not consume a credit — don't bill plan.
     billed: false,
   };
+}
+
+function isTruthyFlag(v: unknown): boolean {
+  if (v === true) return true;
+  if (typeof v === "string") return v.trim().toLowerCase() === "true";
+  return false;
 }
 
 async function verifyMyEmailVerifier(
@@ -106,8 +125,9 @@ async function verifyMyEmailVerifier(
   let data: {
     Status?: string;
     Diagnosis?: string;
-    Disposable_Domain?: string;
-    catch_all?: string;
+    Disposable_Domain?: string | boolean;
+    Greylisted?: string | boolean;
+    catch_all?: string | boolean;
     status?: boolean;
     message?: string;
     error?: string;
@@ -118,8 +138,12 @@ async function verifyMyEmailVerifier(
     /* non-JSON */
   }
 
-  if (res.status === 401 || data.error === "INVALID_API_KEY") {
-    console.error("[email-verify] MyEmailVerifier invalid API key");
+  const authFailed =
+    res.status === 401 ||
+    data.error === "INVALID_API_KEY" ||
+    /invalid api key|unauthorized/i.test(data.message ?? "");
+  if (authFailed) {
+    console.error("[email-verify] MyEmailVerifier auth failed:", data.message ?? data.error);
     return softUnknown(email, "myemailverifier", "verify_auth_failed");
   }
   if (!res.ok) {
@@ -127,24 +151,86 @@ async function verifyMyEmailVerifier(
     return softUnknown(email, "myemailverifier", `verify_http_${res.status}`);
   }
 
-  const raw = (data.Status ?? "").toLowerCase();
-  const disposable = String(data.Disposable_Domain).toLowerCase() === "true";
+  // MEV returns HTTP 200 with status:false for credits / blocked account / etc.
+  if (data.status === false) {
+    console.error(
+      "[email-verify] MyEmailVerifier account error (fail-open):",
+      data.message ?? text.slice(0, 160),
+    );
+    return softUnknown(
+      email,
+      "myemailverifier",
+      data.message?.slice(0, 80) || "verify_account_error",
+    );
+  }
+
+  const raw = (data.Status ?? "").toLowerCase().replace(/\s+/g, "-");
+  if (!raw) {
+    console.error(
+      "[email-verify] MyEmailVerifier missing Status (fail-open):",
+      text.slice(0, 160),
+    );
+    return softUnknown(email, "myemailverifier", "verify_empty_status");
+  }
+
+  const disposable = isTruthyFlag(data.Disposable_Domain);
+  const greylisted =
+    isTruthyFlag(data.Greylisted) ||
+    raw === "grey-listed" ||
+    raw === "greylisted" ||
+    raw === "grey_listed";
+
   const status: EmailVerifyStatus =
     raw === "valid"
       ? "deliverable"
       : raw === "invalid"
         ? "undeliverable"
-        : raw === "catch-all" || raw === "catchall"
+        : raw === "catch-all" || raw === "catchall" || isTruthyFlag(data.catch_all)
           ? "risky"
-          : "unknown";
+          : greylisted
+            ? "risky"
+            : "unknown";
 
-  const undeliverable = status === "undeliverable" || disposable;
+  // Disposable = junk. Grey-listed / catch-all = allow (ambiguous, not proof of
+  // dead mailbox). Plain Invalid = soft block (SMTP false positives are common).
+  if (disposable) {
+    return {
+      email,
+      status: "undeliverable",
+      score: null,
+      reason: data.Diagnosis ?? "disposable",
+      okToSend: false,
+      hardFail: true,
+      provider: "myemailverifier",
+      billed: true,
+    };
+  }
+
+  if (status === "undeliverable" && !greylisted) {
+    console.warn(
+      "[email-verify] MEV Invalid (soft-block):",
+      email,
+      data.Diagnosis ?? raw,
+    );
+    return {
+      email,
+      status: "undeliverable",
+      score: null,
+      reason: data.Diagnosis ?? raw,
+      okToSend: false,
+      hardFail: false,
+      provider: "myemailverifier",
+      billed: true,
+    };
+  }
+
   return {
     email,
-    status: undeliverable ? "undeliverable" : status,
+    status: greylisted || status === "risky" ? "risky" : status,
     score: null,
     reason: data.Diagnosis ?? (raw || null),
-    okToSend: !undeliverable,
+    okToSend: true,
+    hardFail: false,
     provider: "myemailverifier",
     billed: true,
   };
@@ -195,14 +281,45 @@ async function verifyZeruh(email: string, key: string): Promise<EmailVerifyResul
 
   const disposable = data.result?.validation_details?.disposable === true;
   const noReply = data.result?.validation_details?.no_reply === true;
-  const undeliverable = status === "undeliverable" || disposable || noReply;
+
+  if (disposable || noReply) {
+    return {
+      email,
+      status: "undeliverable",
+      score: typeof data.result?.score === "number" ? data.result.score : null,
+      reason: data.result?.reason ?? (disposable ? "disposable" : "no_reply"),
+      okToSend: false,
+      hardFail: true,
+      provider: "zeruh",
+      billed: true,
+    };
+  }
+
+  if (status === "undeliverable") {
+    console.warn(
+      "[email-verify] Zeruh undeliverable (soft-block):",
+      email,
+      data.result?.reason ?? raw,
+    );
+    return {
+      email,
+      status: "undeliverable",
+      score: typeof data.result?.score === "number" ? data.result.score : null,
+      reason: data.result?.reason ?? raw,
+      okToSend: false,
+      hardFail: false,
+      provider: "zeruh",
+      billed: true,
+    };
+  }
 
   return {
     email,
-    status: undeliverable ? "undeliverable" : status,
+    status,
     score: typeof data.result?.score === "number" ? data.result.score : null,
     reason: data.result?.reason ?? null,
-    okToSend: !undeliverable,
+    okToSend: true,
+    hardFail: false,
     provider: "zeruh",
     billed: true,
   };
@@ -213,6 +330,12 @@ export function getCachedVerify(email: string): EmailVerifyResult | null {
   const normalized = email.toLowerCase().trim();
   if (!normalized) return null;
   return CACHE.get(normalized) ?? null;
+}
+
+/** Drop a cached result so a force-send path can re-check later if needed. */
+export function clearCachedVerify(email: string): void {
+  const normalized = email.toLowerCase().trim();
+  if (normalized) CACHE.delete(normalized);
 }
 
 /**
@@ -228,6 +351,7 @@ export async function verifyEmail(email: string): Promise<EmailVerifyResult> {
       score: 0,
       reason: "empty",
       okToSend: false,
+      hardFail: true,
       provider: "heuristic",
       billed: false,
     };
