@@ -81,9 +81,10 @@ export function LeadTable({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const { customCols, vis } = useLeadColumnState();
   const visibleCustom = customCols.filter((c) => !!vis.custom[c.id]);
+  const showNotes = !!vis.notes;
   const canDelete = Boolean(onDeleteLead || onDeleteLeads) && !editLocked;
   const colCount =
-    (canDelete ? 1 : 0) + 8 + visibleCustom.length;
+    (canDelete ? 1 : 0) + 7 + (showNotes ? 1 : 0) + visibleCustom.length;
 
   const sortedLeads = useMemo(() => {
     const dir = sort.dir === "asc" ? 1 : -1;
@@ -365,7 +366,9 @@ export function LeadTable({
               <th className="px-5 py-3 font-medium uppercase tracking-widest">
                 Email
               </th>
-              <th className="px-5 py-3 font-medium">Notes</th>
+              {showNotes ? (
+                <th className="px-5 py-3 font-medium">Notes</th>
+              ) : null}
               {visibleCustom.map((c) => (
                 <th key={c.id} className="px-5 py-3 font-medium">
                   {c.name}
@@ -539,29 +542,31 @@ export function LeadTable({
                       status={l.outreach?.status ?? l.status}
                     />
                   </td>
-                  <td
-                    className="max-w-[12rem] px-5 py-3.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {editLocked ? (
-                      <span className="truncate text-sm text-mist-300">
-                        {l.notes?.trim() || "—"}
-                      </span>
-                    ) : (
-                      <input
-                        defaultValue={l.notes ?? ""}
-                        key={`${l.id}-notes-${l.notes ?? ""}`}
-                        onBlur={(e) => {
-                          const next = e.target.value;
-                          if (next !== (l.notes ?? "")) {
-                            onUpdateLead?.(l.id, { notes: next || null });
-                          }
-                        }}
-                        placeholder="—"
-                        className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 hover:border-white/10 focus:border-aurora-400/50 focus:bg-ink-950/40"
-                      />
-                    )}
-                  </td>
+                  {showNotes ? (
+                    <td
+                      className="max-w-[12rem] px-5 py-3.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {editLocked ? (
+                        <span className="truncate text-sm text-mist-300">
+                          {l.notes?.trim() || "—"}
+                        </span>
+                      ) : (
+                        <input
+                          defaultValue={l.notes ?? ""}
+                          key={`${l.id}-notes-${l.notes ?? ""}`}
+                          onBlur={(e) => {
+                            const next = e.target.value;
+                            if (next !== (l.notes ?? "")) {
+                              onUpdateLead?.(l.id, { notes: next || null });
+                            }
+                          }}
+                          placeholder="—"
+                          className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 hover:border-white/10 focus:border-aurora-400/50 focus:bg-ink-950/40"
+                        />
+                      )}
+                    </td>
+                  ) : null}
                   {visibleCustom.map((c) => (
                     <td
                       key={c.id}

@@ -412,23 +412,42 @@ export function MapSkeleton() {
 
 export function SettingsSkeleton() {
   return (
-    <div className="mx-auto max-w-3xl space-y-8 px-4 py-10">
-      <div>
-        <Bone className="h-8 w-40" />
-        <Bone className="mt-2 h-4 w-72 max-w-full" />
-      </div>
-      {Array.from({ length: 3 }, (_, i) => (
-        <div key={i} className="glass rounded-xl2 p-6">
-          <Bone className="h-5 w-36" />
-          <Bone className="mt-2 h-3 w-56 max-w-full" />
-          <div className="mt-5 space-y-3">
-            <Bone className="h-10 w-full rounded-lg" />
-            <Bone className="h-10 w-full rounded-lg" />
-            <Bone className="h-24 w-full rounded-lg" />
+    <main
+      className="mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8"
+      role="status"
+      aria-busy="true"
+      aria-label="Loading settings"
+    >
+      <Bone className="h-9 w-40 sm:h-10" />
+      <Bone className="mt-2 h-3.5 w-72 max-w-full" />
+
+      {(
+        [
+          { fields: 3, tall: true },
+          { fields: 4, tall: false },
+          { fields: 2, tall: false },
+          { fields: 1, tall: false },
+        ] as const
+      ).map((section, i) => (
+        <section key={i} className="mt-8">
+          <Bone className="mb-3 h-3 w-28" />
+          <div className="rounded-xl2 border border-white/10 p-5">
+            <div className="space-y-3">
+              {Array.from({ length: section.fields }, (_, j) => (
+                <Bone
+                  key={j}
+                  className={
+                    section.tall && j === section.fields - 1
+                      ? "h-24 w-full rounded-lg"
+                      : "h-10 w-full rounded-lg"
+                  }
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        </section>
       ))}
-    </div>
+    </main>
   );
 }
 

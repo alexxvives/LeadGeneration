@@ -467,7 +467,7 @@ function OutreachRow({
               </div>
             ) : null}
             {busy && emailVerify ? (
-              <p className="max-w-[9rem] text-right text-[9px] leading-tight text-amber-200/80">
+              <p className="max-w-[9rem] text-right text-[9px] leading-tight text-mist-400">
                 Verifying email…
               </p>
             ) : null}

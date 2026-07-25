@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   api,
+  LEAD_PAGE_CHUNK,
+  LEAD_PAGE_INITIAL,
   QuotaExceededError,
   RateLimitedError,
   type BoardResponse,
@@ -150,6 +152,8 @@ export function Studio() {
   const [pipelineFilter, setPipelineFilter] = useState<CrmStage | "all">("all");
   const [leadSearch, setLeadSearch] = useState("");
   const [leadsHydrating, setLeadsHydrating] = useState(false);
+  /** Background pages after first paint — UI stays interactive. */
+  const [leadsBackfilling, setLeadsBackfilling] = useState(false);
   const [editLocked, setEditLocked] = useState(false);
   const [lockHolder, setLockHolder] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -163,6 +167,12 @@ export function Studio() {
     done: number;
     total: number;
   } | null>(null);
+  const [draftProgress, setDraftProgress] = useState<{
+    done: number;
+    total: number;
+    failed: number;
+  } | null>(null);
+  const draftAbortRef = useRef<AbortController | null>(null);
   const [deletingLeads, setDeletingLeads] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState<{
     done: number;
@@ -189,6 +199,8 @@ export function Studio() {
   const viewRef = useRef(view);
   viewRef.current = view;
   const boardLiteRef = useRef(false);
+  const boardRef = useRef<BoardResponse | null>(null);
+  const leadsGenRef = useRef(0);
 
   const setView = useCallback(
     (next: StudioView) => {
@@ -225,14 +237,57 @@ export function Studio() {
         v === "boards" ||
         v === "admin" ||
         v === "admin-users");
-    const data = await api.board(filterBoardIdRef.current, { lite });
-    boardLiteRef.current = lite;
+    const boardKey = filterBoardIdRef.current;
+
+    // Dashboard/boards/admin: keep cached leads so returning to Leads is instant.
+    if (lite) {
+      const data = await api.board(boardKey, { lite: true });
+      setBoards(data.boards ?? []);
+      setBoard((prev) => {
+        if (prev?.leads?.length) {
+          const complete = prev.leadsHasMore === false;
+          boardLiteRef.current = !complete;
+          return {
+            ...data,
+            leads: prev.leads,
+            leadsTotal: prev.leadsTotal ?? prev.leads.length,
+            leadsHasMore: prev.leadsHasMore ?? false,
+          };
+        }
+        boardLiteRef.current = true;
+        return {
+          ...data,
+          leadsTotal: data.leadsTotal ?? 0,
+          leadsHasMore: false,
+        };
+      });
+      return data;
+    }
+
+    const gen = ++leadsGenRef.current;
+    const prev = boardRef.current;
+    const sameBoard = (prev?.activeBoardId ?? null) === (boardKey ?? null);
+    const haveComplete =
+      !!prev &&
+      sameBoard &&
+      prev.leadsHasMore === false &&
+      prev.leads.length > 0;
+
+    // Soft revalidate (pipeline poll): full replace when we already have everyone.
+    const pageOpts = haveComplete
+      ? undefined
+      : { limit: LEAD_PAGE_INITIAL, offset: 0 };
+
+    const data = await api.board(boardKey, pageOpts);
+    if (leadsGenRef.current !== gen) return data;
+
+    boardLiteRef.current = false;
     setBoards(data.boards ?? []);
     const pinned = activeRunIdRef.current;
-    if (!lite && pinned && pinned !== data.run?.id) {
+    if (pinned && pinned !== data.run?.id) {
       try {
         const { run, leads } = await api.runWithLeads(pinned);
-        const merged = { ...data, run, leads };
+        const merged = { ...data, run, leads, leadsHasMore: false };
         setBoard(merged);
         return merged;
       } catch {
@@ -241,8 +296,49 @@ export function Studio() {
       }
     }
     setBoard(data);
+
+    // Progressive: show first page, keep loading the rest without blocking UI.
+    if (data.leadsHasMore) {
+      setLeadsBackfilling(true);
+      void (async () => {
+        let offset = data.leads.length;
+        try {
+          while (true) {
+            if (leadsGenRef.current !== gen) return;
+            if (filterBoardIdRef.current !== boardKey) return;
+            const chunk = await api.boardLeadsChunk(boardKey, {
+              limit: LEAD_PAGE_CHUNK,
+              offset,
+            });
+            if (leadsGenRef.current !== gen) return;
+            setBoard((b) => {
+              if (!b) return b;
+              const seen = new Set(b.leads.map((l) => l.id));
+              const added = chunk.leads.filter((l) => !seen.has(l.id));
+              return {
+                ...b,
+                leads: [...b.leads, ...added],
+                leadsTotal: chunk.leadsTotal,
+                leadsHasMore: chunk.leadsHasMore,
+              };
+            });
+            offset += chunk.leads.length;
+            if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
+          }
+        } catch {
+          /* keep partial list; user can refresh */
+        } finally {
+          if (leadsGenRef.current === gen) setLeadsBackfilling(false);
+        }
+      })();
+    } else {
+      setLeadsBackfilling(false);
+    }
+
     return data;
   }, []);
+
+  boardRef.current = board;
 
   // Hydrate drafting profiles from the workspace (localStorage write-through).
   useEffect(() => {
@@ -598,7 +694,10 @@ export function Studio() {
     );
   };
 
-  const onDraft = async (leadId: string): Promise<string | null> => {
+  const onDraft = async (
+    leadId: string,
+    opts?: { silent?: boolean },
+  ): Promise<string | null> => {
     try {
       const profile = loadSenderProfile();
       const lead = board?.leads.find((l) => l.id === leadId);
@@ -616,10 +715,17 @@ export function Studio() {
         forceLang: lang,
       });
       patchLeadLocal(leadId, { outreach, status: "queued" });
-      toast("ok", pitch ? "Draft written — ready to contact." : "Empty draft created — add your template in Settings, or edit the body.");
+      if (!opts?.silent) {
+        toast(
+          "ok",
+          pitch
+            ? "Draft written — ready to contact."
+            : "Empty draft created — add your template in Settings, or edit the body.",
+        );
+      }
       return outreach.id;
     } catch (e) {
-      toast("err", (e as Error).message);
+      if (!opts?.silent) toast("err", (e as Error).message);
       return null;
     }
   };
@@ -865,14 +971,69 @@ export function Studio() {
     }
   };
 
+  const cancelDraftAll = useCallback(() => {
+    draftAbortRef.current?.abort();
+  }, []);
+
   const onDraftAllOutreach = async () => {
     if (!board) return;
     const targets = board.leads.filter((l) => !l.outreach && l.emails.length > 0);
+    if (targets.length === 0) return;
+
+    const ac = new AbortController();
+    draftAbortRef.current = ac;
     setOutreachBusy("draft-all");
+    setDraftProgress({ done: 0, total: targets.length, failed: 0 });
+
+    // Template-only drafts are cheap; AI personalize needs a smaller pool.
+    const profile = loadSenderProfile();
+    const concurrency = draftFlagsFromProfile(profile).aiPersonalize ? 4 : 8;
+
+    let cursor = 0;
+    let done = 0;
+    let failed = 0;
+    let ok = 0;
+
+    const worker = async () => {
+      while (true) {
+        if (ac.signal.aborted) return;
+        const i = cursor++;
+        if (i >= targets.length) return;
+        const lead = targets[i]!;
+        const id = await onDraft(lead.id, { silent: true });
+        if (ac.signal.aborted) return;
+        if (id) ok += 1;
+        else failed += 1;
+        done += 1;
+        setDraftProgress({ done, total: targets.length, failed });
+      }
+    };
+
     try {
-      for (const l of targets) await onDraft(l.id);
+      await Promise.all(
+        Array.from({ length: Math.min(concurrency, targets.length) }, () =>
+          worker(),
+        ),
+      );
+      if (ac.signal.aborted) {
+        toast(
+          "ok",
+          `Stopped — drafted ${ok} of ${targets.length}${
+            failed ? ` (${failed} failed)` : ""
+          }.`,
+        );
+      } else if (failed === 0) {
+        toast("ok", `Drafted ${ok} lead${ok === 1 ? "" : "s"}.`);
+      } else {
+        toast(
+          "err",
+          `Drafted ${ok} of ${targets.length} — ${failed} failed.`,
+        );
+      }
     } finally {
       setOutreachBusy(null);
+      setDraftProgress(null);
+      draftAbortRef.current = null;
     }
   };
 
@@ -1460,11 +1621,23 @@ export function Studio() {
                     {" "}
                     of{" "}
                     <span className="font-semibold text-mist-200">
-                      {board.leads.length}
+                      {board.leadsTotal ?? board.leads.length}
                     </span>
                   </>
                 ) : null}{" "}
                 leads
+                {leadsBackfilling ? (
+                  <span className="ml-2 normal-case tracking-normal text-mist-500">
+                    · loading{" "}
+                    <span className="tabular-nums text-mist-300">
+                      {board?.leads.length ?? 0}
+                      {board?.leadsTotal != null
+                        ? `/${board.leadsTotal}`
+                        : ""}
+                    </span>
+                    …
+                  </span>
+                ) : null}
               </p>
               {board && !editLocked ? (
                 <button
@@ -1694,6 +1867,59 @@ export function Studio() {
             />
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={!!draftProgress}
+        onClose={() => {}}
+        dismissible={false}
+        showClose={false}
+        title="Drafting outreach…"
+        className="max-w-sm border-aurora-400/20"
+      >
+        {draftProgress ? (
+          <>
+            <p className="text-sm text-mist-300">
+              <span className="tabular-nums text-mist-100">
+                {draftProgress.done}
+              </span>
+              {" / "}
+              <span className="tabular-nums">{draftProgress.total}</span> leads
+              {draftProgress.failed > 0 ? (
+                <span className="text-mist-500">
+                  {" "}
+                  · {draftProgress.failed} failed
+                </span>
+              ) : null}
+            </p>
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-ink-950/60">
+              <div
+                className="h-full rounded-full bg-aurora-400 transition-[width] duration-150 ease-out"
+                style={{
+                  width: `${
+                    draftProgress.total
+                      ? Math.min(
+                          100,
+                          Math.round(
+                            (draftProgress.done / draftProgress.total) * 100,
+                          ),
+                        )
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={cancelDraftAll}
+                className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-mist-100 transition-colors hover:bg-white/5"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : null}
       </Modal>
 
       <Modal

@@ -1201,37 +1201,46 @@ export class D1Store implements LeadRepository {
   }
 
   async listLeads(filter?: LeadListFilter): Promise<Lead[]> {
+    const limit =
+      filter?.limit != null && filter.limit >= 0 ? Math.floor(filter.limit) : null;
+    const offset = Math.max(0, Math.floor(filter?.offset ?? 0));
+    // Pagination only when `limit` is set (Studio progressive hydrate).
+    const pageSql = limit != null ? ` LIMIT ? OFFSET ?` : "";
+    const pageBind = limit != null ? [limit, offset] : [];
+
     if (filter?.runId && filter?.boardId) {
       const { results } = await this.db
         .prepare(
           `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? AND board_id = ?
-           ORDER BY created_at ASC`,
+           ORDER BY created_at ASC${pageSql}`,
         )
-        .bind(this.workspaceId, filter.runId, filter.boardId)
+        .bind(this.workspaceId, filter.runId, filter.boardId, ...pageBind)
         .all<LeadRow>();
       return results.map(rowToLead);
     }
     if (filter?.runId) {
       const { results } = await this.db
         .prepare(
-          `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? ORDER BY created_at ASC`,
+          `SELECT * FROM leads WHERE workspace_id = ? AND run_id = ? ORDER BY created_at ASC${pageSql}`,
         )
-        .bind(this.workspaceId, filter.runId)
+        .bind(this.workspaceId, filter.runId, ...pageBind)
         .all<LeadRow>();
       return results.map(rowToLead);
     }
     if (filter?.boardId) {
       const { results } = await this.db
         .prepare(
-          `SELECT * FROM leads WHERE workspace_id = ? AND board_id = ? ORDER BY created_at ASC`,
+          `SELECT * FROM leads WHERE workspace_id = ? AND board_id = ? ORDER BY created_at ASC${pageSql}`,
         )
-        .bind(this.workspaceId, filter.boardId)
+        .bind(this.workspaceId, filter.boardId, ...pageBind)
         .all<LeadRow>();
       return results.map(rowToLead);
     }
     const { results } = await this.db
-      .prepare(`SELECT * FROM leads WHERE workspace_id = ? ORDER BY created_at ASC`)
-      .bind(this.workspaceId)
+      .prepare(
+        `SELECT * FROM leads WHERE workspace_id = ? ORDER BY created_at ASC${pageSql}`,
+      )
+      .bind(this.workspaceId, ...pageBind)
       .all<LeadRow>();
     return results.map(rowToLead);
   }

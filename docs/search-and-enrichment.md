@@ -57,8 +57,10 @@ not replace find+fetch.
    search”. Location mismatch can erase the score. Imports use the same rubric
    via `scoreImportedLead` (contactability-led when there is no niche). CSV/Excel
    import scores from spreadsheet columns only (no per-row website fetch) so
-   large lists stay fast. Every point is explained in `fitReasons` in the Lead
-   detail drawer.
+   large lists stay fast. Manual “Add lead” starts at 0% (blank row); editing
+   company/website/emails/phones/location/blurb rescores the same way, using
+   the active outreach pitch as soft niche context. Every point is explained
+   in `fitReasons` in the Lead detail drawer.
 6. **Fallback**: no key, zero results, or any provider error → deterministic
    **demo leads** from `demo.ts` so the UI always works (constitution Art. I.2).
 

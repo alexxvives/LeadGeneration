@@ -26,12 +26,28 @@ import type { LocationSuggestion } from "@/app/api/geocode/route";
 export interface BoardResponse {
   run: Run | null;
   leads: LeadWithOutreach[];
+  /** Total leads for the board filter (paged responses may return a subset). */
+  leadsTotal?: number;
+  /** More lead pages available after this response. */
+  leadsHasMore?: boolean;
   boards: BoardSummary[];
   activeBoardId: string | null;
   boardLock: BoardLock | null;
   capabilities: Capabilities;
   workspace: WorkspaceSummary;
 }
+
+export interface BoardLeadsChunk {
+  leads: LeadWithOutreach[];
+  leadsTotal: number;
+  leadsHasMore: boolean;
+  activeBoardId: string | null;
+}
+
+/** First paint size for progressive lead hydrate. */
+export const LEAD_PAGE_INITIAL = 150;
+/** Background chunk size after the first page. */
+export const LEAD_PAGE_CHUNK = 400;
 
 /** Error thrown when a request is rejected for exceeding a plan quota (402). */
 export class QuotaExceededError extends Error {
@@ -99,14 +115,37 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  board: (boardId?: string | null, opts?: { lite?: boolean }) => {
+  board: (
+    boardId?: string | null,
+    opts?: { lite?: boolean; limit?: number; offset?: number },
+  ) => {
     const params = new URLSearchParams();
     params.set(
       "boardId",
       boardId && boardId !== "all" ? boardId : "all",
     );
     if (opts?.lite) params.set("lite", "1");
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null && opts.offset > 0) {
+      params.set("offset", String(opts.offset));
+    }
     return jsonFetch<BoardResponse>(`/api/board?${params.toString()}`);
+  },
+
+  /** Background lead pages after the first board paint. */
+  boardLeadsChunk: (
+    boardId: string | null | undefined,
+    opts: { limit: number; offset: number },
+  ) => {
+    const params = new URLSearchParams();
+    params.set(
+      "boardId",
+      boardId && boardId !== "all" ? boardId : "all",
+    );
+    params.set("chunk", "1");
+    params.set("limit", String(opts.limit));
+    params.set("offset", String(opts.offset));
+    return jsonFetch<BoardLeadsChunk>(`/api/board?${params.toString()}`);
   },
 
   listBoards: () => jsonFetch<{ boards: BoardSummary[] }>("/api/boards"),

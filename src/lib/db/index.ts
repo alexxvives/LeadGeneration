@@ -37,6 +37,10 @@ export const LOCAL_WORKSPACE_ID = "local";
 export interface LeadListFilter {
   runId?: string;
   boardId?: string;
+  /** Max rows to return (progressive board hydrate). */
+  limit?: number;
+  /** Skip first N rows (with `limit`). */
+  offset?: number;
 }
 
 export interface LeadRepository {

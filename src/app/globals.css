@@ -256,6 +256,8 @@ html[data-theme="light"] {
   }
   html[data-theme="light"] .text-amber-200,
   html[data-theme="light"] .text-amber-200\/70,
+  html[data-theme="light"] .text-amber-200\/80,
+  html[data-theme="light"] .text-amber-200\/90,
   html[data-theme="light"] .text-amber-100 {
     color: #b45309;
   }

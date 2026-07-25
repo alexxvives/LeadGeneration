@@ -792,10 +792,19 @@ export async function getRunWithLeads(
 export async function getLatestBoard(
   ctx: Ctx,
   boardId?: string | null,
-  opts?: { includeLeads?: boolean },
+  opts?: {
+    includeLeads?: boolean;
+    /** Cap rows returned (progressive hydrate). Omit for all. */
+    leadLimit?: number;
+    leadOffset?: number;
+  },
 ): Promise<{
   run: Run | null;
   leads: LeadWithOutreach[];
+  /** Total leads matching the board filter (even when paged). */
+  leadsTotal: number;
+  /** True when more pages remain after this response. */
+  leadsHasMore: boolean;
   boards: BoardSummary[];
   activeBoardId: string | null;
   boardLock: BoardLock | null;
@@ -816,11 +825,15 @@ export async function getLatestBoard(
   }
 
   const includeLeads = opts?.includeLeads !== false;
+  const filter = active ? { boardId: active } : undefined;
 
   if (!includeLeads) {
+    const leadsTotal = await leadDb.countLeads(filter);
     return {
       run: null,
       leads: [],
+      leadsTotal,
+      leadsHasMore: false,
       boards,
       activeBoardId: active,
       boardLock,
@@ -836,10 +849,19 @@ export async function getLatestBoard(
     runs[0] ??
     null;
 
-  const leads = await leadDb.listLeads(active ? { boardId: active } : undefined);
+  const leadsTotal = await leadDb.countLeads(filter);
+  const offset = Math.max(0, opts?.leadOffset ?? 0);
+  const limit = opts?.leadLimit;
+  const leads = await leadDb.listLeads({
+    ...filter,
+    ...(limit != null ? { limit, offset } : {}),
+  });
+  const loadedThrough = offset + leads.length;
   return {
     run,
     leads: await attachOutreach(leadDb, leads),
+    leadsTotal,
+    leadsHasMore: loadedThrough < leadsTotal,
     boards,
     activeBoardId: active,
     boardLock,
@@ -1663,6 +1685,31 @@ export async function cancelImportRun(
   return { ok: true };
 }
 
+/** Soft niche context from the workspace’s active outreach pitch (for fit). */
+function pitchContextFromWorkspace(ws: Workspace | null): string | null {
+  const raw = ws?.outreachProfilesJson?.trim();
+  if (!raw) return null;
+  try {
+    const store = JSON.parse(raw) as {
+      profiles?: Array<{
+        id: string;
+        pitches?: Partial<Record<string, string>>;
+      }>;
+      activeId?: string | null;
+    };
+    const profiles = store.profiles ?? [];
+    const active =
+      profiles.find((p) => p.id === store.activeId) ?? profiles[0] ?? null;
+    if (!active?.pitches) return null;
+    const texts = Object.values(active.pitches)
+      .map((t) => (typeof t === "string" ? t : ""))
+      .filter((t) => t.trim().length > 0);
+    return texts.length ? texts.join(" ") : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Update user-managed CRM fields on a lead (stage, contact method, notes, follow-ups). */
 export async function updateLeadCrm(
   ctx: Ctx,
@@ -1701,7 +1748,10 @@ export async function updateLeadCrm(
   if (!lead) return null;
   await assertBoardEditable(ctx, lead.boardId);
 
-  const next: typeof patch = { ...patch };
+  const next: typeof patch & {
+    fitScore?: number;
+    fitReasons?: string[];
+  } = { ...patch };
 
   // When the user explicitly sets how they contacted, journal a follow-up note.
   if (
@@ -1723,6 +1773,34 @@ export async function updateLeadCrm(
     if (!patch.crmStage && lead.crmStage === "new") {
       next.crmStage = "contacted";
     }
+  }
+
+  // Manual / edited leads start at 0% — recompute when contactable fields change.
+  const fitFieldsChanged =
+    patch.company !== undefined ||
+    patch.website !== undefined ||
+    patch.emails !== undefined ||
+    patch.phones !== undefined ||
+    patch.location !== undefined ||
+    patch.aboutBlurb !== undefined;
+  if (fitFieldsChanged) {
+    const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+    const scored = scoreImportedLead(
+      {
+        company: patch.company ?? lead.company,
+        website: patch.website !== undefined ? patch.website : lead.website,
+        emails: patch.emails ?? lead.emails,
+        phones: patch.phones ?? lead.phones,
+        aboutBlurb:
+          patch.aboutBlurb !== undefined ? patch.aboutBlurb : lead.aboutBlurb,
+        location: patch.location !== undefined ? patch.location : lead.location,
+        tags: lead.tags,
+        contactName: lead.contactName,
+      },
+      pitchContextFromWorkspace(ws),
+    );
+    next.fitScore = scored.score;
+    next.fitReasons = scored.reasons;
   }
 
   return db.updateLead(leadId, next);

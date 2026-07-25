@@ -592,7 +592,15 @@ export class JsonStore implements LeadRepository {
       if (filter?.boardId && (l.boardId || "") !== filter.boardId) return false;
       return true;
     });
-    return [...leads].map(normalizeLead).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const sorted = [...leads]
+      .map(normalizeLead)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const offset = Math.max(0, filter?.offset ?? 0);
+    if (filter?.limit != null && filter.limit >= 0) {
+      return sorted.slice(offset, offset + filter.limit);
+    }
+    if (offset > 0) return sorted.slice(offset);
+    return sorted;
   }
 
   async countLeads(filter?: LeadListFilter): Promise<number> {

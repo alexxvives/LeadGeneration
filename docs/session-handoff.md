@@ -9,22 +9,22 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-22 (manual Add lead)
+## ⏱️ Status — updated 2026-07-25 (draft-all parallel)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0025** local **and remote** (`find_leads_enabled` applied).
 
 ### This pass
-- Leads page: **Add lead** next to the count → creates a blank lead and opens
-  the info drawer to fill in. `POST /api/leads` + `createManualLead` (reuses a
-  per-board `manual` run; meters like import).
+- Outreach **Draft all**: parallel pool (8 / 4 with AI personalize) + cancelable
+  progress modal instead of one toast per draft.
+- Prior same day: manual-lead fit rescore, notes column gate, settings skeleton,
+  progressive lead hydrate, verifying-email mist color.
 
 ### Next
-1. Smoke Add lead on a board (empty + with leads); confirm quota 402 when dry.
+1. Smoke Draft all on a board with dozens of undrafted leads (progress + cancel).
 2. Send a test email to a real inbox (needs Easy/Pro transport).
-3. Verify a sending domain in Resend; set `OUTREACH_FROM_EMAIL` on Worker.
-4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
+3. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 

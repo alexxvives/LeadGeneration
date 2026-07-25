@@ -4,6 +4,21 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-25 — Draft all: parallel + progress modal
+- Outreach “Draft all” was sequential + one toast per lead. Now runs a
+  concurrency pool (8 template / 4 with AI personalize), silent per-lead
+  drafts, and a cancelable progress modal (same pattern as import).
+
+### 2026-07-25 — Manual lead fit + progressive board hydrate
+- Blank `createManualLead` correctly starts at 0% fit; score is recomputed in
+  `updateLeadCrm` when company/website/emails/phones/location/blurb change
+  (`scoreImportedLead` + active profile pitch as soft niche).
+- Notes column already defaulted off in Columns menu but `LeadTable` ignored
+  `vis.notes` — now gated.
+- Large boards: `/api/board?limit=&offset=` + `chunk=1` pages; Studio shows
+  first 150 then backfills 400 at a time. Lite dashboard refresh keeps cached
+  leads so returning to Leads doesn’t re-download.
+
 ### 2026-07-22 — Manual Add lead
 - `POST /api/leads` → `createManualLead`: blank company/fields, tag `manual`,
   reuses one completed `provider: "manual"` run per board (keeps Runs clean).
