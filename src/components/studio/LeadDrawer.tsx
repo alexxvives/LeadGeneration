@@ -190,6 +190,25 @@ export function LeadDrawer(props: DrawerProps) {
     }
   }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, promptNote]);
 
+  // Heal: older sends wrote status but skipped the dated "Email sent" journal.
+  useEffect(() => {
+    if (outreach?.status !== "sent" || !outreach.sentAt) return;
+    const sentDay = outreach.sentAt.slice(0, 10);
+    const existing = lead.followUps ?? [];
+    const has = existing.some(
+      (f) =>
+        f.note.trim().toLowerCase() === "email sent" && f.date === sentDay,
+    );
+    if (has) return;
+    const updated: FollowUp[] = [
+      { id: newId("fu"), date: sentDay, note: "Email sent", done: false },
+      ...existing,
+    ];
+    setFollowUps(updated);
+    void props.onUpdateCrm(lead.id, { followUps: updated });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot heal per lead/sentAt
+  }, [lead.id, outreach?.status, outreach?.sentAt]);
+
   useEffect(() => {
     if (!promptNote || !showAddNote) return;
     const t = window.setTimeout(() => noteInputRef.current?.focus(), 80);

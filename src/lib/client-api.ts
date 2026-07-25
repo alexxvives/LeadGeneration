@@ -30,6 +30,8 @@ export interface BoardResponse {
   leadsTotal?: number;
   /** More lead pages available after this response. */
   leadsHasMore?: boolean;
+  /** Workspace/board CRM stage totals from D1 (Pipeline badges). */
+  crmStageCounts?: Record<CrmStage, number>;
   boards: BoardSummary[];
   activeBoardId: string | null;
   boardLock: BoardLock | null;
@@ -138,6 +140,10 @@ export const api = {
     if (opts?.offset != null && opts.offset > 0) {
       params.set("offset", String(opts.offset));
     }
+    // Local calendar day for workspace “sent today” (Contacted header).
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    params.set("dayStart", dayStart.toISOString());
     return jsonFetch<BoardResponse>(`/api/board?${params.toString()}`);
   },
 
@@ -334,6 +340,7 @@ export const api = {
       ok: boolean;
       error?: string;
       outreach?: Outreach;
+      followUps?: FollowUp[];
       provider?: "google" | "resend" | "maileroo" | "smtp" | "demo";
       verifyBlocked?: boolean;
       canForce?: boolean;

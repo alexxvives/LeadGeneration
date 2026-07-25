@@ -12,20 +12,6 @@ import {
   PhoneIcon,
 } from "@/components/icons";
 
-/** Emails with outreach.sentAt on the local calendar day (board truth). */
-function countEmailsSentToday(leads: LeadWithOutreach[]): number {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const t0 = start.getTime();
-  let n = 0;
-  for (const lead of leads) {
-    const o = lead.outreach;
-    if (o?.status !== "sent" || !o.sentAt) continue;
-    if (new Date(o.sentAt).getTime() >= t0) n += 1;
-  }
-  return n;
-}
-
 type OutreachBucket = "review" | "ready" | "contacted";
 
 /** Any pipeline stage past New counts as contacted in the Outreach queue. */
@@ -45,20 +31,27 @@ function isContacted(lead: LeadWithOutreach): boolean {
 }
 
 function leadEmail(lead: LeadWithOutreach): string | null {
-  return lead.outreach?.toEmail ?? lead.emails[0] ?? null;
+  const raw = lead.outreach?.toEmail ?? lead.emails[0] ?? null;
+  const t = raw?.trim();
+  return t || null;
 }
 
 function leadPhone(lead: LeadWithOutreach): string | null {
-  return lead.phones[0] ?? null;
+  const t = lead.phones[0]?.trim();
+  return t || null;
 }
 
 function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   if (isContacted(lead)) return "contacted";
   const email = leadEmail(lead);
   const phone = leadPhone(lead);
-  // Phone-only: start in Ready — call, then green-arrow → Contacted + notes.
-  if (!email && phone) return "ready";
 
+  // Phone-only → Ready (call path; no email draft).
+  if (!email && phone) return "ready";
+  // No email and no phone → hide from Outreach queue.
+  if (!email) return null;
+
+  // Email leads only in Contact Draft / Ready send path.
   const o = lead.outreach;
   if (
     o?.status === "approved" ||
@@ -73,16 +66,19 @@ function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   return null;
 }
 
-function byFitDesc(a: LeadWithOutreach, b: LeadWithOutreach): number {
-  return (b.fitScore ?? 0) - (a.fitScore ?? 0);
+/** Fit desc, then company A–Z (stable when many share the same score). */
+function byFitThenCompany(a: LeadWithOutreach, b: LeadWithOutreach): number {
+  const fit = (b.fitScore ?? 0) - (a.fitScore ?? 0);
+  if (fit !== 0) return fit;
+  return a.company.localeCompare(b.company, undefined, { sensitivity: "base" });
 }
 
-/** Contacted: newest sends first, then fit. */
+/** Contacted: newest sends first, then fit, then company. */
 function byContactedRecent(a: LeadWithOutreach, b: LeadWithOutreach): number {
   const aSent = a.outreach?.sentAt ?? "";
   const bSent = b.outreach?.sentAt ?? "";
   if (aSent !== bSent) return bSent.localeCompare(aSent);
-  return byFitDesc(a, b);
+  return byFitThenCompany(a, b);
 }
 
 const BUCKET_META: Record<
@@ -106,25 +102,21 @@ const BUCKET_META: Record<
   },
 };
 
-function contactedDayHint(
-  sentToday: number,
-  softCap: number,
-  loadingMore: boolean,
-): string {
-  const n = `${sentToday}${loadingMore ? "…" : ""} sent today`;
+function contactedDayHint(sentToday: number, softCap: number): string {
   if (sentToday >= softCap) {
-    return `${n} · over ~${softCap}/day suggest`;
+    return `${sentToday} sent today · over ~${softCap}/day suggest`;
   }
-  return `${n} · ~${softCap}/day suggest`;
+  return `${sentToday} sent today · ~${softCap}/day suggest`;
 }
 
 /**
  * Compact 3-column send queue: Review → Ready → Contacted.
  * Phone-only leads land in Ready (no email draft required).
- * Cards within each column are sorted by fit (highest first).
+ * Draft/Ready: fit desc, then company A–Z. Contacted: newest send first.
  */
 export function OutreachView({
   leads,
+  sendsToday = 0,
   canSendEmail,
   emailVerify = false,
   busyId,
@@ -141,6 +133,8 @@ export function OutreachView({
   onMarkContacted,
 }: {
   leads: LeadWithOutreach[];
+  /** Workspace DB count of emails sent since local midnight. */
+  sendsToday?: number;
   canSendEmail: boolean;
   emailVerify?: boolean;
   busyId: string | null;
@@ -171,15 +165,14 @@ export function OutreachView({
       const b = bucketOf(lead);
       if (b) next[b].push(lead);
     }
-    next.review.sort(byFitDesc);
-    next.ready.sort(byFitDesc);
+    next.review.sort(byFitThenCompany);
+    next.ready.sort(byFitThenCompany);
     next.contacted.sort(byContactedRecent);
     return next;
   }, [leads]);
 
-  const sentToday = useMemo(() => countEmailsSentToday(leads), [leads]);
   const softCap = warmupStatus().softCap;
-  const overSoftCap = sentToday >= softCap;
+  const overSoftCap = sendsToday >= softCap;
 
   const columns: OutreachBucket[] = ["review", "ready", "contacted"];
 
@@ -232,7 +225,7 @@ export function OutreachView({
                     }
                   >
                     {key === "contacted"
-                      ? contactedDayHint(sentToday, softCap, backfilling)
+                      ? contactedDayHint(sendsToday, softCap)
                       : meta.hint}
                   </p>
                 </div>
@@ -351,9 +344,8 @@ function OutreachRow({
   const hasDraft = Boolean(lead.outreach);
   const openComposer = () => {
     if (bucket === "contacted") {
-      // Sent → draft pane (shows message + Sent stamp); otherwise CRM info.
-      if (sent) onOpenDraft();
-      else onOpenInfo();
+      // Info pane has Notes (dated "Email sent"); draft is via draft button.
+      onOpenInfo();
       return;
     }
     if (phoneOnly) {

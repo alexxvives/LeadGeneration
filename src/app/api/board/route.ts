@@ -40,6 +40,17 @@ export async function GET(req: Request) {
   }
 
   const workspace = await getWorkspaceSummary(ctx);
+  // Client passes local-midnight ISO so “sent today” matches the user’s day.
+  const dayStartRaw = url.searchParams.get("dayStart")?.trim() ?? "";
+  const dayStart =
+    dayStartRaw && !Number.isNaN(Date.parse(dayStartRaw))
+      ? new Date(dayStartRaw).toISOString()
+      : (() => {
+          const d = new Date();
+          d.setUTCHours(0, 0, 0, 0);
+          return d.toISOString();
+        })();
+  const sendsToday = await ctx.db.countSentSince(dayStart);
   const ws = await ctx.db.getWorkspace(ctx.workspaceId);
   const caps = getCapabilities();
   const canSendEmail =
@@ -54,7 +65,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     ...board,
     capabilities: { ...caps, canSendEmail, emailVerify },
-    workspace,
+    workspace: { ...workspace, sendsToday },
   });
 }
 

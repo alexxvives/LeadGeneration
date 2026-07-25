@@ -123,12 +123,6 @@ export function Studio() {
   const view = viewFromParams(rawView);
   const boardParam = searchParams.get("board");
 
-  // Admins land on platform dashboard — not Search / Pipeline / etc.
-  useEffect(() => {
-    if (!isAdmin) return;
-    if (view === "admin" || view === "admin-users") return;
-    router.replace("/app?view=admin", { scroll: false });
-  }, [isAdmin, view, router]);
   // Prefer URL; if nav omitted `board`, keep the stored sidebar selection.
   const filterBoardId = (() => {
     if (boardParam === "all") return null;
@@ -305,23 +299,64 @@ export function Studio() {
         setActiveRunId(null);
       }
     }
-    // Soft refresh while a large board is still paging: merge page-1 updates
-    // into already-loaded leads so Contacted/sent rows don’t disappear.
-    const keepPaged =
+    // Soft refresh / pipeline poll: never replace a larger in-memory list with
+    // a smaller page — that made Pipeline Contacted drop from ~169 → a handful.
+    const incomingIsPage = pageOpts != null;
+    if (
       !!prev &&
       sameBoard &&
-      !haveComplete &&
-      prev.leads.length > data.leads.length &&
-      data.leadsHasMore === true;
-
-    if (keepPaged) {
+      incomingIsPage &&
+      prev.leads.length > 0
+    ) {
       const patch = new Map(data.leads.map((l) => [l.id, l]));
+      const merged = prev.leads.map((l) => patch.get(l.id) ?? l);
+      const seen = new Set(merged.map((l) => l.id));
+      for (const l of data.leads) {
+        if (!seen.has(l.id)) merged.push(l);
+      }
+      const total = data.leadsTotal ?? prev.leadsTotal ?? merged.length;
+      const stillMore = merged.length < total;
       setBoard({
         ...data,
-        leads: prev.leads.map((l) => patch.get(l.id) ?? l),
-        leadsTotal: data.leadsTotal ?? prev.leadsTotal,
-        leadsHasMore: true,
+        leads: merged,
+        leadsTotal: total,
+        leadsHasMore: stillMore,
+        crmStageCounts: data.crmStageCounts ?? prev.crmStageCounts,
       });
+      if (stillMore && !leadsBackfilling) {
+        setLeadsBackfilling(true);
+        void (async () => {
+          let offset = merged.length;
+          try {
+            while (true) {
+              if (leadsGenRef.current !== gen) return;
+              if (filterBoardIdRef.current !== boardKey) return;
+              const chunk = await api.boardLeadsChunk(boardKey, {
+                limit: LEAD_PAGE_CHUNK,
+                offset,
+              });
+              if (leadsGenRef.current !== gen) return;
+              setBoard((b) => {
+                if (!b) return b;
+                const have = new Set(b.leads.map((l) => l.id));
+                const added = chunk.leads.filter((l) => !have.has(l.id));
+                return {
+                  ...b,
+                  leads: [...b.leads, ...added],
+                  leadsTotal: chunk.leadsTotal,
+                  leadsHasMore: chunk.leadsHasMore,
+                };
+              });
+              offset += chunk.leads.length;
+              if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
+            }
+          } catch {
+            /* keep partial list */
+          } finally {
+            if (leadsGenRef.current === gen) setLeadsBackfilling(false);
+          }
+        })();
+      }
       return data;
     }
 
@@ -838,10 +873,28 @@ export function Studio() {
       // and can hide the just-sent lead from Outreach → Contacted.
       if (result.outreach) {
         const sent = result.outreach;
+        const followUps = result.followUps;
         setBoard((b) => {
           if (!b) return b;
+          const prevToday = b.workspace.sendsToday ?? 0;
+          const target = b.leads.find(
+            (l) => l.outreach?.id === outreachId || l.id === sent.leadId,
+          );
+          const movedToContacted = target?.crmStage === "new";
+          const counts = b.crmStageCounts
+            ? { ...b.crmStageCounts }
+            : undefined;
+          if (counts && movedToContacted) {
+            counts.new = Math.max(0, (counts.new ?? 0) - 1);
+            counts.contacted = (counts.contacted ?? 0) + 1;
+          }
           return {
             ...b,
+            workspace: {
+              ...b.workspace,
+              sendsToday: prevToday + 1,
+            },
+            ...(counts ? { crmStageCounts: counts } : {}),
             leads: b.leads.map((l) => {
               if (l.outreach?.id !== outreachId && l.id !== sent.leadId) {
                 return l;
@@ -855,6 +908,7 @@ export function Studio() {
                 crmStage: l.crmStage === "new" ? "contacted" : l.crmStage,
                 contactMethods: methods,
                 outreach: sent,
+                ...(followUps ? { followUps } : {}),
               };
             }),
           };
@@ -1519,8 +1573,7 @@ export function Studio() {
           ) : null}
         </div>
 
-        {!isAdmin &&
-        view !== "dashboard" &&
+        {view !== "dashboard" &&
         view !== "boards" &&
         view !== "admin" &&
         view !== "admin-users" &&
@@ -1693,8 +1746,23 @@ export function Studio() {
       {/* Pipeline view — CRM kanban only */}
       {view === "pipeline" && (
         <div data-tour="pipeline-board" className="min-h-0 flex-1">
+          {leadsBackfilling ? (
+            <p
+              className="mb-2 text-[11px] text-mist-500"
+              role="status"
+              aria-live="polite"
+            >
+              Loading leads{" "}
+              <span className="tabular-nums text-mist-300">
+                {board?.leads.length ?? 0}
+                {board?.leadsTotal != null ? `/${board.leadsTotal}` : ""}
+              </span>
+              … column totals are from the database.
+            </p>
+          ) : null}
           <PipelineView
             leads={searchFilteredLeads}
+            stageCounts={board?.crmStageCounts}
             onOpen={openInfo}
             onMoveStage={onMoveStage}
           />
@@ -1889,6 +1957,7 @@ export function Studio() {
           ) : (
             <OutreachView
               leads={searchFilteredLeads}
+              sendsToday={board.workspace.sendsToday ?? 0}
               canSendEmail={!!board.capabilities.canSendEmail}
               emailVerify={!!board.capabilities.emailVerify}
               busyId={outreachBusy}

@@ -195,6 +195,12 @@ export interface LeadRepository {
    */
   countRecentSendActivity(sinceIso: string, excludeId?: string): Promise<number>;
 
+  /**
+   * Workspace outreach with status `sent` and `sent_at >= sinceIso`.
+   * Used for the Contacted “sent today” counter (client passes local midnight).
+   */
+  countSentSince(sinceIso: string): Promise<number>;
+
   /** Wipe runs/leads/outreach/boards for this workspace (keeps the workspace row). */
   clearWorkspaceData(): Promise<void>;
   /** Delete the workspace row (caller should clear data first). */

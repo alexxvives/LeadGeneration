@@ -9,22 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-26 (Contacted daily send counter)
+## ⏱️ Status — updated 2026-07-26 (Pipeline paging wipe fix)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
 **Migrations:** 0021–**0026** local **and remote** (`workspace smtp_*`).
-**Deployed:** Worker `3dd9623e-92a0-481c-80c5-b7eaa841dcac` (Contacted daily counter).
+**Deployed:** Worker `848adfd8-cbad-4c08-92b1-e421291eeb6d` (Pipeline stage counts + no wipe).
 
 ### This pass
-- Outreach → Contacted header shows emails sent today + soft daily suggest
-  (from Settings mailbox age). Turns amber when over suggest.
-- Prior: 30/min rate + Send-all concurrency 3; Easy → SMTP.
+- Pipeline Contacted undercount: soft refresh wiped paged leads. Fixed + DB
+  stage badges. Notes/sends were fine in D1 (17 Email sent / 169 contacted).
+- Prior: sendsToday from DB; Draft sort; admin studio nav.
 
 ### Next
-1. Confirm Contacted counter matches today’s sends after hard refresh.
-2. Smoke Draft all on a board with dozens of undrafted leads.
-3. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
+1. Hard-refresh Pipeline → Contacted badge should be ~169 (LUMIA), recent sends on top.
+2. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 

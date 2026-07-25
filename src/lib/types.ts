@@ -455,6 +455,11 @@ export interface WorkspaceSummary {
   leadsLimit: number;
   sendsUsed: number;
   sendsLimit: number;
+  /**
+   * Outreach emails with status sent since the client's local midnight
+   * (`dayStart` on GET /api/board). Workspace-wide — not board-paged.
+   */
+  sendsToday?: number;
   /** Insider / BYO sender — no platform send quota. */
   unlimitedSends?: boolean;
   /**

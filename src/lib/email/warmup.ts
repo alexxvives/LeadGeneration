@@ -31,7 +31,7 @@ export const AGE_BAND_OPTIONS: {
   label: string;
   hint: string;
 }[] = [
-  { id: "new", label: "Brand new", hint: "~15/day" },
+  { id: "new", label: "Brand new", hint: "~20/day" },
   { id: "weeks", label: "Weeks", hint: "~25/day" },
   { id: "months", label: "Months", hint: "~40/day" },
   { id: "established", label: "Years", hint: "~80/day" },
@@ -83,12 +83,16 @@ function capForBand(band: MailboxAgeBand): number {
     case "weeks":
       return 25;
     default:
-      return 15;
+      return 20;
   }
 }
 
+/** Local calendar YYYY-MM-DD (not UTC — matches “sent today” in the UI). */
 export function todayKey(d = new Date()): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function loadWarmupProfile(): WarmupProfile {

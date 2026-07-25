@@ -816,6 +816,17 @@ export class JsonStore implements LeadRepository {
     }).length;
   }
 
+  async countSentSince(sinceIso: string): Promise<number> {
+    const data = await this.read();
+    return data.outreach.filter(
+      (o) =>
+        this.inScope(o) &&
+        o.status === "sent" &&
+        !!o.sentAt &&
+        o.sentAt >= sinceIso,
+    ).length;
+  }
+
   clearWorkspaceData(): Promise<void> {
     return this.mutate((data) => {
       const ownedBoardIds = new Set(

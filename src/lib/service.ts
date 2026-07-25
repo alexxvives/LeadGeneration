@@ -809,6 +809,8 @@ export async function getLatestBoard(
   leadsTotal: number;
   /** True when more pages remain after this response. */
   leadsHasMore: boolean;
+  /** DB truth for Pipeline column badges (not limited to loaded pages). */
+  crmStageCounts: Record<CrmStage, number>;
   boards: BoardSummary[];
   activeBoardId: string | null;
   boardLock: BoardLock | null;
@@ -831,13 +833,35 @@ export async function getLatestBoard(
   const includeLeads = opts?.includeLeads !== false;
   const filter = active ? { boardId: active } : undefined;
 
+  const emptyStageCounts = (): Record<CrmStage, number> => ({
+    new: 0,
+    contacted: 0,
+    in_conversation: 0,
+    closed: 0,
+    not_interested: 0,
+  });
+
+  const toStageCounts = (
+    byCrmStage: Record<string, number>,
+  ): Record<CrmStage, number> => {
+    const next = emptyStageCounts();
+    for (const stage of Object.keys(next) as CrmStage[]) {
+      next[stage] = Number(byCrmStage[stage] ?? 0) || 0;
+    }
+    return next;
+  };
+
   if (!includeLeads) {
-    const leadsTotal = await leadDb.countLeads(filter);
+    const [leadsTotal, summary] = await Promise.all([
+      leadDb.countLeads(filter),
+      leadDb.summarizeLeads(filter),
+    ]);
     return {
       run: null,
       leads: [],
       leadsTotal,
       leadsHasMore: false,
+      crmStageCounts: toStageCounts(summary.byCrmStage),
       boards,
       activeBoardId: active,
       boardLock,
@@ -853,19 +877,23 @@ export async function getLatestBoard(
     runs[0] ??
     null;
 
-  const leadsTotal = await leadDb.countLeads(filter);
   const offset = Math.max(0, opts?.leadOffset ?? 0);
   const limit = opts?.leadLimit;
-  const leads = await leadDb.listLeads({
-    ...filter,
-    ...(limit != null ? { limit, offset } : {}),
-  });
+  const [leadsTotal, summary, leads] = await Promise.all([
+    leadDb.countLeads(filter),
+    leadDb.summarizeLeads(filter),
+    leadDb.listLeads({
+      ...filter,
+      ...(limit != null ? { limit, offset } : {}),
+    }),
+  ]);
   const loadedThrough = offset + leads.length;
   return {
     run,
     leads: await attachOutreach(leadDb, leads),
     leadsTotal,
     leadsHasMore: loadedThrough < leadsTotal,
+    crmStageCounts: toStageCounts(summary.byCrmStage),
     boards,
     activeBoardId: active,
     boardLock,
@@ -1074,6 +1102,8 @@ export async function setOutreachDecision(
 export interface SendOutcome {
   ok: boolean;
   outreach?: Outreach;
+  /** Updated journal after send (includes dated "Email sent" note). */
+  followUps?: FollowUp[];
   error?: string;
   rateLimited?: boolean;
   retryAfterMs?: number;
@@ -1339,7 +1369,12 @@ export async function sendApprovedOutreach(
     }
     await db.updateLead(outreach.leadId, crmPatch);
     await db.incrementWorkspaceUsage(ctx.workspaceId, { sends: 1 });
-    return { ok: true, outreach: updated ?? undefined, provider: result.provider };
+    return {
+      ok: true,
+      outreach: updated ?? undefined,
+      followUps: crmPatch.followUps,
+      provider: result.provider,
+    };
   }
 
   // Transport error — mark failed so Email Status is honest; Send retries via approve.

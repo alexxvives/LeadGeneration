@@ -269,7 +269,7 @@ export function StudioShell({
   const settingsActive = pathname.startsWith("/app/settings");
   const onApp = pathname === "/app";
 
-  // Admins operate the platform — not a personal lead studio.
+  // Studio nav for everyone; admins also get platform Admin section.
   const navSections: {
     label: string;
     items: {
@@ -278,90 +278,91 @@ export function StudioShell({
       icon: Icon;
       active: boolean;
     }[];
-  }[] = isAdmin
-    ? [
+  }[] = [
+    {
+      label: "Overview",
+      items: [
         {
-          label: "Admin",
-          items: [
-            {
-              href: "/app?view=admin",
-              label: "Dashboard",
-              icon: ShieldIcon,
-              active: onApp && (displayView === "admin" || displayView === ""),
-            },
-            {
-              href: "/app?view=admin-users",
-              label: "Users",
-              icon: UsersIcon,
-              active: onApp && displayView === "admin-users",
-            },
-          ],
+          href: "/app?view=dashboard",
+          label: "Dashboard",
+          icon: DashboardIcon,
+          active: onApp && displayView === "dashboard",
         },
-      ]
-    : [
+      ],
+    },
+    {
+      label: "Find",
+      items: [
         {
-          label: "Overview",
-          items: [
-            {
-              href: "/app?view=dashboard",
-              label: "Dashboard",
-              icon: DashboardIcon,
-              active: onApp && displayView === "dashboard",
-            },
-          ],
+          href: "/app",
+          label: "Search",
+          icon: SearchIcon,
+          active: onApp && displayView === "",
         },
         {
-          label: "Find",
-          items: [
-            {
-              href: "/app",
-              label: "Search",
-              icon: SearchIcon,
-              active: onApp && displayView === "",
-            },
-            {
-              href: "/app?view=leads",
-              label: "Leads",
-              icon: UsersIcon,
-              active: onApp && displayView === "leads",
-            },
-          ],
+          href: "/app?view=leads",
+          label: "Leads",
+          icon: UsersIcon,
+          active: onApp && displayView === "leads",
+        },
+      ],
+    },
+    {
+      label: "Engage",
+      items: [
+        {
+          href: "/app?view=pipeline",
+          label: "Pipeline",
+          icon: PipelineIcon,
+          active: onApp && displayView === "pipeline",
         },
         {
-          label: "Engage",
-          items: [
-            {
-              href: "/app?view=pipeline",
-              label: "Pipeline",
-              icon: PipelineIcon,
-              active: onApp && displayView === "pipeline",
-            },
-            {
-              href: "/app?view=outreach",
-              label: "Outreach",
-              icon: MailIcon,
-              active: onApp && displayView === "outreach",
-            },
-          ],
+          href: "/app?view=outreach",
+          label: "Outreach",
+          icon: MailIcon,
+          active: onApp && displayView === "outreach",
+        },
+      ],
+    },
+    {
+      label: "Organize",
+      items: [
+        {
+          href: "/app?view=boards",
+          label: "Boards",
+          icon: BoardsIcon,
+          active: onApp && displayView === "boards",
         },
         {
-          label: "Organize",
-          items: [
-            {
-              href: "/app?view=boards",
-              label: "Boards",
-              icon: BoardsIcon,
-              active: onApp && displayView === "boards",
-            },
-            {
-              href: "/app?view=runs",
-              label: "Runs",
-              icon: HistoryIcon,
-              active: onApp && displayView === "runs",
-            },
-          ],
+          href: "/app?view=runs",
+          label: "Runs",
+          icon: HistoryIcon,
+          active: onApp && displayView === "runs",
         },
-      ];
+      ],
+    },
+    ...(isAdmin
+      ? [
+          {
+            label: "Admin",
+            items: [
+              {
+                href: "/app?view=admin",
+                label: "Platform",
+                icon: ShieldIcon,
+                active: onApp && displayView === "admin",
+              },
+              {
+                href: "/app?view=admin-users",
+                label: "Users",
+                icon: UsersIcon,
+                active: onApp && displayView === "admin-users",
+              },
+            ],
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="relative flex min-h-screen">
@@ -425,7 +426,7 @@ export function StudioShell({
 
         {/* Board + outreach profile filters + account card */}
         <div className="mt-auto border-t border-white/5 pt-5">
-          {!isAdmin ? (
+          {displayView !== "admin" && displayView !== "admin-users" ? (
             <div className="mb-5 space-y-2">
               <BoardPicker
                 boards={boards}

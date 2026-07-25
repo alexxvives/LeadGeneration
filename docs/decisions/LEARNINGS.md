@@ -4,6 +4,32 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-07-26 — Pipeline Contacted “only 4” was client paging wipe
+- D1 truth: LUMIA had **169** contacted + **17** sends with “Email sent”
+  notes; UI showed a handful. Cause: Pipeline filters `board.leads` only, and
+  soft refresh / 15s poll could `setBoard(page1)` and discard already-loaded
+  rows. Fix: never shrink leads on a paged refresh; `crmStageCounts` from
+  `summarizeLeads` for column badges; Contacted cards sort by `sentAt` desc.
+- How to catch next time: after Send-all, compare UI badge vs
+  `wrangler d1 execute … COUNT(*) … crm_stage='contacted'`; dogfood skill on
+  Pipeline with 2k board; report “expected N / saw M + screenshot + board name”.
+
+### 2026-07-26 — Sent-today was paging fiction; Contact Draft sort
+- Contacted “N sent today” counted loaded board rows → climbed during
+  backfill and undercounted. Now workspace DB `countSentSince(local midnight)`
+  via `dayStart` on GET /api/board → `workspace.sendsToday`. Soft new-inbox
+  suggest 15→20. Contact Draft/Ready: fit desc, then company A–Z.
+
+### 2026-07-26 — Debug audit: admin lockout, send notes, Contact Draft
+- Admin accounts had Search/studio nav stripped + hard redirect to Platform
+  dashboard — looked like “search inputs removed.” Restored full studio nav
+  for admins (+ Admin section); usage bars show again in header center.
+- Send wrote “Email sent” follow-up in D1 but client optimistic patch omitted
+  `followUps`, and Contacted opened draft (no Notes pane). Return followUps
+  from send, patch client, open Contacted → info; heal missing notes on open.
+- Contact Draft was showing contactless (“No email or phone”) cards. Now:
+  email → Draft/Ready; phone-only → Ready; neither → hidden from Outreach.
+
 ### 2026-07-26 — Contacted shows sent-today vs soft daily suggest
 - Outreach → Contacted header: `N sent today · ~Y/day suggest` (amber when
   over). Count = outreach `sentAt` on local calendar day; Y from Settings

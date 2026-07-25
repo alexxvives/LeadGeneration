@@ -72,12 +72,31 @@ function cardSubtitle(lead: LeadWithOutreach): string | null {
 
 // ─── Pipeline (CRM kanban with drag-and-drop) ─────────────────────────────────
 
+function sortColumnLeads(
+  stage: CrmStage,
+  leads: LeadWithOutreach[],
+): LeadWithOutreach[] {
+  return [...leads].sort((a, b) => {
+    if (stage === "contacted") {
+      const aSent = a.outreach?.sentAt ?? "";
+      const bSent = b.outreach?.sentAt ?? "";
+      if (aSent !== bSent) return bSent.localeCompare(aSent);
+    }
+    const fit = b.fitScore - a.fitScore;
+    if (fit !== 0) return fit;
+    return a.company.localeCompare(b.company, undefined, { sensitivity: "base" });
+  });
+}
+
 export function PipelineView({
   leads,
+  stageCounts,
   onOpen,
   onMoveStage,
 }: {
   leads: LeadWithOutreach[];
+  /** DB totals — column badges stay honest while leads are still paging in. */
+  stageCounts?: Record<CrmStage, number>;
   onOpen: (id: string) => void;
   onMoveStage: (
     leadId: string,
@@ -138,12 +157,18 @@ export function PipelineView({
             }}
           >
             {MAIN_COLUMNS.map((col) => {
-              const colLeads = leads.filter((l) => l.crmStage === col.stage);
+              const colLeads = sortColumnLeads(
+                col.stage,
+                leads.filter((l) => l.crmStage === col.stage),
+              );
+              const badge =
+                stageCounts?.[col.stage] ?? colLeads.length;
               return (
                 <PipelineColumn
                   key={col.stage}
                   col={col}
                   leads={colLeads}
+                  count={badge}
                   onOpen={openIfClick}
                   activeId={activeId}
                 />
@@ -153,13 +178,19 @@ export function PipelineView({
 
           <div className="grid shrink-0 gap-2 sm:grid-cols-1">
             {PARKED_COLUMNS.map((col) => {
-              const colLeads = leads.filter((l) => l.crmStage === col.stage);
+              const colLeads = sortColumnLeads(
+                col.stage,
+                leads.filter((l) => l.crmStage === col.stage),
+              );
               const open = parkedOpen[col.stage] ?? false;
+              const badge =
+                stageCounts?.[col.stage] ?? colLeads.length;
               return (
                 <ParkedStage
                   key={col.stage}
                   col={col}
                   leads={colLeads}
+                  count={badge}
                   open={open}
                   onToggle={() =>
                     setParkedOpen((prev) => ({
@@ -194,6 +225,7 @@ export function PipelineView({
 function ParkedStage({
   col,
   leads,
+  count,
   open,
   onToggle,
   onOpen,
@@ -201,6 +233,7 @@ function ParkedStage({
 }: {
   col: (typeof PARKED_COLUMNS)[number];
   leads: LeadWithOutreach[];
+  count: number;
   open: boolean;
   onToggle: () => void;
   onOpen: (id: string) => void;
@@ -228,7 +261,7 @@ function ParkedStage({
           {col.title}
         </span>
         <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
-          {leads.length}
+          {count}
         </span>
         <span className="text-xs text-mist-600">{open ? "▾" : "▸"}</span>
       </button>
@@ -240,9 +273,7 @@ function ParkedStage({
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              {[...leads]
-                .sort((a, b) => b.fitScore - a.fitScore)
-                .map((l) => (
+              {leads.map((l) => (
                   <DraggablePipelineCard
                     key={l.id}
                     lead={l}
@@ -261,11 +292,13 @@ function ParkedStage({
 function PipelineColumn({
   col,
   leads,
+  count,
   onOpen,
   activeId,
 }: {
   col: (typeof MAIN_COLUMNS)[number] | (typeof PARKED_COLUMNS)[number];
   leads: LeadWithOutreach[];
+  count: number;
   onOpen: (id: string) => void;
   activeId: string | null;
 }) {
@@ -281,18 +314,18 @@ function PipelineColumn({
         <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
         <h3 className="truncate text-sm font-semibold leading-none text-mist-100">{col.title}</h3>
         <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
-          {leads.length}
+          {count}
         </span>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3">
         {leads.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
-            {col.empty}
+            {count > 0
+              ? "Still loading these cards…"
+              : col.empty}
           </p>
         ) : (
-          [...leads]
-            .sort((a, b) => b.fitScore - a.fitScore)
-            .map((l) => (
+          leads.map((l) => (
               <DraggablePipelineCard
                 key={l.id}
                 lead={l}

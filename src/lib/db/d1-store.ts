@@ -1570,6 +1570,20 @@ export class D1Store implements LeadRepository {
     return Number(row?.n ?? 0);
   }
 
+  async countSentSince(sinceIso: string): Promise<number> {
+    const row = await this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM outreach
+         WHERE workspace_id = ?
+           AND status = 'sent'
+           AND sent_at IS NOT NULL
+           AND sent_at >= ?`,
+      )
+      .bind(this.workspaceId, sinceIso)
+      .first<{ n: number }>();
+    return Number(row?.n ?? 0);
+  }
+
   async clearWorkspaceData(): Promise<void> {
     const boards = await this.db
       .prepare(`SELECT id FROM boards WHERE workspace_id = ?`)
