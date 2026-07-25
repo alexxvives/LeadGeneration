@@ -9,21 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-07-26 (workspace SMTP)
+## ⏱️ Status — updated 2026-07-26 (workspace SMTP live)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Local:** admin ops chrome; Insider invites; account delete (live only).
-**Migrations:** 0021–**0026** (workspace SMTP) — apply remote before/with deploy.
+**Migrations:** 0021–**0026** local **and remote** (`workspace smtp_*`).
+**Deployed:** Worker `d7c38dd6-ea2a-4273-9202-4ff8d00a99d3` (Easy → SMTP).
 
 ### This pass
-- Easy → **SMTP** (Hostinger/generic): workspace `smtp_*` fields, Settings UI,
-  `sendEmail()` path. Platform `SMTP_*` unchanged (auth/fallback).
-- Human next: Settings → Easy → SMTP → paste Hostinger password for
-  `info@itslumia.com`, Send test, confirm Hostinger Sent.
+- Easy → **SMTP** shipped: migration 0026, Settings UI, `sendEmail()` path.
+- Human: Settings → Easy → SMTP → Hostinger creds for `info@itslumia.com`,
+  Send test, check Hostinger Sent.
 
 ### Next
-1. Deploy + `npm run cf:migrate` (0026).
-2. User configures Hostinger SMTP in Settings; switch off Resend as preferred.
+1. User pastes Hostinger mailbox password in Settings (not in git).
+2. Confirm test + outreach send appear in Hostinger Sent.
 3. Smoke Draft all on a board with dozens of undrafted leads.
 4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
