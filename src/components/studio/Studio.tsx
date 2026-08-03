@@ -8,7 +8,6 @@ import {
   LEAD_PAGE_CHUNK,
   LEAD_PAGE_INITIAL,
   QuotaExceededError,
-  RateLimitedError,
   type BoardResponse,
 } from "@/lib/client-api";
 import type { ContactMethod, CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
@@ -186,6 +185,8 @@ export function Studio() {
   );
   const [pipelineFilter, setPipelineFilter] = useState<CrmStage | "all">("all");
   const [leadSearch, setLeadSearch] = useState("");
+  /** Outreach-only company-type filter (chrome next to search). */
+  const [outreachTypeFilter, setOutreachTypeFilter] = useState("all");
   const [leadsHydrating, setLeadsHydrating] = useState(false);
   /** Background pages after first paint — UI stays interactive. */
   const [leadsBackfilling, setLeadsBackfilling] = useState(false);
@@ -936,7 +937,15 @@ export function Studio() {
     }
   };
 
-  const onSend = async (outreachId: string, opts?: { skipVerify?: boolean }) => {
+  const closeLeadDrawer = useCallback(() => {
+    setDrawerPromptNote(false);
+    setSelectedId(null);
+  }, []);
+
+  const onSend = async (
+    outreachId: string,
+    opts?: { skipVerify?: boolean },
+  ): Promise<boolean> => {
     try {
       const result = await api.send(outreachId, opts);
       recordWarmupSend();
@@ -993,11 +1002,12 @@ export function Studio() {
           ? "Sent (simulated — not delivered)."
           : "Email sent.",
       );
+      return true;
     } catch (e) {
       await refresh();
       if (e instanceof QuotaExceededError && e.kind === "verifies") {
         setVerifyLimitPlan(e.planId);
-        return;
+        return false;
       }
       const err = e as Error & {
         undeliverableRemoved?: boolean;
@@ -1012,7 +1022,7 @@ export function Studio() {
           message: msg,
           reason: err.verifyReason ?? null,
         });
-        return;
+        return false;
       }
       if (err.undeliverableRemoved || /isn.?t real|can.?t receive mail|undeliverable/i.test(msg)) {
         toast("err", msg);
@@ -1026,33 +1036,34 @@ export function Studio() {
       } else {
         handleError(e);
       }
+      return false;
     }
   };
 
   const runSend = async (
     outreachId: string,
     opts?: { skipVerify?: boolean },
-  ) => {
+  ): Promise<boolean> => {
     setOutreachBusy(outreachId);
     try {
-      await onSend(outreachId, opts);
+      return await onSend(outreachId, opts);
     } finally {
       setOutreachBusy(null);
     }
   };
 
   /** Real delivery needs a provider; otherwise confirm simulate-or-settings. Soft warmup warn if over recommend. */
-  const requestSend = async (outreachId: string) => {
+  const requestSend = async (outreachId: string): Promise<boolean> => {
     // Send click is the per-lead human gate — promote draft → approved first.
     const lead = findLeadByOutreach(outreachId);
     const st = lead?.outreach?.status;
-    if (st === "sending") return; // claim already in flight
+    if (st === "sending") return false; // claim already in flight
     if (st === "draft" || st === "rejected" || st === "failed") {
       await onDecide(outreachId, "approved", { silent: true });
     }
     if (!board?.capabilities.canSendEmail) {
       setPendingSendId(outreachId);
-      return;
+      return false;
     }
     const status = warmupStatus();
     if (status.overSoftCap) {
@@ -1061,30 +1072,33 @@ export function Studio() {
         todayCount: status.todayCount,
         softCap: status.softCap,
       });
-      return;
+      return false;
     }
-    await runSend(outreachId);
+    return runSend(outreachId);
   };
 
   const confirmSimulateSend = async () => {
     const id = pendingSendId;
     setPendingSendId(null);
     if (!id) return;
-    await runSend(id);
+    const ok = await runSend(id);
+    if (ok) closeLeadDrawer();
   };
 
   const confirmWarmupSend = async () => {
     const id = warmupWarn?.outreachId;
     setWarmupWarn(null);
     if (!id) return;
-    await runSend(id);
+    const ok = await runSend(id);
+    if (ok) closeLeadDrawer();
   };
 
   const confirmVerifyForceSend = async () => {
     const id = verifyWarn?.outreachId;
     setVerifyWarn(null);
     if (!id) return;
-    await runSend(id, { skipVerify: true });
+    const ok = await runSend(id, { skipVerify: true });
+    if (ok) closeLeadDrawer();
   };
 
   const onSetDelivery = async (
@@ -1250,114 +1264,6 @@ export function Studio() {
     }
   };
 
-  /** Send every approved outreach in Ready (Send click = per-lead gate — Art. I.1). */
-  const onSendAllOutreach = async () => {
-    if (!board) return;
-    const targets = board.leads.filter((l) => {
-      const s = l.outreach?.status;
-      return (
-        (s === "approved" || s === "failed") &&
-        (l.outreach?.toEmail || l.emails[0])
-      );
-    });
-    if (targets.length === 0) return;
-
-    if (!board.capabilities.canSendEmail) {
-      toast(
-        "err",
-        "Add a sending key in Settings before Send all — or send one at a time to simulate.",
-      );
-      return;
-    }
-
-    const status = warmupStatus();
-    if (status.overSoftCap) {
-      const ok = confirm(
-        `Soft warmup recommend is ${status.softCap}/day (you've sent ${status.todayCount}). Send all ${targets.length} anyway?`,
-      );
-      if (!ok) return;
-    } else {
-      const ok = confirm(
-        `Send ${targets.length} email${targets.length === 1 ? "" : "s"} now?`,
-      );
-      if (!ok) return;
-    }
-
-    setOutreachBusy("send-all");
-    // Modest pool — faster than 1-by-1; SMTP + rate limit still apply.
-    const concurrency = 3;
-    let cursor = 0;
-    let sent = 0;
-    let failed = 0;
-    let hitVerifyLimit = false;
-    let rateToastAt = 0;
-
-    const sendOne = async (l: (typeof targets)[number]) => {
-      if (!l.outreach || hitVerifyLimit) return;
-      let attempts = 0;
-      for (;;) {
-        if (hitVerifyLimit) return;
-        try {
-          if (l.outreach.status !== "approved") {
-            await onDecide(l.outreach.id, "approved", { silent: true });
-          }
-          await api.send(l.outreach.id);
-          recordWarmupSend();
-          sent += 1;
-          return;
-        } catch (e) {
-          if (e instanceof QuotaExceededError && e.kind === "verifies") {
-            hitVerifyLimit = true;
-            setVerifyLimitPlan(e.planId);
-            return;
-          }
-          if (e instanceof RateLimitedError && attempts < 8) {
-            attempts += 1;
-            const now = Date.now();
-            if (now - rateToastAt > 4_000) {
-              rateToastAt = now;
-              toast(
-                "ok",
-                `Pausing for rate limit… ${sent} of ${targets.length} sent`,
-              );
-            }
-            await new Promise((r) => setTimeout(r, e.retryAfterMs));
-            continue;
-          }
-          failed += 1;
-          return;
-        }
-      }
-    };
-
-    const worker = async () => {
-      while (!hitVerifyLimit) {
-        const i = cursor++;
-        if (i >= targets.length) return;
-        await sendOne(targets[i]!);
-      }
-    };
-
-    try {
-      await Promise.all(
-        Array.from({ length: Math.min(concurrency, targets.length) }, () =>
-          worker(),
-        ),
-      );
-      await refresh();
-      if (sent > 0) {
-        toast(
-          "ok",
-          `Sent ${sent}${failed ? ` · ${failed} failed` : ""}.`,
-        );
-      } else if (failed > 0 && !hitVerifyLimit) {
-        toast("err", `Could not send ${failed} email${failed === 1 ? "" : "s"}.`);
-      }
-    } finally {
-      setOutreachBusy(null);
-    }
-  };
-
   const ensureLeadDetail = useCallback(
     async (id: string) => {
       const cur = boardRef.current?.leads.find((l) => l.id === id);
@@ -1458,6 +1364,24 @@ export function Studio() {
     const all = board?.leads ?? [];
     return all.filter((l) => leadMatchesSearch(l, deferredLeadSearch));
   }, [board?.leads, deferredLeadSearch, leadMatchesSearch]);
+
+  const outreachCompanyTypes = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of board?.leads ?? []) {
+      const t = l.companyType?.trim();
+      if (t) set.add(t);
+    }
+    return [...set].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
+  }, [board?.leads]);
+
+  const outreachFilteredLeads = useMemo(() => {
+    if (outreachTypeFilter === "all") return searchFilteredLeads;
+    return searchFilteredLeads.filter(
+      (l) => (l.companyType?.trim() || "") === outreachTypeFilter,
+    );
+  }, [searchFilteredLeads, outreachTypeFilter]);
 
   const filteredLeads = useMemo(() => {
     if (deferredPipelineFilter === "all") return searchFilteredLeads;
@@ -1753,16 +1677,36 @@ export function Studio() {
             </label>
           ) : null}
           {showLeadSearch ? (
-            <label className="relative inline-flex w-full max-w-xs items-center sm:w-56">
-              <span className="sr-only">Search leads</span>
-              <input
-                type="search"
-                value={leadSearch}
-                onChange={(e) => setLeadSearch(e.target.value)}
-                placeholder="Search leads…"
-                className="w-full rounded-xl border border-white/10 bg-ink-900/60 py-2 pl-3 pr-3 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/50"
-              />
-            </label>
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+              {view === "outreach" ? (
+                <label className="inline-flex min-w-0 items-center gap-2">
+                  <span className="sr-only">Filter by lead type</span>
+                  <Select
+                    value={outreachTypeFilter}
+                    onChange={(e) => setOutreachTypeFilter(e.target.value)}
+                    className="max-w-[11rem] py-2 text-sm"
+                    aria-label="Filter outreach by lead type"
+                  >
+                    <option value="all">All types</option>
+                    {outreachCompanyTypes.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              ) : null}
+              <label className="relative inline-flex w-full max-w-xs items-center sm:w-56">
+                <span className="sr-only">Search leads</span>
+                <input
+                  type="search"
+                  value={leadSearch}
+                  onChange={(e) => setLeadSearch(e.target.value)}
+                  placeholder="Search leads…"
+                  className="w-full rounded-xl border border-white/10 bg-ink-900/60 py-2 pl-3 pr-3 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/50"
+                />
+              </label>
+            </div>
           ) : null}
         </div>
       </div>
@@ -2081,7 +2025,7 @@ export function Studio() {
             </div>
           ) : (
             <OutreachView
-              leads={searchFilteredLeads}
+              leads={outreachFilteredLeads}
               sendsToday={board.workspace.sendsToday ?? 0}
               canSendEmail={!!board.capabilities.canSendEmail}
               emailVerify={!!board.capabilities.emailVerify}
@@ -2097,7 +2041,6 @@ export function Studio() {
                 await requestSend(outreachId);
               }}
               onDraftAll={onDraftAllOutreach}
-              onSendAll={onSendAllOutreach}
               onMarkContacted={onMarkContacted}
             />
           )}
@@ -2116,10 +2059,7 @@ export function Studio() {
           mode={drawerMode}
           promptNote={drawerPromptNote}
           capabilities={board.capabilities}
-          onClose={() => {
-            setDrawerPromptNote(false);
-            setSelectedId(null);
-          }}
+          onClose={closeLeadDrawer}
           onUndoMarkContacted={
             drawerPromptNote
               ? () => onUndoMarkContacted(selected.id)
@@ -2129,7 +2069,7 @@ export function Studio() {
           onDraft={onDraft}
           onSaveDraft={onSaveDraft}
           onDecide={onDecide}
-          onSend={async (id) => requestSend(id)}
+          onSend={requestSend}
           onSetDelivery={onSetDelivery}
           onUpdateCrm={onUpdateLeadCrm}
         />

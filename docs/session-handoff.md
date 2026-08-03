@@ -9,24 +9,22 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-03 (webhook rebuild deploy verified)
+## ⏱️ Status — updated 2026-08-03 (outreach drawer send UX)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Deployed:** Worker `a93f4822-07f9-43f9-b7dd-bc68be079af7`  
-**Git:** `f1b1748` on `master` (pushed).
+**Git:** `f1b1748` on `master` (local may be ahead — deploy after this pass).
 **Migrations:** 0021–**0026** local **and remote** (`workspace smtp_*`).
 
 ### This pass
-- Human re-enabled Resend webhook. First `cf:deploy` shipped a **stale**
-  `.open-next` (July) — still 503. Fixed with `cf:build` then `cf:deploy`.
-- Probe after rebuild: ping → 200; unsigned bounce → **200**
-  `ignored:no_signing_secret` (no longer 503). Real Resend events with Svix
-  sig should update `deliveryStatus` again.
-- Bounce UX (Pipeline rose + Contacted revert) is in the live Worker.
+- Outreach: removed Send all; type filter sits next to search bar.
+- Draft drawer: Approve + Approve & send; on successful send close drawer
+  and toast (no in-modal “Sent” celebration).
+- Prior: webhook rebuild deploy verified; slim board list + keep-alive.
 
 ### Next
-1. Optional: Replay missed bounce messages in Resend (July 23 → re-enable).
-2. Optional: re-save Settings → Easy once to refresh/ensure webhook secret.
+1. Deploy this pass; smoke Approve & send from Contact Draft.
+2. Optional: Replay missed bounce messages in Resend.
 3. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---

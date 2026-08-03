@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
 import { warmupStatus } from "@/lib/email/warmup";
 import { FitMeter, Spinner } from "@/components/ui";
-import { Select } from "@/components/ui/Select";
 import {
   ArrowIcon,
   CheckIcon,
@@ -133,7 +132,6 @@ export function OutreachView({
   onApprove,
   onSend,
   onDraftAll,
-  onSendAll,
   onMarkContacted,
 }: {
   leads: LeadWithOutreach[];
@@ -152,7 +150,6 @@ export function OutreachView({
   onApprove: (leadId: string) => Promise<void>;
   onSend: (outreachId: string) => Promise<void>;
   onDraftAll: () => Promise<void>;
-  onSendAll: () => Promise<void>;
   onMarkContacted: (
     leadId: string,
     method: ContactMethod,
@@ -160,25 +157,6 @@ export function OutreachView({
   ) => Promise<void>;
 }) {
   const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-
-  const companyTypes = useMemo(() => {
-    const set = new Set<string>();
-    for (const lead of leads) {
-      const t = lead.companyType?.trim();
-      if (t) set.add(t);
-    }
-    return [...set].sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" }),
-    );
-  }, [leads]);
-
-  const typeFiltered = useMemo(() => {
-    if (typeFilter === "all") return leads;
-    return leads.filter(
-      (l) => (l.companyType?.trim() || "") === typeFilter,
-    );
-  }, [leads, typeFilter]);
 
   const grouped = useMemo(() => {
     const next: Record<OutreachBucket, LeadWithOutreach[]> = {
@@ -186,7 +164,7 @@ export function OutreachView({
       ready: [],
       contacted: [],
     };
-    for (const lead of typeFiltered) {
+    for (const lead of leads) {
       const b = bucketOf(lead);
       if (b) next[b].push(lead);
     }
@@ -196,7 +174,7 @@ export function OutreachView({
       next.ready = next.ready.filter((l) => !leadEmail(l) && Boolean(leadPhone(l)));
     }
     return next;
-  }, [typeFiltered, readyChannel]);
+  }, [leads, readyChannel]);
 
   const reviewRows = useStableDuringLoad(
     grouped.review,
@@ -226,43 +204,25 @@ export function OutreachView({
 
   return (
     <div data-tour="outreach-queue" className="flex h-full min-h-0 flex-col gap-3">
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <label className="flex min-w-0 items-center gap-2 text-[11px] text-mist-500">
-          <span className="shrink-0 uppercase tracking-wider">Type</span>
-          <Select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="max-w-[12rem] py-1.5 text-xs"
-            aria-label="Filter outreach by lead type"
-          >
-            <option value="all">All types</option>
-            {companyTypes.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </Select>
-        </label>
-        {backfilling ? (
-          <p
-            className="text-[11px] text-mist-500"
-            role="status"
-            aria-live="polite"
-          >
-            Loading more
-            {loadedCount != null ? (
-              <>
-                {" "}
-                <span className="tabular-nums text-mist-300">
-                  {loadedCount}
-                  {totalCount != null ? `/${totalCount}` : ""}
-                </span>
-              </>
-            ) : null}
-            … top of each column first
-          </p>
-        ) : null}
-      </div>
+      {backfilling ? (
+        <p
+          className="shrink-0 text-[11px] text-mist-500"
+          role="status"
+          aria-live="polite"
+        >
+          Loading more
+          {loadedCount != null ? (
+            <>
+              {" "}
+              <span className="tabular-nums text-mist-300">
+                {loadedCount}
+                {totalCount != null ? `/${totalCount}` : ""}
+              </span>
+            </>
+          ) : null}
+          … top of each column first
+        </p>
+      ) : null}
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
         {columns.map((key) => {
           const meta = BUCKET_META[key];
@@ -340,21 +300,6 @@ export function OutreachView({
                         <CheckIcon className="h-3 w-3" />
                       )}
                       Draft all
-                    </button>
-                  ) : null}
-                  {key === "ready" && rows.some((l) => leadEmail(l)) ? (
-                    <button
-                      type="button"
-                      onClick={() => void onSendAll()}
-                      disabled={busyId === "send-all"}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                    >
-                      {busyId === "send-all" ? (
-                        <Spinner className="h-3 w-3" />
-                      ) : (
-                        <ArrowIcon className="h-3 w-3" />
-                      )}
-                      Send all
                     </button>
                   ) : null}
                 </div>

@@ -77,7 +77,8 @@ interface DrawerProps {
     opts?: { silent?: boolean },
   ) => Promise<void>;
   onDecide: (outreachId: string, decision: "approved" | "rejected") => Promise<void>;
-  onSend: (outreachId: string) => Promise<void>;
+  /** Returns true when the email was actually sent (drawer should close). */
+  onSend: (outreachId: string) => Promise<boolean | void>;
   onSetDelivery: (outreachId: string, deliveryStatus: DeliveryStatus) => Promise<void>;
   onUpdateCrm: (
     leadId: string,
@@ -310,7 +311,8 @@ export function LeadDrawer(props: DrawerProps) {
     await props.onUpdateCrm(lead.id, { followUps: updated });
   };
 
-  const canSend = outreach?.status === "approved" && !!toEmail;
+  /** Recipient required; draft→approved is handled inside onSend. */
+  const canSend = Boolean(toEmail.trim());
   const sent = outreach?.status === "sent";
 
   return (
@@ -871,19 +873,12 @@ export function LeadDrawer(props: DrawerProps) {
 
                 {sent ? (
                   <div className="space-y-4 pt-1">
-                    <div className="animate-sent-pop flex flex-col items-center gap-2 rounded-xl2 border border-aurora-400/25 bg-gradient-to-b from-aurora-400/15 to-transparent px-4 py-5 text-center">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-aurora-400 text-on-accent shadow-[0_0_28px_-4px_rgba(67,224,168,0.65)]">
-                        <CheckIcon className="h-6 w-6" />
-                      </span>
-                      <p className="font-display text-lg font-semibold text-aurora-200">
-                        Sent
-                      </p>
-                      {outreach.sentAt ? (
-                        <p className="text-xs text-mist-400">
-                          {new Date(outreach.sentAt).toLocaleString()}
-                        </p>
-                      ) : null}
-                    </div>
+                    <p className="text-center text-sm text-mist-400">
+                      Sent
+                      {outreach.sentAt
+                        ? ` · ${new Date(outreach.sentAt).toLocaleString()}`
+                        : ""}
+                    </p>
                     <div>
                       <p className="mb-2 text-center text-xs font-medium uppercase tracking-widest text-mist-500">
                         Delivery outcome
@@ -964,13 +959,14 @@ export function LeadDrawer(props: DrawerProps) {
                     </button>
                     {outreach.status !== "approved" ? (
                       <button
+                        type="button"
                         onClick={() =>
                           run("approve", async () => {
                             await persistIfDirty();
                             await props.onDecide(outreach.id, "approved");
                           })
                         }
-                        disabled={busy === "approve"}
+                        disabled={busy === "approve" || busy === "send"}
                         className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-105 disabled:opacity-50"
                       >
                         {busy === "approve" ? (
@@ -980,32 +976,37 @@ export function LeadDrawer(props: DrawerProps) {
                         )}
                         Approve
                       </button>
-                    ) : (
-                      <button
-                        onClick={() =>
-                          run("send", async () => {
-                            await persistIfDirty();
-                            await props.onSend(outreach.id);
-                          })
-                        }
-                        disabled={!canSend || busy === "send"}
-                        title={!toEmail ? "Add a recipient email first" : undefined}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-105 disabled:opacity-50"
-                      >
-                        {busy === "send" ? (
-                          <Spinner className="h-3.5 w-3.5" />
-                        ) : (
-                          <ArrowIcon className="h-4 w-4" />
-                        )}
-                        {busy === "send"
-                          ? capabilities.emailVerify
-                            ? "Verifying email…"
-                            : "Sending…"
-                          : capabilities.canSendEmail
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        run("send", async () => {
+                          await persistIfDirty();
+                          const done = await props.onSend(outreach.id);
+                          if (done) onClose();
+                        })
+                      }
+                      disabled={!canSend || busy === "send" || busy === "approve"}
+                      title={!toEmail ? "Add a recipient email first" : undefined}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-105 disabled:opacity-50"
+                    >
+                      {busy === "send" ? (
+                        <Spinner className="h-3.5 w-3.5" />
+                      ) : (
+                        <ArrowIcon className="h-4 w-4" />
+                      )}
+                      {busy === "send"
+                        ? capabilities.emailVerify
+                          ? "Verifying email…"
+                          : "Sending…"
+                        : outreach.status === "approved"
+                          ? capabilities.canSendEmail
                             ? "Send email"
-                            : "Send (simulate)"}
-                      </button>
-                    )}
+                            : "Send (simulate)"
+                          : capabilities.canSendEmail
+                            ? "Approve & send"
+                            : "Approve & send (simulate)"}
+                    </button>
                   </div>
                 )}
 
