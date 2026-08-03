@@ -17,8 +17,11 @@ type ResendTag = { name?: string; value?: string };
  *  - Per-workspace (auto-registered when the user saves a BYO Resend key)
  *  - Platform `RESEND_WEBHOOK_SECRET` (optional fallback for platform sends)
  *
- * Matching: tags `hermes_ws` / `leadify_ws` + outreach id. Email fallback only
- * for inbound replies after a signature verifies.
+ * Matching: tags `hermes_ws` / `leadify_ws` + outreach id. Email fallback for
+ * replies + bounces after a signature verifies.
+ *
+ * Never return 503 for missing secrets — Resend auto-disables endpoints that
+ * keep failing. Drop unverifiable events with 200 instead.
  */
 export async function POST(req: Request) {
   const raw = await req.text();
@@ -57,30 +60,39 @@ export async function POST(req: Request) {
   const binding = await getD1Binding();
   const probe = getDb(binding, LOCAL_WORKSPACE_ID);
 
-  // Resolve which Svix secret to use (workspace auto-webhook, else platform).
-  // When a BYO workspace secret verifies the event, email-fallback lookups
-  // must stay inside that workspace (audit C2.9).
+  // Candidate Svix secrets: workspace BYO first, platform as fallback.
+  // When a BYO workspace secret verifies, email-fallback stays in that workspace.
   const platformSecret = env.resendWebhookSecret();
-  let verifySecret = platformSecret;
+  const candidates: string[] = [];
   let secretWorkspaceId: string | null = null;
   if (tagWs) {
     const ws = await probe.getWorkspace(tagWs);
     if (ws?.resendWebhookSecret?.trim()) {
-      verifySecret = ws.resendWebhookSecret.trim();
+      candidates.push(ws.resendWebhookSecret.trim());
       secretWorkspaceId = tagWs;
     }
   }
-
-  if (authRequired() && !verifySecret) {
-    return NextResponse.json(
-      { error: "No webhook signing secret for this event" },
-      { status: 503 },
-    );
+  if (platformSecret && !candidates.includes(platformSecret)) {
+    candidates.push(platformSecret);
   }
 
-  if (verifySecret) {
-    const ok = await verifySvix(raw, req.headers, verifySecret);
-    if (!ok) {
+  let verified = !authRequired() && candidates.length === 0;
+  if (candidates.length === 0) {
+    if (authRequired()) {
+      console.error("[webhooks/resend] no signing secret for event", {
+        type,
+        tagWs: tagWs ? "set" : null,
+      });
+      return NextResponse.json({ ok: true, ignored: "no_signing_secret" });
+    }
+  } else {
+    for (const secret of candidates) {
+      if (await verifySvix(raw, req.headers, secret)) {
+        verified = true;
+        break;
+      }
+    }
+    if (!verified) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
   }
@@ -109,7 +121,8 @@ export async function POST(req: Request) {
   }
 
   const allowEmailFallback =
-    delivery === "replied" && (!!verifySecret || !authRequired());
+    (delivery === "replied" || delivery === "bounced") &&
+    (verified || !authRequired());
   if (!allowEmailFallback) {
     return NextResponse.json({ ok: true, matched: 0 });
   }

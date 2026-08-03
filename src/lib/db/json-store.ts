@@ -787,13 +787,19 @@ export class JsonStore implements LeadRepository {
     return data.outreach.filter((o) => this.inScope(o)).map(normalizeOutreach);
   }
 
-  async listOutreachByLeadIds(leadIds: string[]): Promise<Outreach[]> {
+  async listOutreachByLeadIds(
+    leadIds: string[],
+    opts?: { omitBody?: boolean },
+  ): Promise<Outreach[]> {
     const want = new Set(leadIds.filter(Boolean));
     if (want.size === 0) return [];
     const data = await this.read();
     return data.outreach
       .filter((o) => this.inScope(o) && want.has(o.leadId))
-      .map(normalizeOutreach);
+      .map((o) => {
+        const n = normalizeOutreach(o);
+        return opts?.omitBody ? { ...n, body: "" } : n;
+      });
   }
 
   async findLatestSentByEmail(

@@ -225,6 +225,11 @@ to reset); in production on Cloudflare Workers, `getDb()` receives a D1 binding
 and uses `D1Store` instead. Pipeline/Leads respect the sidebar board filter
 (**All** by default). Each workspace has a **Default** board; see ADR 0014.
 
+Board hydrate is **progressive + slim**: first ~150 leads, then chunks of ~400,
+without email bodies / about blurbs / notes (`detailLoaded: false`). Opening a
+lead drawer fetches full detail via `GET /api/leads/:id`. Pipeline and Outreach
+stay mounted after first visit so switching back is instant.
+
 ## 6. Guardrails baked into the flow
 
 - `sendApprovedOutreach` refuses anything not `approved` (returns 409 via the API).

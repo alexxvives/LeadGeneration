@@ -358,6 +358,10 @@ export const api = {
       body: JSON.stringify({ boardId: opts?.boardId ?? null }),
     }),
 
+  /** Full lead + outreach body (board list omits heavy fields). */
+  getLead: (id: string) =>
+    jsonFetch<{ lead: LeadWithOutreach }>(`/api/leads/${id}`),
+
   updateLead: (
     id: string,
     patch: {

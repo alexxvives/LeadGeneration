@@ -172,7 +172,10 @@ export interface LeadRepository {
   getOutreachByLead(leadId: string): Promise<Outreach | null>;
   listOutreach(): Promise<Outreach[]>;
   /** Outreach rows for the given lead ids (chunked IN-list on D1). */
-  listOutreachByLeadIds(leadIds: string[]): Promise<Outreach[]>;
+  listOutreachByLeadIds(
+    leadIds: string[],
+    opts?: { omitBody?: boolean },
+  ): Promise<Outreach[]>;
 
   /**
    * Cross-workspace: latest sent outreach for a recipient (inbound reply match).

@@ -13,7 +13,6 @@ import {
 import { signOut, useSession } from "next-auth/react";
 import { BrandMark } from "@/components/BrandMark";
 import { AuthModal } from "@/components/AuthModal";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   GettingStartedWizard,
   useGettingStartedOpen,
@@ -40,7 +39,11 @@ import {
   DashboardIcon,
   BoardsIcon,
   ShieldIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@/components/icons";
+
+const SIDEBAR_COLLAPSED_KEY = "hermes_sidebar_collapsed";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -268,6 +271,29 @@ export function StudioShell({
   const userEmail = (session?.user?.email as string | undefined) ?? null;
   const settingsActive = pathname.startsWith("/app/settings");
   const onApp = pathname === "/app";
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
+        setSidebarCollapsed(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   // Studio nav for everyone; admins also get platform Admin section.
   const navSections: {
@@ -364,25 +390,49 @@ export function StudioShell({
       : []),
   ];
 
+  const wide = !sidebarCollapsed;
+
   return (
     <div className="relative flex min-h-screen">
       <div className="pointer-events-none fixed inset-0 -z-10 aurora-glow opacity-40" />
 
-      <div className="pointer-events-none fixed right-3 top-3 z-50 sm:right-5 sm:top-4">
-        <div className="pointer-events-auto">
-          <ThemeToggle />
-        </div>
-      </div>
+      <aside
+        className={`sticky top-0 z-30 flex h-screen flex-col border-r border-white/5 bg-ink-950/90 py-5 backdrop-blur-xl transition-[width] duration-200 ease-out ${
+          wide ? "relative w-16 sm:w-[18.4rem] sm:px-4" : "relative w-16"
+        }`}
+      >
+        {wide ? (
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            className="absolute right-2 top-3 z-10 hidden rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100 sm:inline-flex"
+            aria-label="Collapse sidebar"
+            title="Collapse menu"
+          >
+            <ChevronLeftIcon className="h-4 w-4" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            className="mb-3 hidden items-center justify-center self-center rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100 sm:inline-flex"
+            aria-label="Expand sidebar"
+            title="Expand menu"
+          >
+            <ChevronRightIcon className="h-4 w-4" />
+          </button>
+        )}
 
-      <aside className="sticky top-0 z-30 flex h-screen w-16 flex-col border-r border-white/5 bg-ink-950/90 py-5 backdrop-blur-xl sm:w-[18.4rem] sm:px-4">
         <Link
           href="/"
-          className="mb-8 flex justify-center px-1 transition-opacity hover:opacity-80 sm:justify-start"
+          className={`mb-8 flex px-1 transition-opacity hover:opacity-80 ${
+            wide ? "justify-center sm:justify-start sm:pr-8" : "justify-center"
+          }`}
         >
-          <span className="hidden sm:inline">
+          <span className={wide ? "hidden sm:inline" : "hidden"}>
             <BrandMark />
           </span>
-          <span className="sm:hidden">
+          <span className={wide ? "sm:hidden" : ""}>
             <BrandMark size="sm" withWordmark={false} />
           </span>
         </Link>
@@ -390,7 +440,11 @@ export function StudioShell({
         <nav className="flex flex-1 flex-col gap-4 overflow-y-auto">
           {navSections.map((section) => (
             <div key={section.label} className="flex flex-col gap-1">
-              <p className="mb-0.5 hidden px-3 text-[10px] uppercase tracking-wider text-mist-500 sm:block">
+              <p
+                className={`mb-0.5 px-3 text-[10px] uppercase tracking-wider text-mist-500 ${
+                  wide ? "hidden sm:block" : "hidden"
+                }`}
+              >
                 {section.label}
               </p>
               {section.items.map((item) => {
@@ -405,7 +459,10 @@ export function StudioShell({
                     key={item.href}
                     href={boardHref(item.href)}
                     onClick={() => setPendingNavView(viewKey)}
-                    className={`group flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors sm:justify-start ${
+                    title={item.label}
+                    className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                      wide ? "justify-center sm:justify-start" : "justify-center"
+                    } ${
                       item.active
                         ? "bg-aurora-400/10 text-aurora-300"
                         : "text-mist-300 hover:bg-white/5 hover:text-mist-100"
@@ -416,7 +473,9 @@ export function StudioShell({
                         item.active ? "text-aurora-300" : "text-mist-500 group-hover:text-aurora-300"
                       }`}
                     />
-                    <span className="hidden sm:inline">{item.label}</span>
+                    <span className={wide ? "hidden sm:inline" : "hidden"}>
+                      {item.label}
+                    </span>
                   </Link>
                 );
               })}
@@ -426,7 +485,9 @@ export function StudioShell({
 
         {/* Board + outreach profile filters + account card */}
         <div className="mt-auto border-t border-white/5 pt-5">
-          {displayView !== "admin" && displayView !== "admin-users" ? (
+          {wide &&
+          displayView !== "admin" &&
+          displayView !== "admin-users" ? (
             <div className="mb-5 space-y-2">
               <BoardPicker
                 boards={boards}
@@ -437,7 +498,7 @@ export function StudioShell({
             </div>
           ) : null}
 
-          <div className="hidden sm:block">
+          <div className={wide ? "hidden sm:block" : "hidden"}>
             <Link
               href="/app/settings"
               className={`block rounded-xl border p-3 transition-colors ${
@@ -491,7 +552,11 @@ export function StudioShell({
             </Link>
           </div>
 
-          <div className="flex flex-col items-center gap-1 sm:hidden">
+          <div
+            className={`flex flex-col items-center gap-1 ${
+              wide ? "sm:hidden" : ""
+            }`}
+          >
             <Link
               href="/app/settings"
               title="Settings"

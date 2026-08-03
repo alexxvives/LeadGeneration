@@ -3,6 +3,7 @@ import { env } from "@/lib/config";
 const RESEND_EVENTS = [
   "email.bounced",
   "email.complained",
+  "email.failed",
   "email.delivered",
   "email.received",
 ] as const;
@@ -12,9 +13,16 @@ export interface EnsuredResendWebhook {
   signingSecret: string;
 }
 
+type ListedWebhook = {
+  id: string;
+  endpoint: string;
+  status: string | null;
+};
+
 /**
  * Ensure a Resend account posts delivery events to Hermes.
  * Called when the user saves a BYO Resend API key — no dashboard setup.
+ * Also re-enables webhooks Resend auto-disabled after delivery failures.
  */
 export async function ensureResendDeliveryWebhook(
   apiKey: string,
@@ -27,8 +35,16 @@ export async function ensureResendDeliveryWebhook(
 
   // Already registered for this workspace — keep the stored signing secret.
   if (opts?.existingId && opts.existingSecret) {
-    const stillThere = await listHasEndpoint(key, endpoint, opts.existingId);
-    if (stillThere) {
+    const listed = await listWebhooks(key);
+    const mine = listed.find(
+      (w) =>
+        w.id === opts.existingId &&
+        normalizeUrl(w.endpoint) === normalizeUrl(endpoint),
+    );
+    if (mine) {
+      if (mine.status === "disabled") {
+        await enableWebhook(key, mine.id).catch(() => undefined);
+      }
       return { id: opts.existingId, signingSecret: opts.existingSecret };
     }
   }
@@ -40,6 +56,9 @@ export async function ensureResendDeliveryWebhook(
     (w) => normalizeUrl(w.endpoint) === normalizeUrl(endpoint),
   );
   if (match && opts?.existingSecret) {
+    if (match.status === "disabled") {
+      await enableWebhook(key, match.id).catch(() => undefined);
+    }
     return { id: match.id, signingSecret: opts.existingSecret };
   }
   if (match && !opts?.existingSecret) {
@@ -54,30 +73,40 @@ function normalizeUrl(u: string): string {
   return u.trim().replace(/\/$/, "").toLowerCase();
 }
 
-async function listWebhooks(
-  apiKey: string,
-): Promise<{ id: string; endpoint: string }[]> {
+async function listWebhooks(apiKey: string): Promise<ListedWebhook[]> {
   const res = await fetch("https://api.resend.com/webhooks", {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) return [];
   const body = (await res.json()) as {
-    data?: { id?: string; endpoint?: string }[];
+    data?: { id?: string; endpoint?: string; status?: string }[];
   };
   return (body.data ?? [])
     .filter((w) => w.id && w.endpoint)
-    .map((w) => ({ id: w.id!, endpoint: w.endpoint! }));
+    .map((w) => ({
+      id: w.id!,
+      endpoint: w.endpoint!,
+      status: w.status ?? null,
+    }));
 }
 
-async function listHasEndpoint(
-  apiKey: string,
-  endpoint: string,
-  id: string,
-): Promise<boolean> {
-  const listed = await listWebhooks(apiKey);
-  return listed.some(
-    (w) => w.id === id && normalizeUrl(w.endpoint) === normalizeUrl(endpoint),
-  );
+async function enableWebhook(apiKey: string, id: string): Promise<void> {
+  const res = await fetch(`https://api.resend.com/webhooks/${id}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status: "enabled" }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error(
+      "[resend-webhooks] enable failed",
+      res.status,
+      text.slice(0, 200),
+    );
+  }
 }
 
 async function deleteWebhook(apiKey: string, id: string): Promise<void> {

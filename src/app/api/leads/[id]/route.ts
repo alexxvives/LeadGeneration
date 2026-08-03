@@ -1,11 +1,23 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
-import { deleteLead, updateLeadCrm } from "@/lib/service";
+import { deleteLead, getLeadWithOutreach, updateLeadCrm } from "@/lib/service";
 import { isBoardLockedError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** Full lead + outreach (board list is slim — body/blurb loaded here). */
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const ctx = await getCtx();
+  const lead = await getLeadWithOutreach(ctx, id);
+  if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+  return NextResponse.json({ lead });
+}
 
 const PatchSchema = z.object({
   crmStage: z

@@ -1506,17 +1506,25 @@ export class D1Store implements LeadRepository {
     return results.map(rowToOutreach);
   }
 
-  async listOutreachByLeadIds(leadIds: string[]): Promise<Outreach[]> {
+  async listOutreachByLeadIds(
+    leadIds: string[],
+    opts?: { omitBody?: boolean },
+  ): Promise<Outreach[]> {
     const ids = [...new Set(leadIds.filter(Boolean))];
     if (ids.length === 0) return [];
     const out: Outreach[] = [];
     const CHUNK = 50;
+    // List path skips body — largest column and unused until drawer open.
+    const cols = opts?.omitBody
+      ? `id, workspace_id, lead_id, run_id, to_email, subject, '' AS body,
+         status, delivery_status, sent_at, error, created_at, updated_at`
+      : "*";
     for (let i = 0; i < ids.length; i += CHUNK) {
       const chunk = ids.slice(i, i + CHUNK);
       const placeholders = chunk.map(() => "?").join(",");
       const { results } = await this.db
         .prepare(
-          `SELECT * FROM outreach
+          `SELECT ${cols} FROM outreach
            WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
         )
         .bind(this.workspaceId, ...chunk)

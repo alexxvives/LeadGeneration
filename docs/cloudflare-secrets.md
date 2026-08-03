@@ -47,9 +47,14 @@ npx wrangler secret delete ADMIN_PASSWORD
 ### Resend delivery webhooks (bounce / reply → CRM)
 
 **End users do not configure webhooks.** When someone pastes their Resend API
-key in Settings → Easy, Hermes calls Resend’s API to register
-`/api/webhooks/resend` and stores that account’s signing secret on the
+key in Settings → Easy (or re-saves Easy settings with a key on file), Hermes
+registers `/api/webhooks/resend` and **re-enables** the endpoint if Resend
+auto-disabled it after delivery failures. Signing secret is stored on the
 workspace (migration 0016).
+
+If Resend emails “Webhook endpoint disabled”, deploy a healthy Worker first,
+then either click **Enable** in the Resend dashboard or re-save Settings → Easy
+in Hermes (API `status: enabled`).
 
 Optional platform fallback (only if you send with the Worker’s
 `RESEND_API_KEY` rather than a BYO key):

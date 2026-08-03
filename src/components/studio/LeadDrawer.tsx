@@ -65,6 +65,10 @@ interface DrawerProps {
   mode?: "info" | "draft";
   /** Open the dated-note composer (today preselected) — phone contact flow. */
   promptNote?: boolean;
+  /** Undo a mistaken Ready→Contacted mark (phone / form log). */
+  onUndoMarkContacted?: () => Promise<void>;
+  /** Clear the post-call prompt chrome after the user saves a note. */
+  onPromptNoteDone?: () => void;
   onClose: () => void;
   onDraft: (leadId: string) => Promise<void | boolean | string | null>;
   onSaveDraft: (
@@ -297,6 +301,7 @@ export function LeadDrawer(props: DrawerProps) {
     setNewNoteDate(todayIsoDate());
     setNewNoteText("");
     await props.onUpdateCrm(lead.id, { followUps: updated, notes: null });
+    if (promptNote) props.onPromptNoteDone?.();
   };
 
   const deleteFollowUp = async (fuId: string) => {
@@ -330,6 +335,12 @@ export function LeadDrawer(props: DrawerProps) {
         {/* Header */}
         <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
           <div className="min-w-0 flex-1 pr-2">
+            {lead.detailLoaded === false ? (
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] text-mist-500">
+                <Spinner className="h-3 w-3" />
+                Loading full details…
+              </p>
+            ) : null}
             {mode === "info" ? (
               <div className="flex items-center gap-2">
                 <CrmStagePill stage={lead.crmStage ?? "new"} />
@@ -615,6 +626,39 @@ export function LeadDrawer(props: DrawerProps) {
                 </p>
               )}
 
+              {promptNote ? (
+                <div className="rounded-xl border border-aurora-400/25 bg-aurora-400/10 px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-aurora-200">
+                        Logged as called
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-mist-400">
+                        Add a note, or undo if you opened this by mistake.
+                      </p>
+                    </div>
+                    {props.onUndoMarkContacted ? (
+                      <button
+                        type="button"
+                        disabled={busy === "undo-contact"}
+                        onClick={() =>
+                          void run("undo-contact", async () => {
+                            await props.onUndoMarkContacted!();
+                          })
+                        }
+                        className="shrink-0 rounded-full border border-white/15 bg-ink-950/40 px-2.5 py-1 text-[11px] font-medium text-mist-200 transition-colors hover:border-amber-400/40 hover:bg-amber-400/10 hover:text-amber-100 disabled:opacity-50"
+                      >
+                        {busy === "undo-contact" ? (
+                          <Spinner className="h-3 w-3" />
+                        ) : (
+                          "Undo"
+                        )}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
               {showAddNote && (
                 <div className="space-y-2 rounded-xl border border-white/10 bg-ink-900/60 p-3">
                   <input
@@ -631,7 +675,7 @@ export function LeadDrawer(props: DrawerProps) {
                     placeholder="What happened…"
                     className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60"
                   />
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => void addNote()}
@@ -649,8 +693,22 @@ export function LeadDrawer(props: DrawerProps) {
                       }}
                       className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
                     >
-                      Cancel
+                      {promptNote ? "Skip note" : "Cancel"}
                     </button>
+                    {promptNote && props.onUndoMarkContacted ? (
+                      <button
+                        type="button"
+                        disabled={busy === "undo-contact"}
+                        onClick={() =>
+                          void run("undo-contact", async () => {
+                            await props.onUndoMarkContacted!();
+                          })
+                        }
+                        className="ml-auto rounded-full border border-amber-400/30 px-3 py-1 text-xs font-medium text-amber-200 hover:bg-amber-400/10 disabled:opacity-50"
+                      >
+                        Undo call log
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               )}

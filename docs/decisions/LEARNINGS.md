@@ -4,6 +4,32 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-02 — Resend webhook auto-disable + bounce CRM
+- Resend disabled `…/api/webhooks/resend` after repeated non-2xx since
+  2026-07-23 (endpoint itself probes fine with 200 now). Likely cause: **503
+  when no Svix secret** resolved for an event (missing platform secret /
+  missing workspace `resendWebhookSecret`). Resend treats that as endpoint
+  failure and eventually disables delivery.
+- Fix: return **200 ignored** for missing secret (log server-side); try
+  workspace **and** platform secrets; Settings save **PATCH status=enabled**
+  on disabled hooks; bounce → revert Contacted→New when email was sole method.
+- Ops: after deploy, Enable in Resend dashboard (or re-save Easy settings) and
+  Replay missed bounce messages.
+
+### 2026-08-02 — Slim board list + keep Outreach mounted
+- Board hydrate was shipping full `outreach.body` (+ blurbs) for every lead —
+  dominant cost at ~3k. List path now omits body/about/notes (`detailLoaded:
+  false`); drawer calls `GET /api/leads/:id` for full detail. Soft refresh must
+  never use unbounded `api.board()` once the cache is complete.
+- Remount on every Outreach visit felt like a “reload”; keep Pipeline/Outreach
+  mounted (CSS hide) like Leads layouts.
+
+### 2026-08-02 — Outreach Ready filters + mistaken call undo
+- Ready channel filter is client-only on the Ready column (email vs phone-only);
+  company type filters all three Outreach columns from `lead.companyType`.
+- Phone mark-called opens the info drawer with `promptNote`; Undo must move
+  stage back to `new` and clear `contactMethods` (not just dismiss the note).
+
 ### 2026-07-26 — Skeleton back; load top-of-column first
 - Pipeline hydrate had dropped to spinners/text — restored `PipelineSkeleton`
   (+ immediate boot skeleton). Progressive `listLeads` now orders

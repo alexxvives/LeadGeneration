@@ -1,5 +1,6 @@
 import { env, getCapabilities, authRequired } from "@/lib/config";
 import { HelpIcon, SparkIcon } from "@/components/icons";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
 import { getPlan, isPaidPlan } from "@/lib/plans";
 import type { Workspace } from "@/lib/types";
@@ -88,7 +89,10 @@ export default async function SettingsPage({
 
   if (isAdmin) {
     return (
-      <main className="mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8">
+      <main className="relative mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8">
+        <div className="absolute right-3 top-3 z-20 sm:right-5 sm:top-4">
+          <ThemeToggle />
+        </div>
         <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
           Admin settings
         </h1>
@@ -145,7 +149,10 @@ export default async function SettingsPage({
   }
 
   return (
-    <main className="mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8">
+    <main className="relative mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8">
+      <div className="absolute right-3 top-3 z-20 sm:right-5 sm:top-4">
+        <ThemeToggle />
+      </div>
       <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
       <p className="mt-0.5 text-sm text-mist-500">
         Profiles, sending setup, and workspace preferences.

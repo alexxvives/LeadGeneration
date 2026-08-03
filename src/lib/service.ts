@@ -890,7 +890,8 @@ export async function getLatestBoard(
   const loadedThrough = offset + leads.length;
   return {
     run,
-    leads: await attachOutreach(leadDb, leads),
+    // Slim list: no email bodies / blurbs — drawer fetches full detail on open.
+    leads: await attachOutreach(leadDb, leads, { slim: true }),
     leadsTotal,
     leadsHasMore: loadedThrough < leadsTotal,
     crmStageCounts: toStageCounts(summary.byCrmStage),
@@ -946,10 +947,54 @@ export async function getDashboardStats(
 async function attachOutreach(
   db: LeadRepository,
   leads: Lead[],
+  opts?: { slim?: boolean },
 ): Promise<LeadWithOutreach[]> {
-  const rows = await db.listOutreachByLeadIds(leads.map((l) => l.id));
+  const rows = await db.listOutreachByLeadIds(
+    leads.map((l) => l.id),
+    opts?.slim ? { omitBody: true } : undefined,
+  );
   const byLead = new Map(rows.map((o) => [o.leadId, o]));
-  return leads.map((l) => ({ ...l, outreach: byLead.get(l.id) ?? null }));
+  return leads.map((l) => {
+    const outreach = byLead.get(l.id) ?? null;
+    if (!opts?.slim) {
+      return { ...l, outreach, detailLoaded: true };
+    }
+    // List rows: drop blurb/notes/body so 3k boards stay fast over the wire.
+    return {
+      ...l,
+      aboutBlurb: null,
+      notes: null,
+      outreach: outreach
+        ? { ...outreach, body: "" }
+        : null,
+      detailLoaded: false,
+    };
+  });
+}
+
+/** Full lead + outreach for drawer / edit (not the slim board list). */
+export async function getLeadWithOutreach(
+  ctx: Ctx,
+  leadId: string,
+): Promise<LeadWithOutreach | null> {
+  let db = ctx.db;
+  let lead = await db.getLead(leadId);
+  if (!lead && ctx.userId) {
+    const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
+    for (const bid of sharedIds) {
+      const access = await resolveBoardAccess(ctx, bid);
+      if (!access) continue;
+      const found = await access.db.getLead(leadId);
+      if (found) {
+        lead = found;
+        db = access.db;
+        break;
+      }
+    }
+  }
+  if (!lead) return null;
+  const [row] = await attachOutreach(db, [lead], { slim: false });
+  return row ?? null;
 }
 
 /** Draft (or re-draft) outreach for a lead and move it into the approval queue. */
@@ -1580,14 +1625,45 @@ export async function setOutreachDeliveryStatus(
         patch.contactMethods = [...lead.contactMethods, "email"];
       }
       const today = nowIso().slice(0, 10);
-      const existing = lead.followUps ?? [];
-      const hasReplyNote = existing.some(
+      const existingFu = lead.followUps ?? [];
+      const hasReplyNote = existingFu.some(
         (f) => f.note.trim().toLowerCase() === "reply received" && f.date === today,
       );
       if (!hasReplyNote) {
         patch.followUps = [
           { id: newId("fu"), date: today, note: "Reply received", done: false },
-          ...existing,
+          ...existingFu,
+        ];
+      }
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.updateLead(outreach.leadId, patch);
+      }
+    }
+  }
+
+  // Bounce: email never landed — undo auto Contacted from send, journal a note.
+  if (deliveryStatus === "bounced" && prev !== "bounced") {
+    const lead = await ctx.db.getLead(outreach.leadId);
+    if (lead) {
+      const patch: Partial<Lead> = {};
+      const methods = lead.contactMethods ?? [];
+      const withoutEmail = methods.filter((m) => m !== "email");
+      if (withoutEmail.length !== methods.length) {
+        patch.contactMethods = withoutEmail;
+      }
+      // Send path moves new → contacted; bounce means that contact didn't happen.
+      if (lead.crmStage === "contacted" && withoutEmail.length === 0) {
+        patch.crmStage = "new";
+      }
+      const today = nowIso().slice(0, 10);
+      const existingFu = lead.followUps ?? [];
+      const hasBounceNote = existingFu.some(
+        (f) => f.note.trim().toLowerCase() === "email bounced" && f.date === today,
+      );
+      if (!hasBounceNote) {
+        patch.followUps = [
+          { id: newId("fu"), date: today, note: "Email bounced", done: false },
+          ...existingFu,
         ];
       }
       if (Object.keys(patch).length > 0) {
@@ -1630,13 +1706,20 @@ export async function updateWorkspaceEmailSettings(
     nextPatch.resendWebhookSecret = null;
   }
 
-  // New/rotated BYO Resend key → register delivery webhook (no user dashboard work).
-  if (typeof patch.resendApiKey === "string" && patch.resendApiKey.trim()) {
+  // Register / re-enable delivery webhook whenever a Resend key is still on file
+  // (new paste or any Settings save — recovers Resend auto-disabled endpoints).
+  const keyForWebhook =
+    patch.resendApiKey === null
+      ? ""
+      : typeof patch.resendApiKey === "string" && patch.resendApiKey.trim()
+        ? patch.resendApiKey.trim()
+        : existing?.resendApiKey?.trim() || "";
+  if (keyForWebhook) {
     try {
       const { ensureResendDeliveryWebhook } = await import(
         "@/lib/email/resend-webhooks"
       );
-      const ensured = await ensureResendDeliveryWebhook(patch.resendApiKey, {
+      const ensured = await ensureResendDeliveryWebhook(keyForWebhook, {
         existingId: existing?.resendWebhookId,
         existingSecret: existing?.resendWebhookSecret,
       });

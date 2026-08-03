@@ -441,6 +441,12 @@ export interface Outreach {
 /** Convenience view model returned to the client. */
 export interface LeadWithOutreach extends Lead {
   outreach: Outreach | null;
+  /**
+   * Board list responses omit heavy fields (email body, about, notes).
+   * `false` = slim row; open the drawer to fetch full detail.
+   * `true` / omitted after mutations = full payload available.
+   */
+  detailLoaded?: boolean;
 }
 
 /**

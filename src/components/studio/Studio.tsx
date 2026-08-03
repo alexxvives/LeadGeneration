@@ -75,6 +75,37 @@ type StudioView =
   | "boards"
   | "admin"
   | "admin-users";
+type EngageView = "pipeline" | "outreach";
+
+/** Merge a slim board-list row into a cached lead without wiping drawer detail. */
+function mergeSlimIntoCached(
+  prev: LeadWithOutreach,
+  incoming: LeadWithOutreach,
+): LeadWithOutreach {
+  const keepDetail =
+    prev.detailLoaded === true ||
+    Boolean(prev.outreach?.body) ||
+    Boolean(prev.aboutBlurb) ||
+    Boolean(prev.notes);
+
+  if (!keepDetail) return incoming;
+
+  return {
+    ...incoming,
+    aboutBlurb: prev.aboutBlurb,
+    notes: prev.notes,
+    followUps: prev.followUps?.length ? prev.followUps : incoming.followUps,
+    outreach:
+      incoming.outreach && prev.outreach
+        ? {
+            ...incoming.outreach,
+            body: prev.outreach.body || incoming.outreach.body,
+            subject: prev.outreach.subject || incoming.outreach.subject,
+          }
+        : (incoming.outreach ?? prev.outreach),
+    detailLoaded: true,
+  };
+}
 
 function viewFromParams(view: string | null): StudioView {
   if (view === "pipeline") return "pipeline";
@@ -149,6 +180,10 @@ export function Studio() {
   const [visitedLayouts, setVisitedLayouts] = useState<Set<"table" | "cards" | "map">>(
     () => new Set(["table"]),
   );
+  /** Keep Pipeline/Outreach mounted so re-entering doesn’t rebuild 3k rows. */
+  const [visitedEngage, setVisitedEngage] = useState<Set<EngageView>>(
+    () => new Set(),
+  );
   const [pipelineFilter, setPipelineFilter] = useState<CrmStage | "all">("all");
   const [leadSearch, setLeadSearch] = useState("");
   const [leadsHydrating, setLeadsHydrating] = useState(false);
@@ -206,6 +241,8 @@ export function Studio() {
   const boardLiteRef = useRef(false);
   const boardRef = useRef<BoardResponse | null>(null);
   const leadsGenRef = useRef(0);
+  /** Lead ids already toasted as bounced this session (null = not seeded yet). */
+  const seenBouncedIdsRef = useRef<Set<string> | null>(null);
 
   const setView = useCallback(
     (next: StudioView) => {
@@ -278,10 +315,8 @@ export function Studio() {
       prev.leadsHasMore === false &&
       prev.leads.length > 0;
 
-    // Soft revalidate (pipeline poll): full replace when we already have everyone.
-    const pageOpts = haveComplete
-      ? undefined
-      : { limit: LEAD_PAGE_INITIAL, offset: 0 };
+    // Always page — never pull all ~3k fat/slim rows in one soft-refresh.
+    const pageOpts = { limit: LEAD_PAGE_INITIAL, offset: 0 };
 
     const data = await api.board(boardKey, pageOpts);
     if (leadsGenRef.current !== gen) return data;
@@ -302,21 +337,18 @@ export function Studio() {
     }
     // Soft refresh / pipeline poll: never replace a larger in-memory list with
     // a smaller page — that made Pipeline Contacted drop from ~169 → a handful.
-    const incomingIsPage = pageOpts != null;
-    if (
-      !!prev &&
-      sameBoard &&
-      incomingIsPage &&
-      prev.leads.length > 0
-    ) {
+    if (!!prev && sameBoard && prev.leads.length > 0) {
       const patch = new Map(data.leads.map((l) => [l.id, l]));
-      const merged = prev.leads.map((l) => patch.get(l.id) ?? l);
+      const merged = prev.leads.map((l) => {
+        const incoming = patch.get(l.id);
+        return incoming ? mergeSlimIntoCached(l, incoming) : l;
+      });
       const seen = new Set(merged.map((l) => l.id));
       for (const l of data.leads) {
         if (!seen.has(l.id)) merged.push(l);
       }
       const total = data.leadsTotal ?? prev.leadsTotal ?? merged.length;
-      const stillMore = merged.length < total;
+      const stillMore = !haveComplete && merged.length < total;
       setBoard({
         ...data,
         leads: merged,
@@ -406,6 +438,28 @@ export function Studio() {
 
   boardRef.current = board;
 
+  // Notify when new bounces appear (webhooks update deliveryStatus asynchronously).
+  useEffect(() => {
+    const leads = board?.leads;
+    if (!leads) return;
+    const bounced = leads.filter((l) => l.outreach?.deliveryStatus === "bounced");
+    const ids = bounced.map((l) => l.id);
+    if (seenBouncedIdsRef.current === null) {
+      seenBouncedIdsRef.current = new Set(ids);
+      return;
+    }
+    const fresh = bounced.filter((l) => !seenBouncedIdsRef.current!.has(l.id));
+    for (const id of ids) seenBouncedIdsRef.current.add(id);
+    if (fresh.length === 0) return;
+    const names = fresh.map((l) => l.company).slice(0, 2);
+    toast(
+      "err",
+      fresh.length === 1
+        ? `Email bounced: ${names[0]} — removed from Contacted.`
+        : `${fresh.length} emails bounced (${names.join(", ")}${fresh.length > 2 ? "…" : ""}) — removed from Contacted.`,
+    );
+  }, [board?.leads, toast]);
+
   // Hydrate drafting profiles from the workspace (localStorage write-through).
   useEffect(() => {
     void hydrateOutreachProfilesFromServer();
@@ -448,6 +502,17 @@ export function Studio() {
       cancelled = true;
     };
   }, [view, refresh]);
+
+  // Keep Pipeline/Outreach mounted after first visit (instant re-entry).
+  useEffect(() => {
+    if (view !== "pipeline" && view !== "outreach") return;
+    setVisitedEngage((prev) => {
+      if (prev.has(view)) return prev;
+      const next = new Set(prev);
+      next.add(view);
+      return next;
+    });
+  }, [view]);
 
   // Pipeline: pick up webhook reply → In Conversation without a manual refresh.
   useEffect(() => {
@@ -780,7 +845,11 @@ export function Studio() {
         aiPersonalize: flags.aiPersonalize,
         forceLang: lang,
       });
-      patchLeadLocal(leadId, { outreach, status: "queued" });
+      patchLeadLocal(leadId, {
+        outreach,
+        status: "queued",
+        detailLoaded: true,
+      });
       if (!opts?.silent) {
         toast(
           "ok",
@@ -818,7 +887,7 @@ export function Studio() {
     try {
       const { outreach } = await api.updateOutreach(outreachId, patch);
       const lead = findLeadByOutreach(outreachId);
-      if (lead) patchLeadLocal(lead.id, { outreach });
+      if (lead) patchLeadLocal(lead.id, { outreach, detailLoaded: true });
       if (!opts?.silent) toast("ok", "Edits saved.");
     } catch (e) {
       toast("err", (e as Error).message);
@@ -838,6 +907,7 @@ export function Studio() {
         patchLeadLocal(lead.id, {
           outreach,
           status: decision === "approved" ? "approved" : "rejected",
+          detailLoaded: true,
         });
       }
       if (!opts?.silent) {
@@ -1027,11 +1097,11 @@ export function Studio() {
       const lead = findLeadByOutreach(outreachId);
       if (lead) patchLeadLocal(lead.id, { outreach });
       toast(
-        "ok",
+        deliveryStatus === "bounced" ? "err" : "ok",
         deliveryStatus === "replied"
           ? "Marked replied — moved to In Conversation."
           : deliveryStatus === "bounced"
-            ? "Marked bounced."
+            ? "Bounced — removed from Contacted. Fix the address and try again."
             : "Delivery status updated.",
       );
     } catch (e) {
@@ -1087,10 +1157,18 @@ export function Studio() {
         setDrawerPromptNote(true);
         setDrawerMode("info");
         setSelectedId(leadId);
+        void ensureLeadDetail(leadId);
       }
     } finally {
       setOutreachBusy(null);
     }
+  };
+
+  const onUndoMarkContacted = async (leadId: string) => {
+    await onMoveStage(leadId, "new", []);
+    setDrawerPromptNote(false);
+    setSelectedId(null);
+    toast("ok", "Undone — lead back in Ready to Contact.");
   };
 
   const onUpdateLeadCrm = async (
@@ -1280,15 +1358,31 @@ export function Studio() {
     }
   };
 
+  const ensureLeadDetail = useCallback(
+    async (id: string) => {
+      const cur = boardRef.current?.leads.find((l) => l.id === id);
+      if (!cur || cur.detailLoaded !== false) return;
+      try {
+        const { lead } = await api.getLead(id);
+        patchLeadLocal(id, { ...lead, detailLoaded: true });
+      } catch (e) {
+        toast("err", (e as Error).message);
+      }
+    },
+    [toast],
+  );
+
   const openInfo = (id: string) => {
     setDrawerPromptNote(false);
     setDrawerMode("info");
     setSelectedId(id);
+    void ensureLeadDetail(id);
   };
   const openDraft = (id: string) => {
     setDrawerPromptNote(false);
     setDrawerMode("draft");
     setSelectedId(id);
+    void ensureLeadDetail(id);
   };
 
   const onAddLead = async () => {
@@ -1740,9 +1834,15 @@ export function Studio() {
         </div>
       )}
 
-      {/* Pipeline view — CRM kanban only */}
-      {view === "pipeline" && (
-        <div data-tour="pipeline-board" className="min-h-0 flex-1">
+      {/* Pipeline — kept mounted after first visit for instant re-entry */}
+      {(view === "pipeline" || visitedEngage.has("pipeline")) && (
+        <div
+          data-tour="pipeline-board"
+          className={
+            view === "pipeline" ? "min-h-0 flex-1" : "hidden"
+          }
+          aria-hidden={view !== "pipeline"}
+        >
           {loading || leadsHydrating || !board ? (
             <div role="status" aria-busy="true" aria-label="Loading pipeline">
               <PipelineSkeleton />
@@ -1763,6 +1863,22 @@ export function Studio() {
                   … top cards first
                 </p>
               ) : null}
+              {(() => {
+                const bouncedCount = searchFilteredLeads.filter(
+                  (l) => l.outreach?.deliveryStatus === "bounced",
+                ).length;
+                if (bouncedCount === 0) return null;
+                return (
+                  <p
+                    className="mb-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-200 ring-1 ring-inset ring-rose-400/25"
+                    role="status"
+                  >
+                    {bouncedCount === 1
+                      ? "1 email bounced — open the rose-highlighted card to fix the address."
+                      : `${bouncedCount} emails bounced — rose-highlighted cards need a better address.`}
+                  </p>
+                );
+              })()}
               <PipelineView
                 leads={searchFilteredLeads}
                 stageCounts={board.crmStageCounts}
@@ -1953,9 +2069,12 @@ export function Studio() {
         </div>
       )}
 
-      {/* Outreach queue — draft / approve / send */}
-      {view === "outreach" && (
-        <div className="min-h-0 flex-1">
+      {/* Outreach — kept mounted after first visit for instant re-entry */}
+      {(view === "outreach" || visitedEngage.has("outreach")) && (
+        <div
+          className={view === "outreach" ? "min-h-0 flex-1" : "hidden"}
+          aria-hidden={view !== "outreach"}
+        >
           {loading || leadsHydrating || !board ? (
             <div role="status" aria-busy="true" aria-label="Loading outreach">
               <OutreachSkeleton />
@@ -2001,6 +2120,12 @@ export function Studio() {
             setDrawerPromptNote(false);
             setSelectedId(null);
           }}
+          onUndoMarkContacted={
+            drawerPromptNote
+              ? () => onUndoMarkContacted(selected.id)
+              : undefined
+          }
+          onPromptNoteDone={() => setDrawerPromptNote(false)}
           onDraft={onDraft}
           onSaveDraft={onSaveDraft}
           onDecide={onDecide}

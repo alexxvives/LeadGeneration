@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
 import { warmupStatus } from "@/lib/email/warmup";
 import { FitMeter, Spinner } from "@/components/ui";
+import { Select } from "@/components/ui/Select";
 import {
   ArrowIcon,
   CheckIcon,
@@ -14,6 +15,8 @@ import {
 import { useStableDuringLoad } from "./skeletons";
 
 type OutreachBucket = "review" | "ready" | "contacted";
+/** Ready-column contact-channel filter. */
+type ReadyChannelFilter = "all" | "email" | "phone";
 
 /** Any pipeline stage past New counts as contacted in the Outreach queue. */
 function isContacted(lead: LeadWithOutreach): boolean {
@@ -156,18 +159,44 @@ export function OutreachView({
     opts?: { promptNote?: boolean },
   ) => Promise<void>;
 }) {
+  const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+
+  const companyTypes = useMemo(() => {
+    const set = new Set<string>();
+    for (const lead of leads) {
+      const t = lead.companyType?.trim();
+      if (t) set.add(t);
+    }
+    return [...set].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
+  }, [leads]);
+
+  const typeFiltered = useMemo(() => {
+    if (typeFilter === "all") return leads;
+    return leads.filter(
+      (l) => (l.companyType?.trim() || "") === typeFilter,
+    );
+  }, [leads, typeFilter]);
+
   const grouped = useMemo(() => {
     const next: Record<OutreachBucket, LeadWithOutreach[]> = {
       review: [],
       ready: [],
       contacted: [],
     };
-    for (const lead of leads) {
+    for (const lead of typeFiltered) {
       const b = bucketOf(lead);
       if (b) next[b].push(lead);
     }
+    if (readyChannel === "email") {
+      next.ready = next.ready.filter((l) => Boolean(leadEmail(l)));
+    } else if (readyChannel === "phone") {
+      next.ready = next.ready.filter((l) => !leadEmail(l) && Boolean(leadPhone(l)));
+    }
     return next;
-  }, [leads]);
+  }, [typeFiltered, readyChannel]);
 
   const reviewRows = useStableDuringLoad(
     grouped.review,
@@ -197,25 +226,43 @@ export function OutreachView({
 
   return (
     <div data-tour="outreach-queue" className="flex h-full min-h-0 flex-col gap-3">
-      {backfilling ? (
-        <p
-          className="shrink-0 text-[11px] text-mist-500"
-          role="status"
-          aria-live="polite"
-        >
-          Loading more
-          {loadedCount != null ? (
-            <>
-              {" "}
-              <span className="tabular-nums text-mist-300">
-                {loadedCount}
-                {totalCount != null ? `/${totalCount}` : ""}
-              </span>
-            </>
-          ) : null}
-          … top of each column first
-        </p>
-      ) : null}
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <label className="flex min-w-0 items-center gap-2 text-[11px] text-mist-500">
+          <span className="shrink-0 uppercase tracking-wider">Type</span>
+          <Select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="max-w-[12rem] py-1.5 text-xs"
+            aria-label="Filter outreach by lead type"
+          >
+            <option value="all">All types</option>
+            {companyTypes.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </Select>
+        </label>
+        {backfilling ? (
+          <p
+            className="text-[11px] text-mist-500"
+            role="status"
+            aria-live="polite"
+          >
+            Loading more
+            {loadedCount != null ? (
+              <>
+                {" "}
+                <span className="tabular-nums text-mist-300">
+                  {loadedCount}
+                  {totalCount != null ? `/${totalCount}` : ""}
+                </span>
+              </>
+            ) : null}
+            … top of each column first
+          </p>
+        ) : null}
+      </div>
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
         {columns.map((key) => {
           const meta = BUCKET_META[key];
@@ -248,36 +295,69 @@ export function OutreachView({
                       : meta.hint}
                   </p>
                 </div>
-                {key === "review" && rows.some((l) => !l.outreach) ? (
-                  <button
-                    type="button"
-                    onClick={() => void onDraftAll()}
-                    disabled={busyId === "draft-all"}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                  >
-                    {busyId === "draft-all" ? (
-                      <Spinner className="h-3 w-3" />
-                    ) : (
-                      <CheckIcon className="h-3 w-3" />
-                    )}
-                    Draft all
-                  </button>
-                ) : null}
-                {key === "ready" && rows.some((l) => leadEmail(l)) ? (
-                  <button
-                    type="button"
-                    onClick={() => void onSendAll()}
-                    disabled={busyId === "send-all"}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                  >
-                    {busyId === "send-all" ? (
-                      <Spinner className="h-3 w-3" />
-                    ) : (
-                      <ArrowIcon className="h-3 w-3" />
-                    )}
-                    Send all
-                  </button>
-                ) : null}
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                  {key === "ready" ? (
+                    <div
+                      className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-0.5"
+                      role="group"
+                      aria-label="Filter Ready by contact channel"
+                    >
+                      {(
+                        [
+                          ["all", "All"],
+                          ["email", "Email"],
+                          ["phone", "Phone"],
+                        ] as const
+                      ).map(([id, label]) => {
+                        const active = readyChannel === id;
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => setReadyChannel(id)}
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                              active
+                                ? "bg-aurora-400 text-on-accent"
+                                : "text-mist-400 hover:text-mist-100"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                  {key === "review" && rows.some((l) => !l.outreach) ? (
+                    <button
+                      type="button"
+                      onClick={() => void onDraftAll()}
+                      disabled={busyId === "draft-all"}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
+                    >
+                      {busyId === "draft-all" ? (
+                        <Spinner className="h-3 w-3" />
+                      ) : (
+                        <CheckIcon className="h-3 w-3" />
+                      )}
+                      Draft all
+                    </button>
+                  ) : null}
+                  {key === "ready" && rows.some((l) => leadEmail(l)) ? (
+                    <button
+                      type="button"
+                      onClick={() => void onSendAll()}
+                      disabled={busyId === "send-all"}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-aurora-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
+                    >
+                      {busyId === "send-all" ? (
+                        <Spinner className="h-3 w-3" />
+                      ) : (
+                        <ArrowIcon className="h-3 w-3" />
+                      )}
+                      Send all
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
