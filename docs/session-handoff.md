@@ -9,25 +9,25 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-02 (slim board list + outreach keep-alive)
+## ⏱️ Status — updated 2026-08-03 (webhook rebuild deploy verified)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Local:** admin ops chrome; Insider invites; account delete (live only).
+**Deployed:** Worker `a93f4822-07f9-43f9-b7dd-bc68be079af7`  
+**Git:** `f1b1748` on `master` (pushed).
 **Migrations:** 0021–**0026** local **and remote** (`workspace smtp_*`).
 
 ### This pass
-- Board list slim: omit email `body` / about / notes; drawer loads full via
-  `GET /api/leads/:id`. Soft refresh never re-pulls all ~3k in one request.
-- Pipeline/Outreach stay mounted after first visit (no remount “reload”).
-- Prior same day: bounce UX + Resend webhook resilience; Outreach filters;
-  call-log Undo; collapsible sidebar; theme toggle on Settings only.
+- Human re-enabled Resend webhook. First `cf:deploy` shipped a **stale**
+  `.open-next` (July) — still 503. Fixed with `cf:build` then `cf:deploy`.
+- Probe after rebuild: ping → 200; unsigned bounce → **200**
+  `ignored:no_signing_secret` (no longer 503). Real Resend events with Svix
+  sig should update `deliveryStatus` again.
+- Bounce UX (Pipeline rose + Contacted revert) is in the live Worker.
 
 ### Next
-1. Deploy; hard-refresh Outreach with a large board — confirm instant re-entry
-   + fast first paint; drawer shows “Loading full details…” briefly.
-2. Optional: virtualize Outreach columns if Contacted still feels heavy at 3k.
-3. Human ops: re-enable Resend webhook if still disabled; `git filter-repo`
-   purge of deleted LEADS xlsx from history.
+1. Optional: Replay missed bounce messages in Resend (July 23 → re-enable).
+2. Optional: re-save Settings → Easy once to refresh/ensure webhook secret.
+3. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 

@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-03 — `cf:deploy` alone can ship a stale Worker
+- On Windows, `npm run cf:deploy` uploaded an old `.open-next` from July while
+  source already had the bounce/webhook fix — live still returned 503. Always
+  run `npm run cf:build` before `cf:deploy` when code changed (or confirm
+  `.open-next/worker.js` mtime is fresh).
+
 ### 2026-08-02 — Resend webhook auto-disable + bounce CRM
 - Resend disabled `…/api/webhooks/resend` after repeated non-2xx since
   2026-07-23 (endpoint itself probes fine with 200 now). Likely cause: **503
