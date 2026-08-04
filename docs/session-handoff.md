@@ -9,22 +9,22 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-04 (boards sync + Contact Draft send)
+## ⏱️ Status — updated 2026-08-04 (Draft all → Ready)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0026** local **and remote** (`workspace smtp_*`).
 
 ### This pass
-- Boards created on Boards page now sync into Studio → import/search picker
-  (was stale → user recreated → duplicates). Assign modal also re-fetches on open.
-- Contact Draft: amber = approve→Ready; **aurora arrow = Approve & send** now.
-  Drawer still has Approve + Approve & send.
-- Bounce: fine to wait for a natural bounce; webhook health already probed.
+- Outreach **Draft all**: drafts + auto-approves into **Ready to contact**
+  (no longer leaves “Review” in Contact Draft). Button stays for redraft after
+  profile/pitch changes (all non-sent email leads).
+- Earlier today: Resend bounce webhook tags shape fix + backfill.
 
 ### Next
-1. Deploy (`cf:build` then `cf:deploy`); hard-refresh Outreach Contact Draft.
-2. User may delete the accidental duplicate empty board.
-3. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
+1. Deploy (`cf:build` then `cf:deploy`); hard-refresh Outreach.
+2. Resend: replay bounced events if any other misses remain.
+3. User may delete the accidental duplicate empty board.
+4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 

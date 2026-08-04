@@ -4,6 +4,22 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-04 — Draft all → Ready + keep button for redraft
+- Outreach **Draft all** previously left status `draft` (Contact Draft /
+  “Review”). Now each draft is auto-approved into **Ready to contact**; send
+  remains per-lead. Button stays visible after the first pass so a profile /
+  pitch change can redraft all non-sent email leads again.
+
+### 2026-08-04 — Resend bounce webhook never updated CRM (tags shape)
+- Prod had **0** `delivery_status=bounced` rows; Resend webhook endpoint was
+  still `enabled`. Root cause: send API tags are `{name,value}[]`, but Resend
+  **webhook** payloads expose tags as a **flat object** (`{ hermes_ws: "…" }`).
+  Handler called `.find` on that object → runtime throw → no CRM update / no
+  toast. Fix: `normalizeResendTags()` accepts both shapes; wrap handler so
+  unexpected errors return **200 ignored** (avoid auto-disable).
+- Symptom example: `info@oposmadrid.es` bounce visible in Resend, Hermes still
+  `sent`/`contacted` until backfilled.
+
 ### 2026-08-04 — Boards page create didn’t show in import picker
 - `BoardsView` kept its own board list; Studio’s `boards` (fed to
   `BoardAssignModal`) stayed stale after Create board → import looked like the

@@ -887,7 +887,7 @@ export function Studio() {
   };
 
   const findLeadByOutreach = (outreachId: string) =>
-    board?.leads.find((l) => l.outreach?.id === outreachId);
+    boardRef.current?.leads.find((l) => l.outreach?.id === outreachId);
 
   const onSaveDraft = async (
     outreachId: string,
@@ -908,13 +908,14 @@ export function Studio() {
   const onDecide = async (
     outreachId: string,
     decision: "approved" | "rejected",
-    opts?: { silent?: boolean },
+    opts?: { silent?: boolean; leadId?: string },
   ) => {
     try {
       const { outreach } = await api.updateOutreach(outreachId, { decision });
-      const lead = findLeadByOutreach(outreachId);
-      if (lead) {
-        patchLeadLocal(lead.id, {
+      const leadId =
+        opts?.leadId ?? findLeadByOutreach(outreachId)?.id ?? null;
+      if (leadId) {
+        patchLeadLocal(leadId, {
           outreach,
           status: decision === "approved" ? "approved" : "rejected",
           detailLoaded: true,
@@ -1229,7 +1230,13 @@ export function Studio() {
 
   const onDraftAllOutreach = async () => {
     if (!board) return;
-    const targets = board.leads.filter((l) => !l.outreach && l.emails.length > 0);
+    // Email leads not yet sent — includes existing drafts so a profile change
+    // can redraft everyone back into Ready to contact.
+    const targets = board.leads.filter((l) => {
+      if (l.emails.length === 0) return false;
+      const s = l.outreach?.status;
+      return s !== "sent" && s !== "sending";
+    });
     if (targets.length === 0) return;
 
     const ac = new AbortController();
@@ -1254,8 +1261,20 @@ export function Studio() {
         const lead = targets[i]!;
         const id = await onDraft(lead.id, { silent: true });
         if (ac.signal.aborted) return;
-        if (id) ok += 1;
-        else failed += 1;
+        if (!id) {
+          failed += 1;
+        } else {
+          try {
+            // Bulk draft lands in Ready (approved). Send stays per-lead.
+            await onDecide(id, "approved", {
+              silent: true,
+              leadId: lead.id,
+            });
+            ok += 1;
+          } catch {
+            failed += 1;
+          }
+        }
         done += 1;
         setDraftProgress({ done, total: targets.length, failed });
       }
@@ -1270,16 +1289,19 @@ export function Studio() {
       if (ac.signal.aborted) {
         toast(
           "ok",
-          `Stopped — drafted ${ok} of ${targets.length}${
+          `Stopped — ${ok} ready to contact of ${targets.length}${
             failed ? ` (${failed} failed)` : ""
           }.`,
         );
       } else if (failed === 0) {
-        toast("ok", `Drafted ${ok} lead${ok === 1 ? "" : "s"}.`);
+        toast(
+          "ok",
+          `${ok} lead${ok === 1 ? "" : "s"} ready to contact.`,
+        );
       } else {
         toast(
           "err",
-          `Drafted ${ok} of ${targets.length} — ${failed} failed.`,
+          `${ok} of ${targets.length} ready — ${failed} failed.`,
         );
       }
     } finally {

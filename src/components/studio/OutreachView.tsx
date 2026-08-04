@@ -203,6 +203,17 @@ export function OutreachView({
   const softCap = warmupStatus().softCap;
   const overSoftCap = sendsToday >= softCap;
 
+  /** Keep Draft all available after first pass so profile edits can redraft. */
+  const draftAllAvailable = useMemo(
+    () =>
+      leads.some((l) => {
+        if (l.emails.length === 0) return false;
+        const s = l.outreach?.status;
+        return s !== "sent" && s !== "sending";
+      }),
+    [leads],
+  );
+
   const columns: OutreachBucket[] = ["review", "ready", "contacted"];
 
   return (
@@ -290,11 +301,12 @@ export function OutreachView({
                       })}
                     </div>
                   ) : null}
-                  {key === "review" && rows.some((l) => !l.outreach) ? (
+                  {key === "review" && draftAllAvailable ? (
                     <button
                       type="button"
                       onClick={() => void onDraftAll()}
                       disabled={busyId === "draft-all"}
+                      title="Draft (or redraft) all email leads into Ready to contact"
                       className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
                     >
                       {busyId === "draft-all" ? (

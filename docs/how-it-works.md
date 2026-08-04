@@ -36,8 +36,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
    detail drawer. Edit subject/body/recipient, then **Approve**. There is no
    Reject-draft control — only clear junk (disposable / no-reply) is stripped
    at verify; soft “Invalid” keeps the address and offers **Send anyway**.
-   Nothing sends on approval alone. **Outreach** can draft-all /
-   approve-selected; **send stays per-lead** (Art. I.1).
+   Nothing sends on approval alone. **Outreach → Draft all** drafts and
+   approves into Ready; **send stays per-lead** (Art. I.1).
 5. **Send** — From the drawer, Approve then Send. From the Outreach queue,
    Send may auto-approve the draft first (the click is the per-lead human
    gate). Soft verify blocks show a confirm modal; hard junk removes the
@@ -93,10 +93,13 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     when available (or a Google search plan-B when no website).
 
   - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (Create /
-    Review; unapproved drafts stay here) → **Ready** (only after Approve) →
-    **Contacted**. Closing the draft drawer without Approve does not advance.
-    Active outreach profile is chosen in the sidebar (next to Board). Send
-    remains per-lead after approve (constitution Art. I.1).
+    Review; unapproved drafts stay here) → **Ready** (after Approve, or after
+    **Draft all**) → **Contacted**. **Draft all** drafts + approves every
+    email lead into Ready (and stays available to redraft after profile edits).
+    Single-lead Create still lands in Contact Draft until Approve. Closing the
+    draft drawer without Approve does not advance. Active outreach profile is
+    chosen in the sidebar (next to Board). Send remains per-lead after approve
+    (constitution Art. I.1).
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Informative only — board filter lives in

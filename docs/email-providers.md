@@ -136,13 +136,16 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - **Webhooks:** `POST /api/webhooks/resend` and `POST /api/webhooks/maileroo`
   (public) — prefer tags (`hermes_ws` + `hermes_outreach`), else latest sent
   by recipient email (replies + bounces, after signature verifies).
+  Resend webhook payloads carry tags as a **flat object** (not the
+  `{name,value}[]` send shape) — the route normalizes both.
   Bounce/complaint/failed → `deliveryStatus=bounced`, undo auto-Contacted when
   email was the only contact method, journal “Email bounced”, Pipeline rose
   highlight + toast on soft refresh. Resend inbound `email.received` →
-  `replied` (+ CRM In Conversation). Missing signing secret returns **200
-  ignored** (not 503) so Resend does not auto-disable the endpoint. Saving
-  Easy settings re-enables a Resend-disabled webhook via API. Platform
-  fallback: `RESEND_WEBHOOK_SECRET` / `MAILEROO_WEBHOOK_SECRET`.
+  `replied` (+ CRM In Conversation). Missing signing secret / unexpected
+  handler errors return **200 ignored** (not 5xx) so Resend does not
+  auto-disable the endpoint. Saving Easy settings re-enables a Resend-disabled
+  webhook via API. Platform fallback: `RESEND_WEBHOOK_SECRET` /
+  `MAILEROO_WEBHOOK_SECRET`.
 - **Pro path:** [`0010-mailbox-oauth-send.md`](decisions/0010-mailbox-oauth-send.md)
   (accepted) — Google OAuth behind `sendEmail()` when connected; Microsoft next.
   Warmup: free DIY slow ramp; paid partner optional — no free automated network.

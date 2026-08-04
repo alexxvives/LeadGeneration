@@ -8,8 +8,6 @@ import { authRequired, env } from "@/lib/config";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type ResendTag = { name?: string; value?: string };
-
 /**
  * Resend → Hermes delivery webhooks.
  *
@@ -22,6 +20,9 @@ type ResendTag = { name?: string; value?: string };
  *
  * Never return 503 for missing secrets — Resend auto-disables endpoints that
  * keep failing. Drop unverifiable events with 200 instead.
+ *
+ * Note: send API accepts tags as `{name,value}[]`, but webhook payloads expose
+ * them as a flat object `{ [name]: value }` (see Resend bounce docs).
  */
 export async function POST(req: Request) {
   const raw = await req.text();
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
       to?: string[] | string;
       email_id?: string;
       from?: string;
-      tags?: ResendTag[];
+      tags?: unknown;
     };
   };
   try {
@@ -41,21 +42,42 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  try {
+    return await handleResendEvent(raw, req.headers, body);
+  } catch (err) {
+    // Never 5xx — Resend auto-disables endpoints that keep failing.
+    console.error("[webhooks/resend] handler error", err);
+    return NextResponse.json({ ok: true, ignored: "handler_error" });
+  }
+}
+
+async function handleResendEvent(
+  raw: string,
+  headers: Headers,
+  body: {
+    type?: string;
+    data?: {
+      to?: string[] | string;
+      email_id?: string;
+      from?: string;
+      tags?: unknown;
+    };
+  },
+): Promise<NextResponse> {
   const type = body.type ?? "";
   const delivery = mapEvent(type);
   if (!delivery) {
     return NextResponse.json({ ok: true, ignored: type });
   }
 
-  const tags = body.data?.tags ?? [];
+  const tags = normalizeResendTags(body.data?.tags);
   const tagWs =
-    tagValue(tags, "hermes_ws") ||
-    tagValue(tags, "leadify_ws") ||
-    tagValue(tags, "lodestar_ws");
+    tags.hermes_ws || tags.leadify_ws || tags.lodestar_ws || null;
   const tagOutreach =
-    tagValue(tags, "hermes_outreach") ||
-    tagValue(tags, "leadify_outreach") ||
-    tagValue(tags, "lodestar_outreach");
+    tags.hermes_outreach ||
+    tags.leadify_outreach ||
+    tags.lodestar_outreach ||
+    null;
 
   const binding = await getD1Binding();
   const probe = getDb(binding, LOCAL_WORKSPACE_ID);
@@ -87,7 +109,7 @@ export async function POST(req: Request) {
     }
   } else {
     for (const secret of candidates) {
-      if (await verifySvix(raw, req.headers, secret)) {
+      if (await verifySvix(raw, headers, secret)) {
         verified = true;
         break;
       }
@@ -165,10 +187,25 @@ export async function POST(req: Request) {
   });
 }
 
-function tagValue(tags: ResendTag[], name: string): string | null {
-  const hit = tags.find((t) => t.name === name);
-  const v = hit?.value?.trim();
-  return v || null;
+/** Resend webhooks: object map. Legacy / send-shape: `{name,value}[]`. */
+function normalizeResendTags(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!raw) return out;
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const name = String((item as { name?: unknown }).name ?? "").trim();
+      const value = String((item as { value?: unknown }).value ?? "").trim();
+      if (name && value) out[name] = value;
+    }
+    return out;
+  }
+  if (typeof raw === "object") {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof v === "string" && v.trim()) out[k] = v.trim();
+    }
+  }
+  return out;
 }
 
 function mapEvent(type: string): DeliveryStatus | null {
