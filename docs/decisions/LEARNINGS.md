@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-04 — Boards page create didn’t show in import picker
+- `BoardsView` kept its own board list; Studio’s `boards` (fed to
+  `BoardAssignModal`) stayed stale after Create board → import looked like the
+  board “didn’t exist” → user created again → duplicates. Fix: `onBoardsChange`
+  from BoardsView + re-fetch `listBoards` whenever the assign modal opens.
+
 ### 2026-08-03 — `cf:deploy` alone can ship a stale Worker
 - On Windows, `npm run cf:deploy` uploaded an old `.open-next` from July while
   source already had the bounce/webhook fix — live still returned 503. Always

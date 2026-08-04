@@ -9,22 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-03 (outreach drawer send UX)
+## ⏱️ Status — updated 2026-08-04 (boards sync + Contact Draft send)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Deployed:** Worker `a93f4822-07f9-43f9-b7dd-bc68be079af7`  
-**Git:** `f1b1748` on `master` (local may be ahead — deploy after this pass).
 **Migrations:** 0021–**0026** local **and remote** (`workspace smtp_*`).
 
 ### This pass
-- Outreach: removed Send all; type filter sits next to search bar.
-- Draft drawer: Approve + Approve & send; on successful send close drawer
-  and toast (no in-modal “Sent” celebration).
-- Prior: webhook rebuild deploy verified; slim board list + keep-alive.
+- Boards created on Boards page now sync into Studio → import/search picker
+  (was stale → user recreated → duplicates). Assign modal also re-fetches on open.
+- Contact Draft: amber = approve→Ready; **aurora arrow = Approve & send** now.
+  Drawer still has Approve + Approve & send.
+- Bounce: fine to wait for a natural bounce; webhook health already probed.
 
 ### Next
-1. Deploy this pass; smoke Approve & send from Contact Draft.
-2. Optional: Replay missed bounce messages in Resend.
+1. Deploy (`cf:build` then `cf:deploy`); hard-refresh Outreach Contact Draft.
+2. User may delete the accidental duplicate empty board.
 3. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---

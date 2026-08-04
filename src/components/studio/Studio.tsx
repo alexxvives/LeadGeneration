@@ -483,6 +483,15 @@ export function Studio() {
       });
   }, [filterBoardId, boardParam, refresh, toast]);
 
+  // Import/search board picker must see boards created on the Boards page.
+  useEffect(() => {
+    if (!assignOpen) return;
+    void api
+      .listBoards()
+      .then(({ boards: list }) => setBoards(list))
+      .catch(() => undefined);
+  }, [assignOpen]);
+
   // Leaving dashboard/boards/admin → reload full lead payload for pipeline/etc.
   useEffect(() => {
     const needsLeads =
@@ -1075,6 +1084,22 @@ export function Studio() {
       return false;
     }
     return runSend(outreachId);
+  };
+
+  /** Contact Draft aurora: create draft if needed, approve, send in one step. */
+  const approveAndSendContactDraft = async (leadId: string) => {
+    setOutreachBusy(leadId);
+    try {
+      const lead = board?.leads.find((l) => l.id === leadId);
+      let outreachId = lead?.outreach?.id ?? null;
+      if (!outreachId) {
+        outreachId = await onDraft(leadId);
+        if (!outreachId) return;
+      }
+      await requestSend(outreachId);
+    } finally {
+      setOutreachBusy(null);
+    }
   };
 
   const confirmSimulateSend = async () => {
@@ -1731,6 +1756,7 @@ export function Studio() {
       {view === "boards" && (
         <BoardsView
           createRequestId={boardCreateReq}
+          onBoardsChange={setBoards}
           onSelectBoard={(id) => {
             storeBoardFilter(id);
             router.replace(`/app?view=pipeline&board=${id}`, { scroll: false });
@@ -2037,6 +2063,7 @@ export function Studio() {
               onOpenDraft={openDraft}
               onCreateDraft={createAndOpenDraft}
               onApprove={approveContactDraft}
+              onApproveAndSend={approveAndSendContactDraft}
               onSend={async (outreachId) => {
                 await requestSend(outreachId);
               }}
@@ -2350,6 +2377,7 @@ export function Studio() {
         preferredBoardId={filterBoardId}
         confirmLabel={assignMode === "search" ? "Find leads" : "Import"}
         onConfirm={onAssignConfirm}
+        onBoardsChange={setBoards}
         onClose={() => {
           setAssignOpen(false);
           setPendingSearch(null);

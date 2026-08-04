@@ -130,6 +130,7 @@ export function OutreachView({
   onOpenDraft,
   onCreateDraft,
   onApprove,
+  onApproveAndSend,
   onSend,
   onDraftAll,
   onMarkContacted,
@@ -148,6 +149,8 @@ export function OutreachView({
   onOpenDraft: (id: string) => void;
   onCreateDraft: (id: string) => Promise<void>;
   onApprove: (leadId: string) => Promise<void>;
+  /** Contact Draft: approve + send without visiting Ready. */
+  onApproveAndSend: (leadId: string) => Promise<void>;
   onSend: (outreachId: string) => Promise<void>;
   onDraftAll: () => Promise<void>;
   onMarkContacted: (
@@ -326,6 +329,7 @@ export function OutreachView({
                       onOpenDraft={() => onOpenDraft(lead.id)}
                       onCreateDraft={() => onCreateDraft(lead.id)}
                       onApprove={() => onApprove(lead.id)}
+                      onApproveAndSend={() => onApproveAndSend(lead.id)}
                       onSend={() =>
                         lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
                       }
@@ -358,6 +362,7 @@ function OutreachRow({
   onOpenDraft,
   onCreateDraft,
   onApprove,
+  onApproveAndSend,
   onSend,
   onMarkContacted,
 }: {
@@ -371,6 +376,7 @@ function OutreachRow({
   onOpenDraft: () => void;
   onCreateDraft: () => Promise<void>;
   onApprove: () => Promise<void>;
+  onApproveAndSend: () => Promise<void>;
   onSend: () => Promise<void>;
   onMarkContacted: (
     method: ContactMethod,
@@ -487,7 +493,7 @@ function OutreachRow({
               aria-label={hasDraft ? "Review draft" : "Create draft"}
               title={
                 hasDraft
-                  ? "Open draft to edit"
+                  ? "Open draft — Approve & send in the drawer"
                   : email
                     ? "Create draft from active profile"
                     : "Create draft (add email in the composer if needed)"
@@ -500,15 +506,33 @@ function OutreachRow({
               type="button"
               disabled={busy || (!hasDraft && !email)}
               onClick={() => void onApprove()}
-              aria-label="Approve draft"
+              aria-label="Approve draft — move to Ready"
               title={
                 hasDraft
-                  ? "Approve — move to Ready to contact"
+                  ? "Approve only — move to Ready to contact"
                   : email
                     ? "Create & approve — move to Ready"
                     : "Needs an email to draft"
               }
               className={`${ACTION_BTN} bg-amber-400 text-on-accent disabled:opacity-50`}
+            >
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : <CheckIcon className="h-2.5 w-2.5" />}
+            </button>
+            <button
+              type="button"
+              disabled={busy || (!hasDraft && !email) || phoneOnly}
+              onClick={() => void onApproveAndSend()}
+              aria-label={
+                canSendEmail ? "Approve and send email" : "Approve and send (simulate)"
+              }
+              title={
+                phoneOnly
+                  ? "Phone-only — use Ready to log a call"
+                  : canSendEmail
+                    ? "Approve & send now"
+                    : "Approve & send (simulate)"
+              }
+              className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
             >
               {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
             </button>

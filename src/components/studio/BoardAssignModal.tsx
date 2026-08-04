@@ -23,6 +23,7 @@ export function BoardAssignModal({
   preferredBoardId,
   confirmLabel = "Continue",
   onConfirm,
+  onBoardsChange,
   onClose,
 }: {
   open: boolean;
@@ -33,6 +34,8 @@ export function BoardAssignModal({
   preferredBoardId?: string | null;
   confirmLabel?: string;
   onConfirm: (dest: BoardDestination) => void | Promise<void>;
+  /** Sync Studio when a board is created inside this modal. */
+  onBoardsChange?: (boards: BoardSummary[]) => void;
   onClose: () => void;
 }) {
   const defaultId =
@@ -82,7 +85,11 @@ export function BoardAssignModal({
         shared: false,
         lock: null,
       };
-      setLocalBoards((prev) => [...prev, summary]);
+      setLocalBoards((prev) => {
+        const next = [...prev, summary];
+        onBoardsChange?.(next);
+        return next;
+      });
       setSelectedId(board.id);
       setCreating(false);
       setNewName("");

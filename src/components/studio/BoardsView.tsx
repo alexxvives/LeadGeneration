@@ -10,9 +10,12 @@ import { BoardsSkeleton, Bone, useDeferredLoading } from "./skeletons";
 
 export function BoardsView({
   onSelectBoard,
+  onBoardsChange,
   createRequestId = 0,
 }: {
   onSelectBoard?: (boardId: string) => void;
+  /** Keep Studio sidebar / import picker in sync after create/rename/delete. */
+  onBoardsChange?: (boards: BoardSummary[]) => void;
   /** Increment from parent to open the create-board prompt. */
   createRequestId?: number;
 }) {
@@ -33,7 +36,8 @@ export function BoardsView({
     ]);
     setBoards(list);
     setInvites(pending);
-  }, []);
+    onBoardsChange?.(list);
+  }, [onBoardsChange]);
 
   useEffect(() => {
     refresh()
