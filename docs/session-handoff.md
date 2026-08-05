@@ -9,21 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-05 (Sending profile name + deploy)
+## ⏱️ Status — updated 2026-08-05 (Sending profile name live)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0027** remote applied (local: run `cf:migrate:local` if needed).
+**Migrations:** 0021–**0027** remote applied.  
+**Deployed:** version `89662cac-…` (`cf:build` + `cf:deploy` after push).
 
 ### This pass
-- Root cause of “How do you want to send? name doesn’t change”: feature commit
-  never pushed (connection reset) / never deployed; migrate had already run.
-- UI: heading shows active profile (`· {name}`); hydrate notifies Sending;
-  legacy seed = active only; empty shells for other profiles.
-- Push + `cf:build` then `cf:deploy` required for live.
+- Root cause: feature commit never pushed (connection reset) / never deployed;
+  migrate 0027 had already run.
+- UI: heading shows `How do you want to send? · {profile}`; hydrate notifies;
+  legacy seed = active only.
+- Pushed + deployed.
 
 ### Next
-1. Hard-refresh Settings — switch profiles; heading `· name` + Your name/From
-   should follow the active profile.
+1. Hard-refresh Settings — switch profiles; confirm heading + Your name/From.
 2. User may delete the accidental duplicate empty board.
 3. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
