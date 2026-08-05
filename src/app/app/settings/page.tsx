@@ -54,7 +54,14 @@ export default async function SettingsPage({
   }
   const plan = getPlan(usage.planId);
   const { mailboxPublicStatus } = await import("@/lib/email/mailbox");
+  const {
+    resolveProfileSendSettings,
+    workspaceHasEasySendKey,
+  } = await import("@/lib/email/profile-send-settings");
   const mailbox = mailboxPublicStatus(ws);
+  const activeSend = ws
+    ? resolveProfileSendSettings(ws).settings
+    : null;
   const session = await auth().catch(() => null);
   // Local demo: tools stay available. Production: users.is_admin via JWT.
   const showAdminTools = isAdminSession(session);
@@ -64,20 +71,19 @@ export default async function SettingsPage({
 
   const canSendEmail =
     caps.canSendEmail ||
-    !!ws?.resendApiKey?.trim() ||
-    !!ws?.mailerooApiKey?.trim() ||
-    !!(ws?.smtpHost?.trim() && ws?.smtpUser?.trim() && ws?.smtpPass) ||
+    (ws ? workspaceHasEasySendKey(ws) : false) ||
     !!ws?.connectedMailbox;
 
+  const preferredPath = activeSend?.preferredSendPath ?? ws?.preferredSendPath;
+  const easyProvider =
+    activeSend?.easyEmailProvider ?? ws?.easyEmailProvider ?? "resend";
   // Prefer Easy when Maileroo/SMTP is the Easy provider or user last chose Easy.
   const defaultPath: "easy" | "pro" =
     mailboxFlag === "connected"
       ? "pro"
-      : ws?.preferredSendPath === "easy" ||
-          ws?.preferredSendPath === "pro"
-        ? ws.preferredSendPath
-        : ws?.easyEmailProvider === "maileroo" ||
-            ws?.easyEmailProvider === "smtp"
+      : preferredPath === "easy" || preferredPath === "pro"
+        ? preferredPath
+        : easyProvider === "maileroo" || easyProvider === "smtp"
           ? "easy"
           : mailbox.connected
             ? "pro"
@@ -188,18 +194,25 @@ export default async function SettingsPage({
           canVerifyEmail={caps.emailVerify}
           emailVerifyEnabled={ws?.emailVerifyEnabled !== false}
           initial={{
-            fromName: ws?.fromName ?? null,
-            fromEmail: ws?.fromEmail ?? null,
-            replyTo: ws?.replyTo ?? null,
-            physicalAddress: ws?.physicalAddress ?? null,
-            easyEmailProvider: ws?.easyEmailProvider ?? "resend",
-            preferredSendPath: ws?.preferredSendPath ?? null,
-            hasResendKey: !!ws?.resendApiKey?.trim(),
-            hasMailerooKey: !!ws?.mailerooApiKey?.trim(),
-            hasSmtpPass: !!ws?.smtpPass?.trim(),
-            smtpHost: ws?.smtpHost ?? null,
-            smtpPort: ws?.smtpPort ?? null,
-            smtpUser: ws?.smtpUser ?? null,
+            fromName: activeSend?.fromName ?? ws?.fromName ?? null,
+            fromEmail: activeSend?.fromEmail ?? ws?.fromEmail ?? null,
+            replyTo: activeSend?.replyTo ?? ws?.replyTo ?? null,
+            physicalAddress:
+              activeSend?.physicalAddress ?? ws?.physicalAddress ?? null,
+            easyEmailProvider: easyProvider,
+            preferredSendPath: preferredPath ?? null,
+            hasResendKey: !!(
+              activeSend?.resendApiKey?.trim() || ws?.resendApiKey?.trim()
+            ),
+            hasMailerooKey: !!(
+              activeSend?.mailerooApiKey?.trim() || ws?.mailerooApiKey?.trim()
+            ),
+            hasSmtpPass: !!(
+              activeSend?.smtpPass?.trim() || ws?.smtpPass?.trim()
+            ),
+            smtpHost: activeSend?.smtpHost ?? ws?.smtpHost ?? null,
+            smtpPort: activeSend?.smtpPort ?? ws?.smtpPort ?? null,
+            smtpUser: activeSend?.smtpUser ?? ws?.smtpUser ?? null,
           }}
           defaults={{
             fromName: env.fromName(),

@@ -14,6 +14,9 @@ const LEGACY_MULTI = ["leadify_sender_profiles"];
 const LEGACY_SINGLE = "hermes_sender_profile";
 const LEGACY_KEYS = ["leadify_sender_profile", "lodestar_sender_profile"];
 
+/** Fired when profiles / activeId change (Settings Sending listens). */
+export const OUTREACH_PROFILE_CHANGE_EVENT = "hermes-outreach-profile-change";
+
 export type OutreachProfile = {
   id: string;
   name: string;
@@ -347,11 +350,17 @@ function normalizeProfile(p: Partial<OutreachProfile> & { defaultOffer?: string 
   });
 }
 
+function notifyProfileChange(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(OUTREACH_PROFILE_CHANGE_EVENT));
+}
+
 function writeStore(store: ProfileStore): void {
   const updatedAt = new Date().toISOString();
   const next: ProfileStore = { ...store, updatedAt };
   lastLocalWriteMs = Date.now();
   localStorage.setItem(KEY, JSON.stringify(next));
+  notifyProfileChange();
   // Write-through to workspace — do not silently drop errors (refresh needs server).
   if (typeof window !== "undefined") {
     void fetch("/api/workspace/settings", {
@@ -371,6 +380,55 @@ function writeStore(store: ProfileStore): void {
       .catch((err) => {
         console.error("[outreach-profiles] PATCH network error", err);
       });
+  }
+}
+
+/** Server-side empty Easy send shell for a newly created profile. */
+export async function ensureProfileSendSettings(
+  profileId: string,
+): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const res = await fetch("/api/workspace/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profileId,
+        ensureProfileSendSettings: profileId,
+      }),
+    });
+    if (!res.ok) {
+      console.error(
+        "[profile-send] ensure failed",
+        res.status,
+        await res.text().catch(() => ""),
+      );
+    }
+  } catch (err) {
+    console.error("[profile-send] ensure network error", err);
+  }
+}
+
+/** Drop Easy send settings when an outreach profile is deleted. */
+export async function removeProfileSendSettings(
+  profileId: string,
+): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const res = await fetch("/api/workspace/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ removeProfileSendSettings: profileId }),
+    });
+    if (!res.ok) {
+      console.error(
+        "[profile-send] remove failed",
+        res.status,
+        await res.text().catch(() => ""),
+      );
+    }
+  } catch (err) {
+    console.error("[profile-send] remove network error", err);
   }
 }
 
@@ -490,15 +548,18 @@ export function createOutreachProfile(name?: string): OutreachProfile {
     profiles: [...store.profiles, profile],
     activeId: profile.id,
   });
+  void ensureProfileSendSettings(profile.id);
   return profile;
 }
 
 export function deleteOutreachProfile(id: string): void {
   const store = readStore();
   const profiles = store.profiles.filter((p) => p.id !== id);
+  void removeProfileSendSettings(id);
   if (profiles.length === 0) {
     const fresh = emptyProfile();
     writeStore({ profiles: [fresh], activeId: fresh.id });
+    void ensureProfileSendSettings(fresh.id);
     return;
   }
   const activeId =

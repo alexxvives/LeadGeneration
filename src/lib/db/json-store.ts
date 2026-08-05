@@ -61,6 +61,10 @@ function normalizeWorkspace(w: Workspace): Workspace {
       typeof raw.outreachProfilesJson === "string"
         ? raw.outreachProfilesJson
         : null,
+    profileSendSettingsJson:
+      typeof raw.profileSendSettingsJson === "string"
+        ? raw.profileSendSettingsJson
+        : null,
     verifiesUsedToday:
       typeof raw.verifiesUsedToday === "number" ? raw.verifiesUsedToday : 0,
     verifiesResetsAt:

@@ -226,6 +226,12 @@ export interface Workspace {
    * Null = client localStorage only (demo / not yet migrated).
    */
   outreachProfilesJson: string | null;
+  /**
+   * JSON map of profileId → Easy Sending identity (From + provider keys).
+   * Secrets stay server-only. Legacy workspace From/key columns remain as fallback.
+   * Pro mailbox is still workspace-scoped (ADR 0010).
+   */
+  profileSendSettingsJson: string | null;
 }
 /**
  * Named collection of leads within a workspace (ADR 0014).

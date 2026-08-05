@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CheckIcon, MailIcon } from "@/components/icons";
 import {
   EmailSettingsForm,
@@ -15,13 +15,50 @@ import {
   recommendedDailySoftCap,
   todayKey,
 } from "@/lib/email/warmup";
+import {
+  loadOutreachProfiles,
+  OUTREACH_PROFILE_CHANGE_EVENT,
+} from "@/lib/sender-profile";
 import type { EasyEmailProvider, MailboxPublicStatus } from "@/lib/types";
 
 type PathId = "easy" | "pro";
 
+type PublicSend = {
+  fromName: string | null;
+  fromEmail: string | null;
+  replyTo: string | null;
+  physicalAddress: string | null;
+  easyEmailProvider: EasyEmailProvider;
+  preferredSendPath: "easy" | "pro" | null;
+  smtpHost: string | null;
+  smtpPort: number | null;
+  smtpUser: string | null;
+  hasResendKey: boolean;
+  hasMailerooKey: boolean;
+  hasSmtpPass: boolean;
+};
+
+function toEmailSettingsValues(send: PublicSend): EmailSettingsValues {
+  return {
+    fromName: send.fromName,
+    fromEmail: send.fromEmail,
+    replyTo: send.replyTo,
+    physicalAddress: send.physicalAddress,
+    easyEmailProvider: send.easyEmailProvider ?? "resend",
+    preferredSendPath: send.preferredSendPath,
+    smtpHost: send.smtpHost,
+    smtpPort: send.smtpPort,
+    smtpUser: send.smtpUser,
+    hasResendKey: send.hasResendKey,
+    hasMailerooKey: send.hasMailerooKey,
+    hasSmtpPass: send.hasSmtpPass,
+  };
+}
+
 /**
  * Dual send-path framing: Easy (Resend / Maileroo / SMTP) is the default wizard;
  * Pro mailbox connect (ADR 0010 — Google first; Microsoft coming).
+ * Easy From + keys are scoped to the active outreach profile.
  */
 export function SendSetupPanel({
   initial,
@@ -47,6 +84,9 @@ export function SendSetupPanel({
   emailVerifyEnabled?: boolean;
 }) {
   void _canSendEmail;
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [profileName, setProfileName] = useState<string>("");
+  const [sendValues, setSendValues] = useState<EmailSettingsValues>(initial);
   const [path, setPath] = useState<PathId>(defaultPath);
   const [easyProvider, setEasyProvider] = useState<EasyEmailProvider>(
     initial.easyEmailProvider ?? "resend",
@@ -58,18 +98,73 @@ export function SendSetupPanel({
   const [testBusy, setTestBusy] = useState(false);
   const [testMsg, setTestMsg] = useState<string | null>(null);
   const [testOk, setTestOk] = useState<boolean | null>(null);
+  const [loadingSend, setLoadingSend] = useState(false);
 
   useEffect(() => {
     setMailbox(mailboxInitial);
   }, [mailboxInitial]);
 
-  useEffect(() => {
-    setEasyProvider(initial.easyEmailProvider ?? "resend");
-  }, [initial.easyEmailProvider]);
+  const applyLocalProfile = useCallback(() => {
+    const store = loadOutreachProfiles();
+    const active =
+      store.profiles.find((p) => p.id === store.activeId) ?? store.profiles[0];
+    setProfileId(active?.id ?? null);
+    setProfileName(active?.name?.trim() || "Profile");
+    return active?.id ?? null;
+  }, []);
+
+  const loadSendForProfile = useCallback(
+    async (id: string | null) => {
+      if (!id) {
+        setSendValues(initial);
+        setEasyProvider(initial.easyEmailProvider ?? "resend");
+        const p = initial.preferredSendPath;
+        if (p === "easy" || p === "pro") setPath(p);
+        return;
+      }
+      setLoadingSend(true);
+      try {
+        const res = await fetch(
+          `/api/workspace/settings?profileId=${encodeURIComponent(id)}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          send?: PublicSend;
+          profileId?: string | null;
+        };
+        if (!data.send) return;
+        const next = toEmailSettingsValues(data.send);
+        setSendValues(next);
+        setEasyProvider(next.easyEmailProvider ?? "resend");
+        const preferred = next.preferredSendPath;
+        if (preferred === "easy" || preferred === "pro") {
+          setPath(preferred);
+        }
+      } catch {
+        /* keep current */
+      } finally {
+        setLoadingSend(false);
+      }
+    },
+    [initial],
+  );
 
   useEffect(() => {
-    setPath(defaultPath);
-  }, [defaultPath]);
+    const id = applyLocalProfile();
+    void loadSendForProfile(id);
+  }, [applyLocalProfile, loadSendForProfile]);
+
+  useEffect(() => {
+    const onChange = () => {
+      const id = applyLocalProfile();
+      void loadSendForProfile(id);
+    };
+    window.addEventListener(OUTREACH_PROFILE_CHANGE_EVENT, onChange);
+    return () => {
+      window.removeEventListener(OUTREACH_PROFILE_CHANGE_EVENT, onChange);
+    };
+  }, [applyLocalProfile, loadSendForProfile]);
 
   async function selectPath(next: PathId) {
     setPath(next);
@@ -78,8 +173,12 @@ export function SendSetupPanel({
       await fetch("/api/workspace/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preferredSendPath: next }),
+        body: JSON.stringify({
+          preferredSendPath: next,
+          ...(profileId ? { profileId } : {}),
+        }),
       });
+      setSendValues((prev) => ({ ...prev, preferredSendPath: next }));
     } catch {
       // non-blocking — identity fields auto-save on blur too
     }
@@ -168,7 +267,15 @@ export function SendSetupPanel({
           </h2>
           <p className="text-sm text-mist-500">
             Easy = Resend, Maileroo, or SMTP (Hostinger). Pro = send through your real
-            Google mailbox.
+            Google mailbox. Easy From + keys follow the active outreach profile
+            {profileName ? (
+              <>
+                {" "}
+                (<span className="text-mist-300">{profileName}</span>).
+              </>
+            ) : (
+              "."
+            )}
           </p>
         </div>
         <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-ink-900/60 p-1">
@@ -203,15 +310,35 @@ export function SendSetupPanel({
           className="scroll-mt-8 rounded-xl2 border border-white/10 p-5"
           data-tour="sending-identity"
         >
-          <h3 className="mb-4 text-sm font-semibold text-mist-100">Sending identity</h3>
-          <EmailSettingsForm
-            initial={initial}
-            defaults={defaults}
-            canEdit={canEdit}
-            variant="easy"
-            easyProvider={easyProvider}
-            onEasyProviderChange={setEasyProvider}
-          />
+          <h3 className="mb-1 text-sm font-semibold text-mist-100">
+            Sending identity
+            {profileName ? (
+              <span className="ml-1.5 font-normal text-mist-500">
+                for {profileName}
+              </span>
+            ) : null}
+          </h3>
+          <p className="mb-4 text-xs text-mist-500">
+            Each outreach profile has its own From address and provider keys. Switch
+            profile above to edit another brand.
+          </p>
+          {loadingSend ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-mist-500">
+              <Spinner className="h-4 w-4" />
+              Loading send settings…
+            </div>
+          ) : (
+            <EmailSettingsForm
+              key={profileId ?? "legacy"}
+              initial={sendValues}
+              defaults={defaults}
+              canEdit={canEdit}
+              variant="easy"
+              easyProvider={easyProvider}
+              onEasyProviderChange={setEasyProvider}
+              profileId={profileId}
+            />
+          )}
           {showResendDns ? (
             <div className="mt-4">
               <DomainHealthPanel compact />
@@ -233,7 +360,8 @@ export function SendSetupPanel({
               Pro mailbox connect is for{" "}
               <span className="text-mist-100">Gmail / Google Workspace</span> only right now
               (Microsoft soon). If your mail is hosted elsewhere (Zoho, Hostinger, generic
-              SMTP), use Easy → SMTP with that mailbox, or Resend/Maileroo + DNS.
+              SMTP), use Easy → SMTP with that mailbox, or Resend/Maileroo + DNS. The
+              mailbox is shared across profiles; Easy From + keys stay per profile.
             </p>
 
             {mailbox.connected ? (
@@ -326,18 +454,34 @@ export function SendSetupPanel({
             className="scroll-mt-8 rounded-xl2 border border-white/10 p-5"
             data-tour="sending-identity"
           >
-            <h3 className="mb-1 text-sm font-semibold text-mist-100">Sending identity</h3>
+            <h3 className="mb-1 text-sm font-semibold text-mist-100">
+              Sending identity
+              {profileName ? (
+                <span className="ml-1.5 font-normal text-mist-500">
+                  for {profileName}
+                </span>
+              ) : null}
+            </h3>
             <p className="mb-4 text-xs text-mist-500">
               Display name for the From line. From email comes from the connected mailbox when
               linked.
             </p>
-            <EmailSettingsForm
-              initial={initial}
-              defaults={defaults}
-              canEdit={canEdit}
-              variant="pro"
-              lockedFromEmail={mailbox.connected ? mailbox.email : null}
-            />
+            {loadingSend ? (
+              <div className="flex items-center gap-2 py-6 text-sm text-mist-500">
+                <Spinner className="h-4 w-4" />
+                Loading send settings…
+              </div>
+            ) : (
+              <EmailSettingsForm
+                key={`pro-${profileId ?? "legacy"}`}
+                initial={sendValues}
+                defaults={defaults}
+                canEdit={canEdit}
+                variant="pro"
+                lockedFromEmail={mailbox.connected ? mailbox.email : null}
+                profileId={profileId}
+              />
+            )}
           </div>
         </div>
       )}
@@ -345,8 +489,9 @@ export function SendSetupPanel({
       <div className="rounded-xl2 border border-white/10 p-5">
         <h3 className="text-sm font-semibold text-mist-100">Send a test email</h3>
         <p className="mt-1 text-xs text-mist-500">
-          Uses your current {path === "pro" ? "Pro mailbox / Easy fallback" : "Easy"}{" "}
-          setup. Enter any inbox to confirm delivery.
+          Uses the active profile&apos;s{" "}
+          {path === "pro" ? "Pro mailbox / Easy fallback" : "Easy"} setup
+          {profileName ? ` (${profileName})` : ""}. Enter any inbox to confirm delivery.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <input

@@ -120,15 +120,16 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - Quotas + rate limits in `service.ts`.
 - Settings → Easy: Resend, Maileroo, or **SMTP** (Hostinger / Zoho / etc.) +
   **Verify emails before sending** (MyEmailVerifier) toggle; Pro mailbox
-  Connect Google (`SendSetupPanel`). Workspace SMTP fields: `smtpHost`,
-  `smtpPort`, `smtpUser`, `smtpPass` (migration 0026). Password never
-  echoed — Settings gets `hasSmtpPass` only. Platform `SMTP_*` env stays
-  auth / last-resort fallback, not tenant mailboxes.
-  **Send a test email** (`POST /api/send/test`) hits the same `sendEmail()`
-  path without an approved outreach. Workspace `preferredSendPath` chooses
-  Easy vs Pro at send time.
-  API keys are stored server-side; Settings only receives `hasResendKey` /
-  `hasMailerooKey` / `hasSmtpPass` flags.
+  Connect Google (`SendSetupPanel`). Easy From + keys are **per outreach
+  profile** (`profile_send_settings_json`, migration 0027 / ADR 0021); Pro
+  mailbox stays workspace-scoped. Legacy workspace SMTP/From columns remain
+  as fallback. Password never echoed — Settings gets `hasSmtpPass` only.
+  Platform `SMTP_*` env stays auth / last-resort fallback, not tenant
+  mailboxes. **Send a test email** (`POST /api/send/test`) uses the active
+  profile’s identity via the same `sendEmail()` path. Profile
+  `preferredSendPath` chooses Easy vs Pro at send time. API keys are
+  server-side only; Settings receives `hasResendKey` / `hasMailerooKey` /
+  `hasSmtpPass` flags.
 - **Hostinger Sent:** API sends (Resend/Maileroo) never appear in
   Hostinger webmail Sent. Easy → SMTP through `smtp.hostinger.com` uses
   that mailbox; copies often show in Sent (IMAP APPEND not implemented).

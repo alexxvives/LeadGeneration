@@ -32,8 +32,20 @@ export async function POST(req: Request) {
     const ctx = await getCtx();
     // Always load workspace so local BYO Resend keys work (not only when metered).
     const ws = await ctx.db.getWorkspace(ctx.workspaceId);
-    const apiKey = ws?.resendApiKey?.trim() || env.resendKey() || null;
-    const email = fromEmail || ws?.fromEmail || env.fromEmail();
+    const { resolveProfileSendSettings } = await import(
+      "@/lib/email/profile-send-settings"
+    );
+    const resolved = ws ? resolveProfileSendSettings(ws) : null;
+    const apiKey =
+      resolved?.settings.resendApiKey?.trim() ||
+      ws?.resendApiKey?.trim() ||
+      env.resendKey() ||
+      null;
+    const email =
+      fromEmail ||
+      resolved?.settings.fromEmail ||
+      ws?.fromEmail ||
+      env.fromEmail();
 
     const health = await fetchResendDomainHealth({ apiKey, fromEmail: email });
     return NextResponse.json(health);

@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-05 — Per-profile Easy Sending identity
+- Easy From + provider keys live in `profile_send_settings_json` keyed by
+  outreach profile id (ADR 0021). Never put keys in `outreachProfilesJson` /
+  localStorage. Send/test-send resolve `activeId`. Pro Google mailbox stays
+  one-per-workspace. First access seeds every known profile from legacy
+  workspace columns when the map is empty.
+
 ### 2026-08-04 — Draft all → Ready + keep button for redraft
 - Outreach **Draft all** previously left status `draft` (Contact Draft /
   “Review”). Now each draft is auto-approved into **Ready to contact**; send

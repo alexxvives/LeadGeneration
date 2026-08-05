@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
-import { updateWorkspaceEmailSettings } from "@/lib/service";
+import {
+  getPublicProfileSendSettings,
+  updateWorkspaceEmailSettings,
+} from "@/lib/service";
 import { isAuthError, isNotFoundError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -25,6 +28,12 @@ const optionalKey = z.preprocess(
 );
 
 const PatchSchema = z.object({
+  /** Target outreach profile for Easy Sending identity. */
+  profileId: z.string().min(1).max(64).optional(),
+  /** Drop send settings when an outreach profile is deleted. */
+  removeProfileSendSettings: z.string().min(1).max(64).optional(),
+  /** Create an empty send-settings shell for a new profile. */
+  ensureProfileSendSettings: z.string().min(1).max(64).optional(),
   fromName: z.preprocess(emptyToNull, z.string().max(100).nullable().optional()),
   fromEmail: optionalEmail,
   replyTo: optionalEmail,
@@ -63,12 +72,17 @@ const PatchSchema = z.object({
   outreachProfilesJson: z.string().max(200_000).nullable().optional(),
 });
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const ctx = await getCtx();
-    const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+    const url = new URL(req.url);
+    const profileId = url.searchParams.get("profileId");
+    const data = await getPublicProfileSendSettings(ctx, profileId);
     return NextResponse.json({
-      outreachProfilesJson: ws?.outreachProfilesJson ?? null,
+      outreachProfilesJson: data.outreachProfilesJson,
+      profileId: data.profileId,
+      send: data.send,
+      sendByProfile: data.sendByProfile,
     });
   } catch (err) {
     if (isAuthError(err)) {
@@ -104,6 +118,13 @@ export async function PATCH(req: Request) {
 
   const data = parsed.data;
   const patch: Parameters<typeof updateWorkspaceEmailSettings>[1] = {};
+  if (data.profileId !== undefined) patch.profileId = data.profileId;
+  if (data.removeProfileSendSettings !== undefined) {
+    patch.removeProfileSendSettings = data.removeProfileSendSettings;
+  }
+  if (data.ensureProfileSendSettings !== undefined) {
+    patch.ensureProfileSendSettings = data.ensureProfileSendSettings;
+  }
   if (data.fromName !== undefined) patch.fromName = data.fromName;
   if (data.fromEmail !== undefined) patch.fromEmail = data.fromEmail;
   if (data.replyTo !== undefined) patch.replyTo = data.replyTo;

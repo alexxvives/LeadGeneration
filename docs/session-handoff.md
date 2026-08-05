@@ -9,20 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-04 (Draft all → Ready)
+## ⏱️ Status — updated 2026-08-05 (per-profile Sending identity)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0026** local **and remote** (`workspace smtp_*`).
+**Migrations:** 0021–**0027** (0027 = `profile_send_settings_json` — apply local + remote).
 
 ### This pass
-- Outreach **Draft all**: drafts + auto-approves into **Ready to contact**
-  (no longer leaves “Review” in Contact Draft). Button stays for redraft after
-  profile/pitch changes (all non-sent email leads).
-- Earlier today: Resend bounce webhook tags shape fix + backfill.
+- Easy Sending identity (From + Resend/Maileroo/SMTP keys) is **per outreach
+  profile** (ADR 0021). Active profile drives send/test-send. Pro mailbox
+  still workspace-scoped. Settings Sending reloads on profile switch.
+- Earlier: Resend bounce tags fix; Draft all → Ready.
 
 ### Next
-1. Deploy (`cf:build` then `cf:deploy`); hard-refresh Outreach.
-2. Resend: replay bounced events if any other misses remain.
+1. `npm run cf:migrate` (+ `:local`) for 0027; deploy (`cf:build` then `cf:deploy`).
+2. Hard-refresh Settings — switch profiles and confirm From/keys differ.
 3. User may delete the accidental duplicate empty board.
 4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 

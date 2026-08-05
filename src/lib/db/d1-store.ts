@@ -99,6 +99,8 @@ type WorkspaceRow = {
   verifies_resets_at: string | null;
   /** Migration 0024 — JSON ProfileStore. */
   outreach_profiles_json: string | null;
+  /** Migration 0027 — per-profile Easy send settings. */
+  profile_send_settings_json: string | null;
 };
 
 type BoardRow = {
@@ -227,6 +229,7 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
     findLeadsEnabled: r.find_leads_enabled === 0 ? false : true,
     connectedMailbox: parseConnectedMailbox(r.connected_mailbox_json),
     outreachProfilesJson: r.outreach_profiles_json ?? null,
+    profileSendSettingsJson: r.profile_send_settings_json ?? null,
   };
 }
 
@@ -479,6 +482,9 @@ export class D1Store implements LeadRepository {
     }
     if ("outreachProfilesJson" in patch) {
       row.outreach_profiles_json = patch.outreachProfilesJson ?? null;
+    }
+    if ("profileSendSettingsJson" in patch) {
+      row.profile_send_settings_json = patch.profileSendSettingsJson ?? null;
     }
 
     if (Object.keys(row).length === 0) return this.getWorkspace(id);

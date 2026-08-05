@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
 import { MailboxAgePicker } from "@/components/studio/MailboxAgePicker";
+import {
+  loadSenderProfile,
+  saveSenderProfile,
+} from "@/lib/sender-profile";
 import type { EasyEmailProvider } from "@/lib/types";
 
 /** Visual stand-in when a key is saved — never the real secret (Art. III.5). */
@@ -48,6 +52,8 @@ export function EmailSettingsForm({
   /** Controlled Easy provider (SendSetupPanel owns the picker). */
   easyProvider,
   onEasyProviderChange,
+  /** Outreach profile that owns this Sending identity. */
+  profileId,
 }: {
   initial: EmailSettingsValues;
   defaults: EmailSettingsDefaults;
@@ -57,6 +63,7 @@ export function EmailSettingsForm({
   lockedFromEmail?: string | null;
   easyProvider?: EasyEmailProvider;
   onEasyProviderChange?: (p: EasyEmailProvider) => void;
+  profileId?: string | null;
 }) {
   const router = useRouter();
   const [values, setValues] = useState({
@@ -218,6 +225,7 @@ export function EmailSettingsForm({
             easyEmailProvider: activeProvider,
             preferredSendPath: "easy",
           };
+      if (profileId) payload.profileId = profileId;
 
       if (!isPro) {
         if (isNewKey(resendDraft)) payload.resendApiKey = resendDraft.trim();
@@ -240,8 +248,22 @@ export function EmailSettingsForm({
         const data = (await res.json()) as { error?: string };
         setError(data.error ?? "Save failed");
       } else {
-        // From name is inbox identity only — email sign-off lives on the
-        // outreach profile (Settings → Outreach), not here.
+        // Sync From name → active profile sign-off displayName when empty
+        // or still matching the previous From name.
+        const name = values.fromName?.trim() ?? "";
+        if (name && profileId) {
+          try {
+            const p = loadSenderProfile();
+            if (p.id === profileId) {
+              const prev = (initial.fromName ?? "").trim();
+              if (!p.displayName.trim() || p.displayName.trim() === prev) {
+                saveSenderProfile({ ...p, displayName: name });
+              }
+            }
+          } catch {
+            /* ignore local sync */
+          }
+        }
         if (!isPro) {
           const nextHasResend = isNewKey(resendDraft) || hasResendKey;
           const nextHasMaileroo = isNewKey(mailerooDraft) || hasMailerooKey;

@@ -61,6 +61,7 @@ export function newWorkspace(args: {
     findLeadsEnabled: true,
     connectedMailbox: null,
     outreachProfilesJson: null,
+    profileSendSettingsJson: null,
   };
 }
 

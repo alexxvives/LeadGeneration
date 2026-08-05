@@ -117,7 +117,9 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 - **`/app/settings`** — sender profile (language flag persists as
   `templateLang` and only changes the **preview** — template editors stay as
   written; preview may translate for display), **Sending** dual path (Easy
-  Resend + DNS health, or Pro Connect Google mailbox) plus **Send a test
+  Resend/Maileroo/SMTP + DNS health, or Pro Connect Google mailbox). Easy
+  **From + provider keys are per outreach profile** (active profile in the
+  sidebar / profile picker); Pro mailbox stays shared. Plus **Send a test
   email**, plan/usage, Boards link, Integrations status, “Ready to send?”
   checklist, and **Danger zone** self-serve account deletion (live app only;
   type `DELETE`). Microsoft mailbox connect is next.

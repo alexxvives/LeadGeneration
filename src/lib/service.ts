@@ -8,6 +8,19 @@ import {
   type OutreachLang,
 } from "@/lib/outreach/locale";
 import { sendEmail } from "@/lib/email/sender";
+import {
+  activeProfileIdFromJson,
+  emptyProfileSendSettings,
+  migrateLegacySendSettingsIfNeeded,
+  parseProfileSendSettingsMap,
+  profileSendSettingsToWorkspaceEmail,
+  resolveProfileSendSettings,
+  serializeProfileSendSettingsMap,
+  toPublicProfileSendSettings,
+  workspaceHasEasySendKey,
+  type ProfileSendSettings,
+  type PublicProfileSendSettings,
+} from "@/lib/email/profile-send-settings";
 import { checkSendRate } from "@/lib/email/rate-limit";
 import { env } from "@/lib/config";
 import {
@@ -1324,8 +1337,11 @@ export async function sendApprovedOutreach(
     };
   }
 
-  const wsForEmail = await db.getWorkspace(ctx.workspaceId);
+  const wsForEmail = await ensureProfileSendSettingsMigrated(ctx);
   const cleanBody = stripLegacyCompliance(outreach.body);
+  const sendIdentity = wsForEmail
+    ? resolveSendIdentity(wsForEmail)
+    : undefined;
   const result = await sendEmail(
     {
       to: toEmail,
@@ -1339,23 +1355,7 @@ export async function sendApprovedOutreach(
         { name: "leadify_outreach", value: outreachId.slice(0, 256) },
       ],
     },
-    wsForEmail
-      ? {
-          fromName: wsForEmail.fromName,
-          fromEmail: wsForEmail.fromEmail,
-          replyTo: wsForEmail.replyTo,
-          physicalAddress: wsForEmail.physicalAddress,
-          resendApiKey: wsForEmail.resendApiKey,
-          mailerooApiKey: wsForEmail.mailerooApiKey,
-          smtpHost: wsForEmail.smtpHost,
-          smtpPort: wsForEmail.smtpPort,
-          smtpUser: wsForEmail.smtpUser,
-          smtpPass: wsForEmail.smtpPass,
-          easyEmailProvider: wsForEmail.easyEmailProvider,
-          preferredSendPath: wsForEmail.preferredSendPath,
-          connectedMailbox: wsForEmail.connectedMailbox,
-        }
-      : undefined,
+    sendIdentity,
   );
 
   // Production (metered): never treat demo/no-transport as a real send.
@@ -1468,7 +1468,8 @@ export async function sendTestEmail(
     };
   }
 
-  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+  const ws = await ensureProfileSendSettingsMigrated(ctx);
+  const sendIdentity = ws ? resolveSendIdentity(ws) : undefined;
   const result = await sendEmail(
     {
       to,
@@ -1485,23 +1486,7 @@ export async function sendTestEmail(
         { name: "hermes_test", value: "1" },
       ],
     },
-    ws
-      ? {
-          fromName: ws.fromName,
-          fromEmail: ws.fromEmail,
-          replyTo: ws.replyTo,
-          physicalAddress: ws.physicalAddress,
-          resendApiKey: ws.resendApiKey,
-          mailerooApiKey: ws.mailerooApiKey,
-          smtpHost: ws.smtpHost,
-          smtpPort: ws.smtpPort,
-          smtpUser: ws.smtpUser,
-          smtpPass: ws.smtpPass,
-          easyEmailProvider: ws.easyEmailProvider,
-          preferredSendPath: ws.preferredSendPath,
-          connectedMailbox: ws.connectedMailbox,
-        }
-      : undefined,
+    sendIdentity,
   );
 
   if (result.connectedMailbox) {
@@ -1674,10 +1659,116 @@ export async function setOutreachDeliveryStatus(
   return outreach;
 }
 
-/** Update per-workspace email sending identity (from name, email, reply-to, etc.). */
+function resolveSendIdentity(ws: Workspace) {
+  const { settings } = resolveProfileSendSettings(ws);
+  return profileSendSettingsToWorkspaceEmail(settings, ws);
+}
+
+/** Persist one-time legacy → per-profile seed when the map is empty. */
+async function ensureProfileSendSettingsMigrated(
+  ctx: Ctx,
+): Promise<Workspace | null> {
+  const existing = await ctx.db.getWorkspace(ctx.workspaceId);
+  if (!existing) return null;
+  const seeded = migrateLegacySendSettingsIfNeeded(existing);
+  if (!seeded) return existing;
+  return (
+    (await ctx.db.updateWorkspace(ctx.workspaceId, {
+      profileSendSettingsJson: seeded,
+      updatedAt: nowIso(),
+    })) ?? existing
+  );
+}
+
+function mergeProfileSendPatch(
+  base: ProfileSendSettings,
+  patch: {
+    fromName?: string | null;
+    fromEmail?: string | null;
+    replyTo?: string | null;
+    physicalAddress?: string | null;
+    resendApiKey?: string | null;
+    mailerooApiKey?: string | null;
+    smtpHost?: string | null;
+    smtpPort?: number | null;
+    smtpUser?: string | null;
+    smtpPass?: string | null;
+    easyEmailProvider?: EasyEmailProvider;
+    preferredSendPath?: "easy" | "pro" | null;
+  },
+): ProfileSendSettings {
+  const next = { ...base };
+  if (patch.fromName !== undefined) next.fromName = patch.fromName;
+  if (patch.fromEmail !== undefined) next.fromEmail = patch.fromEmail;
+  if (patch.replyTo !== undefined) next.replyTo = patch.replyTo;
+  if (patch.physicalAddress !== undefined) {
+    next.physicalAddress = patch.physicalAddress;
+  }
+  if (patch.easyEmailProvider !== undefined) {
+    next.easyEmailProvider = patch.easyEmailProvider;
+  }
+  if (patch.preferredSendPath !== undefined) {
+    next.preferredSendPath = patch.preferredSendPath;
+  }
+  if (patch.resendApiKey !== undefined) next.resendApiKey = patch.resendApiKey;
+  if (patch.mailerooApiKey !== undefined) {
+    next.mailerooApiKey = patch.mailerooApiKey;
+  }
+  if (patch.smtpHost !== undefined) next.smtpHost = patch.smtpHost;
+  if (patch.smtpPort !== undefined) next.smtpPort = patch.smtpPort;
+  if (patch.smtpUser !== undefined) next.smtpUser = patch.smtpUser;
+  if (patch.smtpPass !== undefined) next.smtpPass = patch.smtpPass;
+  return next;
+}
+
+/** Public send settings for Settings UI (active profile or explicit id). */
+export async function getPublicProfileSendSettings(
+  ctx: Ctx,
+  profileId?: string | null,
+): Promise<{
+  profileId: string | null;
+  send: PublicProfileSendSettings;
+  sendByProfile: Record<string, PublicProfileSendSettings>;
+  outreachProfilesJson: string | null;
+}> {
+  const ws = await ensureProfileSendSettingsMigrated(ctx);
+  if (!ws) {
+    return {
+      profileId: null,
+      send: toPublicProfileSendSettings(emptyProfileSendSettings()),
+      sendByProfile: {},
+      outreachProfilesJson: null,
+    };
+  }
+  const map = parseProfileSendSettingsMap(ws.profileSendSettingsJson);
+  const sendByProfile: Record<string, PublicProfileSendSettings> = {};
+  for (const [id, settings] of Object.entries(map)) {
+    sendByProfile[id] = toPublicProfileSendSettings(settings);
+  }
+  const resolved = resolveProfileSendSettings(ws, profileId);
+  // Include resolved even when still on legacy fallback (not yet in map).
+  if (resolved.profileId && !sendByProfile[resolved.profileId]) {
+    sendByProfile[resolved.profileId] = toPublicProfileSendSettings(
+      resolved.settings,
+    );
+  }
+  return {
+    profileId: resolved.profileId,
+    send: toPublicProfileSendSettings(resolved.settings),
+    sendByProfile,
+    outreachProfilesJson: ws.outreachProfilesJson,
+  };
+}
+
+/** Update per-profile (or legacy) email sending identity. */
 export async function updateWorkspaceEmailSettings(
   ctx: Ctx,
   patch: {
+    profileId?: string | null;
+    /** Drop send settings for a deleted outreach profile. */
+    removeProfileSendSettings?: string | null;
+    /** Ensure an empty send-settings shell exists for a new profile. */
+    ensureProfileSendSettings?: string | null;
     fromName?: string | null;
     fromEmail?: string | null;
     replyTo?: string | null;
@@ -1694,34 +1785,148 @@ export async function updateWorkspaceEmailSettings(
     outreachProfilesJson?: string | null;
   },
 ): Promise<void> {
-  const existing = await ctx.db.getWorkspace(ctx.workspaceId);
+  const existing = await ensureProfileSendSettingsMigrated(ctx);
+  if (!existing) {
+    throw new NotFoundError(
+      "Workspace not found — sign in again, then re-save Settings.",
+    );
+  }
+
   const nextPatch: Partial<Workspace> = {
-    ...patch,
     updatedAt: nowIso(),
   };
 
-  // Clearing Resend key also drops the auto-registered webhook credentials.
-  if (patch.resendApiKey === null) {
+  if (patch.emailVerifyEnabled !== undefined) {
+    nextPatch.emailVerifyEnabled = patch.emailVerifyEnabled;
+  }
+  if (patch.outreachProfilesJson !== undefined) {
+    nextPatch.outreachProfilesJson = patch.outreachProfilesJson;
+  }
+
+  const map = parseProfileSendSettingsMap(existing.profileSendSettingsJson);
+  let mapDirty = false;
+
+  if (patch.removeProfileSendSettings?.trim()) {
+    const rid = patch.removeProfileSendSettings.trim();
+    if (rid in map) {
+      delete map[rid];
+      mapDirty = true;
+    }
+  }
+
+  if (patch.ensureProfileSendSettings?.trim()) {
+    const eid = patch.ensureProfileSendSettings.trim();
+    if (!(eid in map)) {
+      map[eid] = emptyProfileSendSettings();
+      mapDirty = true;
+    }
+  }
+
+  const sendFieldTouched =
+    patch.fromName !== undefined ||
+    patch.fromEmail !== undefined ||
+    patch.replyTo !== undefined ||
+    patch.physicalAddress !== undefined ||
+    patch.resendApiKey !== undefined ||
+    patch.mailerooApiKey !== undefined ||
+    patch.smtpHost !== undefined ||
+    patch.smtpPort !== undefined ||
+    patch.smtpUser !== undefined ||
+    patch.smtpPass !== undefined ||
+    patch.easyEmailProvider !== undefined ||
+    patch.preferredSendPath !== undefined;
+
+  const targetProfileId =
+    (patch.profileId && patch.profileId.trim()) ||
+    activeProfileIdFromJson(
+      patch.outreachProfilesJson !== undefined
+        ? patch.outreachProfilesJson
+        : existing.outreachProfilesJson,
+    );
+
+  if (sendFieldTouched) {
+    if (!targetProfileId) {
+      // No profiles yet — keep writing legacy workspace columns only.
+      if (patch.fromName !== undefined) nextPatch.fromName = patch.fromName;
+      if (patch.fromEmail !== undefined) nextPatch.fromEmail = patch.fromEmail;
+      if (patch.replyTo !== undefined) nextPatch.replyTo = patch.replyTo;
+      if (patch.physicalAddress !== undefined) {
+        nextPatch.physicalAddress = patch.physicalAddress;
+      }
+      if (patch.easyEmailProvider !== undefined) {
+        nextPatch.easyEmailProvider = patch.easyEmailProvider;
+      }
+      if (patch.preferredSendPath !== undefined) {
+        nextPatch.preferredSendPath = patch.preferredSendPath;
+      }
+      if (patch.resendApiKey !== undefined) {
+        nextPatch.resendApiKey = patch.resendApiKey;
+      }
+      if (patch.mailerooApiKey !== undefined) {
+        nextPatch.mailerooApiKey = patch.mailerooApiKey;
+      }
+      if (patch.smtpHost !== undefined) nextPatch.smtpHost = patch.smtpHost;
+      if (patch.smtpPort !== undefined) nextPatch.smtpPort = patch.smtpPort;
+      if (patch.smtpUser !== undefined) nextPatch.smtpUser = patch.smtpUser;
+      if (patch.smtpPass !== undefined) nextPatch.smtpPass = patch.smtpPass;
+    } else {
+      const base =
+        map[targetProfileId] ??
+        resolveProfileSendSettings(existing, targetProfileId).settings;
+      const merged = mergeProfileSendPatch(base, patch);
+      map[targetProfileId] = merged;
+      mapDirty = true;
+
+      // Mirror active profile into legacy columns for older readers / admin.
+      const activeId = activeProfileIdFromJson(
+        patch.outreachProfilesJson !== undefined
+          ? patch.outreachProfilesJson
+          : existing.outreachProfilesJson,
+      );
+      if (!activeId || activeId === targetProfileId) {
+        nextPatch.fromName = merged.fromName;
+        nextPatch.fromEmail = merged.fromEmail;
+        nextPatch.replyTo = merged.replyTo;
+        nextPatch.physicalAddress = merged.physicalAddress;
+        nextPatch.easyEmailProvider = merged.easyEmailProvider;
+        nextPatch.preferredSendPath = merged.preferredSendPath;
+        nextPatch.resendApiKey = merged.resendApiKey;
+        nextPatch.mailerooApiKey = merged.mailerooApiKey;
+        nextPatch.smtpHost = merged.smtpHost;
+        nextPatch.smtpPort = merged.smtpPort;
+        nextPatch.smtpUser = merged.smtpUser;
+        nextPatch.smtpPass = merged.smtpPass;
+      }
+    }
+  }
+
+  if (mapDirty) {
+    nextPatch.profileSendSettingsJson = serializeProfileSendSettingsMap(map);
+  }
+
+  // Clearing Resend key also drops the auto-registered webhook credentials
+  // when the active/mirrored workspace key is cleared.
+  if (patch.resendApiKey === null && nextPatch.resendApiKey === null) {
     nextPatch.resendWebhookId = null;
     nextPatch.resendWebhookSecret = null;
   }
 
-  // Register / re-enable delivery webhook whenever a Resend key is still on file
-  // (new paste or any Settings save — recovers Resend auto-disabled endpoints).
   const keyForWebhook =
     patch.resendApiKey === null
       ? ""
       : typeof patch.resendApiKey === "string" && patch.resendApiKey.trim()
         ? patch.resendApiKey.trim()
-        : existing?.resendApiKey?.trim() || "";
+        : targetProfileId && map[targetProfileId]?.resendApiKey?.trim()
+          ? map[targetProfileId]!.resendApiKey!.trim()
+          : existing.resendApiKey?.trim() || "";
   if (keyForWebhook) {
     try {
       const { ensureResendDeliveryWebhook } = await import(
         "@/lib/email/resend-webhooks"
       );
       const ensured = await ensureResendDeliveryWebhook(keyForWebhook, {
-        existingId: existing?.resendWebhookId,
-        existingSecret: existing?.resendWebhookSecret,
+        existingId: existing.resendWebhookId,
+        existingSecret: existing.resendWebhookSecret,
       });
       if (ensured) {
         nextPatch.resendWebhookId = ensured.id;
@@ -1751,14 +1956,37 @@ export async function connectMailbox(
   ctx: Ctx,
   mailbox: ConnectedMailbox,
 ): Promise<void> {
-  const existing = await ctx.db.getWorkspace(ctx.workspaceId);
-  await ctx.db.updateWorkspace(ctx.workspaceId, {
+  const existing = await ensureProfileSendSettingsMigrated(ctx);
+  const activeId = activeProfileIdFromJson(existing?.outreachProfilesJson);
+  const map = parseProfileSendSettingsMap(existing?.profileSendSettingsJson);
+  const nextPatch: Partial<Workspace> = {
     connectedMailbox: mailbox,
-    // Prefer mailbox email as From only when user hasn't set one yet.
-    ...(existing?.fromEmail?.trim() ? {} : { fromEmail: mailbox.email }),
     preferredSendPath: "pro",
     updatedAt: nowIso(),
-  });
+  };
+  // Prefer mailbox email as From only when user hasn't set one yet.
+  if (!existing?.fromEmail?.trim()) {
+    nextPatch.fromEmail = mailbox.email;
+  }
+  if (activeId) {
+    const base =
+      map[activeId] ??
+      (existing
+        ? resolveProfileSendSettings(existing, activeId).settings
+        : emptyProfileSendSettings());
+    const next: ProfileSendSettings = {
+      ...base,
+      preferredSendPath: "pro",
+      fromEmail: base.fromEmail?.trim() ? base.fromEmail : mailbox.email,
+    };
+    map[activeId] = next;
+    nextPatch.profileSendSettingsJson = serializeProfileSendSettingsMap(map);
+    nextPatch.preferredSendPath = "pro";
+    if (!existing?.fromEmail?.trim()) {
+      nextPatch.fromEmail = next.fromEmail;
+    }
+  }
+  await ctx.db.updateWorkspace(ctx.workspaceId, nextPatch);
 }
 
 /** Disconnect Pro mailbox (tokens wiped). Easy Resend path unchanged. */
@@ -2633,11 +2861,7 @@ export async function listAdminUsers(ctx: Ctx): Promise<AdminUserRow[]> {
         runCount: counts.runs[w.id] ?? 0,
         stripeCustomerId: w.stripeCustomerId,
         hasMailbox: Boolean(w.connectedMailbox),
-        hasEasySendKey: Boolean(
-          w.resendApiKey ||
-            w.mailerooApiKey ||
-            (w.smtpHost?.trim() && w.smtpUser?.trim() && w.smtpPass),
-        ),
+        hasEasySendKey: workspaceHasEasySendKey(w),
         emailVerifyEnabled: w.emailVerifyEnabled !== false,
         findLeadsEnabled: w.findLeadsEnabled !== false,
         createdAt: w.createdAt,
