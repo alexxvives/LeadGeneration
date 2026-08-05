@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-05 — MEV verify used wrong host (fail-open)
+- Send-time verify called `api.myemailverifier.com/api/validate_single.php`;
+  current API is `client.myemailverifier.com/verifier/validate_single/{email}/{key}`
+  (same host as getcredits). Wrong host → soft-unknown / looks like verify “does
+  nothing”. Credits endpoint was already correct.
+
+### 2026-08-05 — Provider switch flashed Loading send settings twice
+- Resend↔Maileroo save called `router.refresh()` + sometimes `saveSenderProfile`
+  (notify) while SendSetupPanel also re-fetched when `initial` changed.
+
 ### 2026-08-05 — Settings Sending name stuck on profile switch
 - Live never got the per-profile UI: `git push` of `83cfa72` failed (connection
   reset) and `cf:build` was mistyped — migrate 0027 ran, Worker stayed on Aug 4.

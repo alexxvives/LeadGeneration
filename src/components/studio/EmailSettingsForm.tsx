@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { PasswordField } from "@/components/PasswordField";
 import { Spinner } from "@/components/ui";
 import { MailboxAgePicker } from "@/components/studio/MailboxAgePicker";
@@ -65,7 +64,6 @@ export function EmailSettingsForm({
   onEasyProviderChange?: (p: EasyEmailProvider) => void;
   profileId?: string | null;
 }) {
-  const router = useRouter();
   const [values, setValues] = useState({
     fromName: initial.fromName,
     fromEmail: initial.fromEmail,
@@ -248,10 +246,10 @@ export function EmailSettingsForm({
         const data = (await res.json()) as { error?: string };
         setError(data.error ?? "Save failed");
       } else {
-        // Sync From name → active profile sign-off displayName when empty
-        // or still matching the previous From name.
+        // Sync From name → profile displayName only when the user edited From
+        // name (not on provider switch — that was reloading Sending twice).
         const name = values.fromName?.trim() ?? "";
-        if (name && profileId) {
+        if (name && profileId && lastField.current === "fromName") {
           try {
             const p = loadSenderProfile();
             if (p.id === profileId) {
@@ -282,7 +280,6 @@ export function EmailSettingsForm({
           setSaved(false);
           setSavedHint(null);
         }, 2000);
-        router.refresh();
       }
     } catch {
       setError("Network error");
@@ -292,6 +289,7 @@ export function EmailSettingsForm({
   };
 
   const setProviderAndSave = (p: EasyEmailProvider) => {
+    lastField.current = "easyProvider";
     setProvider(p);
     void save({ providerOverride: p });
   };

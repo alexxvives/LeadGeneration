@@ -111,11 +111,11 @@ async function verifyMyEmailVerifier(
   email: string,
   key: string,
 ): Promise<EmailVerifyResult> {
-  const url = new URL("https://api.myemailverifier.com/api/validate_single.php");
-  url.searchParams.set("apikey", key);
-  url.searchParams.set("email", email);
+  // Docs: GET /verifier/validate_single/{email}/{API_KEY} on client host.
+  // Legacy api.myemailverifier.com/validate_single.php is wrong / fail-open.
+  const url = `https://client.myemailverifier.com/verifier/validate_single/${encodeURIComponent(email)}/${encodeURIComponent(key)}`;
 
-  const res = await fetch(url.toString(), {
+  const res = await fetch(url, {
     method: "GET",
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(25_000),
@@ -128,7 +128,8 @@ async function verifyMyEmailVerifier(
     Disposable_Domain?: string | boolean;
     Greylisted?: string | boolean;
     catch_all?: string | boolean;
-    status?: boolean;
+    /** boolean false = account/credits; string "error" on legacy api host */
+    status?: boolean | string;
     message?: string;
     error?: string;
   } = {};
@@ -138,12 +139,21 @@ async function verifyMyEmailVerifier(
     /* non-JSON */
   }
 
+  const statusFlag = data.status;
   const authFailed =
     res.status === 401 ||
+    res.status === 403 ||
     data.error === "INVALID_API_KEY" ||
-    /invalid api key|unauthorized/i.test(data.message ?? "");
+    data.error === "unauthorized" ||
+    statusFlag === "error" ||
+    /invalid api key|unauthorized|user not found/i.test(
+      `${data.message ?? ""} ${data.error ?? ""}`,
+    );
   if (authFailed) {
-    console.error("[email-verify] MyEmailVerifier auth failed:", data.message ?? data.error);
+    console.error(
+      "[email-verify] MyEmailVerifier auth failed:",
+      data.message ?? data.error ?? text.slice(0, 120),
+    );
     return softUnknown(email, "myemailverifier", "verify_auth_failed");
   }
   if (!res.ok) {
@@ -152,7 +162,7 @@ async function verifyMyEmailVerifier(
   }
 
   // MEV returns HTTP 200 with status:false for credits / blocked account / etc.
-  if (data.status === false) {
+  if (statusFlag === false) {
     console.error(
       "[email-verify] MyEmailVerifier account error (fail-open):",
       data.message ?? text.slice(0, 160),

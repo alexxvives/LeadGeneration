@@ -156,10 +156,13 @@ export function SendSetupPanel({
     [initial],
   );
 
+  // Mount once — do not re-fetch when `initial`/save refresh changes (provider
+  // switch was flashing "Loading send settings…" twice).
   useEffect(() => {
     const id = applyLocalProfile();
     void loadSendForProfile(id);
-  }, [applyLocalProfile, loadSendForProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
+  }, []);
 
   useEffect(() => {
     const onChange = () => {
@@ -276,11 +279,6 @@ export function SendSetupPanel({
               </span>
             ) : null}
           </h2>
-          <p className="text-sm text-mist-500">
-            Easy = Resend, Maileroo, or SMTP (Hostinger). Pro = send through your real
-            Google mailbox. Easy From + keys are per outreach profile — switch the
-            profile above to edit another brand.
-          </p>
         </div>
         <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-ink-900/60 p-1">
           <button

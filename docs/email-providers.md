@@ -111,7 +111,8 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - `src/lib/email/maileroo.ts`: Maileroo HTTP send (`smtp.maileroo.com/api/v2`).
 - `src/lib/email/domain-health.ts` + `POST /api/providers/resend/domain-health`:
   live SPF/DKIM rows from Resend Domains API (demo-safe when no key).
-- `src/lib/email/verify.ts`: **MyEmailVerifier** (preferred) then legacy
+- `src/lib/email/verify.ts`: **MyEmailVerifier** (preferred;
+  `client.myemailverifier.com/verifier/validate_single/{email}/{key}`) then legacy
   Zeruh — **at send** only (`sendApprovedOutreach`) when
   `emailVerifyEnabled` is on. Soft “Invalid” / greylist → warn + optional
   `skipVerify` force-send (address kept). Hard junk (disposable / no-reply)

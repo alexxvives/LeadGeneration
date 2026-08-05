@@ -9,23 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-05 (Sending profile name live)
+## ⏱️ Status — updated 2026-08-05 (Settings polish + MEV URL fix)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0027** remote applied.  
-**Deployed:** version `89662cac-…` (`cf:build` + `cf:deploy` after push).
+**Migrations:** 0021–**0027** remote applied.
 
 ### This pass
-- Root cause: feature commit never pushed (connection reset) / never deployed;
-  migrate 0027 had already run.
-- UI: heading shows `How do you want to send? · {profile}`; hydrate notifies;
-  legacy seed = active only.
-- Pushed + deployed.
+- Removed “How do you want to send?” helper blurb.
+- Fixed double “Loading send settings…” on Resend↔Maileroo (no refresh/notify).
+- Mailbox age select height → `py-2` (match profile input).
+- **MEV verify:** wrong host (`api…/validate_single.php`) →
+  `client.myemailverifier.com/verifier/validate_single/{email}/{key}`.
 
 ### Next
-1. Hard-refresh Settings — switch profiles; confirm heading + Your name/From.
-2. User may delete the accidental duplicate empty board.
-3. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
+1. `cf:build` + `cf:deploy` so live gets MEV + Settings polish.
+2. Hard-refresh Settings; send one lead and confirm verify hits MEV (logs /
+   Verifies bar).
+3. User may delete the accidental duplicate empty board.
 
 ---
 
