@@ -9,23 +9,22 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-05 (Settings polish + MEV URL fix)
+## ⏱️ Status — updated 2026-08-05 (Settings polish + MEV live)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0027** remote applied.
+**Migrations:** 0021–**0027** remote applied.  
+**Deployed:** `79640566-…`
 
 ### This pass
 - Removed “How do you want to send?” helper blurb.
-- Fixed double “Loading send settings…” on Resend↔Maileroo (no refresh/notify).
-- Mailbox age select height → `py-2` (match profile input).
-- **MEV verify:** wrong host (`api…/validate_single.php`) →
-  `client.myemailverifier.com/verifier/validate_single/{email}/{key}`.
+- Fixed double “Loading send settings…” on Resend↔Maileroo.
+- Mailbox age select height → `py-2`.
+- **MEV verify** → `client.myemailverifier.com/verifier/validate_single/…`
+  (was fail-open on wrong/legacy auth shape).
 
 ### Next
-1. `cf:build` + `cf:deploy` so live gets MEV + Settings polish.
-2. Hard-refresh Settings; send one lead and confirm verify hits MEV (logs /
-   Verifies bar).
-3. User may delete the accidental duplicate empty board.
+1. Hard-refresh Settings; send one lead — Verifies bar / soft-block modal.
+2. User may delete the accidental duplicate empty board.
 
 ---
 
