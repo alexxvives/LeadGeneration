@@ -4,12 +4,18 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-05 — Settings Sending name stuck on profile switch
+- Live never got the per-profile UI: `git push` of `83cfa72` failed (connection
+  reset) and `cf:build` was mistyped — migrate 0027 ran, Worker stayed on Aug 4.
+- Also: legacy migrate must seed **active** profile only (others empty), else
+  From/name looks identical across profiles; hydrate must notify Sending panel.
+
 ### 2026-08-05 — Per-profile Easy Sending identity
 - Easy From + provider keys live in `profile_send_settings_json` keyed by
   outreach profile id (ADR 0021). Never put keys in `outreachProfilesJson` /
   localStorage. Send/test-send resolve `activeId`. Pro Google mailbox stays
-  one-per-workspace. First access seeds every known profile from legacy
-  workspace columns when the map is empty.
+  one-per-workspace. First access seeds the **active** profile from legacy
+  columns when the map is empty; other profiles get empty shells.
 
 ### 2026-08-04 — Draft all → Ready + keep button for redraft
 - Outreach **Draft all** previously left status `draft` (Contact Draft /

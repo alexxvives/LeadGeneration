@@ -231,6 +231,10 @@ export function resolveProfileSendSettings(
   if (id && map[id]) {
     return { profileId: id, settings: map[id]! };
   }
+  // Map already has other profiles — don't show legacy (another brand's) From.
+  if (id && Object.keys(map).length > 0) {
+    return { profileId: id, settings: emptyProfileSendSettings() };
+  }
   return {
     profileId: id,
     settings: legacyWorkspaceToProfileSendSettings(ws),
@@ -258,8 +262,9 @@ export function workspaceHasEasySendKey(ws: Workspace): boolean {
 }
 
 /**
- * One-time seed: copy legacy workspace From/keys into every known profile id
- * when the map is empty. Returns null when no write is needed.
+ * One-time seed: copy legacy workspace From/keys into the *active* profile
+ * when the map is empty; other known profiles get empty shells so switching
+ * doesn't show identical From/name until the user sets them.
  */
 export function migrateLegacySendSettingsIfNeeded(
   ws: Workspace,
@@ -282,9 +287,15 @@ export function migrateLegacySendSettingsIfNeeded(
 
   if (!hasLegacy) return null;
 
+  const activeId = activeProfileIdFromJson(ws.outreachProfilesJson);
   const map: ProfileSendSettingsMap = {};
   for (const id of ids) {
-    map[id] = { ...legacy };
+    map[id] =
+      id === activeId
+        ? { ...legacy }
+        : emptyProfileSendSettings({
+            preferredSendPath: legacy.preferredSendPath,
+          });
   }
   return serializeProfileSendSettingsMap(map);
 }

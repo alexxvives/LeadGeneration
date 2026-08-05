@@ -1731,7 +1731,7 @@ export async function getPublicProfileSendSettings(
   sendByProfile: Record<string, PublicProfileSendSettings>;
   outreachProfilesJson: string | null;
 }> {
-  const ws = await ensureProfileSendSettingsMigrated(ctx);
+  let ws = await ensureProfileSendSettingsMigrated(ctx);
   if (!ws) {
     return {
       profileId: null,
@@ -1740,7 +1740,22 @@ export async function getPublicProfileSendSettings(
       outreachProfilesJson: null,
     };
   }
-  const map = parseProfileSendSettingsMap(ws.profileSendSettingsJson);
+  let map = parseProfileSendSettingsMap(ws.profileSendSettingsJson);
+  const requested =
+    (profileId && profileId.trim()) ||
+    activeProfileIdFromJson(ws.outreachProfilesJson);
+  // Persist an empty shell so later saves don't fall through to legacy.
+  if (requested && !map[requested] && Object.keys(map).length > 0) {
+    map = { ...map, [requested]: emptyProfileSendSettings() };
+    const saved = await ctx.db.updateWorkspace(ctx.workspaceId, {
+      profileSendSettingsJson: serializeProfileSendSettingsMap(map),
+      updatedAt: nowIso(),
+    });
+    if (saved) {
+      ws = saved;
+      map = parseProfileSendSettingsMap(ws.profileSendSettingsJson);
+    }
+  }
   const sendByProfile: Record<string, PublicProfileSendSettings> = {};
   for (const [id, settings] of Object.entries(map)) {
     sendByProfile[id] = toPublicProfileSendSettings(settings);

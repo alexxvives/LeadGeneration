@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckIcon, MailIcon } from "@/components/icons";
 import {
   EmailSettingsForm,
@@ -99,6 +99,7 @@ export function SendSetupPanel({
   const [testMsg, setTestMsg] = useState<string | null>(null);
   const [testOk, setTestOk] = useState<boolean | null>(null);
   const [loadingSend, setLoadingSend] = useState(false);
+  const loadSeq = useRef(0);
 
   useEffect(() => {
     setMailbox(mailboxInitial);
@@ -115,6 +116,7 @@ export function SendSetupPanel({
 
   const loadSendForProfile = useCallback(
     async (id: string | null) => {
+      const seq = ++loadSeq.current;
       if (!id) {
         setSendValues(initial);
         setEasyProvider(initial.easyEmailProvider ?? "resend");
@@ -128,11 +130,13 @@ export function SendSetupPanel({
           `/api/workspace/settings?profileId=${encodeURIComponent(id)}`,
           { cache: "no-store" },
         );
+        if (seq !== loadSeq.current) return;
         if (!res.ok) return;
         const data = (await res.json()) as {
           send?: PublicSend;
           profileId?: string | null;
         };
+        if (seq !== loadSeq.current) return;
         if (!data.send) return;
         const next = toEmailSettingsValues(data.send);
         setSendValues(next);
@@ -140,11 +144,13 @@ export function SendSetupPanel({
         const preferred = next.preferredSendPath;
         if (preferred === "easy" || preferred === "pro") {
           setPath(preferred);
+        } else {
+          setPath("easy");
         }
       } catch {
         /* keep current */
       } finally {
-        setLoadingSend(false);
+        if (seq === loadSeq.current) setLoadingSend(false);
       }
     },
     [initial],
@@ -264,18 +270,16 @@ export function SendSetupPanel({
         <div className="min-w-0 flex-1">
           <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-mist-500">
             How do you want to send?
+            {profileName ? (
+              <span className="ml-2 normal-case tracking-normal text-aurora-300">
+                · {profileName}
+              </span>
+            ) : null}
           </h2>
           <p className="text-sm text-mist-500">
             Easy = Resend, Maileroo, or SMTP (Hostinger). Pro = send through your real
-            Google mailbox. Easy From + keys follow the active outreach profile
-            {profileName ? (
-              <>
-                {" "}
-                (<span className="text-mist-300">{profileName}</span>).
-              </>
-            ) : (
-              "."
-            )}
+            Google mailbox. Easy From + keys are per outreach profile — switch the
+            profile above to edit another brand.
           </p>
         </div>
         <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-ink-900/60 p-1">

@@ -23,7 +23,8 @@ different From addresses and often different provider accounts.
 4. **Pro Google mailbox** remains one-per-workspace (ADR 0010). Profiles that
    choose Pro share that mailbox; Easy From + keys stay per profile.
 5. **One-time migrate:** when the map is empty, copy legacy workspace settings
-   into every known profile id.
+   into the active profile only; other known profiles get empty shells so
+   switching does not show an identical From/name until edited.
 
 ## Alternatives considered
 

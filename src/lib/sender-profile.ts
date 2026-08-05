@@ -475,6 +475,8 @@ export async function hydrateOutreachProfilesFromServer(): Promise<void> {
           }
         }
         localStorage.setItem(KEY, JSON.stringify(parsed));
+        // Settings Sending listens — keep From/keys panel in sync after hydrate.
+        notifyProfileChange();
         return;
       }
     }

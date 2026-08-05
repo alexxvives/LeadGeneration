@@ -9,22 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-05 (per-profile Sending identity)
+## ⏱️ Status — updated 2026-08-05 (Sending profile name + deploy)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0027** (0027 = `profile_send_settings_json` — apply local + remote).
+**Migrations:** 0021–**0027** remote applied (local: run `cf:migrate:local` if needed).
 
 ### This pass
-- Easy Sending identity (From + Resend/Maileroo/SMTP keys) is **per outreach
-  profile** (ADR 0021). Active profile drives send/test-send. Pro mailbox
-  still workspace-scoped. Settings Sending reloads on profile switch.
-- Earlier: Resend bounce tags fix; Draft all → Ready.
+- Root cause of “How do you want to send? name doesn’t change”: feature commit
+  never pushed (connection reset) / never deployed; migrate had already run.
+- UI: heading shows active profile (`· {name}`); hydrate notifies Sending;
+  legacy seed = active only; empty shells for other profiles.
+- Push + `cf:build` then `cf:deploy` required for live.
 
 ### Next
-1. `npm run cf:migrate` (+ `:local`) for 0027; deploy (`cf:build` then `cf:deploy`).
-2. Hard-refresh Settings — switch profiles and confirm From/keys differ.
-3. User may delete the accidental duplicate empty board.
-4. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
+1. Hard-refresh Settings — switch profiles; heading `· name` + Your name/From
+   should follow the active profile.
+2. User may delete the accidental duplicate empty board.
+3. Human: `git filter-repo` purge of deleted LEADS xlsx from history.
 
 ---
 
