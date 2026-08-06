@@ -27,6 +27,7 @@ import { env } from "@/lib/config";
 import {
   clearCachedVerify,
   getCachedVerify,
+  isVerifyProviderFailure,
   verifyEmail,
 } from "@/lib/email/verify";
 import {
@@ -1331,6 +1332,19 @@ export async function sendApprovedOutreach(
     const verified = await verifyEmail(toEmail);
     if (verified.billed) {
       await db.incrementWorkspaceUsage(ctx.workspaceId, { verifies: 1 });
+    } else if (isVerifyProviderFailure(verified)) {
+      // Toggle on but live check never completed — do not fail-open silently.
+      clearCachedVerify(toEmail);
+      await releaseClaim(
+        `verify_provider_failed:${verified.reason ?? "unknown"}`,
+      );
+      return {
+        ok: false,
+        error:
+          verified.provider === "heuristic"
+            ? "Email verify is on but no verify API key is configured on the server."
+            : "Email verify is on but the verifier failed (API key, credits, or provider error). Fix MyEmailVerifier or turn verify off in Settings → Sending.",
+      };
     }
     if (!verified.okToSend) {
       // Hard junk only — disposable / no-reply / empty. Soft Invalid keeps the
@@ -1894,7 +1908,7 @@ export async function updateWorkspaceEmailSettings(
     emailVerifyEnabled?: boolean;
     outreachProfilesJson?: string | null;
   },
-): Promise<void> {
+): Promise<{ emailVerifyEnabled: boolean }> {
   const existing = await ensureProfileSendSettingsMigrated(ctx);
   if (!existing) {
     throw new NotFoundError(
@@ -2083,6 +2097,9 @@ export async function updateWorkspaceEmailSettings(
       "Workspace not found — sign in again, then re-save Settings.",
     );
   }
+  return {
+    emailVerifyEnabled: updated.emailVerifyEnabled !== false,
+  };
 }
 
 /** Public mailbox status for Settings (no tokens). */

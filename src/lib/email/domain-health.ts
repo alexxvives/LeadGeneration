@@ -16,6 +16,11 @@ export interface DomainDnsRecord {
   ttl?: string;
   priority?: number;
   status: DnsRecordStatus;
+  /**
+   * Soft recommendation (e.g. DMARC p=none). Not required for Resend “ready”
+   * and must not render as a hard failure in the UI.
+   */
+  optional?: boolean;
 }
 
 export interface DomainHealthResult {
@@ -171,7 +176,8 @@ export async function fetchResendDomainHealth(opts: {
       status: mapStatus(r.status),
     }));
 
-    // Soft DMARC hint — Resend may not return DMARC; we still show a recommended row.
+    // Soft DMARC hint — Resend often omits DMARC; SPF+DKIM are what unlock send.
+    // Show as optional/recommended so a missing record never looks “broken”.
     const hasDmarc = records.some(
       (r) =>
         r.name.toLowerCase().startsWith("_dmarc") ||
@@ -184,7 +190,17 @@ export async function fetchResendDomainHealth(opts: {
         type: "TXT",
         value: `"v=DMARC1; p=none; rua=mailto:dmarc@${detail.name}"`,
         status: "unknown",
+        optional: true,
       });
+    } else {
+      for (const r of records) {
+        if (
+          r.name.toLowerCase().startsWith("_dmarc") ||
+          r.record.toUpperCase() === "DMARC"
+        ) {
+          r.optional = true;
+        }
+      }
     }
 
     const spfOk = records.some(

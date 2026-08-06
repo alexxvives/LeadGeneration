@@ -349,6 +349,28 @@ export function clearCachedVerify(email: string): void {
 }
 
 /**
+ * True when a live provider was configured but the check never completed
+ * (auth, credits, HTTP, parse). These must not be cached as “ok to send”.
+ */
+export function isVerifyProviderFailure(result: EmailVerifyResult): boolean {
+  if (result.provider === "heuristic") {
+    return result.reason === "no_verify_key";
+  }
+  return (
+    !result.billed &&
+    result.okToSend &&
+    (result.status === "unknown" || result.status === "skipped")
+  );
+}
+
+function shouldCacheVerify(result: EmailVerifyResult): boolean {
+  // Never cache fail-open — otherwise one MEV blip permanently skips real checks
+  // for that address in the isolate.
+  if (isVerifyProviderFailure(result)) return false;
+  return true;
+}
+
+/**
  * Verify a single address. Cached in-process for the Worker/request lifetime.
  * Prefer MyEmailVerifier; else Zeruh; else heuristic (never blocks).
  */
@@ -377,23 +399,43 @@ export async function verifyEmail(email: string): Promise<EmailVerifyResult> {
     let result: EmailVerifyResult;
     if (mev) {
       result = await verifyMyEmailVerifier(normalized, mev);
+      // Auth/credits/HTTP fail-open on MEV → try Zeruh before giving up.
+      if (isVerifyProviderFailure(result) && zeruh) {
+        console.warn(
+          "[email-verify] MyEmailVerifier failed; falling back to Zeruh:",
+          result.reason,
+        );
+        result = await verifyZeruh(normalized, zeruh);
+      }
     } else if (zeruh) {
       result = await verifyZeruh(normalized, zeruh);
     } else {
       result = heuristic(normalized);
     }
-    // Cache without billing flag so callers always get billed:false on hit.
-    CACHE.set(normalized, { ...result, billed: false });
+    if (shouldCacheVerify(result)) {
+      // Cache without billing flag so callers always get billed:false on hit.
+      CACHE.set(normalized, { ...result, billed: false });
+    }
     return result;
   } catch (err) {
     console.error("[email-verify] request failed:", err);
-    const soft = softUnknown(
+    // Uncaught errors: try the other provider once before soft-unknown.
+    if (mev && zeruh) {
+      try {
+        const fallback = await verifyZeruh(normalized, zeruh);
+        if (shouldCacheVerify(fallback)) {
+          CACHE.set(normalized, { ...fallback, billed: false });
+        }
+        return fallback;
+      } catch (err2) {
+        console.error("[email-verify] Zeruh fallback failed:", err2);
+      }
+    }
+    return softUnknown(
       normalized,
       mev ? "myemailverifier" : zeruh ? "zeruh" : "heuristic",
       "verify_error",
     );
-    CACHE.set(normalized, soft);
-    return soft;
   }
 }
 

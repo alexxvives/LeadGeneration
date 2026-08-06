@@ -157,8 +157,11 @@ export async function PATCH(req: Request) {
 
   try {
     const ctx = await getCtx();
-    await updateWorkspaceEmailSettings(ctx, patch);
-    return NextResponse.json({ ok: true });
+    const result = await updateWorkspaceEmailSettings(ctx, patch);
+    return NextResponse.json({
+      ok: true,
+      emailVerifyEnabled: result.emailVerifyEnabled,
+    });
   } catch (err) {
     if (isAuthError(err)) {
       return NextResponse.json({ error: err.message }, { status: err.status });

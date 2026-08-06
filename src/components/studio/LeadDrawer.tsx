@@ -1021,30 +1021,30 @@ export function LeadDrawer(props: DrawerProps) {
                     <button
                       type="button"
                       onClick={() =>
-                        run("send", async () => {
-                          await persistIfDirty();
-                          const done = await props.onSend(outreach.id);
-                          if (done) onClose();
-                        })
+                        void (async () => {
+                          if (busy === "send" || busy === "approve") return;
+                          try {
+                            await persistIfDirty();
+                          } catch {
+                            return;
+                          }
+                          // Close immediately — progress lives on the studio toast.
+                          onClose();
+                          void props.onSend(outreach.id);
+                        })()
                       }
                       disabled={!canSend || busy === "send" || busy === "approve"}
                       title={!toEmail ? "Add a recipient email first" : undefined}
                       className="inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-105 disabled:opacity-50"
                     >
-                      {busy === "send" ? (
-                        <Spinner className="h-3.5 w-3.5" />
-                      ) : (
-                        <ArrowIcon className="h-4 w-4" />
-                      )}
-                      {busy === "send"
-                        ? "Sending…"
-                        : outreach.status === "approved"
-                          ? capabilities.canSendEmail
-                            ? "Send email"
-                            : "Send (simulate)"
-                          : capabilities.canSendEmail
-                            ? "Approve & send"
-                            : "Approve & send (simulate)"}
+                      <ArrowIcon className="h-4 w-4" />
+                      {outreach.status === "approved"
+                        ? capabilities.canSendEmail
+                          ? "Send email"
+                          : "Send (simulate)"
+                        : capabilities.canSendEmail
+                          ? "Approve & send"
+                          : "Approve & send (simulate)"}
                     </button>
                   </div>
                 )}

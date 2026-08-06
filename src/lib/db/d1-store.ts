@@ -228,8 +228,9 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
       r.preferred_send_path === "pro" || r.preferred_send_path === "easy"
         ? r.preferred_send_path
         : null,
-    emailVerifyEnabled: r.email_verify_enabled === 0 ? false : true,
-    findLeadsEnabled: r.find_leads_enabled === 0 ? false : true,
+    // D1 may return INTEGER 0/1 or boolean — treat only explicit off as false.
+    emailVerifyEnabled: !isSqliteOff(r.email_verify_enabled),
+    findLeadsEnabled: !isSqliteOff(r.find_leads_enabled),
     connectedMailbox: parseConnectedMailbox(r.connected_mailbox_json),
     outreachProfilesJson: r.outreach_profiles_json ?? null,
     profileSendSettingsJson: r.profile_send_settings_json ?? null,
@@ -332,6 +333,11 @@ function rowToOutreach(r: OutreachRow): Outreach {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
+}
+
+/** INTEGER/boolean/string off flags from D1 (0, false, "0"). */
+function isSqliteOff(v: unknown): boolean {
+  return v === 0 || v === false || v === "0";
 }
 
 /**

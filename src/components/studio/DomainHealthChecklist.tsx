@@ -22,6 +22,8 @@ type StatusItem = {
   key: string;
   label: string;
   ok: boolean;
+  /** Recommended but not required for send (DMARC). */
+  optional?: boolean;
   tip: string;
 };
 
@@ -29,13 +31,17 @@ function itemsFromHealth(health: DomainHealthResult | null): StatusItem[] {
   if (health && health.records.length > 0) {
     return health.records.map((r, i) => {
       const ok = r.status === "verified";
+      const optional = r.optional === true;
       const tip = ok
         ? `${r.record} verified`
-        : `${r.record}: ${r.status}${r.value ? ` — expected ${r.type} ${r.name}` : ""}`;
+        : optional
+          ? `${r.record}: recommended (optional) — SPF + DKIM are enough to send. p=none is fine.`
+          : `${r.record}: ${r.status}${r.value ? ` — expected ${r.type} ${r.name}` : ""}`;
       return {
         key: `${r.record}-${r.type}-${i}`,
         label: r.record,
         ok,
+        optional,
         tip,
       };
     });
@@ -48,16 +54,29 @@ function itemsFromHealth(health: DomainHealthResult | null): StatusItem[] {
       : "Domain DNS not available yet — save a From email on a verified Resend domain");
   return (
     [
-      { key: "spf", label: "SPF" },
-      { key: "dkim", label: "DKIM" },
-      { key: "dmarc", label: "DMARC" },
+      { key: "spf", label: "SPF", optional: false },
+      { key: "dkim", label: "DKIM", optional: false },
+      {
+        key: "dmarc",
+        label: "DMARC",
+        optional: true,
+      },
     ] as const
-  ).map(({ key, label }) => ({
+  ).map(({ key, label, optional }) => ({
     key,
     label,
     ok: false,
-    tip: reason,
+    optional,
+    tip: optional
+      ? "Recommended (optional) — SPF + DKIM unlock sending; DMARC p=none is a monitoring bonus."
+      : reason,
   }));
+}
+
+function chipTone(item: StatusItem): string {
+  if (item.ok) return "bg-aurora-400/15 text-aurora-300";
+  if (item.optional) return "bg-amber-400/10 text-amber-200";
+  return "bg-rose-500/10 text-rose-300";
 }
 
 /**
@@ -134,14 +153,14 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
               <span
                 key={item.key}
                 title={item.tip}
-                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${
-                  item.ok
-                    ? "bg-aurora-400/15 text-aurora-300"
-                    : "bg-rose-500/10 text-rose-300"
-                }`}
+                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${chipTone(item)}`}
               >
                 {item.ok ? (
                   <CheckIcon className="h-3 w-3" aria-hidden />
+                ) : item.optional ? (
+                  <span className="text-[9px] font-semibold" aria-hidden>
+                    ?
+                  </span>
                 ) : (
                   <XIcon className="h-3 w-3" aria-hidden />
                 )}
@@ -176,7 +195,7 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
           </p>
           <p className="mt-1 max-w-xl text-sm text-mist-500">
             {health?.message ??
-              "Paste the records at your registrar. We check Resend until SPF and DKIM turn green."}
+              "Paste SPF + DKIM at your registrar (required). DMARC is optional — p=none is enough if you add it."}
           </p>
         </div>
         {loading ? (
@@ -191,19 +210,34 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
         <p className="border-b border-white/5 px-4 py-3 text-sm text-rose-300">{error}</p>
       )}
 
-      {health && health.records.length > 0 ? (
+          {health && health.records.length > 0 ? (
         <div className="divide-y divide-white/5">
           {health.records.map((r, i) => {
             const copyKey = `${r.name}-${r.type}-${i}`;
             const ok = r.status === "verified";
+            const optional = r.optional === true;
             return (
               <div key={copyKey} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start">
                 <span
-                  title={ok ? `${r.record} verified` : `${r.record}: ${r.status}`}
-                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${statusTone(r.status)}`}
+                  title={
+                    ok
+                      ? `${r.record} verified`
+                      : optional
+                        ? `${r.record}: recommended (optional)`
+                        : `${r.record}: ${r.status}`
+                  }
+                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
+                    ok
+                      ? statusTone(r.status)
+                      : optional
+                        ? "bg-amber-400/15 text-amber-200"
+                        : statusTone(r.status)
+                  }`}
                 >
                   {ok ? (
                     <CheckIcon className="h-4 w-4" />
+                  ) : optional ? (
+                    <span className="text-xs font-semibold">?</span>
                   ) : (
                     <XIcon className="h-4 w-4" />
                   )}
@@ -215,7 +249,9 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
                       {r.type}
                       {r.priority != null ? ` · pri ${r.priority}` : ""}
                     </span>
-                    <span className="text-xs text-mist-500">{r.status}</span>
+                    <span className="text-xs text-mist-500">
+                      {ok ? r.status : optional ? "optional" : r.status}
+                    </span>
                   </div>
                   <CopyRow
                     label="Name"
@@ -246,11 +282,15 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
                 className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
                   item.ok
                     ? "bg-aurora-400/15 text-aurora-300"
-                    : "bg-rose-500/15 text-rose-300"
+                    : item.optional
+                      ? "bg-amber-400/15 text-amber-200"
+                      : "bg-rose-500/15 text-rose-300"
                 }`}
               >
                 {item.ok ? (
                   <CheckIcon className="h-4 w-4" />
+                ) : item.optional ? (
+                  <span className="text-xs font-semibold">?</span>
                 ) : (
                   <XIcon className="h-4 w-4" />
                 )}

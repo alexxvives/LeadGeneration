@@ -281,19 +281,26 @@ export function Studio() {
     [router],
   );
 
+  const toastTimers = useRef(new Map<string, number>());
   const toast = useCallback(
     (kind: Toast["kind"], text: string, ms = 4200, key?: string) => {
       const id = key ?? `t-${Date.now()}-${Math.random()}`;
+      const prev = toastTimers.current.get(id);
+      if (prev) window.clearTimeout(prev);
       setToasts((t) => [...t.filter((x) => x.id !== id), { id, kind, text }]);
-      window.setTimeout(
-        () => setToasts((t) => t.filter((x) => x.id !== id)),
-        ms,
-      );
+      const timer = window.setTimeout(() => {
+        toastTimers.current.delete(id);
+        setToasts((t) => t.filter((x) => x.id !== id));
+      }, ms);
+      toastTimers.current.set(id, timer);
     },
     [],
   );
 
   const dismissToast = useCallback((key: string) => {
+    const prev = toastTimers.current.get(key);
+    if (prev) window.clearTimeout(prev);
+    toastTimers.current.delete(key);
     setToasts((t) => t.filter((x) => x.id !== key));
   }, []);
 
@@ -1331,15 +1338,20 @@ export function Studio() {
       boardRef.current?.workspace.emailVerifyEnabled !== false &&
       !opts?.skipVerify;
     const toastKey = `send-${outreachId}`;
+    let phaseTimer: number | undefined;
     if (verifyOn && to) {
-      // MEV can take up to ~25s — replace-in-place so Sent… clears Verifying…
+      // MEV can take up to ~25s — phase toast, then Sent… replaces the same key.
       toast("ok", `Verifying ${to}…`, 28000, toastKey);
+      phaseTimer = window.setTimeout(() => {
+        toast("ok", `Sending to ${to}…`, 28000, toastKey);
+      }, 1600);
     } else if (to) {
-      toast("ok", `Sending to ${to}…`, 4200, toastKey);
+      toast("ok", `Sending to ${to}…`, 28000, toastKey);
     }
     try {
       return await onSend(outreachId, opts);
     } finally {
+      if (phaseTimer) window.clearTimeout(phaseTimer);
       clearOutreachBusy(...busyKeys);
     }
   };
@@ -2029,15 +2041,15 @@ export function Studio() {
             </label>
           ) : null}
           {showLeadSearch ? (
-            <div className="flex shrink-0 flex-nowrap items-center justify-end gap-2">
+            <div className="flex h-9 shrink-0 flex-nowrap items-center justify-end gap-2">
               {view === "outreach" ? (
-                <label className="inline-flex shrink-0 items-center">
+                <label className="inline-flex h-full shrink-0 items-center">
                   <span className="sr-only">Filter by lead type</span>
-                  <Select
+                  <select
                     value={outreachTypeFilter}
                     onChange={(e) => setOutreachTypeFilter(e.target.value)}
-                    className="w-[9.5rem] py-2 text-sm"
                     aria-label="Filter outreach by lead type"
+                    className="select-glass h-full w-[9.75rem] rounded-xl border border-white/10 bg-ink-900/60 py-0 pl-3 text-sm text-mist-100 outline-none transition-colors hover:border-white/20 focus:border-aurora-400/50"
                   >
                     <option value="all">All types</option>
                     {outreachCompanyTypes.map((t) => (
@@ -2045,17 +2057,17 @@ export function Studio() {
                         {t}
                       </option>
                     ))}
-                  </Select>
+                  </select>
                 </label>
               ) : null}
-              <label className="relative inline-flex w-44 shrink-0 items-center sm:w-56">
+              <label className="relative inline-flex h-full w-44 shrink-0 items-center sm:w-56">
                 <span className="sr-only">Search leads</span>
                 <input
                   type="search"
                   value={leadSearch}
                   onChange={(e) => setLeadSearch(e.target.value)}
                   placeholder="Search leads…"
-                  className="w-full rounded-xl border border-white/10 bg-ink-900/60 py-2 pl-3 pr-3 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/50"
+                  className="h-full w-full rounded-xl border border-white/10 bg-ink-900/60 py-0 pl-3 pr-3 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/50"
                 />
               </label>
             </div>

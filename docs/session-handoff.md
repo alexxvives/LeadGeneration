@@ -9,25 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-06 (Full-platform audit shipped)
+## ⏱️ Status — updated 2026-08-06 (Verify root cause + send UX)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0029** remote applied.  
-**Note:** Deploy after push to see audit fixes on Workers.
+**Note:** Deploy needed for verify fail-open hardening; D1 toggle already fixed.
 
 ### This pass
-- Full UX/UI + logic audit backlog implemented (P0–P2): draftOutreach sent
-  guard; pricing monthly-only; canSendEmail Easy-aligned; soft-merge prune +
-  deleted-board clear; import board-scoped dedupe; send toast replace; quota/
-  rate-limit UX; mobile board sheet; Pipeline stage menu + keyboard; focus
-  traps; Runs open-run; Outreach empties; Dashboard/Boards retry; location
-  combobox a11y; marketing copy aligned.
-- Canvas: `hermes-platform-audit.canvas.tsx` (local Cursor canvases/).
+- Root cause: Insider `email_verify_enabled` was **0** in prod D1 → re-enabled.
+- Verify: no cache on fail-open; MEV→Zeruh fallback; hard error if verify on
+  and provider fails (no silent send). Resend webhook Settings note removed.
+- Lead drawer Send closes immediately; toast Verifying → Sending → Sent.
+- DMARC optional (amber); Outreach type filter matches search chrome.
 
 ### Next
-1. Hard-refresh live after deploy — smoke: pricing (no annual), multi-board
-   import (no relocate), delete board, send verify toast replace, mobile board
-   picker, Pipeline stage select, Runs → Leads.
+1. Deploy + hard-refresh — send should show Verifying… and bump Verifies bar.
 2. Optional later: wire annual Stripe Price IDs; async search queue at scale;
    restore Pro mailbox path if product wants it.
 

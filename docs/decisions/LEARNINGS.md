@@ -4,6 +4,22 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-06 — Verify toggle ↔ D1 is linked; column was off
+- Path is correct: Settings switch → `PATCH /api/workspace/settings`
+  `{ emailVerifyEnabled }` → `updateWorkspaceEmailSettings` →
+  `workspaces.email_verify_enabled`. Insider had `0` (toggle off), not a
+  broken wire. Toggle now echoes confirmed DB value + `router.refresh()`.
+- Fail-open MEV results no longer cached; MEV→Zeruh fallback; provider fail
+  with verify on → hard error. Resend webhook Settings note removed.
+
+### 2026-08-06 — Send toast UX, DMARC optional, verify fail-open visible
+- Lead drawer Send closes immediately; progress is toast-only
+  (`Verifying…` → `Sending…` → `Sent`). Toast timers clear by key so replace
+  doesn’t race-dismiss the final message.
+- DMARC soft row is `optional` — amber “recommended”, not a red failure;
+  SPF+DKIM remain the ready gate.
+- Verify toggle: removed “Email verify off.” copy.
+
 ### 2026-08-06 — Full-platform audit fixes (trust + state + polish)
 - `draftOutreach` now refuses `sent`/`sending` (same as `editOutreach`) — API
   hole could reopen send audit trail.

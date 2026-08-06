@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui";
 
 /**
  * Easy-path toggle: verify recipient emails before send (MyEmailVerifier).
  * Platform key: MYEMAILVERIFIER_API_KEY (legacy: MAILEROO_VERIFY_API_KEY).
  * Daily plan caps are shown on the studio / Settings usage bars.
+ *
+ * Writes `workspaces.email_verify_enabled` via PATCH /api/workspace/settings
+ * and re-reads the confirmed value from the response (not optimistic-only).
  */
 export function EmailVerifySettings({
   canVerify,
@@ -18,6 +22,7 @@ export function EmailVerifySettings({
   initialEnabled: boolean;
   canEdit: boolean;
 }) {
+  const router = useRouter();
   const [enabled, setEnabled] = useState(initialEnabled);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -37,12 +42,23 @@ export function EmailVerifySettings({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emailVerifyEnabled: next }),
       });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        emailVerifyEnabled?: boolean;
+      };
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error ?? "Could not save");
       }
-      setEnabled(next);
-      setMsg(next ? null : "Email verify off.");
+      // Trust the DB echo — never flip UI if the write didn't stick.
+      const confirmed =
+        typeof data.emailVerifyEnabled === "boolean"
+          ? data.emailVerifyEnabled
+          : next;
+      setEnabled(confirmed);
+      if (confirmed !== next) {
+        setMsg("Could not update verify setting — try again.");
+      }
+      router.refresh();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Could not save");
     } finally {
@@ -57,7 +73,7 @@ export function EmailVerifySettings({
         <p className="mt-1 text-xs leading-relaxed text-mist-500">
           Not configured on this server. Set{" "}
           <code className="text-mist-300">MYEMAILVERIFIER_API_KEY</code> (Wrangler
-          secret in production) to enable. Verified by MyEmailVerifier at send.
+          secret in production) to enable.
         </p>
       </div>
     );
@@ -90,7 +106,7 @@ export function EmailVerifySettings({
           />
         </span>
       </button>
-      {msg ? <p className="mt-2 text-xs text-mist-400">{msg}</p> : null}
+      {msg ? <p className="mt-2 text-xs text-rose-300">{msg}</p> : null}
     </div>
   );
 }
