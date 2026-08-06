@@ -318,6 +318,8 @@ export async function createBoard(
     name: trimmed,
     isDefault: false,
     outreachProfileId: outreachProfileId ?? null,
+    // Inherit workspace default so Settings → new board stays consistent.
+    emailVerifyEnabled: ws?.emailVerifyEnabled !== false,
     createdAt: now,
     updatedAt: now,
   });
@@ -326,7 +328,11 @@ export async function createBoard(
 export async function updateBoard(
   ctx: Ctx,
   id: string,
-  patch: { name?: string; outreachProfileId?: string | null },
+  patch: {
+    name?: string;
+    outreachProfileId?: string | null;
+    emailVerifyEnabled?: boolean;
+  },
 ): Promise<Board> {
   const access = await resolveBoardAccess(ctx, id);
   if (!access || access.access !== "owner" || access.shared) {
@@ -349,6 +355,9 @@ export async function updateBoard(
       }
     }
     next.outreachProfileId = pid;
+  }
+  if (patch.emailVerifyEnabled !== undefined) {
+    next.emailVerifyEnabled = patch.emailVerifyEnabled;
   }
   const updated = await access.db.updateBoard(id, next);
   if (!updated) throw new NotFoundError("Board not found");
@@ -1301,10 +1310,18 @@ export async function sendApprovedOutreach(
     });
   }
 
-  // List hygiene — verify at send only (not on enrich).
+  // List hygiene — verify at send only (not on enrich). Per-board flag (ADR 0025).
   const wsForVerify = await db.getWorkspace(ctx.workspaceId);
+  const leadForVerify = await db.getLead(outreach.leadId);
+  const boardForVerify = leadForVerify?.boardId
+    ? ((await db.getBoard(leadForVerify.boardId)) ??
+      (await ctx.db.getBoardAnywhere(leadForVerify.boardId)))
+    : null;
   const verifyOn =
-    !opts?.skipVerify && wsForVerify?.emailVerifyEnabled !== false;
+    !opts?.skipVerify &&
+    (boardForVerify
+      ? boardForVerify.emailVerifyEnabled !== false
+      : wsForVerify?.emailVerifyEnabled !== false);
   if (verifyOn && wsForVerify) {
     const verifyWs = await ensureVerifyWindow(db, wsForVerify);
     const plan = getPlan(verifyWs.planId);
@@ -1337,6 +1354,8 @@ export async function sendApprovedOutreach(
       const detail = verified.reason?.trim() || "unknown";
       await releaseClaim(`verify_provider_failed:${detail}`);
       const authish = /invalid api key|unauthorized|user not found/i.test(detail);
+      const networkish =
+        /verify_timeout|verify_network|verify_error|verify_http_/i.test(detail);
       return {
         ok: false,
         error:
@@ -1344,7 +1363,9 @@ export async function sendApprovedOutreach(
             ? "Email verify is on but MYEMAILVERIFIER_API_KEY is not set on the server."
             : authish
               ? `MyEmailVerifier rejected the API key (${detail}). Update the Wrangler secret MYEMAILVERIFIER_API_KEY from your MEV dashboard, or turn verify off in Settings → Sending.`
-              : `MyEmailVerifier failed (${detail}). Check credits/account at myemailverifier.com, or turn verify off in Settings → Sending.`,
+              : networkish
+                ? `MyEmailVerifier request failed (${detail}). Usually a timeout or network blip between our server and MEV — not your credits. Retry send, or turn verify off in Settings → Sending.`
+                : `MyEmailVerifier failed (${detail}). Check credits/account at myemailverifier.com, or turn verify off in Settings → Sending.`,
       };
     }
     if (!verified.okToSend) {

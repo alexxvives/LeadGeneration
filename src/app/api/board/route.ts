@@ -60,13 +60,24 @@ export async function GET(req: Request) {
     !!ws?.resendApiKey?.trim() ||
     !!ws?.mailerooApiKey?.trim() ||
     !!(ws?.smtpHost?.trim() && ws?.smtpUser?.trim() && ws?.smtpPass);
-  // Effective verify = server key present AND workspace opted in.
-  const emailVerify =
-    caps.emailVerify && (ws?.emailVerifyEnabled !== false);
+  // Effective verify = server key + active board flag (ADR 0025).
+  // “All boards” filter falls back to workspace default.
+  const activeBoard = board.activeBoardId
+    ? board.boards.find((b) => b.id === board.activeBoardId)
+    : null;
+  const boardVerifyOn = activeBoard
+    ? activeBoard.emailVerifyEnabled !== false
+    : ws?.emailVerifyEnabled !== false;
+  const emailVerify = caps.emailVerify && boardVerifyOn;
   return NextResponse.json({
     ...board,
     capabilities: { ...caps, canSendEmail, emailVerify },
-    workspace: { ...workspace, sendsToday },
+    workspace: {
+      ...workspace,
+      sendsToday,
+      // Echo effective flag so Studio chrome matches the active board.
+      emailVerifyEnabled: boardVerifyOn,
+    },
   });
 }
 

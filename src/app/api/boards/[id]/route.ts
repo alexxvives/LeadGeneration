@@ -11,9 +11,13 @@ const PatchSchema = z
   .object({
     name: z.string().min(1).max(80).optional(),
     outreachProfileId: z.string().min(1).max(80).nullable().optional(),
+    emailVerifyEnabled: z.boolean().optional(),
   })
   .refine(
-    (v) => v.name !== undefined || v.outreachProfileId !== undefined,
+    (v) =>
+      v.name !== undefined ||
+      v.outreachProfileId !== undefined ||
+      v.emailVerifyEnabled !== undefined,
     { message: "Nothing to update" },
   );
 

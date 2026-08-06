@@ -109,6 +109,8 @@ type BoardRow = {
   name: string;
   is_default: number;
   outreach_profile_id: string | null;
+  /** Migration 0030 — per-board verify-before-send. */
+  email_verify_enabled: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -244,6 +246,7 @@ function rowToBoard(r: BoardRow): Board {
     name: r.name,
     isDefault: !!r.is_default,
     outreachProfileId: r.outreach_profile_id ?? null,
+    emailVerifyEnabled: !isSqliteOff(r.email_verify_enabled),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -585,8 +588,8 @@ export class D1Store implements LeadRepository {
   async createBoard(board: Board): Promise<Board> {
     await this.db
       .prepare(
-        `INSERT INTO boards (id, workspace_id, name, is_default, outreach_profile_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO boards (id, workspace_id, name, is_default, outreach_profile_id, email_verify_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         board.id,
@@ -594,6 +597,7 @@ export class D1Store implements LeadRepository {
         board.name,
         board.isDefault ? 1 : 0,
         board.outreachProfileId ?? null,
+        board.emailVerifyEnabled === false ? 0 : 1,
         board.createdAt,
         board.updatedAt,
       )
@@ -607,6 +611,9 @@ export class D1Store implements LeadRepository {
     if ("isDefault" in patch) row.is_default = patch.isDefault ? 1 : 0;
     if ("outreachProfileId" in patch) {
       row.outreach_profile_id = patch.outreachProfileId ?? null;
+    }
+    if ("emailVerifyEnabled" in patch) {
+      row.email_verify_enabled = patch.emailVerifyEnabled === false ? 0 : 1;
     }
     if ("updatedAt" in patch) row.updated_at = patch.updatedAt;
     if (Object.keys(row).length === 0) return this.getBoard(id);

@@ -248,6 +248,11 @@ export interface Board {
    * Null → fall back to workspace active profile at send/draft time.
    */
   outreachProfileId: string | null;
+  /**
+   * Verify recipient with MyEmailVerifier before send (ADR 0025).
+   * Per-board — Settings toggle edits the active sidebar board.
+   */
+  emailVerifyEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }

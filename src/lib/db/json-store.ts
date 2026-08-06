@@ -115,6 +115,7 @@ function normalizeBoard(b: Board): Board {
     isDefault: !!b.isDefault,
     outreachProfileId:
       typeof raw.outreachProfileId === "string" ? raw.outreachProfileId : null,
+    emailVerifyEnabled: raw.emailVerifyEnabled === false ? false : true,
   };
 }
 

@@ -63,5 +63,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0022 — Board ↔ outreach profile alignment](0022-board-outreach-profile.md) _(amends 0014 + 0021)_
 - [0023 — No auto-created Default board](0023-no-auto-default-board.md) _(amends 0014)_
 - [0024 — Remove Zeruh / Maileroo Verify — MyEmailVerifier only](0024-remove-zeruh-verify.md) _(amends 0016)_
+- [0025 — Per-board email verify toggle](0025-per-board-email-verify.md) _(amends 0016)_
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

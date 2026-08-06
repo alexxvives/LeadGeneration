@@ -4,6 +4,22 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-07 — Contacted “register” flash; per-board verify
+- Temporary “How contacted? — open to register” on every Contacted row: 
+  `mergeSlimIntoCached` used `incoming.contactMethods ?? prev` so a slim `[]`
+  wiped real methods. Prefer non-empty; also skip needsMethod when
+  `outreach.status === "sent"`.
+- Verify is per-board (`boards.email_verify_enabled`, ADR 0025). Settings
+  switch still looks the same — writes active sidebar board.
+
+### 2026-08-06 — `verify_error` ≠ credits; studio UI prefs in sessionStorage
+- `verify_error` / now `verify_timeout`|`verify_network` means the Worker→MEV
+  `fetch` threw (timeout/abort/network). Credits show as MEV `status:false`
+  with a message — not this code path. User Wi‑Fi does not affect prod
+  (call is server-side); only local `cf:preview`/`dev` uses the machine’s net.
+- Studio: keep Leads mounted like Pipeline/Outreach; persist search / stage /
+  type filter + layout in `sessionStorage` (`hermes_studio_ui`).
+
 ### 2026-08-06 — Soft verify D2 false positive; drawer focus steal
 - MEV `Invalid email (D2)` soft-blocked a real address that Resend then
   delivered — expected; soft-block + Send anyway is correct. Warn modal now

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
 import { warmupStatus } from "@/lib/email/warmup";
 import { FitMeter, Spinner } from "@/components/ui";
@@ -183,6 +183,31 @@ export function OutreachView({
 }) {
   const busySet = useMemo(() => new Set(busyIds), [busyIds]);
   const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
+  const skipReadyChannelPersist = useRef(true);
+
+  // Keep Ready-column channel filter across tab switches / Settings (session only).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("hermes_outreach_ready_channel");
+      if (raw === "email" || raw === "phone" || raw === "all") {
+        setReadyChannel(raw);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (skipReadyChannelPersist.current) {
+      skipReadyChannelPersist.current = false;
+      return;
+    }
+    try {
+      sessionStorage.setItem("hermes_outreach_ready_channel", readyChannel);
+    } catch {
+      /* ignore */
+    }
+  }, [readyChannel]);
 
   const grouped = useMemo(() => {
     const next: Record<OutreachBucket, LeadWithOutreach[]> = {
@@ -423,8 +448,11 @@ function OutreachRow({
   const phoneOnly = !email && Boolean(phone);
   const [pickingMethod, setPickingMethod] = useState(false);
   const methods = lead.contactMethods ?? [];
-  const needsMethod = bucket === "contacted" && methods.length === 0;
   const sent = lead.outreach?.status === "sent";
+  // Sent email already implies the channel — don’t nag “register” during a
+  // brief client merge gap where contactMethods is still empty.
+  const needsMethod =
+    bucket === "contacted" && methods.length === 0 && !sent;
 
   const hasDraft = Boolean(lead.outreach);
   const openComposer = () => {

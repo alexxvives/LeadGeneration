@@ -185,7 +185,11 @@ export const api = {
 
   updateBoard: (
     id: string,
-    patch: { name?: string; outreachProfileId?: string | null },
+    patch: {
+      name?: string;
+      outreachProfileId?: string | null;
+      emailVerifyEnabled?: boolean;
+    },
   ) =>
     jsonFetch<{ board: Board }>(`/api/boards/${id}`, {
       method: "PATCH",

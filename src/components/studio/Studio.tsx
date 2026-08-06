@@ -52,8 +52,14 @@ import { AdminUsersView } from "./AdminUsersView";
 import { BoardsView } from "./BoardsView";
 import { loadStoredBoardFilter, storeBoardFilter } from "./BoardPicker";
 import { BOARD_REFRESH_EVENT } from "./GettingStartedWizard";
+import {
+  loadStudioUiPrefs,
+  saveStudioUiPrefs,
+  type LeadsLayout,
+} from "./studio-ui-prefs";
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
+import { TypeFilterMenu } from "./TypeFilterMenu";
 import type { BoardSummary, ImportLeadRow } from "@/lib/types";
 
 const CRM_STAGE_FILTERS: CrmStage[] = [
@@ -76,7 +82,8 @@ type StudioView =
   | "boards"
   | "admin"
   | "admin-users";
-type EngageView = "pipeline" | "outreach";
+/** Views kept mounted after first visit so filters / sort / scroll survive. */
+type StickyView = "pipeline" | "outreach" | "leads";
 
 /** Merge a slim board-list row into a cached lead without wiping drawer detail. */
 function mergeSlimIntoCached(
@@ -101,10 +108,21 @@ function mergeSlimIntoCached(
         ? prevFu
         : incFu;
 
+  // `??` treats [] as present — a slim/stale empty list was wiping methods and
+  // flashing “How contacted? — open to register” on every Contacted row.
+  const prevMethods = prev.contactMethods ?? [];
+  const incMethods = incoming.contactMethods ?? [];
+  const contactMethods =
+    incMethods.length > 0
+      ? incMethods
+      : prevMethods.length > 0
+        ? prevMethods
+        : incMethods;
+
   return {
     ...incoming,
     crmStage: incoming.crmStage ?? prev.crmStage,
-    contactMethods: incoming.contactMethods ?? prev.contactMethods,
+    contactMethods,
     emails: incoming.emails?.length ? incoming.emails : prev.emails,
     aboutBlurb: incoming.aboutBlurb || prev.aboutBlurb,
     notes: incoming.notes ?? prev.notes,
@@ -188,21 +206,23 @@ export function Studio() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
   const [drawerPromptNote, setDrawerPromptNote] = useState(false);
-  const [layout, setLayout] = useState<"table" | "cards" | "map">("table");
+  const [layout, setLayout] = useState<LeadsLayout>("table");
   /** Toggle highlight — updates urgently; `layout` (pane) may lag in a transition. */
-  const [layoutTab, setLayoutTab] = useState<"table" | "cards" | "map">("table");
+  const [layoutTab, setLayoutTab] = useState<LeadsLayout>("table");
   /** Keep each layout mounted after first visit so switching stays instant. */
-  const [visitedLayouts, setVisitedLayouts] = useState<Set<"table" | "cards" | "map">>(
+  const [visitedLayouts, setVisitedLayouts] = useState<Set<LeadsLayout>>(
     () => new Set(["table"]),
   );
-  /** Keep Pipeline/Outreach mounted so re-entering doesn’t rebuild 3k rows. */
-  const [visitedEngage, setVisitedEngage] = useState<Set<EngageView>>(
+  /** Keep Pipeline / Outreach / Leads mounted so re-entering doesn’t rebuild. */
+  const [visitedSticky, setVisitedSticky] = useState<Set<StickyView>>(
     () => new Set(),
   );
   const [pipelineFilter, setPipelineFilter] = useState<CrmStage | "all">("all");
   const [leadSearch, setLeadSearch] = useState("");
   /** Outreach-only company-type filter (chrome next to search). */
   const [outreachTypeFilter, setOutreachTypeFilter] = useState("all");
+  /** Skip the first persist pass so we don’t overwrite sessionStorage with defaults. */
+  const skipUiPrefsPersistRef = useRef(true);
   const [leadsHydrating, setLeadsHydrating] = useState(false);
   /** Background pages after first paint — UI stays interactive. */
   const [leadsBackfilling, setLeadsBackfilling] = useState(false);
@@ -697,11 +717,48 @@ export function Studio() {
     void hydrateOutreachProfilesFromServer();
   }, []);
 
+  // Restore filters / layout from this browser tab (no DB).
+  useEffect(() => {
+    const prefs = loadStudioUiPrefs();
+    setLeadSearch(prefs.leadSearch);
+    setPipelineFilter(prefs.pipelineFilter);
+    setOutreachTypeFilter(prefs.outreachTypeFilter);
+    setLayout(prefs.layout);
+    setLayoutTab(prefs.layout);
+    setVisitedLayouts((prev) => {
+      if (prev.has(prefs.layout)) return prev;
+      const next = new Set(prev);
+      next.add(prefs.layout);
+      return next;
+    });
+  }, []);
+
+  // Persist chrome prefs (survives Settings → back within the same tab).
+  useEffect(() => {
+    if (skipUiPrefsPersistRef.current) {
+      skipUiPrefsPersistRef.current = false;
+      return;
+    }
+    saveStudioUiPrefs({
+      leadSearch,
+      pipelineFilter,
+      outreachTypeFilter,
+      layout,
+    });
+  }, [leadSearch, pipelineFilter, outreachTypeFilter, layout]);
+
   // Initial load + re-fetch when sidebar board filter changes (single effect).
   // Soft-refresh after first paint so adding `?board=` mid-tour doesn't flash
   // the full-page spinner (that looked like a double render).
-  // Board switch: drop sticky filters so Outreach doesn't look empty.
+  // Board switch (not first mount): drop sticky filters so Outreach doesn’t look empty.
+  const prevFilterBoardRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
+    if (prevFilterBoardRef.current === undefined) {
+      prevFilterBoardRef.current = filterBoardId;
+      return;
+    }
+    if (prevFilterBoardRef.current === filterBoardId) return;
+    prevFilterBoardRef.current = filterBoardId;
     setOutreachTypeFilter("all");
     setLeadSearch("");
     setPipelineFilter("all");
@@ -755,10 +812,10 @@ export function Studio() {
     };
   }, [view, refresh]);
 
-  // Keep Pipeline/Outreach mounted after first visit (instant re-entry).
+  // Keep Pipeline / Outreach / Leads mounted after first visit (instant re-entry).
   useEffect(() => {
-    if (view !== "pipeline" && view !== "outreach") return;
-    setVisitedEngage((prev) => {
+    if (view !== "pipeline" && view !== "outreach" && view !== "leads") return;
+    setVisitedSticky((prev) => {
       if (prev.has(view)) return prev;
       const next = new Set(prev);
       next.add(view);
@@ -1794,7 +1851,7 @@ export function Studio() {
   boardLeadsLenRef.current = board?.leads.length ?? 0;
   useEffect(() => {
     if (view !== "leads") {
-      setLeadsBodyReady(false);
+      // Leave body mounted while the pane is sticky-hidden — don’t tear down.
       return;
     }
     const warm =
@@ -2048,22 +2105,11 @@ export function Studio() {
           {showLeadSearch ? (
             <div className="flex h-9 shrink-0 flex-nowrap items-center justify-end gap-2">
               {view === "outreach" ? (
-                <label className="inline-flex h-full shrink-0 items-center">
-                  <span className="sr-only">Filter by lead type</span>
-                  <select
-                    value={outreachTypeFilter}
-                    onChange={(e) => setOutreachTypeFilter(e.target.value)}
-                    aria-label="Filter outreach by lead type"
-                    className="select-glass h-full w-[9.75rem] rounded-xl border border-white/10 bg-ink-900/60 py-0 pl-3 text-sm text-mist-100 outline-none transition-colors hover:border-white/20 focus:border-aurora-400/50"
-                  >
-                    <option value="all">All types</option>
-                    {outreachCompanyTypes.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <TypeFilterMenu
+                  value={outreachTypeFilter}
+                  options={outreachCompanyTypes}
+                  onChange={setOutreachTypeFilter}
+                />
               ) : null}
               <label className="relative inline-flex h-full w-44 shrink-0 items-center sm:w-56">
                 <span className="sr-only">Search leads</span>
@@ -2149,7 +2195,7 @@ export function Studio() {
       )}
 
       {/* Pipeline — kept mounted after first visit for instant re-entry */}
-      {(view === "pipeline" || visitedEngage.has("pipeline")) && (
+      {(view === "pipeline" || visitedSticky.has("pipeline")) && (
         <div
           data-tour="pipeline-board"
           className={
@@ -2189,9 +2235,17 @@ export function Studio() {
         </div>
       )}
 
-      {/* All leads — one chrome tree; skeleton/empty only in the body slot */}
-      {view === "leads" && (
-        <div data-tour="leads-table" className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+      {/* All leads — kept mounted after first visit (filters / sort / scroll) */}
+      {(view === "leads" || visitedSticky.has("leads")) && (
+        <div
+          data-tour="leads-table"
+          className={
+            view === "leads"
+              ? "flex min-h-0 flex-1 flex-col gap-3 overflow-hidden"
+              : "hidden"
+          }
+          aria-hidden={view !== "leads"}
+        >
           <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-xs uppercase tracking-widest text-mist-500">
@@ -2368,7 +2422,7 @@ export function Studio() {
       )}
 
       {/* Outreach — kept mounted after first visit for instant re-entry */}
-      {(view === "outreach" || visitedEngage.has("outreach")) && (
+      {(view === "outreach" || visitedSticky.has("outreach")) && (
         <div
           className={view === "outreach" ? "min-h-0 flex-1" : "hidden"}
           aria-hidden={view !== "outreach"}

@@ -313,7 +313,12 @@ export async function verifyEmail(email: string): Promise<EmailVerifyResult> {
     return result;
   } catch (err) {
     console.error("[email-verify] request failed:", err);
-    return softUnknown(normalized, mev ? "myemailverifier" : "heuristic", "verify_error");
+    const msg = err instanceof Error ? err.message : String(err);
+    // AbortSignal.timeout / fetch network failures — not credits/auth.
+    const reason = /timeout|aborted|AbortError/i.test(msg)
+      ? "verify_timeout"
+      : "verify_network";
+    return softUnknown(normalized, mev ? "myemailverifier" : "heuristic", reason);
   }
 }
 

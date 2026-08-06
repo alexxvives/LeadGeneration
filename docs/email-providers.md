@@ -71,7 +71,8 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   1. **BYO Easy send:** Resend **or** Maileroo API key + customer domain
      (Settings → Easy — ADR 0011). Resend remains the default DX.
   2. **MyEmailVerifier** via `MYEMAILVERIFIER_API_KEY` — verify **at send**
-     (ADR 0024). Not run during search/enrich. No Zeruh/Maileroo Verify.
+     when the **lead’s board** has verify on (ADR 0025; was workspace-wide).
+     Not run during search/enrich. No Zeruh/Maileroo Verify.
   3. Keep **SMTP path** as optional platform fallback.
   4. Do **not** market a shared Lodestar From-domain for client outreach.
   5. Later (agency plans): optional Instantly/Smartlead-style multi-inbox, or

@@ -9,19 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-06 (verify UX + drawer focus)
+## ⏱️ Status — updated 2026-08-07 (per-board verify + register flash + type menu)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0029** remote applied.  
-**Note:** Deploy needed (ADR 0024 + verify warn email + drawer focus fix).
+**Migrations:** 0021–**0029** remote applied; **0030** needs apply + deploy.  
+**Note:** Deploy needed for this pass.
 
 ### This pass
-- MEV key OK (93 credits when probed). Zeruh removed (ADR 0024).
-- Verify soft-warn shows recipient email; drawer no longer steals focus to
-  close X while editing subject/body.
+- Fixed Contacted “register” flash: merge no longer lets empty `contactMethods`
+  wipe cached methods; sent rows skip the nag.
+- Outreach type filter: custom glass menu (not native select).
+- Verify-before-send is **per board** (ADR 0025 / migration 0030). Settings
+  switch UI unchanged — targets active sidebar board; Boards cards have toggles.
 
 ### Next
-1. Deploy + hard-refresh.
+1. `npm run cf:migrate` (0030) + deploy + hard-refresh.
 2. Optional later: annual Stripe Price IDs; async search queue; Pro mailbox.
 
 ---

@@ -3,14 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui";
+import { api } from "@/lib/client-api";
+import { loadStoredBoardFilter } from "@/components/studio/BoardPicker";
 
 /**
  * Easy-path toggle: verify recipient emails before send (MyEmailVerifier).
- * Platform key: MYEMAILVERIFIER_API_KEY only (ADR 0024).
- * Daily plan caps are shown on the studio / Settings usage bars.
- *
- * Writes `workspaces.email_verify_enabled` via PATCH /api/workspace/settings
- * and re-reads the confirmed value from the response (not optimistic-only).
+ * Same chrome as before — writes the **active sidebar board** (ADR 0025).
+ * When no board is selected (“All”), falls back to workspace default.
  */
 export function EmailVerifySettings({
   canVerify,
@@ -26,10 +25,30 @@ export function EmailVerifySettings({
   const [enabled, setEnabled] = useState(initialEnabled);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [boardId, setBoardId] = useState<string | null>(null);
 
   useEffect(() => {
     setEnabled(initialEnabled);
   }, [initialEnabled]);
+
+  // Resolve active board + its flag (Settings UI unchanged).
+  useEffect(() => {
+    let cancelled = false;
+    const id = loadStoredBoardFilter();
+    setBoardId(id);
+    if (!id) return;
+    void api
+      .listBoards()
+      .then(({ boards }) => {
+        if (cancelled) return;
+        const b = boards.find((x) => x.id === id);
+        if (b) setEnabled(b.emailVerifyEnabled !== false);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function toggle() {
     if (!canEdit || !canVerify || busy) return;
@@ -37,26 +56,32 @@ export function EmailVerifySettings({
     setBusy(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/workspace/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailVerifyEnabled: next }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        emailVerifyEnabled?: boolean;
-      };
-      if (!res.ok) {
-        throw new Error(data.error ?? "Could not save");
-      }
-      // Trust the DB echo — never flip UI if the write didn't stick.
-      const confirmed =
-        typeof data.emailVerifyEnabled === "boolean"
-          ? data.emailVerifyEnabled
-          : next;
-      setEnabled(confirmed);
-      if (confirmed !== next) {
-        setMsg("Could not update verify setting — try again.");
+      if (boardId) {
+        const { board } = await api.updateBoard(boardId, {
+          emailVerifyEnabled: next,
+        });
+        setEnabled(board.emailVerifyEnabled !== false);
+      } else {
+        const res = await fetch("/api/workspace/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emailVerifyEnabled: next }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          emailVerifyEnabled?: boolean;
+        };
+        if (!res.ok) {
+          throw new Error(data.error ?? "Could not save");
+        }
+        const confirmed =
+          typeof data.emailVerifyEnabled === "boolean"
+            ? data.emailVerifyEnabled
+            : next;
+        setEnabled(confirmed);
+        if (confirmed !== next) {
+          setMsg("Could not update verify setting — try again.");
+        }
       }
       router.refresh();
     } catch (e) {
