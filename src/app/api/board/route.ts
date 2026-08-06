@@ -53,12 +53,13 @@ export async function GET(req: Request) {
   const sendsToday = await ctx.db.countSentSince(dayStart);
   const ws = await ctx.db.getWorkspace(ctx.workspaceId);
   const caps = getCapabilities();
+  // Easy path only (Resend / Maileroo / SMTP / platform). Connected mailbox is
+  // not a send transport while resolveSendPath() stays "easy".
   const canSendEmail =
     caps.canSendEmail ||
     !!ws?.resendApiKey?.trim() ||
     !!ws?.mailerooApiKey?.trim() ||
-    !!(ws?.smtpHost?.trim() && ws?.smtpUser?.trim() && ws?.smtpPass) ||
-    !!ws?.connectedMailbox;
+    !!(ws?.smtpHost?.trim() && ws?.smtpUser?.trim() && ws?.smtpPass);
   // Effective verify = server key present AND workspace opted in.
   const emailVerify =
     caps.emailVerify && (ws?.emailVerifyEnabled !== false);

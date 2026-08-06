@@ -66,9 +66,22 @@ ship. Details / evidence live in chat + code; this file is the task board.
 
 ---
 
-## 5. Open ops (human)
+## 5. 2026-08-06 platform audit follow-ups
 
-1. Apply D1 migrations through **0018** (`npm run cf:migrate`) then deploy.
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| A1 | `draftOutreach` can reset sent | done | Guard like editOutreach |
+| A2 | Pricing Annual toggle vs Checkout | done | Toggle removed (monthly only) |
+| A3 | Soft-merge ghosts / board delete | done | Shrink/single-page + clear filter |
+| A4 | Import cross-board relocate | done | Board-scoped company dedupe |
+| A5 | canSendEmail vs Easy-only | done | Dropped mailbox OR |
+| A6 | Mobile board / Pipeline / focus / Runs | done | Sheet, stage select, traps, open run |
+
+---
+
+## 6. Open ops (human)
+
+1. Apply D1 migrations through **0029** (`npm run cf:migrate`) then deploy.
 2. Optional: platform `RESEND_WEBHOOK_SECRET` only if using Worker `RESEND_API_KEY` for outreach.
 3. Delete leftover `ADMIN_EMAIL` / `ADMIN_PASSWORD` Wrangler secrets; rotate admin password hash in D1 when sharing widely.
 

@@ -22,6 +22,7 @@ import {
 } from "@/components/studio/GettingStartedWizard";
 import {
   BoardPicker,
+  MobileBoardButton,
   loadStoredBoardFilter,
   storeBoardFilter,
 } from "@/components/studio/BoardPicker";
@@ -499,8 +500,19 @@ export function StudioShell({
           {wide &&
           displayView !== "admin" &&
           displayView !== "admin-users" ? (
-            <div className="mb-5">
+            <div className="mb-5 hidden sm:block">
               <BoardPicker
+                boards={boards}
+                activeBoardId={activeBoardId}
+                onChange={setBoardFilter}
+              />
+            </div>
+          ) : null}
+          {wide &&
+          displayView !== "admin" &&
+          displayView !== "admin-users" ? (
+            <div className="mb-3 sm:hidden">
+              <MobileBoardButton
                 boards={boards}
                 activeBoardId={activeBoardId}
                 onChange={setBoardFilter}

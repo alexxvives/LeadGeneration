@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { BoardSummary } from "@/lib/types";
 import { BoardsIcon, ChevronDownIcon } from "@/components/icons";
 import { readMigratedKey } from "@/lib/browser-storage";
 import { loadOutreachProfiles } from "@/lib/sender-profile";
+import { Modal } from "@/components/ui/Modal";
 
 const STORAGE_KEY = "hermes_active_board";
 const STORAGE_LEGACY = ["leadify_active_board", "lodestar_active_board"];
@@ -124,5 +125,70 @@ export function BoardPicker({
         </ul>
       )}
     </div>
+  );
+}
+
+/** Icon-rail board switcher for narrow viewports (opens a sheet). */
+export function MobileBoardButton({
+  boards,
+  activeBoardId,
+  onChange,
+}: {
+  boards: BoardSummary[];
+  activeBoardId: string | null;
+  onChange: (boardId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const titleId = useId();
+  const active =
+    activeBoardId && boards.find((b) => b.id === activeBoardId)
+      ? boards.find((b) => b.id === activeBoardId)!
+      : boards[0] ?? null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-aurora-300 transition-colors hover:border-white/15 hover:bg-white/[0.05]"
+        aria-label={active ? `Board: ${active.name}` : "Select board"}
+        title={active?.name ?? "Select board"}
+      >
+        <BoardsIcon className="h-5 w-5" />
+      </button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Board"
+        titleId={titleId}
+        className="max-w-sm"
+      >
+        <ul className="max-h-72 space-y-1 overflow-y-auto">
+          {boards.length === 0 ? (
+            <li className="px-1 py-2 text-sm text-mist-500">No boards yet</li>
+          ) : (
+            boards.map((b) => (
+              <li key={b.id}>
+                <button
+                  type="button"
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm ${
+                    active?.id === b.id
+                      ? "bg-aurora-400/10 text-aurora-300"
+                      : "text-mist-200 hover:bg-white/5"
+                  }`}
+                  onClick={() => {
+                    onChange(b.id);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="min-w-0 truncate">{b.name}</span>
+                  <span className="shrink-0 text-xs text-mist-500">{b.leadCount}</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      </Modal>
+    </>
   );
 }

@@ -166,7 +166,24 @@ export function BoardsView({
 
   return (
     <div className="animate-float-up space-y-6">
-      {err && <p className="text-sm text-rose-300">{err}</p>}
+      {err && (
+        <p className="text-sm text-rose-300">
+          {err}{" "}
+          <button
+            type="button"
+            className="text-aurora-300 underline-offset-2 hover:underline"
+            onClick={() => {
+              setErr(null);
+              setLoading(true);
+              void refresh()
+                .catch((e) => setErr(e instanceof Error ? e.message : "Failed"))
+                .finally(() => setLoading(false));
+            }}
+          >
+            Retry
+          </button>
+        </p>
+      )}
       {busy ? (
         <p className="text-xs text-mist-500">Working…</p>
       ) : null}
@@ -292,7 +309,7 @@ function BoardCard({
           type="button"
           aria-label={`Delete ${b.name}`}
           title="Delete"
-          className="absolute -right-2 -top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border border-ink-700 bg-ink-850 text-mist-400 opacity-0 shadow-sm transition-opacity hover:border-rose-400/50 hover:bg-rose-500/15 hover:text-rose-500 group-hover:opacity-100 focus-visible:opacity-100"
+          className="absolute -right-2 -top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border border-ink-700 bg-ink-850 text-mist-400 opacity-100 shadow-sm transition-opacity hover:border-rose-400/50 hover:bg-rose-500/15 hover:text-rose-500 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();

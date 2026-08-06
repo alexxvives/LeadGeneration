@@ -4,6 +4,26 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-06 — Full-platform audit fixes (trust + state + polish)
+- `draftOutreach` now refuses `sent`/`sending` (same as `editOutreach`) — API
+  hole could reopen send audit trail.
+- Pricing Annual toggle removed until Stripe annual Price IDs exist.
+- `canSendEmail` no longer ORs connected mailbox while send path is Easy-only.
+- Soft-merge: prune/reconcile when totals shrink or board fits one page; clear
+  sticky board on delete; import dedupe scoped to target board (no cross-board
+  relocate). Warmup warn uses server `sendsToday` + local softCap recommend.
+- UX: replaceable send toasts, Ready channel reset on board switch, mobile board
+  sheet, Pipeline stage `<select>` + KeyboardSensor, drawer/auth focus traps,
+  location combobox keyboard, Runs → open run on Leads.
+
+### 2026-08-06 — Default undeletable + non-blocking verify send
+- D1 `deleteBoard` had `AND is_default = 0`, so legacy Default boards could
+  never be removed via the API (ADR 0023 intended the opposite). Guard removed.
+- Empty Defaults deleted in prod D1 for alexxvives + admin workspaces.
+- Outreach send: concurrent busy ids + “Verifying {email}…” / “Sent to…”
+  toasts; UI stays usable while MEV runs. Board switch resets type/search
+  filters and hydrates so Outreach doesn’t stay empty until hard refresh.
+
 ### 2026-08-06 — Single-board sidebar; SMTP off UI; geocode prefetch
 - Board picker no longer offers “All boards” — always one board (profile follows).
 - Search profile select removed (“No profile — review only” meant skip drafts).

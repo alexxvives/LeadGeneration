@@ -15,7 +15,9 @@ export function LayoutToggle({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={`rounded-full px-3 py-1 font-medium transition-colors ${
         active ? "bg-white/10 text-mist-100" : "text-mist-500 hover:text-mist-300"
       }`}
@@ -45,7 +47,7 @@ const SEARCH_PHASES = [
   "Scoring fit…",
 ] as const;
 
-/** Staged progress while a run is in flight (search is still one blocking request). */
+/** Indeterminate progress while a run is in flight (one blocking request). */
 export function SearchProgress({ running }: { running: boolean }) {
   const [phase, setPhase] = useState(0);
 
@@ -56,14 +58,12 @@ export function SearchProgress({ running }: { running: boolean }) {
     }
     setPhase(0);
     const id = window.setInterval(() => {
-      setPhase((p) => Math.min(p + 1, SEARCH_PHASES.length - 1));
-    }, 2200);
+      setPhase((p) => (p + 1) % SEARCH_PHASES.length);
+    }, 2800);
     return () => window.clearInterval(id);
   }, [running]);
 
   if (!running) return null;
-
-  const pct = ((phase + 1) / SEARCH_PHASES.length) * 100;
 
   return (
     <div className="mt-4 overflow-hidden rounded-xl2 border border-aurora-400/20 bg-aurora-400/5 px-5 py-4">
@@ -72,10 +72,7 @@ export function SearchProgress({ running }: { running: boolean }) {
         <Spinner className="h-4 w-4 text-aurora-300" />
       </div>
       <div className="meter-track mt-3 h-1.5 overflow-hidden rounded-full">
-        <div
-          className="h-full rounded-full bg-aurora-400 transition-[width] duration-700 ease-out"
-          style={{ width: `${pct}%` }}
-        />
+        <div className="h-full w-1/3 animate-pulse rounded-full bg-aurora-400" />
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         {[0, 1, 2].map((i) => (
@@ -87,7 +84,7 @@ export function SearchProgress({ running }: { running: boolean }) {
         ))}
       </div>
       <p className="mt-3 text-xs text-mist-500">
-        Leads appear when the run finishes — then we jump you to Pipeline.
+        Working… leads appear when the run finishes — then we open Pipeline.
       </p>
     </div>
   );

@@ -9,25 +9,27 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-06 (UX polish + no-All board)
+## ⏱️ Status — updated 2026-08-06 (Full-platform audit shipped)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0029** remote applied.  
-**Deployed:** 2026-08-06 — version `811bcebb` (no-Default + UX polish).
+**Note:** Deploy after push to see audit fixes on Workers.
 
 ### This pass
-- Removed Pipeline bounce banner; Bounced tag only.
-- Settings: Resend key beside provider toggle; SMTP removed from UI.
-- Verify toggle: no “Verify on — MEV…” toast.
-- Sidebar board picker: single board only (no “All boards”).
-- Search: removed profile dropdown (follows board profile).
-- Map: no address in pin badge; geocode prefetch in background on
-  Pipeline/Leads via `geocode-client`.
-- D1: Default deleted again for alexxvives@ (AKADEMO + LUMIA only).
+- Full UX/UI + logic audit backlog implemented (P0–P2): draftOutreach sent
+  guard; pricing monthly-only; canSendEmail Easy-aligned; soft-merge prune +
+  deleted-board clear; import board-scoped dedupe; send toast replace; quota/
+  rate-limit UX; mobile board sheet; Pipeline stage menu + keyboard; focus
+  traps; Runs open-run; Outreach empties; Dashboard/Boards retry; location
+  combobox a11y; marketing copy aligned.
+- Canvas: `hermes-platform-audit.canvas.tsx` (local Cursor canvases/).
 
 ### Next
-1. Hard-refresh live app — confirm no Default, sidebar single-board, Settings layout.
-2. Spot-check map prefetch (open Pipeline then Map — pins should be warm).
+1. Hard-refresh live after deploy — smoke: pricing (no annual), multi-board
+   import (no relocate), delete board, send verify toast replace, mobile board
+   picker, Pipeline stage select, Runs → Leads.
+2. Optional later: wire annual Stripe Price IDs; async search queue at scale;
+   restore Pro mailbox path if product wants it.
 
 ---
 

@@ -102,8 +102,7 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     approve (constitution Art. I.1).
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
-    mode, lead count, status). Informative only — board filter lives in
-    Pipeline / Leads.
+    mode, lead count, status). Click a run to open its leads on **Leads**.
 
   - **Boards** (`?view=boards`) — create / rename / delete named lead
     collections; invite collaborators by email (in-app accept). Soft lock when

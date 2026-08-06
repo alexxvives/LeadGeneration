@@ -33,7 +33,7 @@ Pricing: **Recurring / Monthly** → amount above → Save.
 Copy each Price ID (`price_…`). Do **not** hard-code them in the repo.
 
 Optional later: annual Prices at ~20% off (`ANNUAL_DISCOUNT` in `plans.ts`). The
-UI annual toggle is not fully wired yet — monthly is enough for launch.
+pricing UI shows monthly only until annual Price IDs are wired end-to-end.
 
 ---
 

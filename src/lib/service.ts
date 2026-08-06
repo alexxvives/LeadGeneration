@@ -1117,6 +1117,10 @@ export async function draftOutreach(
     }
   }
   const existing = await db.getOutreachByLead(leadId);
+  // Preserve send audit trail — never reopen in-flight or sent mail (Art. I.1).
+  if (existing?.status === "sent" || existing?.status === "sending") {
+    return existing;
+  }
   const now = nowIso();
 
   const outreach: Outreach = existing
@@ -2602,9 +2606,11 @@ export async function importLeads(
 
   try {
     const prior = await db.listLeads();
-    // Name-only: shared aggregator emails/domains must not collapse locations.
+    // Name-only within the target board — never silently relocate a lead from
+    // another board (multi-board campaigns share common company names).
     const byCompany = new Map<string, Lead>();
     for (const l of prior) {
+      if (l.boardId !== boardId) continue;
       const ck = companyKey(l.company);
       if (ck) byCompany.set(ck, l);
     }
@@ -2689,7 +2695,6 @@ export async function importLeads(
 
       const patch: Partial<Lead> = {};
       if (match.runId !== run.id) patch.runId = run.id;
-      if (match.boardId !== boardId) patch.boardId = boardId;
       if ((!match.website || /\[object\s+Object\]/i.test(match.website)) && r.website) {
         patch.website = r.website;
       }

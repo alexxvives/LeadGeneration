@@ -84,6 +84,9 @@ export function DashboardView({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setErr(null);
+    // Drop stale board stats immediately so the sidebar filter never lies.
+    setData(null);
     api
       .dashboard(filter === "all" ? null : filter)
       .then((d) => {
@@ -103,9 +106,31 @@ export function DashboardView({
   const boardOptions = boardsProp ?? data?.boards ?? [];
 
   return (
-    <DeferredSkeleton loading={loading && !data} skeleton={<DashboardSkeleton />}>
-      {err || !data ? (
-        <p className="py-12 text-center text-sm text-rose-300">{err ?? "No data"}</p>
+    <DeferredSkeleton loading={loading || !data} skeleton={<DashboardSkeleton />}>
+      {err ? (
+        <div className="py-12 text-center">
+          <p className="text-sm text-rose-300">{err}</p>
+          <button
+            type="button"
+            className="mt-3 text-sm text-aurora-300 underline-offset-2 hover:underline"
+            onClick={() => {
+              setErr(null);
+              setLoading(true);
+              setData(null);
+              void api
+                .dashboard(filter === "all" ? null : filter)
+                .then(setData)
+                .catch((e) =>
+                  setErr(e instanceof Error ? e.message : "Failed to load"),
+                )
+                .finally(() => setLoading(false));
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : !data ? (
+        <p className="py-12 text-center text-sm text-mist-500">No data</p>
       ) : (
         <DashboardLoaded
           data={data}

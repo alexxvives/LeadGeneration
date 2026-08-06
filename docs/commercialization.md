@@ -54,8 +54,8 @@ workspace row. Secrets never reach the client.
 
 ### Phase 4 — Polish ✅ largely done
 Upgrade modal on quota hit, usage bars in Settings, Firecrawl-credit badge. SMTP
-connect wizard (plain env instructions in Settings) shipped. Annual billing toggle
-not yet implemented.
+connect wizard (plain env instructions in Settings) shipped. Pricing UI is monthly
+only until annual Stripe Price IDs are wired end-to-end.
 
 ---
 

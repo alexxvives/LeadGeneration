@@ -640,8 +640,9 @@ export class D1Store implements LeadRepository {
   }
 
   async deleteBoard(id: string): Promise<boolean> {
+    // Legacy is_default boards must be deletable (ADR 0023) — no SQL guard.
     const result = await this.db
-      .prepare(`DELETE FROM boards WHERE id = ? AND workspace_id = ? AND is_default = 0`)
+      .prepare(`DELETE FROM boards WHERE id = ? AND workspace_id = ?`)
       .bind(id, this.workspaceId)
       .run();
     if (result.meta.changes > 0) {

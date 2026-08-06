@@ -30,7 +30,7 @@ const FLOW = [
   {
     n: "03",
     title: "Draft",
-    body: "A personalized first email for every lead.",
+    body: "A first-email draft for every lead when a sender profile is set.",
     icon: MailIcon,
   },
   {
@@ -49,7 +49,7 @@ const CAPABILITIES = [
   },
   {
     title: "Map & pipeline",
-    body: "See them on a map. Drag them through New → Contacted → In talk → Closed.",
+    body: "See them on a map. Drag them through New → Contacted → In Conversation → Closed.",
     icon: PipelineIcon,
   },
   {
@@ -59,7 +59,7 @@ const CAPABILITIES = [
   },
   {
     title: "Approve before send",
-    body: "Personalized drafts per lead. Nothing leaves until you approve that outreach.",
+    body: "Drafts per lead from your profile. Nothing leaves until you approve that outreach.",
     icon: MailIcon,
   },
   {

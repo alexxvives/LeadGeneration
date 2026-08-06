@@ -232,12 +232,46 @@ export function LeadDrawer(props: DrawerProps) {
     onClose();
   };
 
+  const panelRef = useRef<HTMLElement | null>(null);
+  const prevFocusRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
+    prevFocusRef.current = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    const focusables = () =>
+      panel
+        ? Array.from(
+            panel.querySelectorAll<HTMLElement>(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+            ),
+          ).filter((el) => !el.hasAttribute("disabled"))
+        : [];
+    focusables()[0]?.focus();
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") requestClose();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        requestClose();
+        return;
+      }
+      if (e.key !== "Tab" || !panel) return;
+      const list = focusables();
+      if (list.length === 0) return;
+      const firstEl = list[0]!;
+      const lastEl = list[list.length - 1]!;
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      prevFocusRef.current?.focus?.();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose, dirty, subject, body, toEmail]);
 
@@ -324,6 +358,7 @@ export function LeadDrawer(props: DrawerProps) {
         aria-hidden
       />
       <aside
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="lead-drawer-title"
@@ -1002,9 +1037,7 @@ export function LeadDrawer(props: DrawerProps) {
                         <ArrowIcon className="h-4 w-4" />
                       )}
                       {busy === "send"
-                        ? capabilities.emailVerify
-                          ? "Verifying email…"
-                          : "Sending…"
+                        ? "Sending…"
                         : outreach.status === "approved"
                           ? capabilities.canSendEmail
                             ? "Send email"

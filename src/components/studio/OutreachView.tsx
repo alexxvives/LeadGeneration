@@ -91,12 +91,12 @@ const BUCKET_META: Record<
   review: {
     title: "Contact Draft",
     hint: "Create or review a draft",
-    empty: "All leads here are approved or already contacted.",
+    empty: "No email drafts waiting — approve moves them to Ready.",
   },
   ready: {
     title: "Ready to Contact",
-    hint: "Approved drafts",
-    empty: "Approve a draft in Contact Draft to move it here.",
+    hint: "Approved emails & phone-only leads",
+    empty: "Approve a draft, or add a phone-only lead, to fill this column.",
   },
   contacted: {
     title: "Contacted",
@@ -104,6 +104,29 @@ const BUCKET_META: Record<
     empty: "No contacts logged yet.",
   },
 };
+
+function emptyCopy(
+  bucket: OutreachBucket,
+  leads: LeadWithOutreach[],
+  channel: ReadyChannelFilter,
+): string {
+  if (leads.length === 0) {
+    return "No leads on this board yet — run a search or import.";
+  }
+  if (bucket === "ready" && channel === "phone") {
+    return "No phone-only leads in Ready. Switch to All or Email.";
+  }
+  if (bucket === "ready" && channel === "email") {
+    return "No email-ready leads. Approve a draft in Contact Draft.";
+  }
+  if (bucket === "review") {
+    const hasEmail = leads.some((l) => Boolean(leadEmail(l)));
+    if (!hasEmail) {
+      return "No email addresses on this board — phone-only leads skip to Ready.";
+    }
+  }
+  return BUCKET_META[bucket].empty;
+}
 
 function contactedDayHint(sentToday: number, softCap: number): string {
   if (sentToday >= softCap) {
@@ -121,8 +144,7 @@ export function OutreachView({
   leads,
   sendsToday = 0,
   canSendEmail,
-  emailVerify = false,
-  busyId,
+  busyIds = [],
   backfilling = false,
   loadedCount,
   totalCount,
@@ -139,8 +161,8 @@ export function OutreachView({
   /** Workspace DB count of emails sent since local midnight. */
   sendsToday?: number;
   canSendEmail: boolean;
-  emailVerify?: boolean;
-  busyId: string | null;
+  /** Lead / outreach ids currently drafting or sending (concurrent OK). */
+  busyIds?: readonly string[];
   /** Large boards page in — Contacted may gain rows until this finishes. */
   backfilling?: boolean;
   loadedCount?: number;
@@ -151,7 +173,7 @@ export function OutreachView({
   onApprove: (leadId: string) => Promise<void>;
   /** Contact Draft: approve + send without visiting Ready. */
   onApproveAndSend: (leadId: string) => Promise<void>;
-  onSend: (outreachId: string) => Promise<void>;
+  onSend: (outreachId: string) => void | Promise<void>;
   onDraftAll: () => Promise<void>;
   onMarkContacted: (
     leadId: string,
@@ -159,6 +181,7 @@ export function OutreachView({
     opts?: { promptNote?: boolean },
   ) => Promise<void>;
 }) {
+  const busySet = useMemo(() => new Set(busyIds), [busyIds]);
   const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
 
   const grouped = useMemo(() => {
@@ -305,11 +328,11 @@ export function OutreachView({
                     <button
                       type="button"
                       onClick={() => void onDraftAll()}
-                      disabled={busyId === "draft-all"}
+                      disabled={busySet.has("draft-all")}
                       title="Draft (or redraft) all email leads into Ready to contact"
                       className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
                     >
-                      {busyId === "draft-all" ? (
+                      {busySet.has("draft-all") ? (
                         <Spinner className="h-3 w-3" />
                       ) : (
                         <CheckIcon className="h-3 w-3" />
@@ -325,7 +348,7 @@ export function OutreachView({
                   <li className="px-3 py-6 text-center text-[11px] text-mist-600">
                     {backfilling && key === "contacted"
                       ? "Loading contacted leads…"
-                      : meta.empty}
+                      : emptyCopy(key, leads, readyChannel)}
                   </li>
                 ) : (
                   rows.map((lead, i) => (
@@ -333,9 +356,11 @@ export function OutreachView({
                       key={lead.id}
                       lead={lead}
                       bucket={key}
-                      busy={busyId === lead.id || busyId === lead.outreach?.id}
+                      busy={
+                        busySet.has(lead.id) ||
+                        (!!lead.outreach?.id && busySet.has(lead.outreach.id))
+                      }
                       canSendEmail={canSendEmail}
-                      emailVerify={emailVerify}
                       showDivider={i > 0}
                       onOpenInfo={() => onOpenInfo(lead.id)}
                       onOpenDraft={() => onOpenDraft(lead.id)}
@@ -368,7 +393,6 @@ function OutreachRow({
   bucket,
   busy,
   canSendEmail,
-  emailVerify,
   showDivider,
   onOpenInfo,
   onOpenDraft,
@@ -382,14 +406,13 @@ function OutreachRow({
   bucket: OutreachBucket;
   busy: boolean;
   canSendEmail: boolean;
-  emailVerify: boolean;
   showDivider: boolean;
   onOpenInfo: () => void;
   onOpenDraft: () => void;
   onCreateDraft: () => Promise<void>;
   onApprove: () => Promise<void>;
   onApproveAndSend: () => Promise<void>;
-  onSend: () => Promise<void>;
+  onSend: () => void | Promise<void>;
   onMarkContacted: (
     method: ContactMethod,
     opts?: { promptNote?: boolean },
@@ -567,20 +590,8 @@ function OutreachRow({
                   type="button"
                   disabled={busy}
                   onClick={() => void onSend()}
-                  aria-label={
-                    busy && emailVerify
-                      ? "Verifying email"
-                      : canSendEmail
-                        ? "Send"
-                        : "Send (simulate)"
-                  }
-                  title={
-                    busy && emailVerify
-                      ? "Verifying email is deliverable…"
-                      : canSendEmail
-                        ? "Send"
-                        : "Send (simulate)"
-                  }
+                  aria-label={canSendEmail ? "Send" : "Send (simulate)"}
+                  title={canSendEmail ? "Send" : "Send (simulate)"}
                   className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
                 >
                   {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
@@ -629,11 +640,6 @@ function OutreachRow({
                   </button>
                 ))}
               </div>
-            ) : null}
-            {busy && emailVerify ? (
-              <p className="max-w-[9rem] text-right text-[9px] leading-tight text-mist-400">
-                Verifying email…
-              </p>
             ) : null}
           </div>
         )}

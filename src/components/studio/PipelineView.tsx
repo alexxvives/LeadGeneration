@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
@@ -12,6 +13,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
 import { FitMeter } from "@/components/ui";
@@ -105,6 +107,7 @@ function MainStageColumn({
   stageCount,
   backfilling,
   onOpen,
+  onMoveStage,
   activeId,
 }: {
   col: (typeof MAIN_COLUMNS)[number];
@@ -112,6 +115,7 @@ function MainStageColumn({
   stageCount?: number;
   backfilling: boolean;
   onOpen: (id: string) => void;
+  onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
 }) {
   const colLeads = useStageLeads(allLeads, col.stage, backfilling);
@@ -121,6 +125,7 @@ function MainStageColumn({
       leads={colLeads}
       count={stageCount ?? colLeads.length}
       onOpen={onOpen}
+      onMoveStage={onMoveStage}
       activeId={activeId}
     />
   );
@@ -134,6 +139,7 @@ function ParkedStageColumn({
   open,
   onToggle,
   onOpen,
+  onMoveStage,
   activeId,
 }: {
   col: (typeof PARKED_COLUMNS)[number];
@@ -143,6 +149,7 @@ function ParkedStageColumn({
   open: boolean;
   onToggle: () => void;
   onOpen: (id: string) => void;
+  onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
 }) {
   const colLeads = useStageLeads(allLeads, col.stage, backfilling);
@@ -154,6 +161,7 @@ function ParkedStageColumn({
       open={open}
       onToggle={onToggle}
       onOpen={onOpen}
+      onMoveStage={onMoveStage}
       activeId={activeId}
     />
   );
@@ -184,9 +192,10 @@ export function PipelineView({
     not_interested: false,
   });
 
-  // 8px before drag activates — plain click still fires and opens the lead.
+  // Distance for pointer; keyboard for a11y. Touch can scroll columns (no touch-none).
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
@@ -219,7 +228,7 @@ export function PipelineView({
     <div className="flex h-full min-h-0 flex-col gap-3">
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
-        {leads.length === 1 ? "" : "s"} · click for info · drag to move
+        {leads.length === 1 ? "" : "s"} · click for info · drag or use stage menu
       </p>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -238,6 +247,7 @@ export function PipelineView({
                 stageCount={stageCounts?.[col.stage]}
                 backfilling={backfilling}
                 onOpen={openIfClick}
+                onMoveStage={(id, stage) => onMoveStage(id, stage)}
                 activeId={activeId}
               />
             ))}
@@ -259,6 +269,7 @@ export function PipelineView({
                   }))
                 }
                 onOpen={openIfClick}
+                onMoveStage={(id, stage) => onMoveStage(id, stage)}
                 activeId={activeId}
               />
             ))}
@@ -281,6 +292,11 @@ export function PipelineView({
 }
 
 /** Same chrome as main columns: header + body, one border, divider line only. */
+const ALL_STAGES: { stage: CrmStage; label: string }[] = [
+  ...MAIN_COLUMNS.map((c) => ({ stage: c.stage, label: c.title })),
+  ...PARKED_COLUMNS.map((c) => ({ stage: c.stage, label: c.title })),
+];
+
 function ParkedStage({
   col,
   leads,
@@ -288,6 +304,7 @@ function ParkedStage({
   open,
   onToggle,
   onOpen,
+  onMoveStage,
   activeId,
 }: {
   col: (typeof PARKED_COLUMNS)[number];
@@ -296,6 +313,7 @@ function ParkedStage({
   open: boolean;
   onToggle: () => void;
   onOpen: (id: string) => void;
+  onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.stage });
@@ -337,6 +355,7 @@ function ParkedStage({
                     key={l.id}
                     lead={l}
                     onOpen={onOpen}
+                    onMoveStage={onMoveStage}
                     isDragging={l.id === activeId}
                   />
                 ))}
@@ -353,12 +372,14 @@ function PipelineColumn({
   leads,
   count,
   onOpen,
+  onMoveStage,
   activeId,
 }: {
   col: (typeof MAIN_COLUMNS)[number] | (typeof PARKED_COLUMNS)[number];
   leads: LeadWithOutreach[];
   count: number;
   onOpen: (id: string) => void;
+  onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.stage });
@@ -401,6 +422,7 @@ function PipelineColumn({
               key={l.id}
               lead={l}
               onOpen={onOpen}
+              onMoveStage={onMoveStage}
               isDragging={l.id === activeId}
             />
           ))
@@ -423,10 +445,12 @@ function MethodIcons({ methods }: { methods: ContactMethod[] }) {
 function DraggablePipelineCard({
   lead,
   onOpen,
+  onMoveStage,
   isDragging,
 }: {
   lead: LeadWithOutreach;
   onOpen: (id: string) => void;
+  onMoveStage: (leadId: string, stage: CrmStage) => void;
   isDragging: boolean;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
@@ -450,7 +474,7 @@ function DraggablePipelineCard({
       {...attributes}
       {...listeners}
       onClick={() => onOpen(lead.id)}
-      className={`group flex h-auto cursor-grab touch-none items-start gap-1 rounded-xl px-3 py-2.5 transition-all active:cursor-grabbing ${
+      className={`group flex h-auto cursor-grab touch-pan-y items-start gap-1 rounded-xl px-3 py-2.5 transition-all active:cursor-grabbing ${
         replied
           ? "border border-sky-400/50 bg-sky-400/10 shadow-[0_0_0_1px_rgba(56,189,248,0.25)] ring-1 ring-sky-400/30 hover:bg-sky-400/15"
           : needsMethod
@@ -523,6 +547,33 @@ function DraggablePipelineCard({
           </div>
         ) : null}
       </div>
+
+      <label
+        className="sr-only"
+        htmlFor={`stage-${lead.id}`}
+      >
+        Move {lead.company} to stage
+      </label>
+      <select
+        id={`stage-${lead.id}`}
+        value={lead.crmStage}
+        aria-label={`Stage for ${lead.company}`}
+        title="Move to stage"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          e.stopPropagation();
+          const next = e.target.value as CrmStage;
+          if (next !== lead.crmStage) onMoveStage(lead.id, next);
+        }}
+        className="max-w-[5.5rem] shrink-0 truncate rounded-md border border-white/10 bg-ink-950/80 px-1 py-1 text-[10px] text-mist-300 sm:max-w-[6.5rem]"
+      >
+        {ALL_STAGES.map((s) => (
+          <option key={s.stage} value={s.stage}>
+            {s.label}
+          </option>
+        ))}
+      </select>
 
       <button
         type="button"

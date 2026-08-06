@@ -83,13 +83,48 @@ export function AuthModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialMode]);
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  const prevFocusRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
+    prevFocusRef.current = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    const focusables = () =>
+      panel
+        ? Array.from(
+            panel.querySelectorAll<HTMLElement>(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+            ),
+          ).filter((el) => !el.hasAttribute("disabled"))
+        : [];
+    const t = window.setTimeout(() => focusables()[0]?.focus(), 0);
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && canDismiss) onClose();
+      if (e.key === "Escape" && canDismiss) {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !panel) return;
+      const list = focusables();
+      if (list.length === 0) return;
+      const firstEl = list[0]!;
+      const lastEl = list[list.length - 1]!;
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+      prevFocusRef.current?.focus?.();
+    };
   }, [open, canDismiss, onClose]);
 
   if (!open) return null;
@@ -247,7 +282,10 @@ export function AuthModal({
           if (canDismiss) onClose();
         }}
       />
-      <div className="relative w-full max-w-md animate-float-up rounded-xl2 border border-white/10 bg-ink-900 p-6 shadow-2xl shadow-black/40 sm:p-8">
+      <div
+        ref={panelRef}
+        className="relative w-full max-w-md animate-float-up rounded-xl2 border border-white/10 bg-ink-900 p-6 shadow-2xl shadow-black/40 sm:p-8"
+      >
         {canDismiss && (
           <button
             type="button"

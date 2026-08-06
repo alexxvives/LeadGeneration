@@ -8,6 +8,7 @@ import {
   LEAD_PAGE_CHUNK,
   LEAD_PAGE_INITIAL,
   QuotaExceededError,
+  RateLimitedError,
   type BoardResponse,
 } from "@/lib/client-api";
 import type { ContactMethod, CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
@@ -63,7 +64,7 @@ const CRM_STAGE_FILTERS: CrmStage[] = [
   "not_interested",
 ];
 
-type Toast = { id: number; kind: "ok" | "err"; text: string };
+type Toast = { id: string; kind: "ok" | "err"; text: string };
 type UpgradePrompt = { kind: "leads" | "sends"; planId: PlanId };
 type StudioView =
   | "board"
@@ -90,15 +91,29 @@ function mergeSlimIntoCached(
 
   if (!keepDetail) return incoming;
 
+  // Prefer server for CRM / delivery / emails; keep local body/subject/notes.
+  const prevFu = prev.followUps ?? [];
+  const incFu = incoming.followUps ?? [];
+  const followUps =
+    incFu.length >= prevFu.length
+      ? incFu
+      : prevFu.length
+        ? prevFu
+        : incFu;
+
   return {
     ...incoming,
-    aboutBlurb: prev.aboutBlurb,
-    notes: prev.notes,
-    followUps: prev.followUps?.length ? prev.followUps : incoming.followUps,
+    crmStage: incoming.crmStage ?? prev.crmStage,
+    contactMethods: incoming.contactMethods ?? prev.contactMethods,
+    emails: incoming.emails?.length ? incoming.emails : prev.emails,
+    aboutBlurb: incoming.aboutBlurb || prev.aboutBlurb,
+    notes: incoming.notes ?? prev.notes,
+    followUps,
     outreach:
       incoming.outreach && prev.outreach
         ? {
             ...incoming.outreach,
+            // Server delivery/status wins; keep richer local composer body.
             body: prev.outreach.body || incoming.outreach.body,
             subject: prev.outreach.subject || incoming.outreach.subject,
           }
@@ -197,7 +212,18 @@ export function Studio() {
   const [upgrade, setUpgrade] = useState<UpgradePrompt | null>(null);
   const [verifyLimitPlan, setVerifyLimitPlan] = useState<PlanId | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
-  const [outreachBusy, setOutreachBusy] = useState<string | null>(null);
+  /** Concurrent outreach actions — per lead/outreach id (send verify is non-blocking). */
+  const [outreachBusyIds, setOutreachBusyIds] = useState<string[]>([]);
+  const markOutreachBusy = useCallback((...ids: string[]) => {
+    setOutreachBusyIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      return [...next];
+    });
+  }, []);
+  const clearOutreachBusy = useCallback((...ids: string[]) => {
+    setOutreachBusyIds((prev) => prev.filter((id) => !ids.includes(id)));
+  }, []);
   const [addingLead, setAddingLead] = useState(false);
   const [importProgress, setImportProgress] = useState<{
     /** Smooth display value (may lead confirmed slightly). */
@@ -255,10 +281,20 @@ export function Studio() {
     [router],
   );
 
-  const toast = useCallback((kind: Toast["kind"], text: string) => {
-    const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, kind, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200);
+  const toast = useCallback(
+    (kind: Toast["kind"], text: string, ms = 4200, key?: string) => {
+      const id = key ?? `t-${Date.now()}-${Math.random()}`;
+      setToasts((t) => [...t.filter((x) => x.id !== id), { id, kind, text }]);
+      window.setTimeout(
+        () => setToasts((t) => t.filter((x) => x.id !== id)),
+        ms,
+      );
+    },
+    [],
+  );
+
+  const dismissToast = useCallback((key: string) => {
+    setToasts((t) => t.filter((x) => x.id !== key));
   }, []);
 
   const handleError = useCallback(
@@ -266,6 +302,15 @@ export function Studio() {
       if (e instanceof QuotaExceededError) {
         if (e.kind === "verifies") setVerifyLimitPlan(e.planId);
         else setUpgrade({ kind: e.kind, planId: e.planId });
+      } else if (e instanceof RateLimitedError) {
+        const sec = Math.max(1, Math.ceil(e.retryAfterMs / 1000));
+        toast(
+          "err",
+          e.message ||
+            `Sending too fast — try again in ${sec}s.`,
+          Math.min(12_000, e.retryAfterMs + 2000),
+          "rate-limit",
+        );
       } else {
         toast("err", (e as Error).message);
       }
@@ -284,11 +329,14 @@ export function Studio() {
     const boardKey = filterBoardIdRef.current;
 
     // Dashboard/boards/admin: keep cached leads so returning to Leads is instant.
+    // Only reuse leads when the sidebar board filter matches — otherwise a board
+    // switch poisons activeBoardId while leaving the previous board's rows.
     if (lite) {
       const data = await api.board(boardKey, { lite: true });
       setBoards(data.boards ?? []);
       setBoard((prev) => {
-        if (prev?.leads?.length) {
+        const sameBoard = (prev?.activeBoardId ?? null) === (boardKey ?? null);
+        if (sameBoard && prev?.leads?.length) {
           const complete = prev.leadsHasMore === false;
           boardLiteRef.current = !complete;
           return {
@@ -301,6 +349,7 @@ export function Studio() {
         boardLiteRef.current = true;
         return {
           ...data,
+          leads: sameBoard ? (prev?.leads ?? data.leads) : data.leads,
           leadsTotal: data.leadsTotal ?? 0,
           leadsHasMore: false,
         };
@@ -325,6 +374,61 @@ export function Studio() {
 
     boardLiteRef.current = false;
     setBoards(data.boards ?? []);
+
+    // Requested board gone (deleted) — drop sticky filter + hard-replace leads.
+    if (
+      boardKey &&
+      !(data.boards ?? []).some((b) => b.id === boardKey)
+    ) {
+      storeBoardFilter("");
+      if (typeof window !== "undefined") {
+        const next = `/app${queryForView(viewRef.current, null)}`;
+        window.history.replaceState({}, "", next);
+      }
+      setBoard({
+        ...data,
+        leads: data.leads,
+        leadsTotal: data.leadsTotal ?? data.leads.length,
+        leadsHasMore: !!data.leadsHasMore,
+      });
+      if (data.leadsHasMore) {
+        setLeadsBackfilling(true);
+        void (async () => {
+          let offset = data.leads.length;
+          try {
+            while (true) {
+              if (leadsGenRef.current !== gen) return;
+              const chunk = await api.boardLeadsChunk(null, {
+                limit: LEAD_PAGE_CHUNK,
+                offset,
+              });
+              if (leadsGenRef.current !== gen) return;
+              setBoard((b) => {
+                if (!b) return b;
+                const seen = new Set(b.leads.map((l) => l.id));
+                const added = chunk.leads.filter((l) => !seen.has(l.id));
+                return {
+                  ...b,
+                  leads: [...b.leads, ...added],
+                  leadsTotal: chunk.leadsTotal,
+                  leadsHasMore: chunk.leadsHasMore,
+                };
+              });
+              offset += chunk.leads.length;
+              if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
+            }
+          } catch {
+            /* keep partial */
+          } finally {
+            if (leadsGenRef.current === gen) setLeadsBackfilling(false);
+          }
+        })();
+      } else {
+        setLeadsBackfilling(false);
+      }
+      return data;
+    }
+
     const pinned = activeRunIdRef.current;
     if (pinned && pinned !== data.run?.id) {
       try {
@@ -337,9 +441,26 @@ export function Studio() {
         setActiveRunId(null);
       }
     }
+
+    const serverTotal = data.leadsTotal ?? prev?.leadsTotal ?? data.leads.length;
+    const totalShrunk =
+      !!prev &&
+      sameBoard &&
+      serverTotal < (prev.leadsTotal ?? prev.leads.length);
+    // Entire board fits in one page — replace (drops deleted ghosts).
+    const singlePageComplete =
+      !data.leadsHasMore && serverTotal <= data.leads.length;
+
     // Soft refresh / pipeline poll: never replace a larger in-memory list with
     // a smaller page — that made Pipeline Contacted drop from ~169 → a handful.
-    if (!!prev && sameBoard && prev.leads.length > 0) {
+    // Exception: totals shrank or the board is a single page → full reconcile.
+    if (
+      !!prev &&
+      sameBoard &&
+      prev.leads.length > 0 &&
+      !totalShrunk &&
+      !singlePageComplete
+    ) {
       const patch = new Map(data.leads.map((l) => [l.id, l]));
       const merged = prev.leads.map((l) => {
         const incoming = patch.get(l.id);
@@ -349,7 +470,7 @@ export function Studio() {
       for (const l of data.leads) {
         if (!seen.has(l.id)) merged.push(l);
       }
-      const total = data.leadsTotal ?? prev.leadsTotal ?? merged.length;
+      const total = serverTotal;
       const stillMore = !haveComplete && merged.length < total;
       setBoard({
         ...data,
@@ -391,6 +512,107 @@ export function Studio() {
             if (leadsGenRef.current === gen) setLeadsBackfilling(false);
           }
         })();
+      } else if (
+        haveComplete &&
+        !stillMore &&
+        (prev.leadsTotal ?? prev.leads.length) !== total
+      ) {
+        // Count mismatch on a fully loaded board — walk pages once to drop ghosts.
+        void (async () => {
+          const ids = new Set<string>();
+          const byId = new Map<string, LeadWithOutreach>();
+          let offset = 0;
+          try {
+            while (true) {
+              if (leadsGenRef.current !== gen) return;
+              if (filterBoardIdRef.current !== boardKey) return;
+              const chunk = await api.boardLeadsChunk(boardKey, {
+                limit: LEAD_PAGE_CHUNK,
+                offset,
+              });
+              if (leadsGenRef.current !== gen) return;
+              for (const l of chunk.leads) {
+                ids.add(l.id);
+                byId.set(l.id, l);
+              }
+              offset += chunk.leads.length;
+              if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
+            }
+            setBoard((b) => {
+              if (!b || leadsGenRef.current !== gen) return b;
+              const next = b.leads
+                .filter((l) => ids.has(l.id))
+                .map((l) => {
+                  const incoming = byId.get(l.id);
+                  return incoming ? mergeSlimIntoCached(l, incoming) : l;
+                });
+              for (const [id, l] of byId) {
+                if (!next.some((x) => x.id === id)) next.push(l);
+              }
+              return {
+                ...b,
+                leads: next,
+                leadsTotal: ids.size,
+                leadsHasMore: false,
+                crmStageCounts: data.crmStageCounts ?? b.crmStageCounts,
+              };
+            });
+          } catch {
+            /* keep prior list */
+          }
+        })();
+      }
+      return data;
+    }
+
+    // Full replace path (board switch, shrink, or single-page complete).
+    if (!!prev && sameBoard && (totalShrunk || singlePageComplete)) {
+      const prevById = new Map(prev.leads.map((l) => [l.id, l]));
+      setBoard({
+        ...data,
+        leads: data.leads.map((l) => {
+          const old = prevById.get(l.id);
+          return old ? mergeSlimIntoCached(old, l) : l;
+        }),
+        leadsTotal: serverTotal,
+        leadsHasMore: !!data.leadsHasMore,
+        crmStageCounts: data.crmStageCounts ?? prev.crmStageCounts,
+      });
+      if (data.leadsHasMore) {
+        setLeadsBackfilling(true);
+        void (async () => {
+          let offset = data.leads.length;
+          try {
+            while (true) {
+              if (leadsGenRef.current !== gen) return;
+              if (filterBoardIdRef.current !== boardKey) return;
+              const chunk = await api.boardLeadsChunk(boardKey, {
+                limit: LEAD_PAGE_CHUNK,
+                offset,
+              });
+              if (leadsGenRef.current !== gen) return;
+              setBoard((b) => {
+                if (!b) return b;
+                const have = new Set(b.leads.map((l) => l.id));
+                const added = chunk.leads.filter((l) => !have.has(l.id));
+                return {
+                  ...b,
+                  leads: [...b.leads, ...added],
+                  leadsTotal: chunk.leadsTotal,
+                  leadsHasMore: chunk.leadsHasMore,
+                };
+              });
+              offset += chunk.leads.length;
+              if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
+            }
+          } catch {
+            /* keep partial */
+          } finally {
+            if (leadsGenRef.current === gen) setLeadsBackfilling(false);
+          }
+        })();
+      } else {
+        setLeadsBackfilling(false);
       }
       return data;
     }
@@ -470,10 +692,20 @@ export function Studio() {
   // Initial load + re-fetch when sidebar board filter changes (single effect).
   // Soft-refresh after first paint so adding `?board=` mid-tour doesn't flash
   // the full-page spinner (that looked like a double render).
+  // Board switch: drop sticky filters so Outreach doesn't look empty.
+  useEffect(() => {
+    setOutreachTypeFilter("all");
+    setLeadSearch("");
+    setPipelineFilter("all");
+  }, [filterBoardId]);
+
   useEffect(() => {
     if (boardParam) storeBoardFilter(boardParam);
     const first = !hasLoadedRef.current;
     if (first) setLoading(true);
+    else setLeadsHydrating(true);
+    // Cancel in-flight progressive pages for the previous board.
+    leadsGenRef.current += 1;
     void refresh()
       .then(() => {
         hasLoadedRef.current = true;
@@ -481,6 +713,7 @@ export function Studio() {
       .catch((e) => toast("err", e.message))
       .finally(() => {
         if (first) setLoading(false);
+        else setLeadsHydrating(false);
       });
   }, [filterBoardId, boardParam, refresh, toast]);
 
@@ -545,9 +778,10 @@ export function Studio() {
     // Wait for board list so we don't heartbeat a stale id from another session.
     if (boards.length === 0) return;
     if (!boards.some((b) => b.id === bid)) {
-      storeBoardFilter("all");
+      storeBoardFilter("");
       setEditLocked(false);
       setLockHolder(null);
+      router.replace(`/app${queryForView(view, null)}`, { scroll: false });
       return;
     }
     let cancelled = false;
@@ -623,7 +857,9 @@ export function Studio() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("upgraded") === "1") {
       toast("ok", "Upgrade complete — your new plan is active.");
-      window.history.replaceState({}, "", "/app");
+      params.delete("upgraded");
+      const q = params.toString();
+      window.history.replaceState({}, "", q ? `/app?${q}` : "/app");
     }
   }, [toast]);
 
@@ -647,7 +883,7 @@ export function Studio() {
       });
       storeBoardFilter(boardId);
       const data = await refresh();
-      const n = data.leads.length;
+      const n = data.leadsTotal ?? data.run?.leadCount ?? data.leads.length;
       toast(
         "ok",
         `${data.run?.mode === "live" ? "Live search" : "Search"} complete — ${n} lead${n === 1 ? "" : "s"} charted.`,
@@ -878,12 +1114,12 @@ export function Studio() {
 
   /** Contact Draft: generate from latest profile, then open the composer. */
   const createAndOpenDraft = async (leadId: string) => {
-    setOutreachBusy(leadId);
+    markOutreachBusy(leadId);
     try {
       const id = await onDraft(leadId);
       if (id) openDraft(leadId);
     } finally {
-      setOutreachBusy(null);
+      clearOutreachBusy(leadId);
     }
   };
 
@@ -916,9 +1152,19 @@ export function Studio() {
       const leadId =
         opts?.leadId ?? findLeadByOutreach(outreachId)?.id ?? null;
       if (leadId) {
+        const leadStatus =
+          outreach.status === "approved"
+            ? "approved"
+            : outreach.status === "rejected"
+              ? "rejected"
+              : outreach.status === "sent"
+                ? "sent"
+                : outreach.status === "failed"
+                  ? "failed"
+                  : "queued";
         patchLeadLocal(leadId, {
           outreach,
-          status: decision === "approved" ? "approved" : "rejected",
+          status: leadStatus,
           detailLoaded: true,
         });
       }
@@ -933,7 +1179,7 @@ export function Studio() {
 
   /** Yellow arrow: approve (create draft first if missing) → Ready. */
   const approveContactDraft = async (leadId: string) => {
-    setOutreachBusy(leadId);
+    markOutreachBusy(leadId);
     try {
       const lead = board?.leads.find((l) => l.id === leadId);
       let outreachId = lead?.outreach?.id ?? null;
@@ -944,7 +1190,7 @@ export function Studio() {
       await onDecide(outreachId, "approved", { silent: true });
       toast("ok", "Approved — moved to Ready to contact.");
     } finally {
-      setOutreachBusy(null);
+      clearOutreachBusy(leadId);
     }
   };
 
@@ -1007,17 +1253,37 @@ export function Studio() {
       } else {
         await refresh();
       }
-      toast(
-        "ok",
-        result.provider === "demo"
-          ? "Sent (simulated — not delivered)."
-          : "Email sent.",
-      );
+      {
+        const lead = findLeadByOutreach(outreachId);
+        const to =
+          result.outreach?.toEmail ??
+          lead?.outreach?.toEmail ??
+          lead?.emails?.[0] ??
+          null;
+        dismissToast(`send-${outreachId}`);
+        toast(
+          "ok",
+          result.provider === "demo"
+            ? to
+              ? `Sent to ${to} (simulated — not delivered).`
+              : "Sent (simulated — not delivered)."
+            : to
+              ? `Sent to ${to}.`
+              : "Email sent.",
+          4200,
+          `send-${outreachId}`,
+        );
+      }
       return true;
     } catch (e) {
+      dismissToast(`send-${outreachId}`);
       await refresh();
       if (e instanceof QuotaExceededError && e.kind === "verifies") {
         setVerifyLimitPlan(e.planId);
+        return false;
+      }
+      if (e instanceof QuotaExceededError && e.kind === "sends") {
+        setUpgrade({ kind: "sends", planId: e.planId });
         return false;
       }
       const err = e as Error & {
@@ -1055,11 +1321,26 @@ export function Studio() {
     outreachId: string,
     opts?: { skipVerify?: boolean },
   ): Promise<boolean> => {
-    setOutreachBusy(outreachId);
+    const lead = findLeadByOutreach(outreachId);
+    const to =
+      lead?.outreach?.toEmail ?? lead?.emails?.[0] ?? null;
+    const busyKeys = [outreachId, ...(lead ? [lead.id] : [])];
+    markOutreachBusy(...busyKeys);
+    const verifyOn =
+      !!boardRef.current?.capabilities.emailVerify &&
+      boardRef.current?.workspace.emailVerifyEnabled !== false &&
+      !opts?.skipVerify;
+    const toastKey = `send-${outreachId}`;
+    if (verifyOn && to) {
+      // MEV can take up to ~25s — replace-in-place so Sent… clears Verifying…
+      toast("ok", `Verifying ${to}…`, 28000, toastKey);
+    } else if (to) {
+      toast("ok", `Sending to ${to}…`, 4200, toastKey);
+    }
     try {
       return await onSend(outreachId, opts);
     } finally {
-      setOutreachBusy(null);
+      clearOutreachBusy(...busyKeys);
     }
   };
 
@@ -1076,12 +1357,22 @@ export function Studio() {
       setPendingSendId(outreachId);
       return false;
     }
-    const status = warmupStatus();
-    if (status.overSoftCap) {
+    const ws = board.workspace;
+    if (
+      !ws.unlimitedSends &&
+      ws.sendsLimit > 0 &&
+      ws.sendsUsed >= ws.sendsLimit
+    ) {
+      setUpgrade({ kind: "sends", planId: ws.planId });
+      return false;
+    }
+    const softCap = warmupStatus().softCap;
+    const todayCount = ws.sendsToday ?? 0;
+    if (todayCount >= softCap) {
       setWarmupWarn({
         outreachId,
-        todayCount: status.todayCount,
-        softCap: status.softCap,
+        todayCount,
+        softCap,
       });
       return false;
     }
@@ -1090,7 +1381,7 @@ export function Studio() {
 
   /** Contact Draft aurora: create draft if needed, approve, send in one step. */
   const approveAndSendContactDraft = async (leadId: string) => {
-    setOutreachBusy(leadId);
+    markOutreachBusy(leadId);
     try {
       const lead = board?.leads.find((l) => l.id === leadId);
       let outreachId = lead?.outreach?.id ?? null;
@@ -1098,9 +1389,10 @@ export function Studio() {
         outreachId = await onDraft(leadId);
         if (!outreachId) return;
       }
-      await requestSend(outreachId);
+      // Fire send without holding the whole queue — verify/send toasts update in background.
+      void requestSend(outreachId);
     } finally {
-      setOutreachBusy(null);
+      clearOutreachBusy(leadId);
     }
   };
 
@@ -1185,7 +1477,7 @@ export function Studio() {
     method: ContactMethod,
     opts?: { promptNote?: boolean },
   ) => {
-    setOutreachBusy(leadId);
+    markOutreachBusy(leadId);
     try {
       await onMoveStage(leadId, "contacted", [method]);
       toast(
@@ -1201,7 +1493,7 @@ export function Studio() {
         void ensureLeadDetail(leadId);
       }
     } finally {
-      setOutreachBusy(null);
+      clearOutreachBusy(leadId);
     }
   };
 
@@ -1216,11 +1508,14 @@ export function Studio() {
     leadId: string,
     patch: Parameters<typeof api.updateLead>[1],
   ) => {
+    const prior = boardRef.current?.leads.find((l) => l.id === leadId);
     patchLeadLocal(leadId, patch as Partial<LeadWithOutreach>);
     try {
       const { lead } = await api.updateLead(leadId, patch);
       patchLeadLocal(leadId, lead);
     } catch (e) {
+      if (prior) patchLeadLocal(leadId, prior);
+      else await refresh();
       toast("err", (e as Error).message);
     }
   };
@@ -1242,7 +1537,7 @@ export function Studio() {
 
     const ac = new AbortController();
     draftAbortRef.current = ac;
-    setOutreachBusy("draft-all");
+    markOutreachBusy("draft-all");
     setDraftProgress({ done: 0, total: targets.length, failed: 0 });
 
     // Template-only drafts are cheap; AI personalize needs a smaller pool.
@@ -1306,7 +1601,7 @@ export function Studio() {
         );
       }
     } finally {
-      setOutreachBusy(null);
+      clearOutreachBusy("draft-all");
       setDraftProgress(null);
       draftAbortRef.current = null;
     }
@@ -1657,7 +1952,7 @@ export function Studio() {
         view !== "admin" &&
         view !== "admin-users" &&
         board?.workspace ? (
-          <div className="hidden min-w-[16rem] max-w-md flex-col gap-1 justify-self-center sm:flex sm:min-w-[22rem]">
+          <div className="flex min-w-0 max-w-md flex-col gap-1 justify-self-stretch sm:min-w-[16rem] sm:justify-self-center sm:min-w-[22rem]">
             <div
               className={`grid gap-4 ${
                 board.capabilities.emailVerify &&
@@ -1734,14 +2029,14 @@ export function Studio() {
             </label>
           ) : null}
           {showLeadSearch ? (
-            <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <div className="flex shrink-0 flex-nowrap items-center justify-end gap-2">
               {view === "outreach" ? (
-                <label className="inline-flex min-w-0 items-center gap-2">
+                <label className="inline-flex shrink-0 items-center">
                   <span className="sr-only">Filter by lead type</span>
                   <Select
                     value={outreachTypeFilter}
                     onChange={(e) => setOutreachTypeFilter(e.target.value)}
-                    className="max-w-[11rem] py-2 text-sm"
+                    className="w-[9.5rem] py-2 text-sm"
                     aria-label="Filter outreach by lead type"
                   >
                     <option value="all">All types</option>
@@ -1753,7 +2048,7 @@ export function Studio() {
                   </Select>
                 </label>
               ) : null}
-              <label className="relative inline-flex w-full max-w-xs items-center sm:w-56">
+              <label className="relative inline-flex w-44 shrink-0 items-center sm:w-56">
                 <span className="sr-only">Search leads</span>
                 <input
                   type="search"
@@ -2067,11 +2362,11 @@ export function Studio() {
             </div>
           ) : (
             <OutreachView
+              key={filterBoardId ?? "all"}
               leads={outreachFilteredLeads}
               sendsToday={board.workspace.sendsToday ?? 0}
               canSendEmail={!!board.capabilities.canSendEmail}
-              emailVerify={!!board.capabilities.emailVerify}
-              busyId={outreachBusy}
+              busyIds={outreachBusyIds}
               backfilling={leadsBackfilling}
               loadedCount={board.leads.length}
               totalCount={board.leadsTotal ?? board.leads.length}
@@ -2080,8 +2375,9 @@ export function Studio() {
               onCreateDraft={createAndOpenDraft}
               onApprove={approveContactDraft}
               onApproveAndSend={approveAndSendContactDraft}
-              onSend={async (outreachId) => {
-                await requestSend(outreachId);
+              onSend={(outreachId) => {
+                // Non-blocking: verify/send continue while user works other leads.
+                void requestSend(outreachId);
               }}
               onDraftAll={onDraftAllOutreach}
               onMarkContacted={onMarkContacted}
@@ -2092,7 +2388,17 @@ export function Studio() {
 
       {/* Runs view */}
       {view === "runs" && (
-        <RunsView activeRunId={activeRunId ?? board?.run?.id ?? null} />
+        <RunsView
+          activeRunId={activeRunId ?? board?.run?.id ?? null}
+          onOpenRun={(runId) => {
+            activeRunIdRef.current = runId;
+            setActiveRunId(runId);
+            setView("leads");
+            void refresh({ forceFull: true }).catch((e) =>
+              toast("err", (e as Error).message),
+            );
+          }}
+        />
       )}
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PLAN_ORDER, PLANS, annualMonthlyPrice } from "@/lib/plans";
+import { PLAN_ORDER, PLANS } from "@/lib/plans";
 import { api } from "@/lib/client-api";
 import type { PlanId } from "@/lib/types";
 import { CheckIcon } from "@/components/icons";
@@ -10,7 +10,6 @@ import { Spinner } from "@/components/ui";
 
 export function PricingCards() {
   const router = useRouter();
-  const [annual, setAnnual] = useState(false);
   const [busy, setBusy] = useState<PlanId | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
@@ -38,37 +37,10 @@ export function PricingCards() {
 
   return (
     <div className="mt-10">
-      <div className="mb-8 flex items-center justify-center gap-3">
-        <span className={annual ? "text-mist-500" : "text-mist-100"}>Monthly</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={annual}
-          onClick={() => setAnnual((a) => !a)}
-          className={`relative h-7 w-12 shrink-0 overflow-hidden rounded-full border border-white/10 transition-colors ${
-            annual ? "bg-aurora-400" : "bg-ink-800"
-          }`}
-        >
-          <span
-            className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-on-accent shadow-sm transition-transform duration-200 ease-out ${
-              annual ? "translate-x-5" : "translate-x-0"
-            }`}
-          />
-        </button>
-        <span className={annual ? "text-mist-100" : "text-mist-500"}>
-          Annual <span className="text-aurora-300">(save ~20%)</span>
-        </span>
-      </div>
-
       <div className="grid gap-5 text-left sm:grid-cols-2 lg:grid-cols-4">
         {PLAN_ORDER.map((id) => {
           const plan = PLANS[id];
-          const price =
-            plan.monthlyPrice === 0
-              ? 0
-              : annual
-                ? annualMonthlyPrice(plan)
-                : plan.monthlyPrice;
+          const price = plan.monthlyPrice;
           const highlighted = id === "pro";
           return (
             <div
@@ -91,9 +63,6 @@ export function PricingCards() {
                 </span>
                 <span className="text-sm text-mist-500">/mo</span>
               </div>
-              {annual && plan.monthlyPrice > 0 && (
-                <p className="mt-1 text-xs text-mist-500">billed annually</p>
-              )}
 
               <button
                 onClick={() => onSelect(id)}

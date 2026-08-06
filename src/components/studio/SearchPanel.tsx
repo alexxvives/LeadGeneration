@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { SearchIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import type { PlanId, SearchStrategy } from "@/lib/types";
@@ -79,6 +79,8 @@ function LocationCombobox({
   const [open, setOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   useEffect(() => {
     setInputValue(value);
@@ -88,6 +90,7 @@ function LocationCombobox({
     const handler = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
+        setActiveIndex(-1);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -99,6 +102,7 @@ function LocationCombobox({
     // Typing clears confirmation — must pick from the list again.
     onConfirmedChange(false);
     onChange("");
+    setActiveIndex(-1);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (raw.trim().length < 2) {
       setSuggestions([]);
@@ -111,6 +115,7 @@ function LocationCombobox({
         const { suggestions: s } = await api.suggestLocations(raw);
         setSuggestions(s);
         setOpen(s.length > 0);
+        setActiveIndex(s.length > 0 ? 0 : -1);
       } catch {
         setSuggestions([]);
       } finally {
@@ -125,6 +130,7 @@ function LocationCombobox({
     onConfirmedChange(true);
     setSuggestions([]);
     setOpen(false);
+    setActiveIndex(-1);
   };
 
   const clear = () => {
@@ -133,9 +139,34 @@ function LocationCombobox({
     onConfirmedChange(true); // empty location is allowed
     setSuggestions([]);
     setOpen(false);
+    setActiveIndex(-1);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!open || suggestions.length === 0) {
+      if (e.key === "Escape") setOpen(false);
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      const s = suggestions[activeIndex];
+      if (s) pick(s);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      setActiveIndex(-1);
+    }
   };
 
   const needsPick = inputValue.trim().length > 0 && !confirmed;
+  const activeId =
+    activeIndex >= 0 ? `${listId}-opt-${activeIndex}` : undefined;
 
   return (
     <div ref={wrapRef} className="relative">
@@ -143,8 +174,14 @@ function LocationCombobox({
         <input
           value={inputValue}
           onChange={(e) => handleInput(e.target.value)}
+          onKeyDown={onKeyDown}
           onFocus={() => suggestions.length > 0 && setOpen(true)}
           placeholder="Type a city, then pick from the list"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={activeId}
           className={`w-full rounded-lg border bg-ink-900/60 px-4 py-3 pr-8 text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60 ${
             needsPick ? "border-amber-400/40" : "border-white/10"
           }`}
@@ -174,16 +211,29 @@ function LocationCombobox({
       )}
 
       {open && suggestions.length > 0 && (
-        <ul className="absolute z-40 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-ink-900 shadow-xl">
+        <ul
+          id={listId}
+          role="listbox"
+          className="absolute z-40 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-ink-900 shadow-xl"
+        >
           {suggestions.map((s, i) => (
-            <li key={`${s.label}-${i}`}>
+            <li
+              key={`${s.label}-${i}`}
+              id={`${listId}-opt-${i}`}
+              role="option"
+              aria-selected={i === activeIndex}
+            >
               <button
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   pick(s);
                 }}
-                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-mist-100 transition-colors hover:bg-white/5"
+                className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
+                  i === activeIndex
+                    ? "bg-aurora-400/10 text-aurora-200"
+                    : "text-mist-100 hover:bg-white/5"
+                }`}
               >
                 {s.label}
               </button>
