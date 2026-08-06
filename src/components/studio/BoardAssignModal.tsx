@@ -14,7 +14,7 @@ export type BoardDestination = {
 
 /**
  * Modal to pick (or create) a destination board before search/import.
- * Default board is always available; All-filter selection falls back to Default.
+ * When the workspace has no boards yet, creation is the only path.
  */
 export function BoardAssignModal({
   open,
@@ -31,7 +31,7 @@ export function BoardAssignModal({
   title?: string;
   subtitle?: string;
   boards: BoardSummary[];
-  /** Preselect: preferred board, else Default. */
+  /** Preselect: preferred board, else first board. */
   preferredBoardId?: string | null;
   confirmLabel?: string;
   onConfirm: (dest: BoardDestination) => void | Promise<void>;
@@ -39,14 +39,11 @@ export function BoardAssignModal({
   onBoardsChange?: (boards: BoardSummary[]) => void;
   onClose: () => void;
 }) {
-  const defaultId =
-    boards.find((b) => b.isDefault)?.id ??
-    boards[0]?.id ??
-    null;
+  const fallbackId = boards[0]?.id ?? null;
   const initial =
     (preferredBoardId && boards.some((b) => b.id === preferredBoardId)
       ? preferredBoardId
-      : null) ?? defaultId;
+      : null) ?? fallbackId;
 
   const [selectedId, setSelectedId] = useState<string | null>(initial);
   const [creating, setCreating] = useState(false);
@@ -59,7 +56,7 @@ export function BoardAssignModal({
     if (!open) return;
     setLocalBoards(boards);
     setSelectedId(initial);
-    setCreating(false);
+    setCreating(boards.length === 0);
     setNewName("");
     setErr(null);
   }, [open, boards, initial]);

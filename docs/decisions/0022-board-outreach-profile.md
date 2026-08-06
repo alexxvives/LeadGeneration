@@ -45,6 +45,6 @@ unclear. Users expected “pick a board” to imply the brand.
 
 - Migration `0029_board_outreach_profile.sql`.
 - `createOutreachProfileAsync` syncs profile to workspace before `createBoard`.
-- Boards UI shows linked profile + “Fill in Settings”; legacy boards can create
-  a matching profile on demand.
+- Legacy boards can create a matching profile on demand (link only — Boards UI
+  no longer surfaces “Outreach profile / Fill in Settings”; edit in Settings).
 - Sidebar `ProfilePicker` removed from Studio chrome (component may remain unused).

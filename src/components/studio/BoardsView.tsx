@@ -4,13 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "@/lib/client-api";
 import type { BoardInvite, BoardMember, BoardSummary } from "@/lib/types";
-import Link from "next/link";
 import {
   createOutreachProfileAsync,
   deleteOutreachProfile,
   loadOutreachProfiles,
   saveSenderProfile,
-  type OutreachProfile,
 } from "@/lib/sender-profile";
 import { Spinner } from "@/components/ui";
 import { PencilIcon, UsersIcon, XIcon } from "@/components/icons";
@@ -36,7 +34,6 @@ export function BoardsView({
   const [editName, setEditName] = useState("");
   const [inviteBoard, setInviteBoard] = useState<BoardSummary | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [profiles, setProfiles] = useState<OutreachProfile[]>([]);
 
   const refresh = useCallback(async () => {
     const [{ boards: list }, { invites: pending }] = await Promise.all([
@@ -63,7 +60,6 @@ export function BoardsView({
     }
     setBoards(next);
     setInvites(pending);
-    setProfiles(loadOutreachProfiles().profiles);
     onBoardsChange?.(next);
   }, [onBoardsChange]);
 
@@ -121,7 +117,7 @@ export function BoardsView({
   async function handleDelete(id: string) {
     if (
       !confirm(
-        "Delete this board and its outreach profile? Leads move to Default.",
+        "Delete this board and its outreach profile? Leads move to another board if one remains.",
       )
     )
       return;
@@ -183,7 +179,6 @@ export function BoardsView({
             <BoardCard
               key={b.id}
               board={b}
-              profiles={profiles}
               editingId={editingId}
               editName={editName}
               onSelect={() => onSelectBoard?.(b.id)}
@@ -233,7 +228,6 @@ export function BoardsView({
             <BoardCard
               key={b.id}
               board={b}
-              profiles={profiles}
               editingId={editingId}
               editName={editName}
               onSelect={() => onSelectBoard?.(b.id)}
@@ -270,7 +264,6 @@ export function BoardsView({
 
 function BoardCard({
   board: b,
-  profiles,
   editingId,
   editName,
   onSelect,
@@ -282,7 +275,6 @@ function BoardCard({
   onInvite,
 }: {
   board: BoardSummary;
-  profiles: OutreachProfile[];
   editingId: string | null;
   editName: string;
   onSelect: () => void;
@@ -293,12 +285,9 @@ function BoardCard({
   onDelete: () => void;
   onInvite: () => void;
 }) {
-  const linkedProfile = b.outreachProfileId
-    ? profiles.find((p) => p.id === b.outreachProfileId) ?? null
-    : null;
   return (
     <li className="group relative">
-      {!b.isDefault && !b.shared ? (
+      {!b.shared ? (
         <button
           type="button"
           aria-label={`Delete ${b.name}`}
@@ -404,29 +393,6 @@ function BoardCard({
             <dt className="text-mist-500">Leads</dt>
             <dd className="font-display text-2xl text-mist-100">{b.leadCount}</dd>
           </div>
-          {!b.shared && linkedProfile ? (
-            <div
-              className="border-t border-white/8 pt-3 text-left"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              <p className="text-[10px] uppercase tracking-wider text-mist-500">
-                Outreach profile
-              </p>
-              <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-mist-200">
-                <span className="truncate font-medium">
-                  {linkedProfile.name.trim() || "Untitled"}
-                </span>
-                <Link
-                  href="/app/settings"
-                  className="shrink-0 text-aurora-300 hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Fill in Settings
-                </Link>
-              </p>
-            </div>
-          ) : null}
           <div className="grid grid-cols-3 gap-2 border-t border-white/8 pt-3 text-center">
             <div>
               <dt className="text-mist-500">Contacted</dt>
@@ -525,8 +491,8 @@ function CreateBoardModal({
               New board
             </h2>
             <p className="mt-1 text-sm text-mist-500">
-              Creates a board and a matching empty outreach profile — fill voice
-              and From address in Settings.
+              Name a list for this campaign or niche. Voice and From address live
+              in Settings.
             </p>
           </div>
           <button

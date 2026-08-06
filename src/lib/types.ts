@@ -234,15 +234,15 @@ export interface Workspace {
   profileSendSettingsJson: string | null;
 }
 /**
- * Named collection of leads within a workspace (ADR 0014).
- * Every workspace has exactly one `isDefault` board; new leads land there
- * unless the user picks another board at search/import time.
+ * Named collection of leads within a workspace (ADR 0014, amended by 0023).
+ * Boards are created at search/import time — no auto "Default" board.
+ * Legacy `isDefault` may still exist on older rows until cleaned up.
  */
 export interface Board {
   id: string;
   workspaceId: string;
   name: string;
-  /** Exactly one default board per workspace — catch-all for unassigned leads. */
+  /** Legacy flag; new boards are never default (ADR 0023). */
   isDefault: boolean;
   /**
    * Outreach profile (pitch + Easy From/keys) for this board (ADR 0022).

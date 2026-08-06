@@ -9,21 +9,25 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-06 (Easy-only + skeletons)
+## ⏱️ Status — updated 2026-08-06 (map / boards / bounce)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0029** remote applied.  
-**Deployed:** (local UX pass — deploy when ready)
+**Deployed:** code changes below are **local only** — deploy to stop prod
+recreating Default via old `ensureDefaultBoard`.
 
 ### This pass
-- Removed Pro mailbox send option from Settings UI; sends resolve Easy-only.
-- Rebuilt loading skeletons to match real page layouts (pipeline, outreach,
-  search, admin, leads table/cards, settings, studio chrome).
+- Map: hide unmapped pins; “N leads remaining to be mapped…” progress.
+- Boards UI: removed Outreach profile / Fill in Settings block.
+- No auto Default board (ADR 0023); delete moves leads to another board.
+- Bounce: tag beside fit (not rose card); clear bounced email on webhook.
+- D1 cleanup for alexxvives@: kept filled AKADEMO + LUMIA profiles, linked to
+  matching boards, deleted Default + empty duplicate profiles.
 
 ### Next
-1. Hard-refresh Settings — no Easy/Pro toggle; only sending identity.
-2. Spot-check skeleton → content on Boards / Pipeline / Outreach / Search.
-3. Deploy when ready.
+1. **Deploy** so Default stops auto-recreating on `/api/boards`.
+2. Spot-check map remaining count + bounced tag on Pipeline.
+3. Confirm AKADEMO/LUMIA send from linked filled profiles.
 
 ---
 

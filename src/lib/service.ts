@@ -136,11 +136,14 @@ function firstContactAttribution(
 const defaultBoardOrphansChecked = new Set<string>();
 
 /**
- * Ensure the workspace has a Default board and back-fill any leads/runs that
- * predate boards (empty boardId). Orphan scan runs once per workspace per
- * isolate; duplicate-default collapse still runs when needed.
+ * Heal board invariants without auto-creating a "Default" board.
+ * - Collapse duplicate `isDefault` boards onto the oldest.
+ * - Back-fill orphan leads/runs (empty boardId) onto an existing board once
+ *   per workspace per isolate.
+ * Returns a fallback board (default flag, else oldest) or null when empty.
+ * Users create boards at search/import time (ADR 0023).
  */
-export async function ensureDefaultBoard(ctx: Ctx): Promise<Board> {
+export async function ensureDefaultBoard(ctx: Ctx): Promise<Board | null> {
   const { db } = ctx;
   const boards = await db.listBoards();
   const defaults = boards
@@ -151,29 +154,7 @@ export async function ensureDefaultBoard(ctx: Ctx): Promise<Board> {
     );
   let def = defaults[0] ?? null;
 
-  if (!def) {
-    const now = nowIso();
-    try {
-      def = await db.createBoard({
-        id: newId("board"),
-        workspaceId: ctx.workspaceId,
-        name: "Default",
-        isDefault: true,
-        outreachProfileId: activeProfileIdFromJson(
-          (await db.getWorkspace(ctx.workspaceId))?.outreachProfilesJson,
-        ),
-        createdAt: now,
-        updatedAt: now,
-      });
-    } catch {
-      // Concurrent create (unique index) — re-read the winner.
-      const again = (await db.listBoards()).filter((b) => b.isDefault);
-      def = again.sort(
-        (a, b) =>
-          a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
-      )[0]!;
-    }
-  } else if (defaults.length > 1) {
+  if (defaults.length > 1 && def) {
     for (const extra of defaults.slice(1)) {
       const [extraLeads, extraRuns] = await Promise.all([
         db.listLeads({ boardId: extra.id }),
@@ -190,7 +171,14 @@ export async function ensureDefaultBoard(ctx: Ctx): Promise<Board> {
     }
   }
 
-  if (!defaultBoardOrphansChecked.has(ctx.workspaceId)) {
+  if (!def && boards.length > 0) {
+    def = [...boards].sort(
+      (a, b) =>
+        a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+    )[0]!;
+  }
+
+  if (def && !defaultBoardOrphansChecked.has(ctx.workspaceId)) {
     const [leads, runs] = await Promise.all([db.listLeads(), db.listRuns()]);
     const orphanLeads = leads.filter((l) => !l.boardId);
     const orphanRuns = runs.filter((r) => !r.boardId);
@@ -376,19 +364,33 @@ export async function renameBoard(
 }
 
 /**
- * Delete a non-default board. Leads move to the Default board.
+ * Delete a board. Leads/runs move to another board when one remains;
+ * deleting the last board with leads is blocked.
  */
 export async function deleteBoard(ctx: Ctx, id: string): Promise<void> {
   const existing = await ctx.db.getBoard(id);
   if (!existing) throw new NotFoundError("Board not found");
-  if (existing.isDefault) throw new Error("Cannot delete the Default board");
-  const def = await ensureDefaultBoard(ctx);
+  const others = (await ctx.db.listBoards())
+    .filter((b) => b.id !== id)
+    .sort(
+      (a, b) =>
+        Number(b.isDefault) - Number(a.isDefault) ||
+        a.createdAt.localeCompare(b.createdAt) ||
+        a.id.localeCompare(b.id),
+    );
   const leads = await ctx.db.listLeads({ boardId: id });
   const runs = (await ctx.db.listRuns()).filter((r) => r.boardId === id);
-  await Promise.all([
-    ...leads.map((l) => ctx.db.updateLead(l.id, { boardId: def.id })),
-    ...runs.map((r) => ctx.db.updateRun(r.id, { boardId: def.id })),
-  ]);
+  const dest = others[0] ?? null;
+  if (!dest) {
+    if (leads.length > 0) {
+      throw new Error("Move or delete leads before removing the last board");
+    }
+  } else {
+    await Promise.all([
+      ...leads.map((l) => ctx.db.updateLead(l.id, { boardId: dest.id })),
+      ...runs.map((r) => ctx.db.updateRun(r.id, { boardId: dest.id })),
+    ]);
+  }
   await ctx.db.deleteBoard(id);
 }
 
@@ -544,7 +546,7 @@ async function assertBoardEditable(ctx: Ctx, boardId: string): Promise<void> {
   }
 }
 
-/** Resolve a boardId or fall back to Default (optionally create by name). */
+/** Resolve a boardId or create by name — never invents a Default board. */
 export async function resolveBoardId(
   ctx: Ctx,
   opts?: { boardId?: string | null; newBoardName?: string | null },
@@ -557,8 +559,7 @@ export async function resolveBoardId(
     const b = await ctx.db.getBoard(opts.boardId);
     if (b) return b.id;
   }
-  const def = await ensureDefaultBoard(ctx);
-  return def.id;
+  throw new Error("Pick or create a board before adding leads");
 }
 
 /**
@@ -1694,11 +1695,18 @@ export async function setOutreachDeliveryStatus(
     }
   }
 
-  // Bounce: email never landed — undo auto Contacted from send, journal a note.
+  // Bounce: email never landed — strip the bad address, undo Contacted, journal.
   if (deliveryStatus === "bounced" && prev !== "bounced") {
     const lead = await ctx.db.getLead(outreach.leadId);
     if (lead) {
       const patch: Partial<Lead> = {};
+      const bouncedAddr = (outreach.toEmail ?? "").trim().toLowerCase();
+      if (bouncedAddr && lead.emails.some((e) => e.toLowerCase() === bouncedAddr)) {
+        patch.emails = lead.emails.filter((e) => e.toLowerCase() !== bouncedAddr);
+      } else if (lead.emails.length === 1) {
+        // Single known address + bounce → clear so we don't re-send the same one.
+        patch.emails = [];
+      }
       const methods = lead.contactMethods ?? [];
       const withoutEmail = methods.filter((m) => m !== "email");
       if (withoutEmail.length !== methods.length) {
@@ -1710,12 +1718,15 @@ export async function setOutreachDeliveryStatus(
       }
       const today = nowIso().slice(0, 10);
       const existingFu = lead.followUps ?? [];
-      const hasBounceNote = existingFu.some(
-        (f) => f.note.trim().toLowerCase() === "email bounced" && f.date === today,
+      const bounceNote = bouncedAddr
+        ? `Email bounced (${bouncedAddr})`
+        : "Email bounced";
+      const hasBounceNote = existingFu.some((f) =>
+        f.note.trim().toLowerCase().startsWith("email bounced"),
       );
       if (!hasBounceNote) {
         patch.followUps = [
-          { id: newId("fu"), date: today, note: "Email bounced", done: false },
+          { id: newId("fu"), date: today, note: bounceNote, done: false },
           ...existingFu,
         ];
       }
@@ -2371,8 +2382,7 @@ export async function createManualLead(
     db = access.db;
     workspaceId = access.board.workspaceId;
   } else {
-    const def = await ensureDefaultBoard(ctx);
-    boardId = def.id;
+    throw new Error("Pick or create a board before adding leads");
   }
 
   await assertBoardEditable(ctx, boardId);

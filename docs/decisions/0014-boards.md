@@ -1,5 +1,5 @@
 # 0014. First-class Boards for lead collections
-- Status: accepted
+- Status: accepted _(amended by [0023](0023-no-auto-default-board.md) — no auto Default)_
 - Date: 2026-07-15
 
 ## Context

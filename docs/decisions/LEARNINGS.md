@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-06 — Map pins, no Default board, bounce UX, MEV catch
+- Map: only pin leads geocoded from their own `location` (street first; city
+  after street pending clears). Badge shows “N leads remaining to be mapped…”.
+- No auto Default board (ADR 0023). Search/import must pick or create a board.
+- Boards card: removed Outreach profile / “Fill in Settings” (edit in Settings).
+- Bounce: no rose card highlight — “Bounced” pill beside fit; strip bounced
+  address from `lead.emails` and note it on the follow-up.
+- MEV on `general@ingenerosdelestado.es`: Status Invalid + Disposable_Domain
+  (toxic D6) → hardFail — verify-at-send would have blocked. Resend bounce
+  webhooks can arrive hours–a day later (deferral / ISP feedback loops).
+
 ### 2026-08-06 — Easy-only send + skeleton UI pass
 - Removed Pro mailbox toggle from Settings; `resolveSendPath` always Easy.
 - Rebuilt studio loading skeletons to mirror real layouts (Outreach rows,

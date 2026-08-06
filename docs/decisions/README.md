@@ -52,7 +52,7 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0011 — Easy send: Resend or Maileroo (BYO)](0011-easy-resend-or-maileroo.md) _(amended by [0021](0021-per-profile-sending-identity.md) for per-profile From/keys)_
 - [0012 — Natural email bodies — no STOP footer](0012-natural-email-bodies-no-stop-footer.md) _(amends constitution Art. I.3)_
 - [0013 — Pitch AI: no heuristic fallback](0013-pitch-ai-no-heuristic-fallback.md)
-- [0014 — First-class Boards for lead collections](0014-boards.md)
+- [0014 — First-class Boards for lead collections](0014-boards.md) _(amended by [0023](0023-no-auto-default-board.md) — no auto Default)_
 - [0015 — Board sharing with soft presence lock](0015-board-sharing-soft-lock.md)
 - [0016 — MyEmailVerifier is the primary email verify provider](0016-myemailverifier-primary-verify.md) _(amends 0009 verify path)_
 - [0017 — Hidden Insider plan with shared free-credit pool](0017-insider-shared-free-pool.md) _(credit display amended by [0018](0018-insider-raw-firecrawl-credits.md))_
@@ -61,5 +61,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0020 — Cursor API is not a Firecrawl alternative](0020-no-cursor-api-for-search.md) _(deferred: Insider Grok/LLM extract on FC markdown)_
 - [0021 — Per-profile Easy Sending identity](0021-per-profile-sending-identity.md) _(amends 0011; Pro mailbox still ADR 0010)_
 - [0022 — Board ↔ outreach profile alignment](0022-board-outreach-profile.md) _(amends 0014 + 0021)_
+- [0023 — No auto-created Default board](0023-no-auto-default-board.md) _(amends 0014)_
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

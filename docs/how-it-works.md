@@ -70,7 +70,7 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
   - **Search** (default / no `?view=`) — always-expanded search form + CSV/Excel
     import. Search and import open a board-picker modal; leads land on the
-    chosen board (workspace **Default** if none). Import dedupes by **company
+    chosen board (create one if the workspace has none). Import dedupes by **company
     name** only (not website/email — aggregators share those). Live search
     when Firecrawl is configured; otherwise load demo data. After a run, the
     app redirects to Pipeline. Integration status lives in Settings (no mode
@@ -107,10 +107,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
   - **Boards** (`?view=boards`) — create / rename / delete named lead
     collections; invite collaborators by email (in-app accept). Soft lock when
-    someone else is editing. Every workspace has a non-deletable **Default**
-    board. Creating a board also creates an empty outreach profile with the
-    same name (fill pitch / From in Settings; profiles are not created or
-    deleted separately). Also linked from Settings → Boards.
+    someone else is editing. Boards are created at search/import (no auto
+    **Default** — ADR 0023). Creating a board also creates a matching empty
+    outreach profile (edit pitch / From in Settings). Also linked from
+    Settings → Boards.
 
   - **Lead detail drawer** — opens from any lead card/row/pin. Contact info
     (incl. full address), about blurb, fit-score reasons, CRM stage, dated notes
@@ -228,7 +228,7 @@ the local JSON-store path is always unmetered/demo.
 A `Run` has many `Lead`s; each `Lead` has at most one `Outreach`. By default everything is persisted to `data/db.json` (git-ignored — delete it
 to reset); in production on Cloudflare Workers, `getDb()` receives a D1 binding
 and uses `D1Store` instead. Pipeline/Leads respect the sidebar board filter
-(**All** by default). Each workspace has a **Default** board; see ADR 0014.
+(**All** by default). Boards are user-created (ADR 0014 / 0023).
 
 Board hydrate is **progressive + slim**: first ~150 leads, then chunks of ~400,
 without email bodies / about blurbs / notes (`detailLoaded: false`). Opening a

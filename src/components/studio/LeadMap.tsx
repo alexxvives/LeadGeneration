@@ -141,18 +141,34 @@ function ensureLeafletCss() {
   document.head.appendChild(link);
 }
 
+/** Street-level candidates get exact geocode; plain "City, Country" stays city-level. */
+function isStreetCandidate(loc: string): boolean {
+  if (!loc.includes(",")) return false;
+  const parts = loc.split(",").map((p) => p.trim()).filter(Boolean);
+  return parts.length >= 3 || /^\d/.test(parts[0] ?? "");
+}
+
+/**
+ * Only pin leads with a geocode of their own location (exact street, or city
+ * when not a street candidate / after street failed). Never place a pin from
+ * the board hint alone — those look "mapped" but aren't.
+ */
 function buildPinsAround(
   leads: LeadWithOutreach[],
   centers: Map<string, Coords>,
-  fallback: Coords | null,
-  hintLower: string,
-  exactByLoc?: Map<string, Coords>,
-): Pin[] {
+  exactByLoc: Map<string, Coords> | undefined,
+  opts: { refining: boolean; streetPending: Set<string> },
+): { pins: Pin[]; remaining: number } {
   const next: Pin[] = [];
+  let remaining = 0;
   for (const l of leads) {
-    const loc = (l.location?.trim() || hintLower).trim();
+    const loc = l.location?.trim() ?? "";
+    if (!loc) {
+      remaining++;
+      continue;
+    }
     const locKey = loc.toLowerCase();
-    const exact = loc ? exactByLoc?.get(locKey) ?? null : null;
+    const exact = exactByLoc?.get(locKey) ?? null;
     if (exact) {
       // Tiny offset so stacked same-building pins stay clickable.
       const j = jitter(l.id || l.company, 0.0005);
@@ -165,14 +181,20 @@ function buildPinsAround(
       continue;
     }
 
-    const key = loc ? cityKey(loc) : "";
-    let coords = key ? centers.get(key) ?? null : null;
-    if (!coords) coords = fallback;
-    if (!coords) continue;
+    // Still waiting on street refine — don't show a fuzzy city pin yet.
+    if (isStreetCandidate(loc) && (opts.refining || opts.streetPending.has(locKey))) {
+      remaining++;
+      continue;
+    }
 
-    const sameAsHint = !loc || locKey === hintLower;
-    // ~0.8–1.2 km spread within a city (was ~2–3 km).
-    const j = jitter(l.id || l.company, sameAsHint ? 0.008 : 0.012);
+    const key = cityKey(loc);
+    const coords = key ? centers.get(key) ?? null : null;
+    if (!coords) {
+      remaining++;
+      continue;
+    }
+
+    const j = jitter(l.id || l.company, 0.012);
     next.push({
       id: l.id,
       company: l.company,
@@ -180,7 +202,7 @@ function buildPinsAround(
       crmStage: l.crmStage ?? "new",
     });
   }
-  return next;
+  return { pins: next, remaining };
 }
 
 export function LeadMap({
@@ -203,13 +225,24 @@ export function LeadMap({
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pins, setPins] = useState<Pin[]>([]);
+  const [remaining, setRemaining] = useState(0);
   const [loadingPins, setLoadingPins] = useState(true);
-  const [refining, setRefining] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const mapBusy = (!ready || loadingPins) && !initError;
   const showMapSkeleton = useDeferredLoading(mapBusy);
 
   const mapLeads = leads;
+
+  const applyPins = (
+    centers: Map<string, Coords>,
+    exact: Map<string, Coords> | undefined,
+    opts: { refining: boolean; streetPending: Set<string> },
+  ) => {
+    const built = buildPinsAround(mapLeads, centers, exact, opts);
+    setPins(built.pins);
+    setRemaining(built.remaining);
+    return built;
+  };
 
   const hint = useMemo(
     () =>
@@ -234,20 +267,23 @@ export function LeadMap({
     didFitRef.current = false;
     (async () => {
       setLoadingPins(true);
-      setRefining(false);
+      setRemaining(0);
       const hintLower = hint.trim().toLowerCase();
       const base = hint ? await geocode(hint) : null;
       if (cancelled) return;
 
-      // Fast path: one geocode → all pins visible immediately.
+      // Seed city centers from the board hint + each lead's own city key.
       const centers = new Map<string, Coords>();
       if (base && hintLower) centers.set(cityKey(hint), base);
 
-      const immediate = buildPinsAround(mapLeads, centers, base, hintLower);
-      setPins(immediate);
+      const emptyPending = new Set<string>();
+      const immediate = applyPins(centers, undefined, {
+        refining: false,
+        streetPending: emptyPending,
+      });
       setError(
-        immediate.length === 0
-          ? "Couldn't place leads on the map. Add a Location to your search, or wait for scraped addresses."
+        immediate.pins.length === 0 && immediate.remaining === mapLeads.length
+          ? "Couldn't place leads on the map. Add addresses on leads, or wait for scraped locations."
           : null,
       );
       setLoadingPins(false);
@@ -258,13 +294,25 @@ export function LeadMap({
         const loc = l.location?.trim();
         if (!loc) continue;
         const key = cityKey(loc);
-        if (key && key !== cityKey(hint) && !centers.has(key)) cities.add(key);
+        if (key && !centers.has(key)) cities.add(key);
       }
       const toResolve = [...cities].slice(0, MAX_CITY_GEOCODES);
-      const needRefine = toResolve.length > 0 || mapLeads.some((l) => l.location?.includes(","));
+
+      // Street-level: every unique full address, in background batches.
+      const streets: string[] = [];
+      const seenStreet = new Set<string>();
+      for (const l of mapLeads) {
+        const loc = l.location?.trim();
+        if (!loc || !isStreetCandidate(loc)) continue;
+        const key = loc.toLowerCase();
+        if (seenStreet.has(key)) continue;
+        seenStreet.add(key);
+        streets.push(key);
+      }
+
+      const needRefine = toResolve.length > 0 || streets.length > 0;
       if (!needRefine) return;
 
-      setRefining(true);
       if (toResolve.length > 0) {
         await mapPool(toResolve, GEOCODE_CONCURRENCY, async (key) => {
           if (cancelled) return;
@@ -272,23 +320,10 @@ export function LeadMap({
           if (coords) centers.set(key, coords);
         });
         if (cancelled) return;
-        setPins(buildPinsAround(mapLeads, centers, base, hintLower));
-      }
-
-      // Street-level: every unique full address, in background batches.
-      // Cached hits apply immediately; remaining keep refining until done.
-      const streets: string[] = [];
-      const seenStreet = new Set<string>();
-      for (const l of mapLeads) {
-        const loc = l.location?.trim();
-        if (!loc || !loc.includes(",")) continue;
-        // Skip pure "City, Country" — already covered by city refine.
-        const parts = loc.split(",").map((p) => p.trim()).filter(Boolean);
-        if (parts.length < 3 && !/^\d/.test(parts[0] ?? "")) continue;
-        const key = loc.toLowerCase();
-        if (seenStreet.has(key)) continue;
-        seenStreet.add(key);
-        streets.push(key);
+        applyPins(centers, undefined, {
+          refining: true,
+          streetPending: new Set(streets),
+        });
       }
 
       const exact = new Map<string, Coords>();
@@ -301,9 +336,8 @@ export function LeadMap({
           pending.push(loc);
         }
       }
-      if (exact.size > 0) {
-        setPins(buildPinsAround(mapLeads, centers, base, hintLower, exact));
-      }
+      const streetPending = new Set(pending);
+      applyPins(centers, exact, { refining: true, streetPending });
 
       for (let i = 0; i < pending.length; i += STREET_BATCH) {
         if (cancelled) return;
@@ -312,15 +346,19 @@ export function LeadMap({
           if (cancelled) return;
           const coords = await geocode(loc);
           if (coords) exact.set(loc, coords);
+          streetPending.delete(loc);
         });
         if (cancelled) return;
-        setPins(buildPinsAround(mapLeads, centers, base, hintLower, exact));
+        applyPins(centers, exact, { refining: true, streetPending });
         if (i + STREET_BATCH < pending.length) {
           await new Promise((r) => setTimeout(r, STREET_BATCH_PAUSE_MS));
         }
       }
 
-      setRefining(false);
+      applyPins(centers, exact, {
+        refining: false,
+        streetPending: new Set(),
+      });
     })();
     return () => {
       cancelled = true;
@@ -485,14 +523,18 @@ export function LeadMap({
             {initError ?? error}
           </div>
         )}
-        {ready && !error && !initError && pins.length > 0 && (
+        {ready && !error && !initError && (pins.length > 0 || remaining > 0) && (
           <div
-            className="pointer-events-none absolute right-4 top-4 z-[500] rounded-full border border-white/10 bg-ink-900/90 px-3 py-1.5 text-xs text-mist-300 shadow backdrop-blur"
+            className="pointer-events-none absolute right-4 top-4 z-[500] max-w-[min(100%-2rem,20rem)] rounded-full border border-white/10 bg-ink-900/90 px-3 py-1.5 text-xs text-mist-300 shadow backdrop-blur"
             data-testid="map-pin-count"
           >
-            {pins.length} pin{pins.length === 1 ? "" : "s"}
+            {pins.length > 0
+              ? `${pins.length} pin${pins.length === 1 ? "" : "s"}`
+              : "Mapping…"}
             {hint ? ` · ${hint}` : ""}
-            {refining ? " · refining…" : ""}
+            {remaining > 0
+              ? ` · ${remaining} lead${remaining === 1 ? "" : "s"} remaining to be mapped…`
+              : ""}
           </div>
         )}
         {pins.length > 0 && (

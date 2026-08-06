@@ -1873,8 +1873,8 @@ export function Studio() {
                     role="status"
                   >
                     {bouncedCount === 1
-                      ? "1 email bounced — open the rose-highlighted card to fix the address."
-                      : `${bouncedCount} emails bounced — rose-highlighted cards need a better address.`}
+                      ? "1 email bounced — find the Bounced tag next to fit score and fix the address."
+                      : `${bouncedCount} emails bounced — cards tagged Bounced need a better address.`}
                   </p>
                 );
               })()}
