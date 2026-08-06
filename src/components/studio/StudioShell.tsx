@@ -25,8 +25,11 @@ import {
   loadStoredBoardFilter,
   storeBoardFilter,
 } from "@/components/studio/BoardPicker";
-import { ProfilePicker } from "@/components/studio/ProfilePicker";
 import { api } from "@/lib/client-api";
+import {
+  loadOutreachProfiles,
+  setActiveOutreachProfile,
+} from "@/lib/sender-profile";
 import type { BoardSummary } from "@/lib/types";
 import {
   SearchIcon,
@@ -189,12 +192,26 @@ export function StudioShell({
     const next = id ?? "all";
     storeBoardFilter(next);
     setActiveBoardId(id);
+    // Board → profile: activate the board's linked outreach profile.
+    if (id) {
+      const linked = boards.find((b) => b.id === id)?.outreachProfileId;
+      if (linked) setActiveOutreachProfile(linked);
+    }
     const params = new URLSearchParams(searchParams.toString());
     if (next === "all") params.delete("board");
     else params.set("board", next);
     const q = params.toString();
     router.replace(q ? `${pathname}?${q}` : pathname);
   };
+
+  // Keep profile aligned when URL/storage restores a board (not only picker clicks).
+  useEffect(() => {
+    if (!activeBoardId) return;
+    const linked = boards.find((b) => b.id === activeBoardId)?.outreachProfileId;
+    if (!linked) return;
+    if (loadOutreachProfiles().activeId === linked) return;
+    setActiveOutreachProfile(linked);
+  }, [activeBoardId, boards]);
 
   const boardHref = (href: string) => {
     if (!activeBoardId) return href;
@@ -488,13 +505,12 @@ export function StudioShell({
           {wide &&
           displayView !== "admin" &&
           displayView !== "admin-users" ? (
-            <div className="mb-5 space-y-2">
+            <div className="mb-5">
               <BoardPicker
                 boards={boards}
                 activeBoardId={activeBoardId}
                 onChange={setBoardFilter}
               />
-              <ProfilePicker />
             </div>
           ) : null}
 

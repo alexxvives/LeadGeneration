@@ -87,6 +87,10 @@ function normalizeLead(l: Lead): Lead {
         ? raw.contactMethods
         : (raw.contactMethod ?? null),
     ),
+    contactedByUserId:
+      typeof raw.contactedByUserId === "string" ? raw.contactedByUserId : null,
+    contactedByName:
+      typeof raw.contactedByName === "string" ? raw.contactedByName : null,
     notes: (raw.notes as Lead["notes"] | undefined) ?? null,
     followUps: (raw.followUps as Lead["followUps"] | undefined) ?? [],
     customFields:
@@ -105,9 +109,12 @@ function normalizeRun(r: Run): Run {
 }
 
 function normalizeBoard(b: Board): Board {
+  const raw = b as unknown as Record<string, unknown>;
   return {
     ...b,
     isDefault: !!b.isDefault,
+    outreachProfileId:
+      typeof raw.outreachProfileId === "string" ? raw.outreachProfileId : null,
   };
 }
 

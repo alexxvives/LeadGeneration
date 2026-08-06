@@ -4,24 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckIcon, XIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
 import type { DomainDnsRecord, DomainHealthResult } from "@/lib/email/domain-health";
-import { readMigratedKey } from "@/lib/browser-storage";
-
-const MANUAL_KEY = "hermes_domain_health_v1";
-const MANUAL_LEGACY_KEYS = ["leadify_domain_health_v1", "lodestar_domain_health_v1"];
-
-type ManualChecks = {
-  spf: boolean;
-  dkim: boolean;
-  dmarc: boolean;
-  warmup: boolean;
-};
-
-const MANUAL_DEFAULTS: ManualChecks = {
-  spf: false,
-  dkim: false,
-  dmarc: false,
-  warmup: false,
-};
 
 function statusTone(status: DomainDnsRecord["status"]) {
   switch (status) {
@@ -36,26 +18,58 @@ function statusTone(status: DomainDnsRecord["status"]) {
   }
 }
 
+type StatusItem = {
+  key: string;
+  label: string;
+  ok: boolean;
+  tip: string;
+};
+
+function itemsFromHealth(health: DomainHealthResult | null): StatusItem[] {
+  if (health && health.records.length > 0) {
+    return health.records.map((r, i) => {
+      const ok = r.status === "verified";
+      const tip = ok
+        ? `${r.record} verified`
+        : `${r.record}: ${r.status}${r.value ? ` — expected ${r.type} ${r.name}` : ""}`;
+      return {
+        key: `${r.record}-${r.type}-${i}`,
+        label: r.record,
+        ok,
+        tip,
+      };
+    });
+  }
+  // Demo / no API key / domain not registered yet — show expected checks as not ready.
+  const reason =
+    health?.message?.trim() ||
+    (health?.mode === "demo"
+      ? "Add a Resend API key and From email to check DNS live"
+      : "Domain DNS not available yet — save a From email on a verified Resend domain");
+  return (
+    [
+      { key: "spf", label: "SPF" },
+      { key: "dkim", label: "DKIM" },
+      { key: "dmarc", label: "DMARC" },
+    ] as const
+  ).map(({ key, label }) => ({
+    key,
+    label,
+    ok: false,
+    tip: reason,
+  }));
+}
+
 /**
  * Easy Sending: live Resend DNS rows (auto-check on load + every 30s until
- * ready). Manual fallback when no API key (demo-safe). Compact mode fits
- * inside the sending-identity card.
+ * ready). Status-only — green check / red cross with hover tip. Compact mode
+ * fits inside the sending-identity card.
  */
 export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
   const [health, setHealth] = useState<DomainHealthResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [manual, setManual] = useState<ManualChecks>(MANUAL_DEFAULTS);
-
-  useEffect(() => {
-    try {
-      const raw = readMigratedKey(MANUAL_KEY, MANUAL_LEGACY_KEYS);
-      if (raw) setManual({ ...MANUAL_DEFAULTS, ...JSON.parse(raw) });
-    } catch {
-      /* ignore */
-    }
-  }, []);
 
   const poll = useCallback(async () => {
     setLoading(true);
@@ -100,89 +114,48 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
     }
   };
 
-  const toggleManual = (key: keyof ManualChecks) => {
-    setManual((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      try {
-        localStorage.setItem(MANUAL_KEY, JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  };
-
-  const showManual = !health || health.mode === "demo" || health.records.length === 0;
+  const items = itemsFromHealth(health);
 
   if (compact) {
     const statusLabel = health?.ready
-      ? "Ready to send"
+      ? "Ready"
       : health?.domain
-        ? `DNS for ${health.domain}`
-        : "Verify sending domain";
+        ? health.domain
+        : "Verify domain";
     return (
-      <div className="rounded-lg border border-white/8 bg-ink-950/40 px-3 py-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-mist-500">
-              Domain health
-            </p>
-            <p className="mt-0.5 text-sm text-mist-200">{statusLabel}</p>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-mist-500">
-              {health?.message ??
-                "Add SPF / DKIM at your DNS host — we check Resend until they verify."}
-            </p>
+      <div className="rounded-lg border border-white/8 bg-ink-950/40 px-3 py-1.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-mist-500">
+            Domain health
+          </p>
+          <p className="min-w-0 truncate text-xs text-mist-200">{statusLabel}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {items.map((item) => (
+              <span
+                key={item.key}
+                title={item.tip}
+                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${
+                  item.ok
+                    ? "bg-aurora-400/15 text-aurora-300"
+                    : "bg-rose-500/10 text-rose-300"
+                }`}
+              >
+                {item.ok ? (
+                  <CheckIcon className="h-3 w-3" aria-hidden />
+                ) : (
+                  <XIcon className="h-3 w-3" aria-hidden />
+                )}
+                {item.label}
+              </span>
+            ))}
           </div>
           {loading ? (
-            <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-mist-500">
+            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-mist-500">
               <Spinner className="h-3 w-3" />
-              Checking…
             </span>
           ) : null}
         </div>
-        {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
-        {health && health.records.length > 0 ? (
-          <ul className="mt-2 space-y-1">
-            {health.records.map((r, i) => (
-              <li
-                key={`${r.name}-${r.type}-${i}`}
-                className="flex items-center gap-2 text-[11px] text-mist-400"
-              >
-                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                  r.status === "verified" ? "bg-aurora-400" : "bg-mist-600"
-                }`} />
-                <span className="truncate text-mist-300">{r.record}</span>
-                <span className="ml-auto shrink-0 uppercase tracking-wider text-mist-600">
-                  {r.status}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {showManual ? (
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 border-t border-white/5 pt-2">
-            {(
-              [
-                { key: "spf" as const, label: "SPF" },
-                { key: "dkim" as const, label: "DKIM" },
-                { key: "dmarc" as const, label: "DMARC" },
-              ] as const
-            ).map(({ key, label }) => (
-              <label
-                key={key}
-                className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] text-mist-400"
-              >
-                <input
-                  type="checkbox"
-                  checked={manual[key]}
-                  onChange={() => toggleManual(key)}
-                  className="rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40"
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        ) : null}
+        {error ? <p className="mt-1 text-[11px] text-rose-300">{error}</p> : null}
       </div>
     );
   }
@@ -218,16 +191,18 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
         <p className="border-b border-white/5 px-4 py-3 text-sm text-rose-300">{error}</p>
       )}
 
-      {health && health.records.length > 0 && (
+      {health && health.records.length > 0 ? (
         <div className="divide-y divide-white/5">
           {health.records.map((r, i) => {
             const copyKey = `${r.name}-${r.type}-${i}`;
+            const ok = r.status === "verified";
             return (
               <div key={copyKey} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start">
                 <span
+                  title={ok ? `${r.record} verified` : `${r.record}: ${r.status}`}
                   className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${statusTone(r.status)}`}
                 >
-                  {r.status === "verified" ? (
+                  {ok ? (
                     <CheckIcon className="h-4 w-4" />
                   ) : (
                     <XIcon className="h-4 w-4" />
@@ -259,69 +234,48 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
             );
           })}
         </div>
-      )}
-
-      {showManual && (
-        <div className="border-t border-white/5">
-          <p className="px-4 pt-3 text-xs text-mist-500">
-            Manual checklist (stored in this browser)
-            {health?.docsUrl ? (
-              <>
-                {" "}
-                ·{" "}
-                <a
-                  href={health.docsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-aurora-300 hover:underline"
-                >
-                  Resend domain docs
-                </a>
-              </>
-            ) : null}
-          </p>
-          {(
-            [
-              { key: "spf" as const, label: "SPF record", hint: "Authorize Resend on your domain" },
-              { key: "dkim" as const, label: "DKIM signing", hint: "Add Resend DKIM records" },
-              {
-                key: "dmarc" as const,
-                label: "DMARC policy",
-                hint: "Start with p=none; tighten once aligned",
-              },
-              {
-                key: "warmup" as const,
-                label: "Warm-up plan",
-                hint: "Ramp slowly — don’t blast from day one",
-              },
-            ] as const
-          ).map((item, i) => {
-            const on = manual[item.key];
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => toggleManual(item.key)}
-                className={`flex w-full items-start gap-4 px-4 py-3 text-left transition-colors hover:bg-white/[0.03] ${
-                  i > 0 ? "border-t border-white/5" : ""
+      ) : (
+        <ul className="divide-y divide-white/5">
+          {items.map((item) => (
+            <li
+              key={item.key}
+              title={item.tip}
+              className="flex items-start gap-4 px-4 py-3"
+            >
+              <span
+                className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
+                  item.ok
+                    ? "bg-aurora-400/15 text-aurora-300"
+                    : "bg-rose-500/15 text-rose-300"
                 }`}
               >
-                <span
-                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${
-                    on ? "bg-aurora-400/15 text-aurora-300" : "bg-white/5 text-mist-500"
-                  }`}
-                >
-                  {on ? <CheckIcon className="h-4 w-4" /> : <XIcon className="h-4 w-4" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-mist-100">{item.label}</span>
-                  <span className="block text-sm text-mist-500">{item.hint}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                {item.ok ? (
+                  <CheckIcon className="h-4 w-4" />
+                ) : (
+                  <XIcon className="h-4 w-4" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium text-mist-100">{item.label}</span>
+                <span className="block text-sm text-mist-500">{item.tip}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
+
+      {health?.docsUrl ? (
+        <p className="border-t border-white/5 px-4 py-3 text-xs text-mist-500">
+          <a
+            href={health.docsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-aurora-300 hover:underline"
+          >
+            Resend domain docs
+          </a>
+        </p>
+      ) : null}
     </div>
   );
 }

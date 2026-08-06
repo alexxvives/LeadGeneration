@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
-import { deleteBoard, renameBoard } from "@/lib/service";
+import { deleteBoard, updateBoard } from "@/lib/service";
 import { isNotFoundError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PatchSchema = z.object({
-  name: z.string().min(1).max(80),
-});
+const PatchSchema = z
+  .object({
+    name: z.string().min(1).max(80).optional(),
+    outreachProfileId: z.string().min(1).max(80).nullable().optional(),
+  })
+  .refine(
+    (v) => v.name !== undefined || v.outreachProfileId !== undefined,
+    { message: "Nothing to update" },
+  );
 
 export async function PATCH(
   req: Request,
@@ -24,17 +30,20 @@ export async function PATCH(
   }
   const parsed = PatchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Board name is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid patch" },
+      { status: 400 },
+    );
   }
   try {
     const ctx = await getCtx();
-    const board = await renameBoard(ctx, id, parsed.data.name);
+    const board = await updateBoard(ctx, id, parsed.data);
     return NextResponse.json({ board });
   } catch (err) {
     if (isNotFoundError(err)) {
       return NextResponse.json({ error: err.message }, { status: 404 });
     }
-    const message = err instanceof Error ? err.message : "Failed to rename board";
+    const message = err instanceof Error ? err.message : "Failed to update board";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

@@ -165,16 +165,31 @@ export const api = {
 
   listBoards: () => jsonFetch<{ boards: BoardSummary[] }>("/api/boards"),
 
-  createBoard: (name: string) =>
+  createBoard: (
+    name: string,
+    opts?: { outreachProfileId?: string | null },
+  ) =>
     jsonFetch<{ board: Board }>("/api/boards", {
       method: "POST",
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({
+        name,
+        outreachProfileId: opts?.outreachProfileId,
+      }),
     }),
 
   renameBoard: (id: string, name: string) =>
     jsonFetch<{ board: Board }>(`/api/boards/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ name }),
+    }),
+
+  updateBoard: (
+    id: string,
+    patch: { name?: string; outreachProfileId?: string | null },
+  ) =>
+    jsonFetch<{ board: Board }>(`/api/boards/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
     }),
 
   deleteBoard: (id: string) =>

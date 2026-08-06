@@ -121,9 +121,10 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - Quotas + rate limits in `service.ts`.
 - Settings → Easy: Resend, Maileroo, or **SMTP** (Hostinger / Zoho / etc.) +
   **Verify emails before sending** (MyEmailVerifier) toggle; Pro mailbox
-  Connect Google (`SendSetupPanel`). Easy From + keys are **per outreach
-  profile** (`profile_send_settings_json`, migration 0027 / ADR 0021); Pro
-  mailbox stays workspace-scoped. Legacy workspace SMTP/From columns remain
+  Connect Google (`SendSetupPanel`).   Easy From + keys are **per outreach
+  profile** (`profile_send_settings_json`, migration 0027 / ADR 0021); each
+  **board** links to one profile (`outreach_profile_id`, ADR 0022) so send uses
+  that board’s From/keys. Pro mailbox stays workspace-scoped. Legacy workspace SMTP/From columns remain
   as fallback. Password never echoed — Settings gets `hasSmtpPass` only.
   Platform `SMTP_*` env stays auth / last-resort fallback, not tenant
   mailboxes. **Send a test email** (`POST /api/send/test`) uses the active
@@ -145,9 +146,13 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   highlight + toast on soft refresh. Resend inbound `email.received` →
   `replied` (+ CRM In Conversation). Missing signing secret / unexpected
   handler errors return **200 ignored** (not 5xx) so Resend does not
-  auto-disable the endpoint. Saving Easy settings re-enables a Resend-disabled
-  webhook via API. Platform fallback: `RESEND_WEBHOOK_SECRET` /
-  `MAILEROO_WEBHOOK_SECRET`.
+  auto-disable the endpoint. Saving Easy settings auto-registers **one**
+  webhook endpoint per Resend **account** (API key); signing secrets are kept
+  per outreach profile (and mirrored on the workspace). Different profiles that
+  share the same Resend account reuse that webhook — do **not** create one
+  webhook per profile in the Resend dashboard. The handler tries every stored
+  profile secret for the tagged workspace. Platform fallback:
+  `RESEND_WEBHOOK_SECRET` / `MAILEROO_WEBHOOK_SECRET`.
 - **Pro path:** [`0010-mailbox-oauth-send.md`](decisions/0010-mailbox-oauth-send.md)
   (accepted) — Google OAuth behind `sendEmail()` when connected; Microsoft next.
   Warmup: free DIY slow ramp; paid partner optional — no free automated network.

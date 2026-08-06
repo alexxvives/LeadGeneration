@@ -60,5 +60,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0019 — Admin Find-leads toggle + account deletion](0019-find-leads-toggle-account-deletion.md)
 - [0020 — Cursor API is not a Firecrawl alternative](0020-no-cursor-api-for-search.md) _(deferred: Insider Grok/LLM extract on FC markdown)_
 - [0021 — Per-profile Easy Sending identity](0021-per-profile-sending-identity.md) _(amends 0011; Pro mailbox still ADR 0010)_
+- [0022 — Board ↔ outreach profile alignment](0022-board-outreach-profile.md) _(amends 0014 + 0021)_
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

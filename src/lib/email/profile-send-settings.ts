@@ -18,6 +18,9 @@ export type ProfileSendSettings = {
   easyEmailProvider: EasyEmailProvider;
   preferredSendPath: "easy" | "pro" | null;
   resendApiKey: string | null;
+  /** Auto-registered Resend webhook for this profile's API key (per account). */
+  resendWebhookId: string | null;
+  resendWebhookSecret: string | null;
   mailerooApiKey: string | null;
   smtpHost: string | null;
   smtpPort: number | null;
@@ -59,6 +62,14 @@ export function emptyProfileSendSettings(
         ? partial.preferredSendPath
         : null,
     resendApiKey: partial?.resendApiKey ?? null,
+    resendWebhookId:
+      typeof partial?.resendWebhookId === "string"
+        ? partial.resendWebhookId
+        : null,
+    resendWebhookSecret:
+      typeof partial?.resendWebhookSecret === "string"
+        ? partial.resendWebhookSecret
+        : null,
     mailerooApiKey: partial?.mailerooApiKey ?? null,
     smtpHost: partial?.smtpHost ?? null,
     smtpPort:
@@ -81,6 +92,8 @@ export function legacyWorkspaceToProfileSendSettings(
     | "easyEmailProvider"
     | "preferredSendPath"
     | "resendApiKey"
+    | "resendWebhookId"
+    | "resendWebhookSecret"
     | "mailerooApiKey"
     | "smtpHost"
     | "smtpPort"
@@ -96,12 +109,30 @@ export function legacyWorkspaceToProfileSendSettings(
     easyEmailProvider: ws.easyEmailProvider,
     preferredSendPath: ws.preferredSendPath,
     resendApiKey: ws.resendApiKey,
+    resendWebhookId: ws.resendWebhookId,
+    resendWebhookSecret: ws.resendWebhookSecret,
     mailerooApiKey: ws.mailerooApiKey,
     smtpHost: ws.smtpHost,
     smtpPort: ws.smtpPort,
     smtpUser: ws.smtpUser,
     smtpPass: ws.smtpPass,
   });
+}
+
+/** Signing secrets for Resend webhooks — workspace + every profile entry. */
+export function collectResendWebhookSecrets(ws: Workspace): string[] {
+  const out: string[] = [];
+  const push = (s: string | null | undefined) => {
+    const t = s?.trim();
+    if (t && !out.includes(t)) out.push(t);
+  };
+  push(ws.resendWebhookSecret);
+  for (const entry of Object.values(
+    parseProfileSendSettingsMap(ws.profileSendSettingsJson),
+  )) {
+    push(entry.resendWebhookSecret);
+  }
+  return out;
 }
 
 export function parseProfileSendSettingsMap(

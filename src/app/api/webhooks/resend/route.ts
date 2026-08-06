@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb, LOCAL_WORKSPACE_ID } from "@/lib/db";
 import { getD1Binding } from "@/lib/cf";
 import { setOutreachDeliveryStatus, type Ctx } from "@/lib/service";
+import { collectResendWebhookSecrets } from "@/lib/email/profile-send-settings";
 import type { DeliveryStatus } from "@/lib/types";
 import { authRequired, env } from "@/lib/config";
 
@@ -82,16 +83,16 @@ async function handleResendEvent(
   const binding = await getD1Binding();
   const probe = getDb(binding, LOCAL_WORKSPACE_ID);
 
-  // Candidate Svix secrets: workspace BYO first, platform as fallback.
-  // When a BYO workspace secret verifies, email-fallback stays in that workspace.
+  // Candidate Svix secrets: workspace + per-profile BYO keys, then platform.
+  // Multiple profiles may use different Resend accounts — try every stored secret.
   const platformSecret = env.resendWebhookSecret();
   const candidates: string[] = [];
   let secretWorkspaceId: string | null = null;
   if (tagWs) {
     const ws = await probe.getWorkspace(tagWs);
-    if (ws?.resendWebhookSecret?.trim()) {
-      candidates.push(ws.resendWebhookSecret.trim());
-      secretWorkspaceId = tagWs;
+    if (ws) {
+      for (const s of collectResendWebhookSecrets(ws)) candidates.push(s);
+      if (candidates.length > 0) secretWorkspaceId = tagWs;
     }
   }
   if (platformSecret && !candidates.includes(platformSecret)) {

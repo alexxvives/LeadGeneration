@@ -14,6 +14,7 @@ export async function GET() {
 
 const CreateSchema = z.object({
   name: z.string().min(1).max(80),
+  outreachProfileId: z.string().min(1).max(80).nullable().optional(),
 });
 
 export async function POST(req: Request) {
@@ -29,7 +30,9 @@ export async function POST(req: Request) {
   }
   try {
     const ctx = await getCtx();
-    const board = await createBoard(ctx, parsed.data.name);
+    const board = await createBoard(ctx, parsed.data.name, {
+      outreachProfileId: parsed.data.outreachProfileId,
+    });
     return NextResponse.json({ board }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create board";

@@ -4,6 +4,26 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-06 — Board creates paired empty profile (ADR 0022)
+- Creating a board also creates an empty outreach profile with the same name
+  (`createOutreachProfileAsync` awaits workspace PATCH before `createBoard`).
+- Sidebar: board picker only — selecting a board activates its linked profile.
+- Domain health compact UI is status-only (check/cross + hover tip), no manual
+  checkboxes.
+
+### 2026-08-05 — Board ↔ profile alignment (ADR 0022)
+- `boards.outreach_profile_id` drives active profile in the sidebar and send
+  identity for leads on that board. Distinct From/emails ⇒ distinct Resend
+  accounts ⇒ distinct webhook secrets (same Hermes URL). New boards inherit
+  the current active profile.
+
+### 2026-08-05 — Map geocode + contacted-by + Resend webhooks per key
+- Nominatim hits are durable in D1 `geocode_cache` (Worker isolates recycle
+  in-memory Maps). Map still caps city/street lookups; street refine ≤80 unique
+  addresses. Contact attribution: `contacted_by_*` on first leave-New (send or
+  CRM). Resend: one webhook URL per API key/account — store signing secret on
+  the profile that owns the key; verify tries all profile secrets for the ws.
+
 ### 2026-08-05 — MEV verify used wrong host (fail-open)
 - Send-time verify called `api.myemailverifier.com/api/validate_single.php`;
   current API is `client.myemailverifier.com/verifier/validate_single/{email}/{key}`

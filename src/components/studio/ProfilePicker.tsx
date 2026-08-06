@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MailIcon, ChevronDownIcon } from "@/components/icons";
 import {
   loadOutreachProfiles,
+  OUTREACH_PROFILE_CHANGE_EVENT,
   setActiveOutreachProfile,
   type OutreachProfile,
 } from "@/lib/sender-profile";
@@ -41,9 +42,11 @@ export function ProfilePicker({
     };
     window.addEventListener("storage", onStorage);
     window.addEventListener("focus", refresh);
+    window.addEventListener(OUTREACH_PROFILE_CHANGE_EVENT, refresh);
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener(OUTREACH_PROFILE_CHANGE_EVENT, refresh);
     };
   }, []);
 

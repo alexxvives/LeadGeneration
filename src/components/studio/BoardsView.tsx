@@ -4,6 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "@/lib/client-api";
 import type { BoardInvite, BoardMember, BoardSummary } from "@/lib/types";
+import Link from "next/link";
+import {
+  createOutreachProfileAsync,
+  loadOutreachProfiles,
+  type OutreachProfile,
+} from "@/lib/sender-profile";
 import { Spinner } from "@/components/ui";
 import { PencilIcon, UsersIcon, XIcon } from "@/components/icons";
 import { BoardsSkeleton, Bone, useDeferredLoading } from "./skeletons";
@@ -28,6 +34,7 @@ export function BoardsView({
   const [editName, setEditName] = useState("");
   const [inviteBoard, setInviteBoard] = useState<BoardSummary | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [profiles, setProfiles] = useState<OutreachProfile[]>([]);
 
   const refresh = useCallback(async () => {
     const [{ boards: list }, { invites: pending }] = await Promise.all([
@@ -36,6 +43,7 @@ export function BoardsView({
     ]);
     setBoards(list);
     setInvites(pending);
+    setProfiles(loadOutreachProfiles().profiles);
     onBoardsChange?.(list);
   }, [onBoardsChange]);
 
@@ -53,12 +61,29 @@ export function BoardsView({
     setBusy(true);
     setErr(null);
     try {
-      await api.createBoard(name);
+      // Board ↔ brand: each new board gets an empty outreach profile of the same name.
+      const profile = await createOutreachProfileAsync(name);
+      await api.createBoard(name, { outreachProfileId: profile.id });
       setCreateOpen(false);
       await refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Create failed");
       throw e;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Legacy boards without a linked profile — create one named after the board. */
+  async function handleEnsureProfile(boardId: string, boardName: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const profile = await createOutreachProfileAsync(boardName);
+      await api.updateBoard(boardId, { outreachProfileId: profile.id });
+      await refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not create outreach profile");
     } finally {
       setBusy(false);
     }
@@ -131,6 +156,7 @@ export function BoardsView({
             <BoardCard
               key={b.id}
               board={b}
+              profiles={profiles}
               editingId={editingId}
               editName={editName}
               onSelect={() => onSelectBoard?.(b.id)}
@@ -143,6 +169,7 @@ export function BoardsView({
               onCancelEdit={() => setEditingId(null)}
               onDelete={() => void handleDelete(b.id)}
               onInvite={() => setInviteBoard(b)}
+              onEnsureProfile={() => void handleEnsureProfile(b.id, b.name)}
             />
           ))}
         {invites.map((inv) => (
@@ -180,6 +207,7 @@ export function BoardsView({
             <BoardCard
               key={b.id}
               board={b}
+              profiles={profiles}
               editingId={editingId}
               editName={editName}
               onSelect={() => onSelectBoard?.(b.id)}
@@ -192,6 +220,7 @@ export function BoardsView({
               onCancelEdit={() => setEditingId(null)}
               onDelete={() => void handleDelete(b.id)}
               onInvite={() => setInviteBoard(b)}
+              onEnsureProfile={() => void handleEnsureProfile(b.id, b.name)}
             />
           ))}
       </ul>
@@ -216,6 +245,7 @@ export function BoardsView({
 
 function BoardCard({
   board: b,
+  profiles,
   editingId,
   editName,
   onSelect,
@@ -225,8 +255,10 @@ function BoardCard({
   onCancelEdit,
   onDelete,
   onInvite,
+  onEnsureProfile,
 }: {
   board: BoardSummary;
+  profiles: OutreachProfile[];
   editingId: string | null;
   editName: string;
   onSelect: () => void;
@@ -236,7 +268,11 @@ function BoardCard({
   onCancelEdit: () => void;
   onDelete: () => void;
   onInvite: () => void;
+  onEnsureProfile: () => void;
 }) {
+  const linkedProfile = b.outreachProfileId
+    ? profiles.find((p) => p.id === b.outreachProfileId) ?? null
+    : null;
   return (
     <li className="group relative">
       {!b.isDefault && !b.shared ? (
@@ -345,6 +381,39 @@ function BoardCard({
             <dt className="text-mist-500">Leads</dt>
             <dd className="font-display text-2xl text-mist-100">{b.leadCount}</dd>
           </div>
+          {!b.shared ? (
+            <div
+              className="border-t border-white/8 pt-3 text-left"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <p className="text-[10px] uppercase tracking-wider text-mist-500">
+                Outreach profile
+              </p>
+              {linkedProfile ? (
+                <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-mist-200">
+                  <span className="truncate font-medium">
+                    {linkedProfile.name.trim() || "Untitled"}
+                  </span>
+                  <Link
+                    href="/app/settings"
+                    className="shrink-0 text-aurora-300 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Fill in Settings
+                  </Link>
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onEnsureProfile}
+                  className="mt-1 text-xs font-medium text-aurora-300 hover:underline"
+                >
+                  Create outreach profile
+                </button>
+              )}
+            </div>
+          ) : null}
           <div className="grid grid-cols-3 gap-2 border-t border-white/8 pt-3 text-center">
             <div>
               <dt className="text-mist-500">Contacted</dt>
@@ -443,7 +512,8 @@ function CreateBoardModal({
               New board
             </h2>
             <p className="mt-1 text-sm text-mist-500">
-              A board holds a search niche, pipeline, and outreach queue.
+              Creates a board and a matching empty outreach profile — fill voice
+              and From address in Settings.
             </p>
           </div>
           <button

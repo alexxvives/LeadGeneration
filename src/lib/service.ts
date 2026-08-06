@@ -13,6 +13,7 @@ import {
   emptyProfileSendSettings,
   migrateLegacySendSettingsIfNeeded,
   parseProfileSendSettingsMap,
+  profileIdsFromJson,
   profileSendSettingsToWorkspaceEmail,
   resolveProfileSendSettings,
   serializeProfileSendSettingsMap,
@@ -109,6 +110,28 @@ export interface Ctx {
   scopeToWorkspace: (workspaceId: string) => LeadRepository;
 }
 
+/** First-touch attribution for shared boards — set once, cleared on reset to New. */
+function firstContactAttribution(
+  ctx: Ctx,
+  lead: Lead,
+  nextStage: CrmStage | undefined,
+): Pick<Lead, "contactedByUserId" | "contactedByName"> | null {
+  if (nextStage === "new") {
+    return { contactedByUserId: null, contactedByName: null };
+  }
+  if (nextStage == null || lead.crmStage !== "new") return null;
+  if (lead.contactedByUserId || lead.contactedByName) return null;
+  const name =
+    ctx.userName?.trim() ||
+    ctx.userEmail?.trim() ||
+    (ctx.userId ? "Teammate" : null);
+  if (!ctx.userId && !name) return null;
+  return {
+    contactedByUserId: ctx.userId,
+    contactedByName: name,
+  };
+}
+
 /** Per-workspace: orphan backfill runs at most once per isolate lifetime. */
 const defaultBoardOrphansChecked = new Set<string>();
 
@@ -136,6 +159,9 @@ export async function ensureDefaultBoard(ctx: Ctx): Promise<Board> {
         workspaceId: ctx.workspaceId,
         name: "Default",
         isDefault: true,
+        outreachProfileId: activeProfileIdFromJson(
+          (await db.getWorkspace(ctx.workspaceId))?.outreachProfilesJson,
+        ),
         createdAt: now,
         updatedAt: now,
       });
@@ -282,39 +308,71 @@ export async function listBoardSummaries(ctx: Ctx): Promise<BoardSummary[]> {
 export async function createBoard(
   ctx: Ctx,
   name: string,
+  opts?: { outreachProfileId?: string | null },
 ): Promise<Board> {
   await ensureDefaultBoard(ctx);
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Board name is required");
   if (trimmed.length > 80) throw new Error("Board name is too long");
+  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
+  const known = new Set(profileIdsFromJson(ws?.outreachProfilesJson));
+  let outreachProfileId =
+    opts?.outreachProfileId?.trim() ||
+    activeProfileIdFromJson(ws?.outreachProfilesJson);
+  if (outreachProfileId && known.size > 0 && !known.has(outreachProfileId)) {
+    outreachProfileId = activeProfileIdFromJson(ws?.outreachProfilesJson);
+  }
   const now = nowIso();
   return ctx.db.createBoard({
     id: newId("board"),
     workspaceId: ctx.workspaceId,
     name: trimmed,
     isDefault: false,
+    outreachProfileId: outreachProfileId ?? null,
     createdAt: now,
     updatedAt: now,
   });
 }
 
+export async function updateBoard(
+  ctx: Ctx,
+  id: string,
+  patch: { name?: string; outreachProfileId?: string | null },
+): Promise<Board> {
+  const access = await resolveBoardAccess(ctx, id);
+  if (!access || access.access !== "owner" || access.shared) {
+    throw new NotFoundError("Board not found");
+  }
+  const next: Partial<Board> = { updatedAt: nowIso() };
+  if (patch.name !== undefined) {
+    const trimmed = patch.name.trim();
+    if (!trimmed) throw new Error("Board name is required");
+    if (trimmed.length > 80) throw new Error("Board name is too long");
+    next.name = trimmed;
+  }
+  if (patch.outreachProfileId !== undefined) {
+    const pid = patch.outreachProfileId?.trim() || null;
+    if (pid) {
+      const ws = await access.db.getWorkspace(access.board.workspaceId);
+      const known = profileIdsFromJson(ws?.outreachProfilesJson);
+      if (known.length > 0 && !known.includes(pid)) {
+        throw new Error("Unknown outreach profile");
+      }
+    }
+    next.outreachProfileId = pid;
+  }
+  const updated = await access.db.updateBoard(id, next);
+  if (!updated) throw new NotFoundError("Board not found");
+  return updated;
+}
+
+/** @deprecated Use updateBoard — kept for any stray imports. */
 export async function renameBoard(
   ctx: Ctx,
   id: string,
   name: string,
 ): Promise<Board> {
-  const trimmed = name.trim();
-  if (!trimmed) throw new Error("Board name is required");
-  const access = await resolveBoardAccess(ctx, id);
-  if (!access || access.access !== "owner" || access.shared) {
-    throw new NotFoundError("Board not found");
-  }
-  const updated = await access.db.updateBoard(id, {
-    name: trimmed,
-    updatedAt: nowIso(),
-  });
-  if (!updated) throw new NotFoundError("Board not found");
-  return updated;
+  return updateBoard(ctx, id, { name });
 }
 
 /**
@@ -698,6 +756,8 @@ export async function createAndRunSearch(
       status: "new",
       crmStage: "new",
       contactMethods: [],
+      contactedByUserId: null,
+      contactedByName: null,
       notes: null,
       followUps: [],
       customFields: {},
@@ -1339,8 +1399,12 @@ export async function sendApprovedOutreach(
 
   const wsForEmail = await ensureProfileSendSettingsMigrated(ctx);
   const cleanBody = stripLegacyCompliance(outreach.body);
+  const leadForProfile = await db.getLead(outreach.leadId);
+  const boardProfileId = leadForProfile
+    ? await profileIdForLead(db, leadForProfile)
+    : null;
   const sendIdentity = wsForEmail
-    ? resolveSendIdentity(wsForEmail)
+    ? resolveSendIdentity(wsForEmail, boardProfileId)
     : undefined;
   const result = await sendEmail(
     {
@@ -1389,15 +1453,19 @@ export async function sendApprovedOutreach(
       error: null,
       updatedAt: nowIso(),
     });
-    const lead = await db.getLead(outreach.leadId);
+    const lead = leadForProfile ?? (await db.getLead(outreach.leadId));
     const crmPatch: Partial<Lead> = { status: "sent" };
     if (lead) {
       if (lead.crmStage === "new") crmPatch.crmStage = "contacted";
       if (!lead.contactMethods.includes("email")) {
         crmPatch.contactMethods = [...lead.contactMethods, "email"];
       }
-    }
-    if (lead) {
+      const attr = firstContactAttribution(
+        ctx,
+        lead,
+        crmPatch.crmStage ?? lead.crmStage,
+      );
+      if (attr) Object.assign(crmPatch, attr);
       const existing = lead.followUps ?? [];
       const today = nowIso().slice(0, 10);
       const hasEmailSentNote = existing.some(
@@ -1659,9 +1727,21 @@ export async function setOutreachDeliveryStatus(
   return outreach;
 }
 
-function resolveSendIdentity(ws: Workspace) {
-  const { settings } = resolveProfileSendSettings(ws);
+function resolveSendIdentity(ws: Workspace, profileId?: string | null) {
+  const { settings } = resolveProfileSendSettings(ws, profileId);
   return profileSendSettingsToWorkspaceEmail(settings, ws);
+}
+
+/** Board-linked profile for a lead, else null (caller falls back to active). */
+async function profileIdForLead(
+  db: LeadRepository,
+  lead: Lead,
+): Promise<string | null> {
+  if (!lead.boardId) return null;
+  const board =
+    (await db.getBoard(lead.boardId)) ??
+    (await db.getBoardAnywhere(lead.boardId));
+  return board?.outreachProfileId?.trim() || null;
 }
 
 /** Persist one-time legacy → per-profile seed when the map is empty. */
@@ -1919,33 +1999,63 @@ export async function updateWorkspaceEmailSettings(
     nextPatch.profileSendSettingsJson = serializeProfileSendSettingsMap(map);
   }
 
-  // Clearing Resend key also drops the auto-registered webhook credentials
-  // when the active/mirrored workspace key is cleared.
-  if (patch.resendApiKey === null && nextPatch.resendApiKey === null) {
-    nextPatch.resendWebhookId = null;
-    nextPatch.resendWebhookSecret = null;
+  // Clearing Resend key also drops webhook credentials on that profile +
+  // mirrored workspace columns when the active key is cleared.
+  if (patch.resendApiKey === null) {
+    if (targetProfileId && map[targetProfileId]) {
+      map[targetProfileId] = {
+        ...map[targetProfileId]!,
+        resendWebhookId: null,
+        resendWebhookSecret: null,
+      };
+      mapDirty = true;
+      nextPatch.profileSendSettingsJson =
+        serializeProfileSendSettingsMap(map);
+    }
+    if (nextPatch.resendApiKey === null) {
+      nextPatch.resendWebhookId = null;
+      nextPatch.resendWebhookSecret = null;
+    }
   }
 
+  const profileForWebhook = targetProfileId ? map[targetProfileId] : null;
   const keyForWebhook =
     patch.resendApiKey === null
       ? ""
       : typeof patch.resendApiKey === "string" && patch.resendApiKey.trim()
         ? patch.resendApiKey.trim()
-        : targetProfileId && map[targetProfileId]?.resendApiKey?.trim()
-          ? map[targetProfileId]!.resendApiKey!.trim()
-          : existing.resendApiKey?.trim() || "";
+        : profileForWebhook?.resendApiKey?.trim() ||
+          existing.resendApiKey?.trim() ||
+          "";
   if (keyForWebhook) {
     try {
       const { ensureResendDeliveryWebhook } = await import(
         "@/lib/email/resend-webhooks"
       );
       const ensured = await ensureResendDeliveryWebhook(keyForWebhook, {
-        existingId: existing.resendWebhookId,
-        existingSecret: existing.resendWebhookSecret,
+        existingId:
+          profileForWebhook?.resendWebhookId ?? existing.resendWebhookId,
+        existingSecret:
+          profileForWebhook?.resendWebhookSecret ??
+          existing.resendWebhookSecret,
       });
       if (ensured) {
+        // Mirror onto workspace for older readers / platform fallback path.
         nextPatch.resendWebhookId = ensured.id;
         nextPatch.resendWebhookSecret = ensured.signingSecret;
+        if (targetProfileId) {
+          const base =
+            map[targetProfileId] ??
+            resolveProfileSendSettings(existing, targetProfileId).settings;
+          map[targetProfileId] = {
+            ...base,
+            resendWebhookId: ensured.id,
+            resendWebhookSecret: ensured.signingSecret,
+          };
+          mapDirty = true;
+          nextPatch.profileSendSettingsJson =
+            serializeProfileSendSettingsMap(map);
+        }
       }
     } catch (err) {
       console.error("[updateWorkspaceEmailSettings] resend webhook ensure", err);
@@ -2177,6 +2287,8 @@ export async function updateLeadCrm(
   const next: typeof patch & {
     fitScore?: number;
     fitReasons?: string[];
+    contactedByUserId?: string | null;
+    contactedByName?: string | null;
   } = { ...patch };
 
   // When the user explicitly sets how they contacted, journal a follow-up note.
@@ -2199,6 +2311,14 @@ export async function updateLeadCrm(
     if (!patch.crmStage && lead.crmStage === "new") {
       next.crmStage = "contacted";
     }
+  }
+
+  const stageAfter =
+    next.crmStage ?? patch.crmStage ?? lead.crmStage;
+  const attr = firstContactAttribution(ctx, lead, stageAfter);
+  if (attr) {
+    next.contactedByUserId = attr.contactedByUserId;
+    next.contactedByName = attr.contactedByName;
   }
 
   // Manual / edited leads start at 0% — recompute when contactable fields change.
@@ -2324,6 +2444,8 @@ export async function createManualLead(
     status: "new",
     crmStage: "new",
     contactMethods: [],
+    contactedByUserId: null,
+    contactedByName: null,
     notes: null,
     followUps: [],
     customFields: {},
@@ -2685,6 +2807,8 @@ export async function importLeads(
         status: "new" as const,
         crmStage: r.crmStage ?? ("new" as const),
         contactMethods: r.contactMethods ?? [],
+        contactedByUserId: null,
+        contactedByName: null,
         notes: null,
         followUps: [],
         customFields: {},

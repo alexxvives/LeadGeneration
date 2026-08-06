@@ -9,22 +9,24 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-05 (Settings polish + MEV live)
+## ⏱️ Status — updated 2026-08-06 (board↔profile UX)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0027** remote applied.  
-**Deployed:** `79640566-…`
+**Migrations:** 0021–**0029** remote applied.  
+**Deployed:** (local UX pass — deploy when ready)
 
 ### This pass
-- Removed “How do you want to send?” helper blurb.
-- Fixed double “Loading send settings…” on Resend↔Maileroo.
-- Mailbox age select height → `py-2`.
-- **MEV verify** → `client.myemailverifier.com/verifier/validate_single/…`
-  (was fail-open on wrong/legacy auth shape).
+- New board → empty outreach profile with same name (await sync, then link).
+- Sidebar: Board picker only (profile implied by board).
+- Domain health: check/cross + hover tip (no checkboxes).
+- Mailbox age select height matches From email; “How do you want to send?”
+  sits directly above the sending-identity container.
+- ADR 0022 + LEARNINGS updated.
 
 ### Next
-1. Hard-refresh Settings; send one lead — Verifies bar / soft-block modal.
-2. User may delete the accidental duplicate empty board.
+1. Hard-refresh; create a board and confirm Settings shows the empty profile.
+2. Deploy when ready; legacy boards without a link can use “Create outreach
+   profile” on the board card.
 
 ---
 

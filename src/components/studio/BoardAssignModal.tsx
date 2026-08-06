@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { BoardSummary } from "@/lib/types";
 import { api } from "@/lib/client-api";
+import { createOutreachProfileAsync } from "@/lib/sender-profile";
 import { Spinner } from "@/components/ui";
 import { XIcon } from "@/components/icons";
 
@@ -74,7 +75,10 @@ export function BoardAssignModal({
     setBusy(true);
     setErr(null);
     try {
-      const { board } = await api.createBoard(name);
+      const profile = await createOutreachProfileAsync(name);
+      const { board } = await api.createBoard(name, {
+        outreachProfileId: profile.id,
+      });
       const summary: BoardSummary = {
         ...board,
         leadCount: 0,

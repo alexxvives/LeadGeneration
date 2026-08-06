@@ -75,6 +75,8 @@ const PREVIEW_LEAD: Lead = {
   status: "new",
   crmStage: "new",
   contactMethods: [],
+  contactedByUserId: null,
+  contactedByName: null,
   notes: null,
   followUps: [],
   customFields: {},

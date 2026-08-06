@@ -108,6 +108,7 @@ type BoardRow = {
   workspace_id: string;
   name: string;
   is_default: number;
+  outreach_profile_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -149,6 +150,8 @@ type LeadRow = {
   status: Lead["status"];
   crm_stage: string | null;
   contact_method: string | null;
+  contacted_by_user_id: string | null;
+  contacted_by_name: string | null;
   notes: string | null;
   follow_ups: string | null; // JSON-encoded FollowUp[]
   custom_fields: string | null; // JSON-encoded Record<string, string>
@@ -239,6 +242,7 @@ function rowToBoard(r: BoardRow): Board {
     workspaceId: r.workspace_id,
     name: r.name,
     isDefault: !!r.is_default,
+    outreachProfileId: r.outreach_profile_id ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -303,6 +307,8 @@ function rowToLead(r: LeadRow): Lead {
     status: r.status,
     crmStage: normalizeCrmStage(r.crm_stage),
     contactMethods: parseContactMethods(r.contact_method),
+    contactedByUserId: r.contacted_by_user_id ?? null,
+    contactedByName: r.contacted_by_name ?? null,
     notes: r.notes ?? null,
     followUps: parseFollowUps(r.follow_ups),
     customFields: parseCustomFields(r.custom_fields),
@@ -573,14 +579,15 @@ export class D1Store implements LeadRepository {
   async createBoard(board: Board): Promise<Board> {
     await this.db
       .prepare(
-        `INSERT INTO boards (id, workspace_id, name, is_default, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO boards (id, workspace_id, name, is_default, outreach_profile_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         board.id,
         this.workspaceId,
         board.name,
         board.isDefault ? 1 : 0,
+        board.outreachProfileId ?? null,
         board.createdAt,
         board.updatedAt,
       )
@@ -592,6 +599,9 @@ export class D1Store implements LeadRepository {
     const row: Record<string, unknown> = {};
     if ("name" in patch) row.name = patch.name;
     if ("isDefault" in patch) row.is_default = patch.isDefault ? 1 : 0;
+    if ("outreachProfileId" in patch) {
+      row.outreach_profile_id = patch.outreachProfileId ?? null;
+    }
     if ("updatedAt" in patch) row.updated_at = patch.updatedAt;
     if (Object.keys(row).length === 0) return this.getBoard(id);
     const { clause, values } = buildSet(row);
@@ -1065,8 +1075,9 @@ export class D1Store implements LeadRepository {
           `INSERT INTO leads
            (id, workspace_id, run_id, board_id, company, website, emails, phones, contact_name,
             location, about_blurb, company_type, tags, fit_score, fit_reasons, source_url,
-            status, crm_stage, contact_method, notes, follow_ups, custom_fields, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            status, crm_stage, contact_method, contacted_by_user_id, contacted_by_name,
+            notes, follow_ups, custom_fields, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           l.id,
@@ -1088,6 +1099,8 @@ export class D1Store implements LeadRepository {
           l.status,
           l.crmStage ?? "new",
           serializeContactMethods(l.contactMethods),
+          l.contactedByUserId ?? null,
+          l.contactedByName ?? null,
           l.notes ?? null,
           JSON.stringify(l.followUps ?? []),
           JSON.stringify(l.customFields ?? {}),
@@ -1118,6 +1131,12 @@ export class D1Store implements LeadRepository {
     if ("crmStage" in patch) row.crm_stage = patch.crmStage;
     if ("contactMethods" in patch) {
       row.contact_method = serializeContactMethods(patch.contactMethods);
+    }
+    if ("contactedByUserId" in patch) {
+      row.contacted_by_user_id = patch.contactedByUserId ?? null;
+    }
+    if ("contactedByName" in patch) {
+      row.contacted_by_name = patch.contactedByName ?? null;
     }
     if ("notes" in patch) row.notes = patch.notes ?? null;
     if ("followUps" in patch) row.follow_ups = JSON.stringify(patch.followUps ?? []);

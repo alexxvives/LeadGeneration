@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
+import { getD1Binding } from "@/lib/cf";
+import { getGeocodeCache, setGeocodeCache } from "@/lib/geocode-cache";
 
 /**
  * Server-side geocoding proxy.
  *
- * Autocomplete (?suggest=1): uses Photon by Komoot (https://photon.komoot.io).
- * Photon is purpose-built for autocomplete — it ranks by OSM importance score
- * so major cities surface before small towns with similar prefixes. No API key.
- *
- * Single geocode (?q=...): uses Nominatim for a single coordinate lookup (map pin).
+ * Autocomplete (?suggest=1): Photon by Komoot (no API key).
+ * Single geocode (?q=...): Nominatim, with D1-backed durable cache so Worker
+ * isolates don't re-hit Nominatim for the same city/street.
  *
  * Modes:
  *  - ?q=...            → { coords: { lat, lng } | null }
@@ -17,13 +17,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export type LocationSuggestion = {
-  label: string;  // e.g. "Barcelona, Spain"
-  value: string;  // same, used as the search field value
+  label: string;
+  value: string;
   lat: number;
   lng: number;
 };
 
 type Coords = { lat: number; lng: number };
+/** Process-local hot cache (demo / within one isolate). */
 const coordCache = new Map<string, Coords | null>();
 const suggestCache = new Map<string, LocationSuggestion[]>();
 
@@ -32,15 +33,13 @@ const NOMINATIM_HEADERS = {
   "User-Agent": "HermesMail/0.1 (contact=dev@localhost)",
 };
 
-// ─── Photon autocomplete ──────────────────────────────────────────────────────
-
 type PhotonFeature = {
   properties: {
     name?: string;
     country?: string;
     state?: string;
     city?: string;
-    type?: string;    // "city" | "town" | "village" | "country" | "state" | etc.
+    type?: string;
     osm_type?: string;
   };
   geometry: { coordinates: [number, number] };
@@ -49,7 +48,6 @@ type PhotonFeature = {
 function photonLabel(p: PhotonFeature["properties"]): string {
   const parts: string[] = [];
   if (p.name) parts.push(p.name);
-  // For countries, name is the country itself — don't repeat.
   if (p.state && p.state !== p.name) parts.push(p.state);
   if (p.country && p.country !== p.name) parts.push(p.country);
   return parts.slice(0, 3).join(", ");
@@ -64,16 +62,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Missing q" }, { status: 400 });
   }
 
-  // ─── Autocomplete via Photon ──────────────────────────────────────────────
   if (suggest) {
     const key = q.toLowerCase();
     if (suggestCache.has(key)) {
       return NextResponse.json({ suggestions: suggestCache.get(key) });
     }
     try {
-      // Photon returns results ordered by OSM importance score — populous cities
-      // naturally rank higher than small towns with the same name prefix.
-      // layer=city,town,state,country keeps noise out (no streets, buildings, etc.)
       const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=7&layer=city&layer=state&layer=country`;
       const res = await fetch(url, {
         headers: { Accept: "application/json" },
@@ -103,19 +97,39 @@ export async function GET(req: Request) {
     }
   }
 
-  // ─── Single geocode via Nominatim ─────────────────────────────────────────
   const key = q.toLowerCase();
-  if (coordCache.has(key)) return NextResponse.json({ coords: coordCache.get(key) });
+  if (coordCache.has(key)) {
+    return NextResponse.json({ coords: coordCache.get(key) });
+  }
+
+  const d1 = await getD1Binding();
+  const durable = await getGeocodeCache(d1, key);
+  if (durable !== undefined) {
+    coordCache.set(key, durable);
+    return NextResponse.json({ coords: durable });
+  }
+
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
-    const res = await fetch(url, { headers: NOMINATIM_HEADERS, signal: AbortSignal.timeout(8_000) });
-    if (!res.ok) { coordCache.set(key, null); return NextResponse.json({ coords: null }); }
+    const res = await fetch(url, {
+      headers: NOMINATIM_HEADERS,
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) {
+      coordCache.set(key, null);
+      await setGeocodeCache(d1, key, null);
+      return NextResponse.json({ coords: null });
+    }
     const data = (await res.json()) as { lat: string; lon: string }[];
-    const coords = data[0] ? { lat: Number(data[0].lat), lng: Number(data[0].lon) } : null;
+    const coords = data[0]
+      ? { lat: Number(data[0].lat), lng: Number(data[0].lon) }
+      : null;
     coordCache.set(key, coords);
+    await setGeocodeCache(d1, key, coords);
     return NextResponse.json({ coords });
   } catch {
     coordCache.set(key, null);
+    await setGeocodeCache(d1, key, null);
     return NextResponse.json({ coords: null });
   }
 }

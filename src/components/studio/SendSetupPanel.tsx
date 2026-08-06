@@ -269,17 +269,7 @@ export function SendSetupPanel({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-mist-500">
-            How do you want to send?
-            {profileName ? (
-              <span className="ml-2 normal-case tracking-normal text-aurora-300">
-                · {profileName}
-              </span>
-            ) : null}
-          </h2>
-        </div>
+      <div className="flex justify-end">
         <div className="inline-flex shrink-0 rounded-full border border-white/10 bg-ink-900/60 p-1">
           <button
             type="button"
@@ -307,11 +297,20 @@ export function SendSetupPanel({
       </div>
 
       {path === "easy" ? (
-        <div
-          id="sending-identity"
-          className="scroll-mt-8 rounded-xl2 border border-white/10 p-5"
-          data-tour="sending-identity"
-        >
+        <div>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-mist-500">
+            How do you want to send?
+            {profileName ? (
+              <span className="ml-2 normal-case tracking-normal text-aurora-300">
+                · {profileName}
+              </span>
+            ) : null}
+          </h2>
+          <div
+            id="sending-identity"
+            className="scroll-mt-8 rounded-xl2 border border-white/10 p-5"
+            data-tour="sending-identity"
+          >
           <h3 className="mb-1 text-sm font-semibold text-mist-100">
             Sending identity
             {profileName ? (
@@ -321,8 +320,8 @@ export function SendSetupPanel({
             ) : null}
           </h3>
           <p className="mb-4 text-xs text-mist-500">
-            Each outreach profile has its own From address and provider keys. Switch
-            profile above to edit another brand.
+            From address and keys for this board&apos;s outreach profile. Select a
+            board in the sidebar to switch brands.
           </p>
           {loadingSend ? (
             <div className="flex items-center gap-2 py-6 text-sm text-mist-500">
@@ -351,6 +350,7 @@ export function SendSetupPanel({
             initialEnabled={emailVerifyEnabled}
             canEdit={canEdit}
           />
+          </div>
         </div>
       ) : (
         <div className="space-y-5">
@@ -451,39 +451,49 @@ export function SendSetupPanel({
             )}
           </div>
 
-          <div
-            id="sending-identity-pro"
-            className="scroll-mt-8 rounded-xl2 border border-white/10 p-5"
-            data-tour="sending-identity"
-          >
-            <h3 className="mb-1 text-sm font-semibold text-mist-100">
-              Sending identity
+          <div>
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-mist-500">
+              How do you want to send?
               {profileName ? (
-                <span className="ml-1.5 font-normal text-mist-500">
-                  for {profileName}
+                <span className="ml-2 normal-case tracking-normal text-aurora-300">
+                  · {profileName}
                 </span>
               ) : null}
-            </h3>
-            <p className="mb-4 text-xs text-mist-500">
-              Display name for the From line. From email comes from the connected mailbox when
-              linked.
-            </p>
-            {loadingSend ? (
-              <div className="flex items-center gap-2 py-6 text-sm text-mist-500">
-                <Spinner className="h-4 w-4" />
-                Loading send settings…
-              </div>
-            ) : (
-              <EmailSettingsForm
-                key={`pro-${profileId ?? "legacy"}`}
-                initial={sendValues}
-                defaults={defaults}
-                canEdit={canEdit}
-                variant="pro"
-                lockedFromEmail={mailbox.connected ? mailbox.email : null}
-                profileId={profileId}
-              />
-            )}
+            </h2>
+            <div
+              id="sending-identity-pro"
+              className="scroll-mt-8 rounded-xl2 border border-white/10 p-5"
+              data-tour="sending-identity"
+            >
+              <h3 className="mb-1 text-sm font-semibold text-mist-100">
+                Sending identity
+                {profileName ? (
+                  <span className="ml-1.5 font-normal text-mist-500">
+                    for {profileName}
+                  </span>
+                ) : null}
+              </h3>
+              <p className="mb-4 text-xs text-mist-500">
+                Display name for the From line. From email comes from the connected mailbox when
+                linked.
+              </p>
+              {loadingSend ? (
+                <div className="flex items-center gap-2 py-6 text-sm text-mist-500">
+                  <Spinner className="h-4 w-4" />
+                  Loading send settings…
+                </div>
+              ) : (
+                <EmailSettingsForm
+                  key={`pro-${profileId ?? "legacy"}`}
+                  initial={sendValues}
+                  defaults={defaults}
+                  canEdit={canEdit}
+                  variant="pro"
+                  lockedFromEmail={mailbox.connected ? mailbox.email : null}
+                  profileId={profileId}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}

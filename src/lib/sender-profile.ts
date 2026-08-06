@@ -355,31 +355,30 @@ function notifyProfileChange(): void {
   window.dispatchEvent(new CustomEvent(OUTREACH_PROFILE_CHANGE_EVENT));
 }
 
+/** Local write + notify; server write-through (fire-and-forget). */
 function writeStore(store: ProfileStore): void {
+  void persistStore(store).catch((err) => {
+    console.error("[outreach-profiles] persist failed", err);
+  });
+}
+
+/** Local write + await workspace PATCH (needed before linking a new board). */
+async function persistStore(store: ProfileStore): Promise<void> {
   const updatedAt = new Date().toISOString();
   const next: ProfileStore = { ...store, updatedAt };
   lastLocalWriteMs = Date.now();
   localStorage.setItem(KEY, JSON.stringify(next));
   notifyProfileChange();
-  // Write-through to workspace — do not silently drop errors (refresh needs server).
-  if (typeof window !== "undefined") {
-    void fetch("/api/workspace/settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ outreachProfilesJson: JSON.stringify(next) }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          console.error(
-            "[outreach-profiles] PATCH failed",
-            res.status,
-            await res.text().catch(() => ""),
-          );
-        }
-      })
-      .catch((err) => {
-        console.error("[outreach-profiles] PATCH network error", err);
-      });
+  if (typeof window === "undefined") return;
+  const res = await fetch("/api/workspace/settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ outreachProfilesJson: JSON.stringify(next) }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("[outreach-profiles] PATCH failed", res.status, body);
+    throw new Error("Could not save outreach profile");
   }
 }
 
@@ -551,6 +550,25 @@ export function createOutreachProfile(name?: string): OutreachProfile {
     activeId: profile.id,
   });
   void ensureProfileSendSettings(profile.id);
+  return profile;
+}
+
+/**
+ * Create an empty outreach profile, sync to the workspace, then ensure Easy
+ * send settings. Use when a board must link the new id immediately.
+ */
+export async function createOutreachProfileAsync(
+  name?: string,
+): Promise<OutreachProfile> {
+  const store = readStore();
+  const profile = emptyProfile({
+    name: name?.trim() || `Profile ${store.profiles.length + 1}`,
+  });
+  await persistStore({
+    profiles: [...store.profiles, profile],
+    activeId: profile.id,
+  });
+  await ensureProfileSendSettings(profile.id);
   return profile;
 }
 

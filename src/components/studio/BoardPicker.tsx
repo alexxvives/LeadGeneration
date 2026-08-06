@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BoardSummary } from "@/lib/types";
 import { BoardsIcon, ChevronDownIcon } from "@/components/icons";
 import { readMigratedKey } from "@/lib/browser-storage";
+import { loadOutreachProfiles } from "@/lib/sender-profile";
 
 const STORAGE_KEY = "hermes_active_board";
 const STORAGE_LEGACY = ["leadify_active_board", "lodestar_active_board"];
@@ -19,6 +20,7 @@ export function storeBoardFilter(id: string): void {
 
 /**
  * Compact board filter above the account card — All (default) or one board.
+ * Selecting a board activates its linked outreach profile (StudioShell).
  */
 export function BoardPicker({
   boards,
@@ -38,6 +40,11 @@ export function BoardPicker({
       : null;
   const label = active ? active.name : "All boards";
   const totalLeads = boards.reduce((s, b) => s + b.leadCount, 0);
+  const profileName = (profileId: string | null | undefined) => {
+    if (!profileId) return null;
+    const p = loadOutreachProfiles().profiles.find((x) => x.id === profileId);
+    return p?.name?.trim() || null;
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -108,13 +115,18 @@ export function BoardPicker({
                   setOpen(false);
                 }}
               >
-                <span className="truncate">
+                <span className="min-w-0 truncate">
                   {b.name}
                   {b.isDefault ? (
                     <span className="ml-1.5 text-[10px] text-mist-500">Default</span>
                   ) : null}
                   {b.shared ? (
                     <span className="ml-1.5 text-[10px] text-amber-400">Shared</span>
+                  ) : null}
+                  {profileName(b.outreachProfileId) ? (
+                    <span className="ml-1.5 text-[10px] text-mist-500">
+                      · {profileName(b.outreachProfileId)}
+                    </span>
                   ) : null}
                 </span>
                 <span className="shrink-0 text-xs text-mist-500">{b.leadCount}</span>

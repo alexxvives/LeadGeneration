@@ -244,6 +244,11 @@ export interface Board {
   name: string;
   /** Exactly one default board per workspace — catch-all for unassigned leads. */
   isDefault: boolean;
+  /**
+   * Outreach profile (pitch + Easy From/keys) for this board (ADR 0022).
+   * Null → fall back to workspace active profile at send/draft time.
+   */
+  outreachProfileId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -408,6 +413,12 @@ export interface Lead {
    * empty when unknown. Persisted in `contact_method` TEXT (single value or JSON).
    */
   contactMethods: ContactMethod[];
+  /**
+   * Who first moved this lead out of New (send or manual CRM). Denormalized
+   * name so shared boards still show attribution if the user leaves.
+   */
+  contactedByUserId: string | null;
+  contactedByName: string | null;
   notes: string | null; // legacy freeform; prefer dated followUps journal
   followUps: FollowUp[]; // dated notes / follow-up journal entries
   /** User-defined table column values (column id → string). */

@@ -436,10 +436,12 @@ function DraggablePipelineCard({
   const bounced = lead.outreach?.deliveryStatus === "bounced";
   const methods = lead.contactMethods ?? [];
   const needsMethod = lead.crmStage === "contacted" && methods.length === 0;
+  const contactedBy = lead.contactedByName?.trim() || null;
   const showMeta =
     bounced ||
     replied ||
     needsMethod ||
+    Boolean(contactedBy) ||
     (lead.crmStage !== "new" &&
       (pendingFollowUps > 0 || methods.length > 0));
 
@@ -517,6 +519,14 @@ function DraggablePipelineCard({
                 <MethodIcons methods={methods} />
               </span>
             )}
+            {contactedBy ? (
+              <span
+                className="max-w-[9rem] truncate rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-400 ring-1 ring-ink-600/40"
+                title={`Contacted by ${contactedBy}`}
+              >
+                {contactedBy}
+              </span>
+            ) : null}
           </div>
         )}
       </div>

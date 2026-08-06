@@ -40,7 +40,7 @@ export function MailboxAgePicker({ disabled = false }: { disabled?: boolean }) {
         disabled={disabled}
         aria-label="Mailbox age"
         onChange={(e) => onChange(e.target.value as MailboxAgeBand)}
-        className="select-glass w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none transition-colors hover:border-white/20 focus:border-aurora-400/60 disabled:opacity-50"
+        className="select-glass w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-2.5 text-sm text-mist-100 outline-none transition-colors hover:border-white/20 focus:border-aurora-400/60 disabled:opacity-50"
       >
         {AGE_BAND_OPTIONS.map((opt) => (
           <option key={opt.id} value={opt.id}>

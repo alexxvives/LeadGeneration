@@ -97,9 +97,9 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     **Draft all**) → **Contacted**. **Draft all** drafts + approves every
     email lead into Ready (and stays available to redraft after profile edits).
     Single-lead Create still lands in Contact Draft until Approve. Closing the
-    draft drawer without Approve does not advance. Active outreach profile is
-    chosen in the sidebar (next to Board). Send remains per-lead after approve
-    (constitution Art. I.1).
+    draft drawer without Approve does not advance. The sidebar Board picker
+    activates that board’s linked outreach profile. Send remains per-lead after
+    approve (constitution Art. I.1).
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Informative only — board filter lives in
@@ -108,7 +108,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   - **Boards** (`?view=boards`) — create / rename / delete named lead
     collections; invite collaborators by email (in-app accept). Soft lock when
     someone else is editing. Every workspace has a non-deletable **Default**
-    board. Also linked from Settings → Boards.
+    board. Creating a board also creates an empty outreach profile with the
+    same name (fill pitch / From in Settings). Also linked from Settings → Boards.
 
   - **Lead detail drawer** — opens from any lead card/row/pin. Contact info
     (incl. full address), about blurb, fit-score reasons, CRM stage, dated notes
@@ -118,11 +119,11 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   `templateLang` and only changes the **preview** — template editors stay as
   written; preview may translate for display), **Sending** dual path (Easy
   Resend/Maileroo/SMTP + DNS health, or Pro Connect Google mailbox). Easy
-  **From + provider keys are per outreach profile** (active profile in the
-  sidebar / profile picker); Pro mailbox stays shared. Plus **Send a test
-  email**, plan/usage, Boards link, Integrations status, “Ready to send?”
-  checklist, and **Danger zone** self-serve account deletion (live app only;
-  type `DELETE`). Microsoft mailbox connect is next.
+  **From + provider keys are per outreach profile** (follows the board selected
+  in the sidebar); Pro mailbox stays shared. Plus **Send a test email**,
+  plan/usage, Boards link, Integrations status, “Ready to send?” checklist, and
+  **Danger zone** self-serve account deletion (live app only; type `DELETE`).
+  Microsoft mailbox connect is next.
   Resources (Getting started wizard, How it works, Plans). No env-var names in
   the UI. Secrets are never shown. Reopen the guide via **Getting started**.
   Platform admins see a slim **Admin settings** page (tools + resources only —
