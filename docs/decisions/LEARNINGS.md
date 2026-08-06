@@ -4,6 +4,19 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-06 — Easy-only send + skeleton UI pass
+- Removed Pro mailbox toggle from Settings; `resolveSendPath` always Easy.
+- Rebuilt studio loading skeletons to mirror real layouts (Outreach rows,
+  Pipeline 4-col + parked, Search form, Admin users table, Settings sections).
+
+### 2026-08-06 — Profiles only via boards + map street refine
+- Settings: no New/Delete profile — board create owns the empty profile; board
+  delete removes it when unshared. Boards view auto-links legacy boards.
+- Boards double-skeleton fixed: Studio no longer blocks boards/dashboard/admin
+  on board payload (those views fetch their own data).
+- Map: background-batched street geocode for every unique address (D1 cache);
+  viewport fits once so refine doesn’t yank the map.
+
 ### 2026-08-06 — Board creates paired empty profile (ADR 0022)
 - Creating a board also creates an empty outreach profile with the same name
   (`createOutreachProfileAsync` awaits workspace PATCH before `createBoard`).

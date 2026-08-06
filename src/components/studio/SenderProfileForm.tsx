@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   canonicalTemplateSource,
-  createOutreachProfile,
-  deleteOutreachProfile,
   hydrateOutreachProfilesFromServer,
   loadOutreachProfiles,
   saveSenderProfile,
@@ -539,22 +537,24 @@ export function SenderProfileForm() {
               aria-label="Outreach profile name"
               className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-mist-100 outline-none"
             />
-            <button
-              type="button"
-              onClick={() => setProfileMenuOpen((o) => !o)}
-              aria-label="Switch outreach profile"
-              aria-expanded={profileMenuOpen}
-              aria-haspopup="listbox"
-              className="shrink-0 border-l border-white/10 px-2.5 text-mist-400 transition-colors hover:bg-white/5 hover:text-mist-100"
-            >
-              <ChevronDownIcon
-                className={`h-3.5 w-3.5 transition-transform ${
-                  profileMenuOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
+            {profiles.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen((o) => !o)}
+                aria-label="Switch outreach profile"
+                aria-expanded={profileMenuOpen}
+                aria-haspopup="listbox"
+                className="shrink-0 border-l border-white/10 px-2.5 text-mist-400 transition-colors hover:bg-white/5 hover:text-mist-100"
+              >
+                <ChevronDownIcon
+                  className={`h-3.5 w-3.5 transition-transform ${
+                    profileMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            ) : null}
           </div>
-          {profileMenuOpen ? (
+          {profileMenuOpen && profiles.length > 1 ? (
             <ul
               role="listbox"
               className="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
@@ -582,31 +582,11 @@ export function SenderProfileForm() {
             </ul>
           ) : null}
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            const created = createOutreachProfile();
-            reload();
-            setActiveId(created.id);
-          }}
-          className="rounded-full border border-ink-700 bg-ink-900 px-3 py-1.5 text-xs font-medium text-mist-100 hover:border-aurora-400/50 hover:text-aurora-300"
-        >
-          New profile
-        </button>
-        {profiles.length > 1 ? (
-          <button
-            type="button"
-            onClick={() => {
-              if (!confirm(`Delete profile “${profile.name}”?`)) return;
-              deleteOutreachProfile(profile.id);
-              reload();
-            }}
-            className="rounded-full border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-200 hover:border-rose-400 hover:bg-rose-500/15"
-          >
-            Delete
-          </button>
-        ) : null}
       </div>
+      <p className="text-xs text-mist-500">
+        Outreach profiles are created with each board and stay linked — fill the
+        pitch and From address here. Delete a board to remove its profile.
+      </p>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-4 rounded-xl2 border border-white/10 p-5">

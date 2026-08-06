@@ -23,7 +23,9 @@ unclear. Users expected “pick a board” to imply the brand.
 3. **Sidebar shows Board only** — no separate profile picker; profile follows
    the board.
 4. **New boards** create an empty outreach profile with the **same name** and
-   link it immediately (fill pitch / From in Settings).
+   link it immediately (fill pitch / From in Settings). No standalone
+   create/delete of profiles in Settings — delete the board to remove its
+   profile (when nothing else links it). Rename board syncs profile name.
 5. **Send** resolves Easy identity from the lead’s board profile first, then
    workspace `activeId` / legacy columns.
 6. **Webhooks:** still one Hermes URL; each Resend **account** (API key) gets

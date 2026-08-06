@@ -77,14 +77,9 @@ export function EmailVerifySettings({
         onClick={() => void toggle()}
         className="flex w-full items-center justify-between gap-3 rounded-lg px-1 py-1 text-left transition-colors disabled:opacity-50"
       >
-        <span className="flex min-w-0 flex-col gap-0.5 text-left">
-          <span className="flex items-center gap-2 text-sm font-medium text-mist-100">
-            Verify emails before sending
-            {busy ? <Spinner className="h-3.5 w-3.5 text-mist-500" /> : null}
-          </span>
-          <span className="text-xs font-normal text-mist-500">
-            Verified by MyEmailVerifier · plan daily cap applies
-          </span>
+        <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-mist-100">
+          Verify emails before sending
+          {busy ? <Spinner className="h-3.5 w-3.5 text-mist-500" /> : null}
         </span>
         <span
           className={`switch-track relative h-6 w-11 shrink-0 rounded-full transition-colors ${

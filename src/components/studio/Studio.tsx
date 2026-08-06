@@ -1508,8 +1508,15 @@ export function Studio() {
       (hasLeads && (!leadsBodyReady || !layoutPaneReady)));
   const showLeadsContentSkeleton = useDeferredLoading(leadsContentPending, 0);
 
-  // First board fetch with no data yet — full-page skeleton immediately.
-  if (loading && !board) {
+  // Views that need the board payload. Boards / dashboard / admin fetch their
+  // own data — don't block them (avoids a second skeleton flash).
+  const needsBoardPayload =
+    view === "board" ||
+    view === "pipeline" ||
+    view === "leads" ||
+    view === "outreach" ||
+    view === "runs";
+  if (loading && !board && needsBoardPayload) {
     return <StudioViewSkeleton view={view} />;
   }
 

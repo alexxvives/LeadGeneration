@@ -109,7 +109,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     collections; invite collaborators by email (in-app accept). Soft lock when
     someone else is editing. Every workspace has a non-deletable **Default**
     board. Creating a board also creates an empty outreach profile with the
-    same name (fill pitch / From in Settings). Also linked from Settings → Boards.
+    same name (fill pitch / From in Settings; profiles are not created or
+    deleted separately). Also linked from Settings → Boards.
 
   - **Lead detail drawer** — opens from any lead card/row/pin. Contact info
     (incl. full address), about blurb, fit-score reasons, CRM stage, dated notes
@@ -117,13 +118,11 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
 - **`/app/settings`** — sender profile (language flag persists as
   `templateLang` and only changes the **preview** — template editors stay as
-  written; preview may translate for display), **Sending** dual path (Easy
-  Resend/Maileroo/SMTP + DNS health, or Pro Connect Google mailbox). Easy
-  **From + provider keys are per outreach profile** (follows the board selected
-  in the sidebar); Pro mailbox stays shared. Plus **Send a test email**,
-  plan/usage, Boards link, Integrations status, “Ready to send?” checklist, and
-  **Danger zone** self-serve account deletion (live app only; type `DELETE`).
-  Microsoft mailbox connect is next.
+  written; preview may translate for display), **Sending** Easy path
+  (Resend/Maileroo/SMTP + DNS health). Easy **From + provider keys are per
+  outreach profile** (follows the board selected in the sidebar). Plus **Send a
+  test email**, plan/usage, Boards link, Integrations status, and **Danger
+  zone** self-serve account deletion (live app only; type `DELETE`).
   Resources (Getting started wizard, How it works, Plans). No env-var names in
   the UI. Secrets are never shown. Reopen the guide via **Getting started**.
   Platform admins see a slim **Admin settings** page (tools + resources only —

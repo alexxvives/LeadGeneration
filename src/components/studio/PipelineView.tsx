@@ -486,10 +486,24 @@ function DraggablePipelineCard({
         {subtitle && (
           <p className="mt-0.5 truncate text-xs leading-snug text-mist-500">{subtitle}</p>
         )}
-        <div className="mt-1.5">
+        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
           <FitMeter score={lead.fitScore} compact />
+          {lead.crmStage !== "new" && pendingFollowUps > 0 ? (
+            <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+              {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
+            </span>
+          ) : null}
+          {lead.crmStage !== "new" && methods.length > 0 ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-300 ring-1 ring-ink-600/40"
+              title={methods.join(", ")}
+            >
+              <MethodIcons methods={methods} />
+            </span>
+          ) : null}
         </div>
-        {showMeta && (
+        {showMeta &&
+        (bounced || replied || needsMethod || Boolean(contactedBy)) ? (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {bounced && (
               <span className="rounded-full bg-rose-400/20 px-1.5 py-0.5 text-[10px] font-medium text-rose-200">
@@ -506,19 +520,6 @@ function DraggablePipelineCard({
                 How contacted?
               </span>
             )}
-            {pendingFollowUps > 0 && (
-              <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-                {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
-              </span>
-            )}
-            {methods.length > 0 && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-300 ring-1 ring-ink-600/40"
-                title={methods.join(", ")}
-              >
-                <MethodIcons methods={methods} />
-              </span>
-            )}
             {contactedBy ? (
               <span
                 className="max-w-[9rem] truncate rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-400 ring-1 ring-ink-600/40"
@@ -528,7 +529,7 @@ function DraggablePipelineCard({
               </span>
             ) : null}
           </div>
-        )}
+        ) : null}
       </div>
 
       <button

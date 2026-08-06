@@ -9,24 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-06 (board↔profile UX)
+## ⏱️ Status — updated 2026-08-06 (Easy-only + skeletons)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0029** remote applied.  
 **Deployed:** (local UX pass — deploy when ready)
 
 ### This pass
-- New board → empty outreach profile with same name (await sync, then link).
-- Sidebar: Board picker only (profile implied by board).
-- Domain health: check/cross + hover tip (no checkboxes).
-- Mailbox age select height matches From email; “How do you want to send?”
-  sits directly above the sending-identity container.
-- ADR 0022 + LEARNINGS updated.
+- Removed Pro mailbox send option from Settings UI; sends resolve Easy-only.
+- Rebuilt loading skeletons to match real page layouts (pipeline, outreach,
+  search, admin, leads table/cards, settings, studio chrome).
 
 ### Next
-1. Hard-refresh; create a board and confirm Settings shows the empty profile.
-2. Deploy when ready; legacy boards without a link can use “Create outreach
-   profile” on the board card.
+1. Hard-refresh Settings — no Easy/Pro toggle; only sending identity.
+2. Spot-check skeleton → content on Boards / Pipeline / Outreach / Search.
+3. Deploy when ready.
 
 ---
 

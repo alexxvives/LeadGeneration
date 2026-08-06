@@ -7,7 +7,8 @@
  * don't re-query. Strategy:
  *   1. Geocode board location hint → place pins with light city jitter (fast).
  *   2. Refine unique city/region keys (capped).
- *   3. Street-level refine for a capped set of unique full addresses (cached).
+ *   3. Background street-level refine for every unique full address (batched;
+ *      pins update as each batch lands so markers move to exact spots).
  *
  * Important: Leaflet mutates the DOM node passed to L.map(). We keep a nested
  * `mapEl` that React never reconciles children into, and we clear `_leaflet_id`
@@ -41,8 +42,9 @@ const LEGEND_ORDER: CrmStage[] = [
 
 /** Cap city-level refine lookups — enough for regional boards, not street-level spam. */
 const MAX_CITY_GEOCODES = 60;
-/** Street geocodes (unique full addresses). Cached server-side after first hit. */
-const MAX_STREET_GEOCODES = 80;
+/** Street geocodes per background batch (D1/local cache makes repeats free). */
+const STREET_BATCH = 12;
+const STREET_BATCH_PAUSE_MS = 350;
 const GEOCODE_CONCURRENCY = 3;
 
 const geocodeCache = new Map<string, Coords | null>();
@@ -194,6 +196,7 @@ export function LeadMap({
   const mapElRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
+  const didFitRef = useRef(false);
   const onOpenRef = useRef(onOpen);
   onOpenRef.current = onOpen;
 
@@ -228,6 +231,7 @@ export function LeadMap({
 
   useEffect(() => {
     let cancelled = false;
+    didFitRef.current = false;
     (async () => {
       setLoadingPins(true);
       setRefining(false);
@@ -271,26 +275,49 @@ export function LeadMap({
         setPins(buildPinsAround(mapLeads, centers, base, hintLower));
       }
 
-      // Street-level: unique full addresses only, capped; D1 cache absorbs repeats.
-      const streets = new Set<string>();
+      // Street-level: every unique full address, in background batches.
+      // Cached hits apply immediately; remaining keep refining until done.
+      const streets: string[] = [];
+      const seenStreet = new Set<string>();
       for (const l of mapLeads) {
         const loc = l.location?.trim();
         if (!loc || !loc.includes(",")) continue;
         // Skip pure "City, Country" — already covered by city refine.
         const parts = loc.split(",").map((p) => p.trim()).filter(Boolean);
         if (parts.length < 3 && !/^\d/.test(parts[0] ?? "")) continue;
-        streets.add(loc.toLowerCase());
+        const key = loc.toLowerCase();
+        if (seenStreet.has(key)) continue;
+        seenStreet.add(key);
+        streets.push(key);
       }
-      const streetList = [...streets].slice(0, MAX_STREET_GEOCODES);
+
       const exact = new Map<string, Coords>();
-      if (streetList.length > 0) {
-        await mapPool(streetList, GEOCODE_CONCURRENCY, async (loc) => {
+      const pending: string[] = [];
+      for (const loc of streets) {
+        if (geocodeCache.has(loc)) {
+          const cached = geocodeCache.get(loc);
+          if (cached) exact.set(loc, cached);
+        } else {
+          pending.push(loc);
+        }
+      }
+      if (exact.size > 0) {
+        setPins(buildPinsAround(mapLeads, centers, base, hintLower, exact));
+      }
+
+      for (let i = 0; i < pending.length; i += STREET_BATCH) {
+        if (cancelled) return;
+        const batch = pending.slice(i, i + STREET_BATCH);
+        await mapPool(batch, GEOCODE_CONCURRENCY, async (loc) => {
           if (cancelled) return;
           const coords = await geocode(loc);
           if (coords) exact.set(loc, coords);
         });
         if (cancelled) return;
         setPins(buildPinsAround(mapLeads, centers, base, hintLower, exact));
+        if (i + STREET_BATCH < pending.length) {
+          await new Promise((r) => setTimeout(r, STREET_BATCH_PAUSE_MS));
+        }
       }
 
       setRefining(false);
@@ -409,13 +436,18 @@ export function LeadMap({
         latLngs.push([pin.coords.lat, pin.coords.lng]);
       }
 
-      if (latLngs.length === 1) {
-        mapRef.current.setView(latLngs[0]!, 12, { animate: false });
-      } else if (latLngs.length > 1) {
-        mapRef.current.fitBounds(L.latLngBounds(latLngs), {
-          padding: [48, 48],
-          maxZoom: 13,
-        });
+      // Fit once on first pin set — background street refine updates markers
+      // in place without yanking the viewport.
+      if (!didFitRef.current && latLngs.length > 0) {
+        didFitRef.current = true;
+        if (latLngs.length === 1) {
+          mapRef.current.setView(latLngs[0]!, 12, { animate: false });
+        } else {
+          mapRef.current.fitBounds(L.latLngBounds(latLngs), {
+            padding: [48, 48],
+            maxZoom: 13,
+          });
+        }
       }
       setTimeout(() => mapRef.current?.invalidateSize(), 80);
     })();

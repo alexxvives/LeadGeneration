@@ -7,7 +7,9 @@ import type { BoardInvite, BoardMember, BoardSummary } from "@/lib/types";
 import Link from "next/link";
 import {
   createOutreachProfileAsync,
+  deleteOutreachProfile,
   loadOutreachProfiles,
+  saveSenderProfile,
   type OutreachProfile,
 } from "@/lib/sender-profile";
 import { Spinner } from "@/components/ui";
@@ -41,10 +43,28 @@ export function BoardsView({
       api.listBoards(),
       api.listMyInvites().catch(() => ({ invites: [] as BoardInvite[] })),
     ]);
-    setBoards(list);
+    // Legacy boards without a link get an empty profile named after the board.
+    let next = list;
+    for (const b of list) {
+      if (b.shared || b.outreachProfileId) continue;
+      try {
+        const profile = await createOutreachProfileAsync(b.name);
+        const { board } = await api.updateBoard(b.id, {
+          outreachProfileId: profile.id,
+        });
+        next = next.map((x) =>
+          x.id === board.id
+            ? { ...x, outreachProfileId: board.outreachProfileId }
+            : x,
+        );
+      } catch {
+        /* keep board; retry next refresh */
+      }
+    }
+    setBoards(next);
     setInvites(pending);
     setProfiles(loadOutreachProfiles().profiles);
-    onBoardsChange?.(list);
+    onBoardsChange?.(next);
   }, [onBoardsChange]);
 
   useEffect(() => {
@@ -74,27 +94,21 @@ export function BoardsView({
     }
   }
 
-  /** Legacy boards without a linked profile — create one named after the board. */
-  async function handleEnsureProfile(boardId: string, boardName: string) {
-    setBusy(true);
-    setErr(null);
-    try {
-      const profile = await createOutreachProfileAsync(boardName);
-      await api.updateBoard(boardId, { outreachProfileId: profile.id });
-      await refresh();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not create outreach profile");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleRename(id: string) {
     const name = editName.trim();
     if (!name) return;
     setBusy(true);
     try {
+      const board = boards.find((b) => b.id === id);
       await api.renameBoard(id, name);
+      if (board?.outreachProfileId) {
+        const p = loadOutreachProfiles().profiles.find(
+          (x) => x.id === board.outreachProfileId,
+        );
+        if (p && p.name !== name) {
+          saveSenderProfile({ ...p, name });
+        }
+      }
       setEditingId(null);
       await refresh();
     } catch (e) {
@@ -105,10 +119,23 @@ export function BoardsView({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this board? Leads move to Default.")) return;
+    if (
+      !confirm(
+        "Delete this board and its outreach profile? Leads move to Default.",
+      )
+    )
+      return;
     setBusy(true);
     try {
+      const board = boards.find((b) => b.id === id);
+      const profileId = board?.outreachProfileId ?? null;
       await api.deleteBoard(id);
+      if (profileId) {
+        const stillLinked = boards.some(
+          (b) => b.id !== id && b.outreachProfileId === profileId,
+        );
+        if (!stillLinked) deleteOutreachProfile(profileId);
+      }
       await refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Delete failed");
@@ -169,7 +196,6 @@ export function BoardsView({
               onCancelEdit={() => setEditingId(null)}
               onDelete={() => void handleDelete(b.id)}
               onInvite={() => setInviteBoard(b)}
-              onEnsureProfile={() => void handleEnsureProfile(b.id, b.name)}
             />
           ))}
         {invites.map((inv) => (
@@ -220,7 +246,6 @@ export function BoardsView({
               onCancelEdit={() => setEditingId(null)}
               onDelete={() => void handleDelete(b.id)}
               onInvite={() => setInviteBoard(b)}
-              onEnsureProfile={() => void handleEnsureProfile(b.id, b.name)}
             />
           ))}
       </ul>
@@ -255,7 +280,6 @@ function BoardCard({
   onCancelEdit,
   onDelete,
   onInvite,
-  onEnsureProfile,
 }: {
   board: BoardSummary;
   profiles: OutreachProfile[];
@@ -268,7 +292,6 @@ function BoardCard({
   onCancelEdit: () => void;
   onDelete: () => void;
   onInvite: () => void;
-  onEnsureProfile: () => void;
 }) {
   const linkedProfile = b.outreachProfileId
     ? profiles.find((p) => p.id === b.outreachProfileId) ?? null
@@ -381,7 +404,7 @@ function BoardCard({
             <dt className="text-mist-500">Leads</dt>
             <dd className="font-display text-2xl text-mist-100">{b.leadCount}</dd>
           </div>
-          {!b.shared ? (
+          {!b.shared && linkedProfile ? (
             <div
               className="border-t border-white/8 pt-3 text-left"
               onClick={(e) => e.stopPropagation()}
@@ -390,28 +413,18 @@ function BoardCard({
               <p className="text-[10px] uppercase tracking-wider text-mist-500">
                 Outreach profile
               </p>
-              {linkedProfile ? (
-                <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-mist-200">
-                  <span className="truncate font-medium">
-                    {linkedProfile.name.trim() || "Untitled"}
-                  </span>
-                  <Link
-                    href="/app/settings"
-                    className="shrink-0 text-aurora-300 hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Fill in Settings
-                  </Link>
-                </p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onEnsureProfile}
-                  className="mt-1 text-xs font-medium text-aurora-300 hover:underline"
+              <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-mist-200">
+                <span className="truncate font-medium">
+                  {linkedProfile.name.trim() || "Untitled"}
+                </span>
+                <Link
+                  href="/app/settings"
+                  className="shrink-0 text-aurora-300 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  Create outreach profile
-                </button>
-              )}
+                  Fill in Settings
+                </Link>
+              </p>
             </div>
           ) : null}
           <div className="grid grid-cols-3 gap-2 border-t border-white/8 pt-3 text-center">

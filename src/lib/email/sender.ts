@@ -99,28 +99,19 @@ async function sendWithResendKey(
   }
 }
 
-function resolveSendPath(ws?: WorkspaceEmailSettings): "easy" | "pro" {
-  if (ws?.preferredSendPath === "easy" || ws?.preferredSendPath === "pro") {
-    return ws.preferredSendPath;
-  }
-  // Default: Pro when a mailbox is linked, otherwise Easy.
-  if (ws?.connectedMailbox?.provider === "google" && ws.connectedMailbox.refreshTokenEnc) {
-    return "pro";
-  }
+/** Product send path is Easy-only (Resend / Maileroo / SMTP). Pro mailbox UI removed. */
+function resolveSendPath(): "easy" | "pro" {
   return "easy";
 }
 
 /**
  * Send a single already-approved email.
  *
- * Priority depends on Settings preferred path:
- *   • Pro → Google mailbox first (when connected), then workspace Easy key
- *   • Easy → workspace Resend / Maileroo / SMTP (selected provider; no cross-fallback)
- * Then (no workspace Easy key): platform Resend → SMTP → demo.
+ * Easy path: workspace Resend / Maileroo / SMTP (selected provider; no
+ * cross-fallback). Then (no workspace Easy key): platform Resend → SMTP → demo.
  *
  * Workspace identity (fromName, fromEmail etc.) overrides env vars so each
  * workspace's outreach appears to come from its own representative.
- * Google sends always use the connected mailbox email as From.
  */
 export async function sendEmail(
   input: SendInput,
@@ -137,7 +128,7 @@ export async function sendEmail(
   const replyToHeader = replyTo || undefined;
   const tags = input.tags?.length ? input.tags : undefined;
 
-  const path = resolveSendPath(ws);
+  const path = resolveSendPath();
   const mailbox = ws?.connectedMailbox;
 
   const tryGoogle = async (): Promise<SendResult | null> => {

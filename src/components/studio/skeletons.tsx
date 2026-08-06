@@ -112,23 +112,41 @@ export function DashboardSkeleton() {
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
-        {[0, 1].map((i) => (
-          <div key={i} className="glass rounded-xl2 p-6">
-            <Bone className="h-5 w-36" />
-            <Bone className="mt-2 h-3 w-48" />
-            <div className="mt-5 space-y-3">
-              {Array.from({ length: 5 }, (_, j) => (
-                <div key={j}>
-                  <div className="mb-1 flex justify-between">
-                    <Bone className="h-3 w-24" />
-                    <Bone className="h-3 w-8" />
-                  </div>
-                  <Bone className="h-2 w-full rounded-full" />
+        <div className="glass rounded-xl2 p-6">
+          <Bone className="h-5 w-36" />
+          <Bone className="mt-2 h-3 w-40" />
+          <div className="mt-5 space-y-3">
+            {Array.from({ length: 5 }, (_, j) => (
+              <div key={j}>
+                <div className="mb-1 flex justify-between">
+                  <Bone className="h-3 w-24" />
+                  <Bone className="h-3 w-8" />
                 </div>
-              ))}
-            </div>
+                <Bone className="h-2 w-full rounded-full" />
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+        <div className="glass rounded-xl2 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <Bone className="h-5 w-20" />
+              <Bone className="mt-2 h-3 w-40" />
+            </div>
+            <Bone className="h-3 w-14" />
+          </div>
+          <ul className="mt-5 space-y-3">
+            {Array.from({ length: 4 }, (_, j) => (
+              <li key={j}>
+                <div className="flex items-center justify-between gap-2">
+                  <Bone className="h-4 w-28" />
+                  <Bone className="h-3 w-20" />
+                </div>
+                <Bone className="mt-1.5 h-1.5 w-full rounded-full" />
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
@@ -138,15 +156,28 @@ export function BoardsSkeleton() {
   return (
     <div className="animate-float-up">
       <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }, (_, i) => (
+        {Array.from({ length: 3 }, (_, i) => (
           <li key={i} className="glass rounded-xl2 p-5">
-            <Bone className="h-5 w-40 max-w-full" />
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <Bone className="h-8 w-full" />
-              <Bone className="h-8 w-full" />
-              <Bone className="h-8 w-full" />
+            <div className="flex items-start justify-between gap-2">
+              <Bone className="h-6 w-36 max-w-full" />
+              <Bone className="h-7 w-16 rounded-full" />
             </div>
-            <Bone className="mt-4 h-3 w-full" />
+            <div className="mt-4 space-y-1 text-center">
+              <Bone className="mx-auto h-3 w-10" />
+              <Bone className="mx-auto h-8 w-12" />
+            </div>
+            <div className="mt-3 border-t border-white/8 pt-3">
+              <Bone className="h-3 w-24" />
+              <Bone className="mt-2 h-3 w-40 max-w-full" />
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/8 pt-3 text-center">
+              {Array.from({ length: 3 }, (_, j) => (
+                <div key={j} className="space-y-1">
+                  <Bone className="mx-auto h-3 w-12" />
+                  <Bone className="mx-auto h-6 w-8" />
+                </div>
+              ))}
+            </div>
           </li>
         ))}
       </ul>
@@ -178,31 +209,113 @@ export function RunsSkeleton() {
 
 export function PipelineSkeleton() {
   return (
-    <div className="flex h-full min-h-0 gap-3 overflow-hidden">
-      {Array.from({ length: 4 }, (_, i) => (
-        <div
-          key={i}
-          className="flex w-[min(18rem,85vw)] shrink-0 flex-col rounded-xl2 border border-white/10 bg-ink-900/40"
-        >
-          <div className="flex items-center gap-2 border-b border-white/5 px-3 py-2.5">
-            <Bone className="h-2.5 w-2.5 rounded-full" />
-            <Bone className="h-3 w-20" />
-            <Bone className="ml-auto h-3 w-6" />
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <Bone className="h-3 w-56 shrink-0" />
+      <div
+        className="grid min-h-0 flex-1 gap-3"
+        style={{ gridTemplateColumns: "repeat(4, minmax(11rem, 1fr))" }}
+      >
+        {Array.from({ length: 4 }, (_, i) => (
+          <div
+            key={i}
+            className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-900/40"
+          >
+            <div className="flex items-center gap-2 border-b border-white/5 px-3 py-2.5">
+              <Bone className="h-2.5 w-2.5 rounded-full" />
+              <Bone className="h-3 w-20" />
+              <Bone className="ml-auto h-5 w-7 rounded-md" />
+            </div>
+            <div className="flex flex-1 flex-col gap-2 p-2">
+              {Array.from({ length: 3 }, (_, j) => (
+                <div
+                  key={j}
+                  className="flex items-start gap-1 rounded-xl border border-white/5 bg-ink-900/60 px-3 py-2.5"
+                >
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Bone className="h-4 w-28 max-w-full" />
+                    <Bone className="h-3 w-20" />
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <Bone className="h-1 w-10 rounded-full" />
+                      <Bone className="h-3 w-6" />
+                      <Bone className="h-4 w-12 rounded-full" />
+                    </div>
+                  </div>
+                  <Bone className="h-5 w-5 shrink-0 rounded-md" />
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-1 flex-col gap-2 p-3">
-            {Array.from({ length: 3 }, (_, j) => (
-              <div
-                key={j}
-                className="rounded-xl border border-white/8 bg-ink-950/50 p-3"
-              >
-                <Bone className="h-4 w-3/4 max-w-[12rem]" />
-                <Bone className="mt-2 h-3 w-1/2 max-w-[8rem]" />
-                <Bone className="mt-3 h-1.5 w-16 rounded-full" />
-              </div>
-            ))}
-          </div>
+        ))}
+      </div>
+      <div className="shrink-0 rounded-xl2 border border-white/10 bg-ink-900/40">
+        <div className="flex items-center gap-2 px-3 py-2.5">
+          <Bone className="h-2.5 w-2.5 rounded-full" />
+          <Bone className="h-3 w-24" />
+          <Bone className="ml-auto h-5 w-7 rounded-md" />
         </div>
-      ))}
+      </div>
+    </div>
+  );
+}
+
+function LeadsTableRowsSkeleton({ rows = 10 }: { rows?: number }) {
+  return (
+    <div className="h-full min-h-0 overflow-hidden rounded-xl2 border border-white/10">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-white/10">
+            <th className="px-4 py-3">
+              <Bone className="h-3 w-3" />
+            </th>
+            {(
+              [
+                "w-20",
+                "w-12",
+                "w-16",
+                "w-16",
+                "w-10",
+                "w-16",
+                "w-12",
+              ] as const
+            ).map((w, i) => (
+              <th key={i} className="px-4 py-3">
+                <Bone className={`h-3 ${w}`} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {Array.from({ length: rows }, (_, i) => (
+            <tr key={i}>
+              <td className="px-4 py-3.5">
+                <Bone className="h-3.5 w-3.5" />
+              </td>
+              <td className="px-4 py-3.5">
+                <Bone className="h-4 w-36" />
+                <Bone className="mt-1 h-3 w-24" />
+              </td>
+              <td className="hidden px-4 py-3.5 sm:table-cell">
+                <Bone className="h-3 w-16" />
+              </td>
+              <td className="hidden px-4 py-3.5 md:table-cell">
+                <Bone className="h-3 w-24" />
+              </td>
+              <td className="px-4 py-3.5">
+                <Bone className="h-3 w-28" />
+              </td>
+              <td className="px-4 py-3.5">
+                <Bone className="h-1.5 w-14 rounded-full" />
+              </td>
+              <td className="px-4 py-3.5">
+                <Bone className="h-5 w-20 rounded-full" />
+              </td>
+              <td className="px-4 py-3.5">
+                <Bone className="h-3 w-16" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -211,33 +324,15 @@ export function LeadsTableSkeleton() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
-        <Bone className="h-3 w-24" />
+        <div className="flex items-center gap-2">
+          <Bone className="h-3 w-20" />
+          <Bone className="h-8 w-24 rounded-full" />
+        </div>
         <Bone className="h-8 w-48 rounded-full justify-self-start sm:justify-self-center" />
         <Bone className="h-8 w-36 justify-self-start sm:justify-self-end" />
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden rounded-xl2 border border-white/10">
-        <div className="border-b border-white/10 px-5 py-3">
-          <div className="flex gap-8">
-            {Array.from({ length: 6 }, (_, i) => (
-              <Bone key={i} className="h-3 w-16" />
-            ))}
-          </div>
-        </div>
-        <div className="divide-y divide-white/5">
-          {Array.from({ length: 10 }, (_, i) => (
-            <div key={i} className="flex items-center gap-6 px-5 py-3.5">
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <Bone className="h-4 w-40" />
-                <Bone className="h-3 w-28" />
-              </div>
-              <Bone className="hidden h-3 w-24 sm:block" />
-              <Bone className="hidden h-3 w-32 md:block" />
-              <Bone className="h-3 w-28" />
-              <Bone className="h-1.5 w-16 rounded-full" />
-              <Bone className="h-5 w-20 rounded-full" />
-            </div>
-          ))}
-        </div>
+      <div className="min-h-0 flex-1">
+        <LeadsTableRowsSkeleton />
       </div>
     </div>
   );
@@ -245,32 +340,7 @@ export function LeadsTableSkeleton() {
 
 /** Content-only skeleton for table body (toolbar stays interactive). */
 export function LeadsTableBodySkeleton() {
-  return (
-    <div className="h-full min-h-0 overflow-hidden rounded-xl2 border border-white/10">
-      <div className="border-b border-white/10 px-5 py-3">
-        <div className="flex gap-8">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Bone key={i} className="h-3 w-16" />
-          ))}
-        </div>
-      </div>
-      <div className="divide-y divide-white/5">
-        {Array.from({ length: 10 }, (_, i) => (
-          <div key={i} className="flex items-center gap-6 px-5 py-3.5">
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <Bone className="h-4 w-40" />
-              <Bone className="h-3 w-28" />
-            </div>
-            <Bone className="hidden h-3 w-24 sm:block" />
-            <Bone className="hidden h-3 w-32 md:block" />
-            <Bone className="h-3 w-28" />
-            <Bone className="h-1.5 w-16 rounded-full" />
-            <Bone className="h-5 w-20 rounded-full" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <LeadsTableRowsSkeleton />;
 }
 
 export function LeadsCardsSkeleton() {
@@ -285,11 +355,15 @@ export function LeadsCardsSkeleton() {
             </div>
             <Bone className="h-5 w-16 rounded-full" />
           </div>
-          <Bone className="mt-4 h-3 w-full" />
+          <Bone className="mt-3 h-3 w-full" />
           <Bone className="mt-2 h-3 w-4/5 max-w-full" />
           <div className="mt-4 flex gap-2">
             <Bone className="h-5 w-14 rounded-full" />
             <Bone className="h-5 w-14 rounded-full" />
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <Bone className="h-4 w-10" />
+            <Bone className="h-4 w-10" />
           </div>
           <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
             <Bone className="h-1.5 w-16 rounded-full" />
@@ -314,52 +388,75 @@ export function LeadsLayoutSkeleton({
 
 export function OutreachSkeleton() {
   return (
-    <div className="grid h-full min-h-0 gap-3 lg:grid-cols-3">
-      {Array.from({ length: 3 }, (_, i) => (
-        <div
-          key={i}
-          className="flex min-h-0 flex-col overflow-hidden rounded-xl2 border border-white/10"
-        >
-          <div className="border-b border-white/5 px-3 py-2.5">
-            <Bone className="h-3 w-28" />
-            <Bone className="mt-1.5 h-3 w-40" />
-          </div>
-          <div className="flex flex-1 flex-col gap-2 p-3">
-            {Array.from({ length: 4 }, (_, j) => (
-              <div
-                key={j}
-                className="rounded-xl border border-white/8 bg-ink-950/40 p-3"
-              >
-                <Bone className="h-4 w-3/4 max-w-[12rem]" />
-                <Bone className="mt-2 h-3 w-1/2 max-w-[8rem]" />
-                <div className="mt-3 flex gap-2">
-                  <Bone className="h-6 w-16 rounded-full" />
-                  <Bone className="h-6 w-6 rounded-full" />
-                </div>
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
+        {Array.from({ length: 3 }, (_, i) => (
+          <section
+            key={i}
+            className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
+          >
+            <div className="flex shrink-0 items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
+              <div className="min-w-0 space-y-1.5">
+                <Bone className="h-3 w-28" />
+                <Bone className="h-3 w-36" />
               </div>
-            ))}
-          </div>
-        </div>
-      ))}
+              {i === 0 ? (
+                <Bone className="h-6 w-20 rounded-full" />
+              ) : i === 1 ? (
+                <Bone className="h-6 w-28 rounded-full" />
+              ) : null}
+            </div>
+            <ul className="min-h-0 flex-1 divide-y divide-white/5 overflow-hidden">
+              {Array.from({ length: 5 }, (_, j) => (
+                <li
+                  key={j}
+                  className="flex items-center justify-between gap-2 px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Bone className="h-4 w-32 max-w-full" />
+                    <Bone className="h-3 w-24" />
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Bone className="h-1 w-10 rounded-full" />
+                    <Bone className="h-6 w-14 rounded-full" />
+                    <Bone className="h-6 w-6 rounded-md" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
 
 export function SearchSkeleton() {
   return (
-    <div className="mb-8 space-y-4">
-      <div className="glass rounded-xl2 p-6">
-        <Bone className="h-5 w-40" />
-        <Bone className="mt-2 h-3 w-64 max-w-full" />
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <Bone className="h-11 w-full rounded-lg" />
-          <Bone className="h-11 w-full rounded-lg" />
+    <div className="mb-8">
+      <div className="glass rounded-xl2 p-5 sm:p-6">
+        <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
+          <div>
+            <Bone className="mb-1.5 h-3 w-40" />
+            <Bone className="h-12 w-full rounded-lg" />
+          </div>
+          <div>
+            <Bone className="mb-1.5 h-3 w-20" />
+            <Bone className="h-12 w-full rounded-lg" />
+          </div>
         </div>
-        <Bone className="mt-4 h-11 w-36 rounded-full" />
-      </div>
-      <div className="rounded-xl2 border border-dashed border-white/10 p-6">
-        <Bone className="mx-auto h-4 w-48" />
-        <Bone className="mx-auto mt-3 h-3 w-64 max-w-full" />
+        <div className="mt-4 grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
+          <Bone className="h-8 w-40 rounded-full" />
+          <Bone className="h-8 w-36 rounded-full justify-self-center" />
+          <Bone className="h-9 w-40 justify-self-stretch sm:justify-self-end" />
+        </div>
+        <div className="mt-3 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
+          <Bone className="h-4 w-48 max-w-full" />
+          <Bone className="mt-2 h-3 w-full max-w-md" />
+        </div>
+        <div className="mt-5 flex justify-center">
+          <Bone className="h-11 w-36 rounded-full" />
+        </div>
       </div>
     </div>
   );
@@ -399,41 +496,134 @@ export function AdminPlatformSkeleton() {
           </div>
         </div>
       </div>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="glass rounded-xl2 p-5">
+          <Bone className="h-4 w-28" />
+          <div className="mt-4 space-y-3">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i}>
+                <div className="mb-1 flex justify-between">
+                  <Bone className="h-3 w-32" />
+                  <Bone className="h-3 w-10" />
+                </div>
+                <Bone className="h-2 w-full rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="glass rounded-xl2 p-5">
+          <Bone className="h-4 w-28" />
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <Bone className="h-20 w-full rounded-xl" />
+            <Bone className="h-20 w-full rounded-xl" />
+            <Bone className="col-span-2 h-24 w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="glass rounded-xl2 p-5">
+          <Bone className="h-4 w-40" />
+          <ul className="mt-4 space-y-3">
+            {Array.from({ length: 5 }, (_, i) => (
+              <li key={i}>
+                <div className="mb-1 flex justify-between">
+                  <Bone className="h-3 w-32" />
+                  <Bone className="h-3 w-10" />
+                </div>
+                <Bone className="h-2 w-full rounded-full" />
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="glass rounded-xl2 p-5">
+          <Bone className="h-4 w-36" />
+          <ul className="mt-4 divide-y divide-white/5">
+            {Array.from({ length: 5 }, (_, i) => (
+              <li key={i} className="flex items-center justify-between py-2.5">
+                <Bone className="h-4 w-40" />
+                <Bone className="h-3 w-16" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
 
 export function AdminUsersSkeleton() {
   return (
-    <div className="animate-float-up space-y-4">
+    <div className="animate-float-up space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl2 border border-white/10 bg-ink-900/40 px-4 py-3">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <Bone className="h-4 w-28" />
+          <Bone className="h-3 w-full max-w-lg" />
+        </div>
+        <Bone className="h-9 w-52 rounded-full" />
+      </div>
       <div className="flex flex-wrap gap-3">
         <Bone className="h-9 w-48 rounded-lg" />
+        <Bone className="h-9 min-w-[14rem] flex-1 rounded-lg" />
         <Bone className="h-9 w-36 rounded-lg" />
-        <Bone className="h-9 w-40 rounded-lg" />
-        <Bone className="ml-auto h-9 w-44 rounded-full" />
       </div>
-      <div className="overflow-hidden rounded-xl2 border border-white/10">
-        <div className="border-b border-white/10 px-4 py-3">
-          <div className="flex gap-6">
-            {Array.from({ length: 5 }, (_, i) => (
-              <Bone key={i} className="h-3 w-20" />
+      <div className="overflow-x-auto rounded-xl2 border border-white/8">
+        <table className="w-full min-w-[64rem] text-left text-sm">
+          <thead>
+            <tr className="border-b border-white/10">
+              {(
+                [
+                  "w-14",
+                  "w-12",
+                  "w-16",
+                  "w-16",
+                  "w-16",
+                  "w-12",
+                  "w-12",
+                  "w-14",
+                  "w-6",
+                ] as const
+              ).map((w, i) => (
+                <th key={i} className="px-4 py-3">
+                  <Bone className={`h-3 ${w}`} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {Array.from({ length: 8 }, (_, i) => (
+              <tr key={i}>
+                <td className="px-4 py-3">
+                  <Bone className="h-4 w-36" />
+                  <Bone className="mt-1 h-3 w-24" />
+                </td>
+                <td className="px-4 py-3">
+                  <Bone className="h-8 w-24 rounded-lg" />
+                </td>
+                <td className="px-4 py-3">
+                  <Bone className="h-6 w-11 rounded-full" />
+                </td>
+                <td className="px-4 py-3">
+                  <Bone className="h-3 w-16" />
+                </td>
+                <td className="px-4 py-3">
+                  <Bone className="h-3 w-12" />
+                </td>
+                <td className="px-4 py-3">
+                  <Bone className="h-3 w-14" />
+                </td>
+                <td className="px-4 py-3">
+                  <Bone className="h-3 w-12" />
+                </td>
+                <td className="px-4 py-3">
+                  <Bone className="h-3 w-16" />
+                </td>
+                <td className="px-2 py-3">
+                  <Bone className="h-7 w-7 rounded-lg" />
+                </td>
+              </tr>
             ))}
-          </div>
-        </div>
-        {Array.from({ length: 8 }, (_, i) => (
-          <div
-            key={i}
-            className={`flex items-center gap-4 px-4 py-3 ${
-              i > 0 ? "border-t border-white/5" : ""
-            }`}
-          >
-            <Bone className="h-4 w-40" />
-            <Bone className="h-4 w-28" />
-            <Bone className="h-5 w-16 rounded-full" />
-            <Bone className="h-4 w-12" />
-            <Bone className="ml-auto h-7 w-7 rounded-lg" />
-          </div>
-        ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -456,40 +646,76 @@ export function MapSkeleton() {
 export function SettingsSkeleton() {
   return (
     <main
-      className="mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8"
+      className="relative mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8"
       role="status"
       aria-busy="true"
       aria-label="Loading settings"
     >
-      <Bone className="h-9 w-40 sm:h-10" />
+      <Bone className="absolute right-3 top-3 h-8 w-8 rounded-full sm:right-5 sm:top-4" />
+      <Bone className="h-9 w-36 sm:h-10" />
       <Bone className="mt-2 h-3.5 w-72 max-w-full" />
 
-      {(
-        [
-          { fields: 3, tall: true },
-          { fields: 4, tall: false },
-          { fields: 2, tall: false },
-          { fields: 1, tall: false },
-        ] as const
-      ).map((section, i) => (
-        <section key={i} className="mt-8">
-          <Bone className="mb-3 h-3 w-28" />
-          <div className="rounded-xl2 border border-white/10 p-5">
+      <section className="mt-8">
+        <Bone className="mb-3 h-3 w-32" />
+        <div className="space-y-4 rounded-xl2 border border-white/10 p-5">
+          <Bone className="h-10 w-56 rounded-lg" />
+          <Bone className="h-3 w-80 max-w-full" />
+          <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
-              {Array.from({ length: section.fields }, (_, j) => (
-                <Bone
-                  key={j}
-                  className={
-                    section.tall && j === section.fields - 1
-                      ? "h-24 w-full rounded-lg"
-                      : "h-10 w-full rounded-lg"
-                  }
-                />
-              ))}
+              <Bone className="h-10 w-full rounded-lg" />
+              <Bone className="h-10 w-full rounded-lg" />
+              <Bone className="h-40 w-full rounded-lg" />
             </div>
+            <Bone className="h-56 w-full rounded-xl2" />
           </div>
-        </section>
-      ))}
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <Bone className="mb-3 h-3 w-40" />
+        <div className="rounded-xl2 border border-white/10 p-5">
+          <Bone className="h-4 w-36" />
+          <Bone className="mt-2 h-3 w-64 max-w-full" />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Bone className="h-10 w-full rounded-lg" />
+            <Bone className="h-10 w-full rounded-lg" />
+          </div>
+          <Bone className="mt-4 h-10 w-full rounded-lg" />
+          <Bone className="mt-4 h-12 w-full rounded-lg" />
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <Bone className="mb-3 h-3 w-24" />
+        <div className="rounded-xl2 border border-white/10 p-5">
+          <Bone className="h-6 w-28" />
+          <Bone className="mt-2 h-3 w-56" />
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <Bone className="h-12 w-full rounded-lg" />
+            <Bone className="h-12 w-full rounded-lg" />
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <Bone className="mb-3 h-3 w-20" />
+        <div className="overflow-hidden rounded-xl2 border border-white/10">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div
+              key={i}
+              className={`flex items-center gap-4 p-5 ${
+                i > 0 ? "border-t border-white/5" : ""
+              }`}
+            >
+              <Bone className="h-5 w-5 rounded-md" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Bone className="h-4 w-28" />
+                <Bone className="h-3 w-48" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </main>
   );
 }
@@ -521,12 +747,15 @@ export function StudioViewSkeleton({
             : view === "outreach"
               ? "Outreach"
               : view === "runs"
-                ? "Runs"
+                ? "Search runs"
                 : view === "admin"
-                  ? "Platform"
+                  ? "Dashboard"
                   : view === "admin-users"
                     ? "Users"
                     : "Search";
+
+  const showUsage =
+    view !== "admin" && view !== "admin-users" && view !== "boards";
 
   const body =
     view === "dashboard" ? (
@@ -565,9 +794,32 @@ export function StudioViewSkeleton({
       aria-busy="true"
       aria-label={`Loading ${title}`}
     >
-      <div className="mb-5 shrink-0 sm:mb-6">
-        <Bone className="h-9 w-40 sm:h-10" />
-        <Bone className="mt-2 h-3 w-64 max-w-full" />
+      <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <Bone className="h-9 w-36 sm:h-10" />
+            {view === "boards" ? (
+              <Bone className="h-8 w-28 rounded-full" />
+            ) : null}
+            {view === "leads" ? (
+              <Bone className="h-8 w-24 rounded-full" />
+            ) : null}
+          </div>
+          <Bone className="mt-2 h-3 w-64 max-w-full" />
+        </div>
+        {showUsage ? (
+          <div className="hidden justify-self-center sm:block">
+            <div className="flex gap-3">
+              <Bone className="h-10 w-28 rounded-lg" />
+              <Bone className="h-10 w-28 rounded-lg" />
+            </div>
+          </div>
+        ) : (
+          <div />
+        )}
+        <div className="justify-self-start sm:justify-self-end">
+          <Bone className="h-9 w-32 rounded-full" />
+        </div>
       </div>
       <div
         className={

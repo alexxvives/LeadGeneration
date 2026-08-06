@@ -19,14 +19,8 @@ export const dynamic = "force-dynamic";
 // Settings: editable outreach profile + capability status.
 // API keys are never rendered — only has* flags reach the client.
 // Platform admins get a slim ops-focused page (no studio send/profiles).
-export default async function SettingsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function SettingsPage() {
   const caps = getCapabilities();
-  const params = (await searchParams) ?? {};
-  const mailboxFlag = typeof params.mailbox === "string" ? params.mailbox : null;
 
   let ctx: Awaited<ReturnType<typeof getCtx>>;
   let usage: Awaited<ReturnType<typeof getWorkspaceSummary>>;
@@ -53,12 +47,10 @@ export default async function SettingsPage({
     ws = await ctx.db.getWorkspace(ctx.workspaceId);
   }
   const plan = getPlan(usage.planId);
-  const { mailboxPublicStatus } = await import("@/lib/email/mailbox");
   const {
     resolveProfileSendSettings,
     workspaceHasEasySendKey,
   } = await import("@/lib/email/profile-send-settings");
-  const mailbox = mailboxPublicStatus(ws);
   const activeSend = ws
     ? resolveProfileSendSettings(ws).settings
     : null;
@@ -70,28 +62,10 @@ export default async function SettingsPage({
     (session?.user?.email as string | undefined) ?? ctx.userEmail ?? null;
 
   const canSendEmail =
-    caps.canSendEmail ||
-    (ws ? workspaceHasEasySendKey(ws) : false) ||
-    !!ws?.connectedMailbox;
+    caps.canSendEmail || (ws ? workspaceHasEasySendKey(ws) : false);
 
-  const preferredPath = activeSend?.preferredSendPath ?? ws?.preferredSendPath;
   const easyProvider =
     activeSend?.easyEmailProvider ?? ws?.easyEmailProvider ?? "resend";
-  // Prefer Easy when Maileroo/SMTP is the Easy provider or user last chose Easy.
-  const defaultPath: "easy" | "pro" =
-    mailboxFlag === "connected"
-      ? "pro"
-      : preferredPath === "easy" || preferredPath === "pro"
-        ? preferredPath
-        : easyProvider === "maileroo" || easyProvider === "smtp"
-          ? "easy"
-          : mailbox.connected
-            ? "pro"
-            : "easy";
-
-  const appUrl = env.appUrl();
-  const appUrlLooksLocal =
-    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(appUrl);
 
   if (isAdmin) {
     return (
@@ -164,19 +138,6 @@ export default async function SettingsPage({
         Profiles, sending setup, and workspace preferences.
       </p>
 
-      {mailboxFlag === "connected" && (
-        <p className="mt-4 rounded-lg border border-aurora-400/30 bg-aurora-400/10 px-4 py-3 text-sm text-mist-100">
-          Google mailbox connected. Approved outreach can send from{" "}
-          <span className="text-aurora-300">{mailbox.email ?? "your Gmail"}</span>.
-        </p>
-      )}
-      {mailboxFlag === "error" && (
-        <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-mist-100">
-          Could not connect Google. Check redirect URI, test-user access, and try again
-          (see docs/gmail-oauth-setup.md).
-        </p>
-      )}
-
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
           Outreach profiles
@@ -188,9 +149,6 @@ export default async function SettingsPage({
         <SendSetupPanel
           canSendEmail={canSendEmail}
           canEdit={true}
-          mailbox={mailbox}
-          defaultPath={defaultPath}
-          appUrlLooksLocal={caps.gmailOAuth && appUrlLooksLocal}
           canVerifyEmail={caps.emailVerify}
           emailVerifyEnabled={ws?.emailVerifyEnabled !== false}
           initial={{
@@ -200,7 +158,7 @@ export default async function SettingsPage({
             physicalAddress:
               activeSend?.physicalAddress ?? ws?.physicalAddress ?? null,
             easyEmailProvider: easyProvider,
-            preferredSendPath: preferredPath ?? null,
+            preferredSendPath: "easy",
             hasResendKey: !!(
               activeSend?.resendApiKey?.trim() || ws?.resendApiKey?.trim()
             ),
