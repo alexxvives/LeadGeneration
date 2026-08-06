@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { SearchIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui";
-import { Select } from "@/components/ui/Select";
 import type { PlanId, SearchStrategy } from "@/lib/types";
 import { getPlan, LEAD_COUNT_OPTIONS } from "@/lib/plans";
 import {
@@ -11,9 +10,9 @@ import {
   getDefaultOffer,
   loadOutreachProfiles,
   loadSenderProfile,
+  OUTREACH_PROFILE_CHANGE_EVENT,
   pitchForLang,
   resolveSignature,
-  setActiveOutreachProfile,
   subjectForLang,
   type OutreachProfile,
 } from "@/lib/sender-profile";
@@ -30,7 +29,7 @@ export interface SearchValues {
   searchStrategy: SearchStrategy;
   offerNotes: string;
   subjectTemplate: string;
-  /** False when user chose no outreach profile — leads go to Review without drafts. */
+  /** False when no active outreach profile — leads go to Review without drafts. */
   autoDraft: boolean;
   /** @deprecated Prefer aiPersonalize. */
   staticBody?: boolean;
@@ -222,8 +221,7 @@ export function SearchPanel({
   const [niche, setNiche] = useState("");
   const [location, setLocation] = useState("");
   const [locationConfirmed, setLocationConfirmed] = useState(true);
-  const [profileId, setProfileId] = useState<string>("");
-  const [profiles, setProfiles] = useState<OutreachProfile[]>([]);
+  const [activeProfile, setActiveProfile] = useState<OutreachProfile | null>(null);
   const [searchStrategy, setSearchStrategy] = useState<SearchStrategy>("standard");
   const [senderName, setSenderName] = useState("");
   // Default 25 — Free can use it when monthly remaining allows (no per-run lock).
@@ -239,13 +237,24 @@ export function SearchPanel({
   const planCap = Math.min(Math.max(...LEAD_COUNT_OPTIONS), planMonthlyCap);
 
   useEffect(() => {
-    const store = loadOutreachProfiles();
-    setProfiles(store.profiles);
-    setProfileId(store.activeId ?? store.profiles[0]?.id ?? "");
+    const syncProfile = () => {
+      const store = loadOutreachProfiles();
+      const active =
+        store.profiles.find((p) => p.id === store.activeId) ??
+        store.profiles[0] ??
+        null;
+      setActiveProfile(active);
+      onProfileChange?.();
+    };
+    syncProfile();
     const profile = loadSenderProfile();
     setSenderName(resolveSignature(profile));
     setIcps(loadSavedIcps());
-  }, []);
+    window.addEventListener(OUTREACH_PROFILE_CHANGE_EVENT, syncProfile);
+    return () => {
+      window.removeEventListener(OUTREACH_PROFILE_CHANGE_EVENT, syncProfile);
+    };
+  }, [onProfileChange]);
 
   // Clamp selection if plan/remaining credits shrink.
   useEffect(() => {
@@ -262,10 +271,8 @@ export function SearchPanel({
     });
   }, [planCap, leadsRemaining, planId]);
 
-  const selectedProfile =
-    profileId && profiles.find((p) => p.id === profileId)
-      ? profiles.find((p) => p.id === profileId)!
-      : null;
+  // Profile follows the sidebar board (ADR 0022) — no separate Search picker.
+  const selectedProfile = activeProfile;
 
   // Admin pause is the only feature gate on the client. Credit / quota checks
   // stay on the server (402) so a Firecrawl usage blip can't look like "Search
@@ -433,11 +440,11 @@ export function SearchPanel({
       )}
 
       <div className="mt-4">
-        <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div
             role="radiogroup"
             aria-label="Search mode"
-            className="inline-flex justify-self-start rounded-full border border-white/10 bg-ink-900/60 p-1"
+            className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1"
           >
             {STRATEGIES.map((s) => {
               const isActive = s.id === searchStrategy;
@@ -463,7 +470,7 @@ export function SearchPanel({
           <div
             role="radiogroup"
             aria-label="Number of leads to find"
-            className="inline-flex flex-wrap justify-self-center gap-1 rounded-full border border-white/10 bg-ink-900/60 p-1"
+            className="inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-ink-900/60 p-1"
           >
             {LEAD_COUNT_OPTIONS.map((n) => {
               const overPlan = n > planCap;
@@ -505,32 +512,6 @@ export function SearchPanel({
                 </button>
               );
             })}
-          </div>
-          <div className="w-full min-w-0 justify-self-stretch sm:max-w-[16rem] sm:justify-self-end">
-            <label className="sr-only" htmlFor="search-outreach-profile">
-              Outreach profile
-            </label>
-            <Select
-              id="search-outreach-profile"
-              value={profileId}
-              onChange={(e) => {
-                const id = e.target.value;
-                setProfileId(id);
-                // Keep Settings / draft creation on the same active profile.
-                if (id) setActiveOutreachProfile(id);
-                onProfileChange?.();
-              }}
-              title="Optional — without one, leads go to Review with no draft"
-              className="w-full py-2 text-sm"
-            >
-              <option value="">No profile — review only</option>
-              {profiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {getDefaultOffer(p) ? "" : " (no pitch yet)"}
-                </option>
-              ))}
-            </Select>
           </div>
         </div>
         <div className="mt-3 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">

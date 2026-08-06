@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-06 — Single-board sidebar; SMTP off UI; geocode prefetch
+- Board picker no longer offers “All boards” — always one board (profile follows).
+- Search profile select removed (“No profile — review only” meant skip drafts).
+- Easy send UI: Resend/Maileroo only; API key sits beside the toggle. SMTP
+  still in types/backend for legacy rows.
+- `prefetchLeadGeocodes` warms Nominatim/D1 cache from Pipeline/Leads views.
+
 ### 2026-08-06 — Map pins, no Default board, bounce UX, MEV catch
 - Map: only pin leads geocoded from their own `location` (street first; city
   after street pending clears). Badge shows “N leads remaining to be mapped…”.

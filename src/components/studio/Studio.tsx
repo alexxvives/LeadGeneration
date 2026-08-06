@@ -15,6 +15,7 @@ import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
 import { LeadTable } from "./LeadTable";
 import { LeadMap } from "./LeadMap";
+import { prefetchLeadGeocodes } from "@/lib/geocode-client";
 import { LeadDrawer } from "./LeadDrawer";
 import { UpgradeModal, UsageBar } from "./UpgradeModal";
 import { VerifyLimitModal } from "./VerifyLimitModal";
@@ -1460,6 +1461,15 @@ export function Studio() {
   const cardsLeads = useActiveLeads(layout === "cards", filteredLeads);
   const mapLeads = useActiveLeads(layout === "map", filteredLeads);
 
+  // Warm geocodes while user is on Pipeline/table — map opens with cache hits.
+  useEffect(() => {
+    if (view !== "leads" && view !== "pipeline") return;
+    prefetchLeadGeocodes({
+      locations: filteredLeads.map((l) => l.location),
+      locationHint: board?.run?.location ?? null,
+    });
+  }, [view, filteredLeads, board?.run?.location]);
+
   // Yield one frame so Leads chrome paints before mounting heavy table/cards.
   // Warm revisits (data + current layout already known) skip the blank frame.
   const [leadsBodyReady, setLeadsBodyReady] = useState(false);
@@ -1701,30 +1711,23 @@ export function Studio() {
         )}
 
         <div className="flex flex-wrap items-center justify-start gap-3 sm:justify-end">
-          {view === "dashboard" ? (
+          {view === "dashboard" && boards.length > 0 ? (
             <label className="inline-flex items-center">
               <span className="sr-only">Filter by board</span>
               <select
-                value={filterBoardId ?? "all"}
+                value={filterBoardId ?? boards[0]!.id}
                 onChange={(e) => {
                   const v = e.target.value;
-                  if (v === "all") {
-                    storeBoardFilter("all");
-                    router.replace("/app?view=dashboard", { scroll: false });
-                  } else {
-                    storeBoardFilter(v);
-                    router.replace(`/app?view=dashboard&board=${v}`, {
-                      scroll: false,
-                    });
-                  }
+                  storeBoardFilter(v);
+                  router.replace(`/app?view=dashboard&board=${v}`, {
+                    scroll: false,
+                  });
                 }}
                 className="select-glass glass rounded-xl border border-white/10 py-2 pl-4 text-sm font-medium text-mist-100 outline-none transition-colors hover:border-white/20 focus:border-aurora-400/50"
               >
-                <option value="all">All boards</option>
                 {boards.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
-                    {b.isDefault ? " (Default)" : ""}
                   </option>
                 ))}
               </select>
@@ -1862,22 +1865,6 @@ export function Studio() {
                   … top cards first
                 </p>
               ) : null}
-              {(() => {
-                const bouncedCount = searchFilteredLeads.filter(
-                  (l) => l.outreach?.deliveryStatus === "bounced",
-                ).length;
-                if (bouncedCount === 0) return null;
-                return (
-                  <p
-                    className="mb-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-200 ring-1 ring-inset ring-rose-400/25"
-                    role="status"
-                  >
-                    {bouncedCount === 1
-                      ? "1 email bounced — find the Bounced tag next to fit score and fix the address."
-                      : `${bouncedCount} emails bounced — cards tagged Bounced need a better address.`}
-                  </p>
-                );
-              })()}
               <PipelineView
                 leads={searchFilteredLeads}
                 stageCounts={board.crmStageCounts}

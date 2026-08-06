@@ -17,10 +17,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CrmStage, LeadWithOutreach } from "@/lib/types";
-import { api } from "@/lib/client-api";
+import {
+  cityKey,
+  geocode,
+  isStreetCandidate,
+  peekGeocodeCache,
+  type Coords,
+} from "@/lib/geocode-client";
 import { useDeferredLoading } from "./skeletons";
 
-type Coords = { lat: number; lng: number };
 type Pin = { id: string; company: string; coords: Coords; crmStage: CrmStage };
 
 /** Hex colors aligned with Pipeline column dots (mist-500 / amber / sky / aurora / rose). */
@@ -46,67 +51,6 @@ const MAX_CITY_GEOCODES = 60;
 const STREET_BATCH = 12;
 const STREET_BATCH_PAUSE_MS = 350;
 const GEOCODE_CONCURRENCY = 3;
-
-const geocodeCache = new Map<string, Coords | null>();
-const geocodeInflight = new Map<string, Promise<Coords | null>>();
-
-/** Try full address, then city/country tails — Nominatim often misses long streets. */
-function geocodeCandidates(query: string): string[] {
-  const q = query.trim();
-  if (!q) return [];
-  const parts = q.split(",").map((p) => p.trim()).filter(Boolean);
-  const out: string[] = [q];
-  if (parts.length >= 2) out.push(parts.slice(-2).join(", "));
-  if (parts.length >= 3) out.push(parts.slice(-3).join(", "));
-  // "08037 Barcelona" style token → "Barcelona, Spain" when country present
-  if (parts.length >= 2) {
-    const cityish = parts[parts.length - 2]!.replace(/^\d+\s+/, "").trim();
-    const country = parts[parts.length - 1]!;
-    if (cityish.length >= 2) out.push(`${cityish}, ${country}`);
-  }
-  return [...new Set(out.map((s) => s.trim()).filter(Boolean))];
-}
-
-/** City/region key for grouping pins (avoids geocoding every street). */
-function cityKey(loc: string): string {
-  const parts = loc
-    .split(",")
-    .map((p) => p.trim())
-    .filter(Boolean);
-  if (parts.length >= 2) return parts.slice(-2).join(", ").toLowerCase();
-  return loc.trim().toLowerCase();
-}
-
-async function geocodeExact(query: string): Promise<Coords | null> {
-  const key = query.trim().toLowerCase();
-  if (!key) return null;
-  if (geocodeCache.has(key)) return geocodeCache.get(key)!;
-  const pending = geocodeInflight.get(key);
-  if (pending) return pending;
-
-  const req = (async () => {
-    try {
-      const { coords } = await api.geocode(key);
-      geocodeCache.set(key, coords);
-      return coords;
-    } catch {
-      geocodeCache.set(key, null);
-      return null;
-    } finally {
-      geocodeInflight.delete(key);
-    }
-  })();
-  geocodeInflight.set(key, req);
-  return req;
-}
-
-async function geocode(query: string): Promise<Coords | null> {
-  for (const candidate of geocodeCandidates(query)) {
-    const coords = await geocodeExact(candidate);
-    if (coords) return coords;
-  }
-  return null;
-}
 
 async function mapPool<T>(
   items: T[],
@@ -139,13 +83,6 @@ function ensureLeafletCss() {
   link.rel = "stylesheet";
   link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
   document.head.appendChild(link);
-}
-
-/** Street-level candidates get exact geocode; plain "City, Country" stays city-level. */
-function isStreetCandidate(loc: string): boolean {
-  if (!loc.includes(",")) return false;
-  const parts = loc.split(",").map((p) => p.trim()).filter(Boolean);
-  return parts.length >= 3 || /^\d/.test(parts[0] ?? "");
 }
 
 /**
@@ -329,11 +266,11 @@ export function LeadMap({
       const exact = new Map<string, Coords>();
       const pending: string[] = [];
       for (const loc of streets) {
-        if (geocodeCache.has(loc)) {
-          const cached = geocodeCache.get(loc);
-          if (cached) exact.set(loc, cached);
-        } else {
+        const cached = peekGeocodeCache(loc);
+        if (cached === undefined) {
           pending.push(loc);
+        } else if (cached) {
+          exact.set(loc, cached);
         }
       }
       const streetPending = new Set(pending);
@@ -531,7 +468,6 @@ export function LeadMap({
             {pins.length > 0
               ? `${pins.length} pin${pins.length === 1 ? "" : "s"}`
               : "Mapping…"}
-            {hint ? ` · ${hint}` : ""}
             {remaining > 0
               ? ` · ${remaining} lead${remaining === 1 ? "" : "s"} remaining to be mapped…`
               : ""}

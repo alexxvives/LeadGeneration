@@ -9,25 +9,25 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-06 (map / boards / bounce)
+## ⏱️ Status — updated 2026-08-06 (UX polish + no-All board)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0029** remote applied.  
-**Deployed:** code changes below are **local only** — deploy to stop prod
-recreating Default via old `ensureDefaultBoard`.
+**Deployed:** 2026-08-06 — version `811bcebb` (no-Default + UX polish).
 
 ### This pass
-- Map: hide unmapped pins; “N leads remaining to be mapped…” progress.
-- Boards UI: removed Outreach profile / Fill in Settings block.
-- No auto Default board (ADR 0023); delete moves leads to another board.
-- Bounce: tag beside fit (not rose card); clear bounced email on webhook.
-- D1 cleanup for alexxvives@: kept filled AKADEMO + LUMIA profiles, linked to
-  matching boards, deleted Default + empty duplicate profiles.
+- Removed Pipeline bounce banner; Bounced tag only.
+- Settings: Resend key beside provider toggle; SMTP removed from UI.
+- Verify toggle: no “Verify on — MEV…” toast.
+- Sidebar board picker: single board only (no “All boards”).
+- Search: removed profile dropdown (follows board profile).
+- Map: no address in pin badge; geocode prefetch in background on
+  Pipeline/Leads via `geocode-client`.
+- D1: Default deleted again for alexxvives@ (AKADEMO + LUMIA only).
 
 ### Next
-1. **Deploy** so Default stops auto-recreating on `/api/boards`.
-2. Spot-check map remaining count + bounced tag on Pipeline.
-3. Confirm AKADEMO/LUMIA send from linked filled profiles.
+1. Hard-refresh live app — confirm no Default, sidebar single-board, Settings layout.
+2. Spot-check map prefetch (open Pipeline then Map — pins should be warm).
 
 ---
 

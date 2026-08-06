@@ -10,16 +10,22 @@ const STORAGE_KEY = "hermes_active_board";
 const STORAGE_LEGACY = ["leadify_active_board", "lodestar_active_board"];
 
 export function loadStoredBoardFilter(): string {
-  if (typeof window === "undefined") return "all";
-  return readMigratedKey(STORAGE_KEY, STORAGE_LEGACY) || "all";
+  if (typeof window === "undefined") return "";
+  const v = readMigratedKey(STORAGE_KEY, STORAGE_LEGACY) || "";
+  // Legacy "all" is no longer a valid selection — force a single board.
+  return v === "all" ? "" : v;
 }
 
 export function storeBoardFilter(id: string): void {
+  if (id === "all") {
+    localStorage.removeItem(STORAGE_KEY);
+    return;
+  }
   localStorage.setItem(STORAGE_KEY, id);
 }
 
 /**
- * Compact board filter above the account card — All (default) or one board.
+ * Compact board picker above the account card — always one board (no "All").
  * Selecting a board activates its linked outreach profile (StudioShell).
  */
 export function BoardPicker({
@@ -28,18 +34,16 @@ export function BoardPicker({
   onChange,
 }: {
   boards: BoardSummary[];
-  /** null / "all" = all boards */
   activeBoardId: string | null;
-  onChange: (boardId: string | null) => void;
+  onChange: (boardId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const active =
     activeBoardId && boards.find((b) => b.id === activeBoardId)
       ? boards.find((b) => b.id === activeBoardId)!
-      : null;
-  const label = active ? active.name : "All boards";
-  const totalLeads = boards.reduce((s, b) => s + b.leadCount, 0);
+      : boards[0] ?? null;
+  const label = active ? active.name : "Select board";
   const profileName = (profileId: string | null | undefined) => {
     if (!profileId) return null;
     const p = loadOutreachProfiles().profiles.find((x) => x.id === profileId);
@@ -84,55 +88,39 @@ export function BoardPicker({
           role="listbox"
           className="absolute bottom-full left-0 right-0 z-40 mb-1 max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
         >
-          <li role="option" aria-selected={!active}>
-            <button
-              type="button"
-              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${
-                !active
-                  ? "bg-aurora-400/10 text-aurora-300"
-                  : "text-mist-200 hover:bg-white/5"
-              }`}
-              onClick={() => {
-                onChange(null);
-                setOpen(false);
-              }}
-            >
-              <span>All boards</span>
-              <span className="text-xs text-mist-500">{totalLeads}</span>
-            </button>
-          </li>
-          {boards.map((b) => (
-            <li key={b.id} role="option" aria-selected={active?.id === b.id}>
-              <button
-                type="button"
-                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${
-                  active?.id === b.id
-                    ? "bg-aurora-400/10 text-aurora-300"
-                    : "text-mist-200 hover:bg-white/5"
-                }`}
-                onClick={() => {
-                  onChange(b.id);
-                  setOpen(false);
-                }}
-              >
-                <span className="min-w-0 truncate">
-                  {b.name}
-                  {b.isDefault ? (
-                    <span className="ml-1.5 text-[10px] text-mist-500">Default</span>
-                  ) : null}
-                  {b.shared ? (
-                    <span className="ml-1.5 text-[10px] text-amber-400">Shared</span>
-                  ) : null}
-                  {profileName(b.outreachProfileId) ? (
-                    <span className="ml-1.5 text-[10px] text-mist-500">
-                      · {profileName(b.outreachProfileId)}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="shrink-0 text-xs text-mist-500">{b.leadCount}</span>
-              </button>
-            </li>
-          ))}
+          {boards.length === 0 ? (
+            <li className="px-3 py-2 text-sm text-mist-500">No boards yet</li>
+          ) : (
+            boards.map((b) => (
+              <li key={b.id} role="option" aria-selected={active?.id === b.id}>
+                <button
+                  type="button"
+                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${
+                    active?.id === b.id
+                      ? "bg-aurora-400/10 text-aurora-300"
+                      : "text-mist-200 hover:bg-white/5"
+                  }`}
+                  onClick={() => {
+                    onChange(b.id);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="min-w-0 truncate">
+                    {b.name}
+                    {b.shared ? (
+                      <span className="ml-1.5 text-[10px] text-amber-400">Shared</span>
+                    ) : null}
+                    {profileName(b.outreachProfileId) ? (
+                      <span className="ml-1.5 text-[10px] text-mist-500">
+                        · {profileName(b.outreachProfileId)}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 text-xs text-mist-500">{b.leadCount}</span>
+                </button>
+              </li>
+            ))
+          )}
         </ul>
       )}
     </div>

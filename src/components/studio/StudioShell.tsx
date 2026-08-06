@@ -133,50 +133,49 @@ export function StudioShell({
     refreshBoards();
   }, [refreshBoards, pathname, view]);
 
-  // Sync board filter from URL, else localStorage. Keep `board` in the URL so
-  // every view (leads/pipeline/…) filters the same way. Drop ids that aren't
-  // in this workspace (stale localStorage from another account/session).
-  // Skip injecting board while the tour is open — the wizard navigates with
-  // the filter already attached (avoids a second replace / double paint).
+  // Sync board from URL, else localStorage, else first board. Always a single
+  // board (no "All"). Drop stale ids. Skip URL inject while the tour is open.
   useEffect(() => {
+    const fallback = boards[0]?.id ?? null;
+    const resolve = (candidate: string | null): string | null => {
+      if (!candidate || candidate === "all") return fallback;
+      if (boards.length === 0) return candidate;
+      return boards.some((b) => b.id === candidate) ? candidate : fallback;
+    };
+
     if (boardParam === "all" || boardParam === "") {
-      setActiveBoardId(null);
-      storeBoardFilter("all");
+      const id = fallback;
+      setActiveBoardId(id);
+      if (id) {
+        storeBoardFilter(id);
+        if (!setupOpen && pathname.startsWith("/app")) {
+          const params = new URLSearchParams(searchParams.toString());
+          params.set("board", id);
+          const q = params.toString();
+          router.replace(q ? `${pathname}?${q}` : pathname);
+        }
+      } else {
+        storeBoardFilter("all");
+      }
       return;
     }
     if (boardParam) {
-      if (boards.length > 0 && !boards.some((b) => b.id === boardParam)) {
-        storeBoardFilter("all");
-        setActiveBoardId(null);
+      const id = resolve(boardParam);
+      setActiveBoardId(id);
+      if (id) storeBoardFilter(id);
+      if (id && id !== boardParam && !setupOpen && pathname.startsWith("/app")) {
         const params = new URLSearchParams(searchParams.toString());
-        params.delete("board");
+        params.set("board", id);
         const q = params.toString();
         router.replace(q ? `${pathname}?${q}` : pathname);
-        return;
-      }
-      setActiveBoardId(boardParam);
-      if (boards.length === 0 || boards.some((b) => b.id === boardParam)) {
-        storeBoardFilter(boardParam);
       }
       return;
     }
     const stored = loadStoredBoardFilter();
-    const id = stored === "all" || !stored ? null : stored;
-    if (!id) {
-      setActiveBoardId(null);
-      return;
-    }
-    if (boards.length === 0) {
-      // Wait to validate before writing board into the URL.
-      setActiveBoardId(id);
-      return;
-    }
-    if (!boards.some((b) => b.id === id)) {
-      storeBoardFilter("all");
-      setActiveBoardId(null);
-      return;
-    }
+    const id = resolve(stored || null);
     setActiveBoardId(id);
+    if (!id) return;
+    storeBoardFilter(id);
     if (setupOpen) return;
     if (pathname.startsWith("/app")) {
       const params = new URLSearchParams(searchParams.toString());
@@ -188,18 +187,13 @@ export function StudioShell({
     }
   }, [boardParam, boards, pathname, router, searchParams, setupOpen]);
 
-  const setBoardFilter = (id: string | null) => {
-    const next = id ?? "all";
-    storeBoardFilter(next);
+  const setBoardFilter = (id: string) => {
+    storeBoardFilter(id);
     setActiveBoardId(id);
-    // Board → profile: activate the board's linked outreach profile.
-    if (id) {
-      const linked = boards.find((b) => b.id === id)?.outreachProfileId;
-      if (linked) setActiveOutreachProfile(linked);
-    }
+    const linked = boards.find((b) => b.id === id)?.outreachProfileId;
+    if (linked) setActiveOutreachProfile(linked);
     const params = new URLSearchParams(searchParams.toString());
-    if (next === "all") params.delete("board");
-    else params.set("board", next);
+    params.set("board", id);
     const q = params.toString();
     router.replace(q ? `${pathname}?${q}` : pathname);
   };

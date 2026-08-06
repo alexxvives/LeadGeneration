@@ -42,11 +42,7 @@ export function EmailVerifySettings({
         throw new Error(data.error ?? "Could not save");
       }
       setEnabled(next);
-      setMsg(
-        next
-          ? "Verify on — MyEmailVerifier checks before each send."
-          : "Email verify off.",
-      );
+      setMsg(next ? null : "Email verify off.");
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Could not save");
     } finally {
