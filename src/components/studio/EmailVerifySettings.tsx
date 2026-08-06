@@ -6,7 +6,7 @@ import { Spinner } from "@/components/ui";
 
 /**
  * Easy-path toggle: verify recipient emails before send (MyEmailVerifier).
- * Platform key: MYEMAILVERIFIER_API_KEY (legacy: MAILEROO_VERIFY_API_KEY).
+ * Platform key: MYEMAILVERIFIER_API_KEY only (ADR 0024).
  * Daily plan caps are shown on the studio / Settings usage bars.
  *
  * Writes `workspaces.email_verify_enabled` via PATCH /api/workspace/settings
@@ -17,7 +17,7 @@ export function EmailVerifySettings({
   initialEnabled,
   canEdit,
 }: {
-  /** Server has MyEmailVerifier (or legacy Zeruh) API key. */
+  /** Server has MYEMAILVERIFIER_API_KEY. */
   canVerify: boolean;
   initialEnabled: boolean;
   canEdit: boolean;

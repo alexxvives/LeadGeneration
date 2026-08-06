@@ -209,9 +209,8 @@ export interface Workspace {
    */
   preferredSendPath: "easy" | "pro" | null;
   /**
-   * When true (default) and the server has a verify key (MyEmailVerifier
-   * preferred; Zeruh legacy), verify recipient emails at send. Off skips
-   * the check (saves credits). ADR 0016.
+   * When true (default) and the server has MYEMAILVERIFIER_API_KEY, verify
+   * recipient emails at send. Off skips the check (saves credits). ADR 0024.
    */
   emailVerifyEnabled: boolean;
   /**

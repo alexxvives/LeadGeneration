@@ -462,7 +462,7 @@ export const api = {
   firecrawlUsage: () =>
     jsonFetch<FirecrawlUsage>("/api/providers/firecrawl/usage"),
 
-  /** MyEmailVerifier (or legacy Zeruh) credit balance — ADR 0016. */
+  /** MyEmailVerifier credit balance — ADR 0016 / 0024. */
   verifyUsage: () => jsonFetch<VerifyUsage>("/api/providers/verify/usage"),
 
   mapImportColumns: (headers: string[]) =>
@@ -493,7 +493,7 @@ export type FirecrawlUsage = {
 
 export type VerifyUsage = {
   available: boolean;
-  provider: "myemailverifier" | "zeruh";
+  provider: "myemailverifier";
   remainingCredits: number | null;
   permanentCredits: number | null;
   recurringCredits: number | null;
@@ -502,5 +502,5 @@ export type VerifyUsage = {
   error?: string;
 };
 
-/** @deprecated Use VerifyUsage — name was historical (Zeruh). */
+/** @deprecated Use VerifyUsage. */
 export type ZeruhUsage = VerifyUsage;

@@ -252,6 +252,7 @@ export function Studio() {
   } | null>(null);
   const [verifyWarn, setVerifyWarn] = useState<{
     outreachId: string;
+    email: string | null;
     message: string;
     reason: string | null;
   } | null>(null);
@@ -1301,8 +1302,12 @@ export function Studio() {
       };
       const msg = err.message;
       if (err.verifyBlocked && err.canForce && !opts?.skipVerify) {
+        const lead = findLeadByOutreach(outreachId);
+        const email =
+          lead?.outreach?.toEmail ?? lead?.emails?.[0] ?? null;
         setVerifyWarn({
           outreachId,
+          email,
           message: msg,
           reason: err.verifyReason ?? null,
         });
@@ -2658,12 +2663,21 @@ export function Studio() {
       >
         {verifyWarn ? (
           <>
+            {verifyWarn.email ? (
+              <p className="mb-2 break-all font-mono text-sm text-mist-100">
+                {verifyWarn.email}
+              </p>
+            ) : null}
             <p className="text-sm text-mist-300">{verifyWarn.message}</p>
             {verifyWarn.reason ? (
               <p className="mt-2 text-xs text-mist-500">
                 Provider detail: {verifyWarn.reason}
               </p>
             ) : null}
+            <p className="mt-2 text-xs text-mist-500">
+              MyEmailVerifier often flags working info@ / SMB addresses as
+              Invalid — delivered mail means it was a false positive.
+            </p>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
                 type="button"

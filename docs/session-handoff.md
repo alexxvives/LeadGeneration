@@ -9,23 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-06 (Verify root cause + send UX)
+## ⏱️ Status — updated 2026-08-06 (verify UX + drawer focus)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0029** remote applied.  
-**Note:** Deploy needed for verify fail-open hardening; D1 toggle already fixed.
+**Note:** Deploy needed (ADR 0024 + verify warn email + drawer focus fix).
 
 ### This pass
-- Root cause: Insider `email_verify_enabled` was **0** in prod D1 → re-enabled.
-- Verify: no cache on fail-open; MEV→Zeruh fallback; hard error if verify on
-  and provider fails (no silent send). Resend webhook Settings note removed.
-- Lead drawer Send closes immediately; toast Verifying → Sending → Sent.
-- DMARC optional (amber); Outreach type filter matches search chrome.
+- MEV key OK (93 credits when probed). Zeruh removed (ADR 0024).
+- Verify soft-warn shows recipient email; drawer no longer steals focus to
+  close X while editing subject/body.
 
 ### Next
-1. Deploy + hard-refresh — send should show Verifying… and bump Verifies bar.
-2. Optional later: wire annual Stripe Price IDs; async search queue at scale;
-   restore Pro mailbox path if product wants it.
+1. Deploy + hard-refresh.
+2. Optional later: annual Stripe Price IDs; async search queue; Pro mailbox.
 
 ---
 

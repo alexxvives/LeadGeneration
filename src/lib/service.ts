@@ -1308,8 +1308,7 @@ export async function sendApprovedOutreach(
   if (verifyOn && wsForVerify) {
     const verifyWs = await ensureVerifyWindow(db, wsForVerify);
     const plan = getPlan(verifyWs.planId);
-    const hasVerifyProvider =
-      Boolean(env.myEmailVerifierKey()) || Boolean(env.zeruhVerifyKey());
+    const hasVerifyProvider = Boolean(env.myEmailVerifierKey());
     const cached = getCachedVerify(toEmail);
     const verifyLimit =
       verifyWs.planId === "insider"
@@ -1335,15 +1334,17 @@ export async function sendApprovedOutreach(
     } else if (isVerifyProviderFailure(verified)) {
       // Toggle on but live check never completed — do not fail-open silently.
       clearCachedVerify(toEmail);
-      await releaseClaim(
-        `verify_provider_failed:${verified.reason ?? "unknown"}`,
-      );
+      const detail = verified.reason?.trim() || "unknown";
+      await releaseClaim(`verify_provider_failed:${detail}`);
+      const authish = /invalid api key|unauthorized|user not found/i.test(detail);
       return {
         ok: false,
         error:
           verified.provider === "heuristic"
-            ? "Email verify is on but no verify API key is configured on the server."
-            : "Email verify is on but the verifier failed (API key, credits, or provider error). Fix MyEmailVerifier or turn verify off in Settings → Sending.",
+            ? "Email verify is on but MYEMAILVERIFIER_API_KEY is not set on the server."
+            : authish
+              ? `MyEmailVerifier rejected the API key (${detail}). Update the Wrangler secret MYEMAILVERIFIER_API_KEY from your MEV dashboard, or turn verify off in Settings → Sending.`
+              : `MyEmailVerifier failed (${detail}). Check credits/account at myemailverifier.com, or turn verify off in Settings → Sending.`,
       };
     }
     if (!verified.okToSend) {
@@ -1377,7 +1378,7 @@ export async function sendApprovedOutreach(
         verifyBlocked: true,
         canForce: true,
         verifyReason: verified.reason,
-        error: `Verifier isn't sure this address can receive mail (${detail}). You can send anyway if you trust it.`,
+        error: `Verifier isn't sure ${toEmail} can receive mail (${detail}). Soft checks false-positive often — you can send anyway if you trust it.`,
       };
     }
   } else if (opts?.skipVerify) {

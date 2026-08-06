@@ -4,6 +4,23 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-06 — Soft verify D2 false positive; drawer focus steal
+- MEV `Invalid email (D2)` soft-blocked a real address that Resend then
+  delivered — expected; soft-block + Send anyway is correct. Warn modal now
+  shows the recipient email + short false-positive note.
+- Lead drawer: focus-trap `useEffect` depended on `subject`/`body`/`toEmail`,
+  so every keystroke re-focused the first button (close X). Trap now mounts
+  once per `lead.id`.
+
+### 2026-08-06 — Send 400 was Invalid MEV key + Zeruh masking it
+- Prod outreach errors: `verify_provider_failed:verify_http_401`. That 401 was
+  **Zeruh fallback**, not “100 free/day ran out”. MEV with a bad key returns
+  HTTP 401 + `{"status":false,"message":"Invalid API Key"}`; we then called
+  Zeruh (`MAILEROO_VERIFY_API_KEY`) which also 401’d and overwrote the reason.
+- Free tier is fine once the key is valid. Keys do not expire from our code —
+  the Wrangler secret value is what MEV rejected.
+- ADR 0024: remove Zeruh entirely; surface MEV’s message on hard-fail.
+
 ### 2026-08-06 — Verify toggle ↔ D1 is linked; column was off
 - Path is correct: Settings switch → `PATCH /api/workspace/settings`
   `{ emailVerifyEnabled }` → `updateWorkspaceEmailSettings` →

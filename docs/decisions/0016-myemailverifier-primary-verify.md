@@ -1,5 +1,5 @@
 # 0016. MyEmailVerifier is the primary email verify provider
-- Status: accepted
+- Status: accepted _(amended by [0024](0024-remove-zeruh-verify.md) — Zeruh removed)_
 - Date: 2026-07-20
 - Amends: [0009](0009-resend-send-maileroo-verify.md)
 
@@ -20,14 +20,11 @@ providers.
 1. **Primary verify:** MyEmailVerifier (`MYEMAILVERIFIER_API_KEY`) at **send**
    time only (`verifyEmail` → `sendApprovedOutreach`), when workspace
    `emailVerifyEnabled` is on.
-2. **Legacy fallback only:** Zeruh / Maileroo Verify
-   (`MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY`) if MEV is unset. Not marketed;
-   kept so existing Wrangler secrets keep working.
+2. **~~Legacy Zeruh fallback~~** — removed by [0024](0024-remove-zeruh-verify.md).
 3. **No key:** local heuristic (demo / zero-key) — never hard-blocks send
    (constitution Art. I.2).
 4. **Do not add** MillionVerifier or other verify vendors while MEV works.
-5. **UI / docs:** say “MyEmailVerifier” (or “Verified before send”); mention
-   Zeruh only as legacy env alias.
+5. **UI / docs:** say “MyEmailVerifier” (or “Verified before send”) only.
 
 ## Alternatives considered
 

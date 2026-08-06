@@ -71,8 +71,7 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   1. **BYO Easy send:** Resend **or** Maileroo API key + customer domain
      (Settings → Easy — ADR 0011). Resend remains the default DX.
   2. **MyEmailVerifier** via `MYEMAILVERIFIER_API_KEY` — verify **at send**
-     (hard-block undeliverable). ADR 0016. Not run during search/enrich.
-     Legacy: `MAILEROO_VERIFY_API_KEY` / `ZERUH_API_KEY` if MEV unset.
+     (ADR 0024). Not run during search/enrich. No Zeruh/Maileroo Verify.
   3. Keep **SMTP path** as optional platform fallback.
   4. Do **not** market a shared Lodestar From-domain for client outreach.
   5. Later (agency plans): optional Instantly/Smartlead-style multi-inbox, or
@@ -111,13 +110,12 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
 - `src/lib/email/maileroo.ts`: Maileroo HTTP send (`smtp.maileroo.com/api/v2`).
 - `src/lib/email/domain-health.ts` + `POST /api/providers/resend/domain-health`:
   live SPF/DKIM rows from Resend Domains API (demo-safe when no key).
-- `src/lib/email/verify.ts`: **MyEmailVerifier** (preferred;
-  `client.myemailverifier.com/verifier/validate_single/{email}/{key}`) then legacy
-  Zeruh — **at send** only (`sendApprovedOutreach`) when
-  `emailVerifyEnabled` is on. Soft “Invalid” / greylist → warn + optional
-  `skipVerify` force-send (address kept). Hard junk (disposable / no-reply)
-  still strips. Plan daily verify caps in Settings + studio; provider
-  balance: `GET /api/providers/verify/usage` (alias `/api/providers/zeruh/usage`).
+- `src/lib/email/verify.ts`: **MyEmailVerifier only**
+  (`client.myemailverifier.com/verifier/validate_single/{email}/{key}`) — **at
+  send** only (`sendApprovedOutreach`) when `emailVerifyEnabled` is on. Soft
+  “Invalid” / greylist → warn + optional `skipVerify` force-send (address kept).
+  Hard junk (disposable / no-reply) still strips. Plan daily verify caps in
+  Settings + studio; provider balance: `GET /api/providers/verify/usage`.
 - Quotas + rate limits in `service.ts`.
 - Settings → Easy: Resend, Maileroo, or **SMTP** (Hostinger / Zoho / etc.) +
   **Verify emails before sending** (MyEmailVerifier) toggle; Pro mailbox

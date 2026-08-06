@@ -64,7 +64,7 @@ export function SendSetupPanel({
   defaults: EmailSettingsDefaults;
   canEdit: boolean;
   canSendEmail: boolean;
-  /** Server has MyEmailVerifier (or legacy Zeruh) verify key. */
+  /** Server has MYEMAILVERIFIER_API_KEY. */
   canVerifyEmail?: boolean;
   emailVerifyEnabled?: boolean;
 }) {

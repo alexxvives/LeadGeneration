@@ -23,8 +23,7 @@ Worker name (must match): `leadgeneration` (`wrangler.jsonc` → `"name"`).
 | `GMAIL_OAUTH_CLIENT_SECRET` | Pro mailbox Connect Google |
 | `GROQ_API_KEY` | Optional pitch/blurb fallback when Workers AI fails |
 | `GEMINI_API_KEY` | Optional pitch/blurb fallback after Groq |
-| `MYEMAILVERIFIER_API_KEY` | **Primary** email verify at send (ADR 0016; ~100 free credits/day) |
-| `MAILEROO_VERIFY_API_KEY` | **Legacy only** — Zeruh verify if MEV unset (alias `ZERUH_API_KEY`). Not marketed. |
+| `MYEMAILVERIFIER_API_KEY` | Email verify at send (ADR 0024; ~100 free credits/day) |
 | `RESEND_WEBHOOK_SECRET` | **Required after deploy of audit hardening** — Svix secret for bounce/reply webhooks |
 | `MAILEROO_WEBHOOK_SECRET` | Required only if you use Maileroo delivery webhooks |
 
@@ -87,11 +86,18 @@ npx wrangler secret put GMAIL_OAUTH_CLIENT_SECRET
 npx wrangler secret put GROQ_API_KEY
 npx wrangler secret put GEMINI_API_KEY
 npx wrangler secret put MYEMAILVERIFIER_API_KEY
-npx wrangler secret put MAILEROO_VERIFY_API_KEY
 ```
 
-`MYEMAILVERIFIER_API_KEY`: set this — [myemailverifier.com](https://myemailverifier.com) (phone verify for ~100 free credits/day).  
-`MAILEROO_VERIFY_API_KEY`: only if you still run Zeruh and have no MEV key — [maileroo.com](https://maileroo.com) → Email Verification. Prefer migrating to MEV. Same values go in `.env.local` for `npm run dev`.
+`MYEMAILVERIFIER_API_KEY`: required for verify-at-send —
+[client.myemailverifier.com/apisettings](https://client.myemailverifier.com/apisettings)
+(phone verify for ~100 free credits/day). Same value in `.env.local` for
+`npm run dev`. Delete any leftover `MAILEROO_VERIFY_API_KEY` /
+`ZERUH_API_KEY` secrets (removed in ADR 0024):
+
+```bash
+npx wrangler secret delete MAILEROO_VERIFY_API_KEY
+npx wrangler secret delete ZERUH_API_KEY
+```
 
 Paste the value when prompted. Never commit secret values to git.
 

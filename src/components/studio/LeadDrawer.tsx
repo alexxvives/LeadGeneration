@@ -220,21 +220,28 @@ export function LeadDrawer(props: DrawerProps) {
     return () => window.clearTimeout(t);
   }, [promptNote, showAddNote, lead.id]);
 
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   const requestClose = () => {
     if (
-      dirty &&
+      dirtyRef.current &&
       !window.confirm(
         "You have unsaved email changes. Leave without saving?",
       )
     ) {
       return;
     }
-    onClose();
+    onCloseRef.current();
   };
 
   const panelRef = useRef<HTMLElement | null>(null);
   const prevFocusRef = useRef<HTMLElement | null>(null);
 
+  // Focus trap once per open lead — do NOT re-run on subject/body keystrokes
+  // (that was stealing focus to the close X after every character).
   useEffect(() => {
     prevFocusRef.current = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
@@ -242,7 +249,7 @@ export function LeadDrawer(props: DrawerProps) {
       panel
         ? Array.from(
             panel.querySelectorAll<HTMLElement>(
-              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+              'button, [href], input, select, textarea, [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
             ),
           ).filter((el) => !el.hasAttribute("disabled"))
         : [];
@@ -272,8 +279,8 @@ export function LeadDrawer(props: DrawerProps) {
       window.removeEventListener("keydown", onKey);
       prevFocusRef.current?.focus?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onClose, dirty, subject, body, toEmail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/lead only
+  }, [lead.id]);
 
   /** Persist composer fields before approve/send so edits aren't lost. */
   const persistIfDirty = async () => {
@@ -965,7 +972,7 @@ export function LeadDrawer(props: DrawerProps) {
                     {outreach.error === "invalid_email_removed"
                       ? "That address couldn't receive mail — we removed it from this lead."
                       : outreach.error.startsWith("verify_blocked:")
-                        ? `Verifier isn't sure this address can receive mail (${outreach.error.slice("verify_blocked:".length)}). You can send anyway if you trust it.`
+                        ? `Verifier isn't sure ${toEmail || "this address"} can receive mail (${outreach.error.slice("verify_blocked:".length)}). Soft checks false-positive often — you can send anyway if you trust it.`
                         : outreach.error}
                   </p>
                 )}

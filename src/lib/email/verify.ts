@@ -1,8 +1,7 @@
 /**
  * Email verification at **send** time (not enrich).
  *
- * Prefer MyEmailVerifier (MYEMAILVERIFIER_API_KEY) — 100 free credits/day.
- * Fall back to Zeruh / Maileroo Verify (MAILEROO_VERIFY_API_KEY / ZERUH_API_KEY).
+ * MyEmailVerifier only (`MYEMAILVERIFIER_API_KEY`) — ~100 free credits/day.
  * No key → local heuristic (demo / zero-key; never blocks).
  *
  * Policy: only hard-block clear junk (disposable / no-reply / bad format).
@@ -19,7 +18,7 @@ export type EmailVerifyStatus =
   | "unknown"
   | "skipped";
 
-export type EmailVerifyProvider = "myemailverifier" | "zeruh" | "heuristic";
+export type EmailVerifyProvider = "myemailverifier" | "heuristic";
 
 export interface EmailVerifyResult {
   email: string;
@@ -112,7 +111,6 @@ async function verifyMyEmailVerifier(
   key: string,
 ): Promise<EmailVerifyResult> {
   // Docs: GET /verifier/validate_single/{email}/{API_KEY} on client host.
-  // Legacy api.myemailverifier.com/validate_single.php is wrong / fail-open.
   const url = `https://client.myemailverifier.com/verifier/validate_single/${encodeURIComponent(email)}/${encodeURIComponent(key)}`;
 
   const res = await fetch(url, {
@@ -140,21 +138,22 @@ async function verifyMyEmailVerifier(
   }
 
   const statusFlag = data.status;
+  const msgBlob = `${data.message ?? ""} ${data.error ?? ""}`;
   const authFailed =
     res.status === 401 ||
     res.status === 403 ||
     data.error === "INVALID_API_KEY" ||
     data.error === "unauthorized" ||
     statusFlag === "error" ||
-    /invalid api key|unauthorized|user not found/i.test(
-      `${data.message ?? ""} ${data.error ?? ""}`,
-    );
+    /invalid api key|unauthorized|user not found/i.test(msgBlob);
   if (authFailed) {
-    console.error(
-      "[email-verify] MyEmailVerifier auth failed:",
-      data.message ?? data.error ?? text.slice(0, 120),
-    );
-    return softUnknown(email, "myemailverifier", "verify_auth_failed");
+    const detail =
+      data.message?.trim() ||
+      data.error?.trim() ||
+      text.slice(0, 80) ||
+      "Invalid API Key";
+    console.error("[email-verify] MyEmailVerifier auth failed:", detail);
+    return softUnknown(email, "myemailverifier", detail.slice(0, 80));
   }
   if (!res.ok) {
     console.error("[email-verify] MyEmailVerifier HTTP", res.status, text.slice(0, 160));
@@ -163,21 +162,19 @@ async function verifyMyEmailVerifier(
 
   // MEV returns HTTP 200 with status:false for credits / blocked account / etc.
   if (statusFlag === false) {
+    const detail =
+      data.message?.trim().slice(0, 80) || "verify_account_error";
     console.error(
-      "[email-verify] MyEmailVerifier account error (fail-open):",
-      data.message ?? text.slice(0, 160),
+      "[email-verify] MyEmailVerifier account error:",
+      detail,
     );
-    return softUnknown(
-      email,
-      "myemailverifier",
-      data.message?.slice(0, 80) || "verify_account_error",
-    );
+    return softUnknown(email, "myemailverifier", detail);
   }
 
   const raw = (data.Status ?? "").toLowerCase().replace(/\s+/g, "-");
   if (!raw) {
     console.error(
-      "[email-verify] MyEmailVerifier missing Status (fail-open):",
+      "[email-verify] MyEmailVerifier missing Status:",
       text.slice(0, 160),
     );
     return softUnknown(email, "myemailverifier", "verify_empty_status");
@@ -246,95 +243,6 @@ async function verifyMyEmailVerifier(
   };
 }
 
-async function verifyZeruh(email: string, key: string): Promise<EmailVerifyResult> {
-  const url = new URL("https://api.zeruh.com/v1/verify");
-  url.searchParams.set("email_address", email);
-  url.searchParams.set("timeout", "15");
-
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    headers: { "X-Api-Key": key, Accept: "application/json" },
-    signal: AbortSignal.timeout(20_000),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    console.error("[email-verify] Zeruh HTTP", res.status, text.slice(0, 160));
-    // Auth failures must never block send — often a wrong key (e.g. MEV key in Zeruh slot).
-    return softUnknown(email, "zeruh", `verify_http_${res.status}`);
-  }
-
-  const data = (await res.json()) as {
-    success?: boolean;
-    message?: string;
-    result?: {
-      status?: string;
-      score?: number;
-      reason?: string;
-      validation_details?: { disposable?: boolean; no_reply?: boolean };
-    };
-  };
-
-  if (data.success === false) {
-    console.error("[email-verify] Zeruh rejected:", data.message);
-    return softUnknown(email, "zeruh", "verify_auth_failed");
-  }
-
-  const raw = data.result?.status?.toLowerCase() ?? "unknown";
-  const status: EmailVerifyStatus =
-    raw === "deliverable" ||
-    raw === "risky" ||
-    raw === "undeliverable" ||
-    raw === "unknown"
-      ? raw
-      : "unknown";
-
-  const disposable = data.result?.validation_details?.disposable === true;
-  const noReply = data.result?.validation_details?.no_reply === true;
-
-  if (disposable || noReply) {
-    return {
-      email,
-      status: "undeliverable",
-      score: typeof data.result?.score === "number" ? data.result.score : null,
-      reason: data.result?.reason ?? (disposable ? "disposable" : "no_reply"),
-      okToSend: false,
-      hardFail: true,
-      provider: "zeruh",
-      billed: true,
-    };
-  }
-
-  if (status === "undeliverable") {
-    console.warn(
-      "[email-verify] Zeruh undeliverable (soft-block):",
-      email,
-      data.result?.reason ?? raw,
-    );
-    return {
-      email,
-      status: "undeliverable",
-      score: typeof data.result?.score === "number" ? data.result.score : null,
-      reason: data.result?.reason ?? raw,
-      okToSend: false,
-      hardFail: false,
-      provider: "zeruh",
-      billed: true,
-    };
-  }
-
-  return {
-    email,
-    status,
-    score: typeof data.result?.score === "number" ? data.result.score : null,
-    reason: data.result?.reason ?? null,
-    okToSend: true,
-    hardFail: false,
-    provider: "zeruh",
-    billed: true,
-  };
-}
-
 /** In-process cache peek — used to allow re-sends without burning plan quota. */
 export function getCachedVerify(email: string): EmailVerifyResult | null {
   const normalized = email.toLowerCase().trim();
@@ -364,15 +272,15 @@ export function isVerifyProviderFailure(result: EmailVerifyResult): boolean {
 }
 
 function shouldCacheVerify(result: EmailVerifyResult): boolean {
-  // Never cache fail-open — otherwise one MEV blip permanently skips real checks
-  // for that address in the isolate.
+  // Never cache provider failures — otherwise one MEV blip permanently skips
+  // real checks for that address in the isolate.
   if (isVerifyProviderFailure(result)) return false;
   return true;
 }
 
 /**
  * Verify a single address. Cached in-process for the Worker/request lifetime.
- * Prefer MyEmailVerifier; else Zeruh; else heuristic (never blocks).
+ * MyEmailVerifier when keyed; else heuristic (never blocks).
  */
 export async function verifyEmail(email: string): Promise<EmailVerifyResult> {
   const normalized = email.toLowerCase().trim();
@@ -393,25 +301,11 @@ export async function verifyEmail(email: string): Promise<EmailVerifyResult> {
   if (cached) return { ...cached, billed: false };
 
   const mev = env.myEmailVerifierKey();
-  const zeruh = env.zeruhVerifyKey();
 
   try {
-    let result: EmailVerifyResult;
-    if (mev) {
-      result = await verifyMyEmailVerifier(normalized, mev);
-      // Auth/credits/HTTP fail-open on MEV → try Zeruh before giving up.
-      if (isVerifyProviderFailure(result) && zeruh) {
-        console.warn(
-          "[email-verify] MyEmailVerifier failed; falling back to Zeruh:",
-          result.reason,
-        );
-        result = await verifyZeruh(normalized, zeruh);
-      }
-    } else if (zeruh) {
-      result = await verifyZeruh(normalized, zeruh);
-    } else {
-      result = heuristic(normalized);
-    }
+    const result = mev
+      ? await verifyMyEmailVerifier(normalized, mev)
+      : heuristic(normalized);
     if (shouldCacheVerify(result)) {
       // Cache without billing flag so callers always get billed:false on hit.
       CACHE.set(normalized, { ...result, billed: false });
@@ -419,23 +313,7 @@ export async function verifyEmail(email: string): Promise<EmailVerifyResult> {
     return result;
   } catch (err) {
     console.error("[email-verify] request failed:", err);
-    // Uncaught errors: try the other provider once before soft-unknown.
-    if (mev && zeruh) {
-      try {
-        const fallback = await verifyZeruh(normalized, zeruh);
-        if (shouldCacheVerify(fallback)) {
-          CACHE.set(normalized, { ...fallback, billed: false });
-        }
-        return fallback;
-      } catch (err2) {
-        console.error("[email-verify] Zeruh fallback failed:", err2);
-      }
-    }
-    return softUnknown(
-      normalized,
-      mev ? "myemailverifier" : zeruh ? "zeruh" : "heuristic",
-      "verify_error",
-    );
+    return softUnknown(normalized, mev ? "myemailverifier" : "heuristic", "verify_error");
   }
 }
 
@@ -452,6 +330,6 @@ export async function filterVerifiableEmails(emails: string[]): Promise<string[]
     const v = await verifyEmail(e);
     if (v.okToSend) kept.push(e);
   }
-  if (!env.myEmailVerifierKey() && !env.zeruhVerifyKey()) return emails;
+  if (!env.myEmailVerifierKey()) return emails;
   return [...kept, ...rest.filter((e) => !head.includes(e))];
 }
