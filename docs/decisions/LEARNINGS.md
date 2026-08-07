@@ -78,7 +78,8 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 - Search profile select removed (“No profile — review only” meant skip drafts).
 - Easy send UI: Resend/Maileroo only; API key sits beside the toggle. SMTP
   still in types/backend for legacy rows.
-- `prefetchLeadGeocodes` warms Nominatim/D1 cache from Pipeline/Leads views.
+- `prefetchLeadGeocodes` warms Nominatim/D1 cache (originally Pipeline/Leads;
+  as of 2026-08-07: any studio page).
 
 ### 2026-08-06 — Map pins, no Default board, bounce UX, MEV catch
 - Map: only pin leads geocoded from their own `location` (street first; city
@@ -146,6 +147,19 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   localStorage. Send/test-send resolve `activeId`. Pro Google mailbox stays
   one-per-workspace. First access seeds the **active** profile from legacy
   columns when the map is empty; other profiles get empty shells.
+
+### 2026-08-07 — Contact actor in Notes; soft send-cap alert once/day
+- Pipeline no longer shows a `contactedByName` chip — send journals
+  `Email sent by {name}` (manual method notes append `— {name}`). Drawer
+  “Contacted by” line removed; Notes/follow-ups are the source.
+- Soft daily warmup recommend modal shows **once per calendar day** when the
+  cap is first crossed; later sends that day proceed without re-prompting.
+
+### 2026-08-07 — Map geocode prefetch on every studio page
+- Prefetch was gated to Pipeline/Leads, so pins only advanced while those
+  views (or the Map tab’s own effect) were active. Now `prefetchLeadGeocodes`
+  runs whenever the board has leads, on any `?view=`, keyed by a location hash
+  so status patches don’t cancel in-flight Nominatim work.
 
 ### 2026-08-07 — Draft all stays in Contact Draft (no auto-approve)
 - Reverted 2026-08-04: **Draft all** must leave status `draft` so leads stay

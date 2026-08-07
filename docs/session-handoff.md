@@ -19,6 +19,10 @@ first, and update the top block at the end of any session that changes state.**
   Approve (reverts 2026-08-04 Ready shortcut).
 - Pipeline cards: removed per-card stage `<select>`; tags (follow-up / bounced /
   methods / replied) sit on the same row as FitMeter (cards stay shorter).
+- Map pin geocode prefetch runs on **any** studio page (not only Pipeline/Leads
+  / Map on screen).
+- Contact actor → Notes (`Email sent by …`), not a pipeline card tag.
+- Soft daily send-cap alert once per day (not on every send after the cap).
 
 ### Next
 1. Deploy + hard-refresh to pick up UI/flow fixes.

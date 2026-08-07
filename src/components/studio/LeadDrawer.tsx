@@ -502,12 +502,6 @@ export function LeadDrawer(props: DrawerProps) {
                     })}
                   </div>
                 </div>
-                {lead.contactedByName ? (
-                  <p className="mt-2 text-[11px] text-mist-500">
-                    Contacted by{" "}
-                    <span className="text-mist-300">{lead.contactedByName}</span>
-                  </p>
-                ) : null}
               </div>
             )}
           </section>

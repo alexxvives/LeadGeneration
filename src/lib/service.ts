@@ -1235,7 +1235,7 @@ export async function setOutreachDecision(
 export interface SendOutcome {
   ok: boolean;
   outreach?: Outreach;
-  /** Updated journal after send (includes dated "Email sent" note). */
+  /** Updated journal after send (includes dated "Email sent by …" note). */
   followUps?: FollowUp[];
   error?: string;
   rateLimited?: boolean;
@@ -1509,13 +1509,29 @@ export async function sendApprovedOutreach(
       if (attr) Object.assign(crmPatch, attr);
       const existing = lead.followUps ?? [];
       const today = nowIso().slice(0, 10);
+      const actor =
+        attr?.contactedByName?.trim() ||
+        lead.contactedByName?.trim() ||
+        ctx.userName?.trim() ||
+        ctx.userEmail?.trim() ||
+        null;
+      const emailSentNote = actor
+        ? `Email sent by ${actor}`
+        : "Email sent";
       const hasEmailSentNote = existing.some(
-        (f) => f.note.trim().toLowerCase() === "email sent" && f.date === today,
+        (f) =>
+          f.note.trim().toLowerCase().startsWith("email sent") &&
+          f.date === today,
       );
       let followUps = existing;
       if (!hasEmailSentNote) {
         followUps = [
-          { id: newId("fu"), date: today, note: "Email sent", done: false },
+          {
+            id: newId("fu"),
+            date: today,
+            note: emailSentNote,
+            done: false,
+          },
           ...followUps,
         ];
       }
@@ -2345,12 +2361,36 @@ export async function updateLeadCrm(
     contactedByName?: string | null;
   } = { ...patch };
 
+  const stageAfterPreview =
+    patch.crmStage ?? lead.crmStage;
+  // Attribution first so journal notes can include the actor name.
+  const attr = firstContactAttribution(
+    ctx,
+    lead,
+    patch.contactMethods &&
+      !contactMethodsEqual(patch.contactMethods, lead.contactMethods) &&
+      !patch.crmStage &&
+      lead.crmStage === "new"
+      ? "contacted"
+      : stageAfterPreview,
+  );
+  if (attr) {
+    next.contactedByUserId = attr.contactedByUserId;
+    next.contactedByName = attr.contactedByName;
+  }
+  const actorName =
+    attr?.contactedByName?.trim() ||
+    lead.contactedByName?.trim() ||
+    ctx.userName?.trim() ||
+    ctx.userEmail?.trim() ||
+    null;
+
   // When the user explicitly sets how they contacted, journal a follow-up note.
   if (
     patch.contactMethods &&
     !contactMethodsEqual(patch.contactMethods, lead.contactMethods)
   ) {
-    const note = contactMethodsFollowUpNote(patch.contactMethods);
+    const note = contactMethodsFollowUpNote(patch.contactMethods, actorName);
     const today = nowIso().slice(0, 10);
     const existing = patch.followUps ?? lead.followUps ?? [];
     const already = existing.some(
@@ -2365,14 +2405,6 @@ export async function updateLeadCrm(
     if (!patch.crmStage && lead.crmStage === "new") {
       next.crmStage = "contacted";
     }
-  }
-
-  const stageAfter =
-    next.crmStage ?? patch.crmStage ?? lead.crmStage;
-  const attr = firstContactAttribution(ctx, lead, stageAfter);
-  if (attr) {
-    next.contactedByUserId = attr.contactedByUserId;
-    next.contactedByName = attr.contactedByName;
   }
 
   // Manual / edited leads start at 0% — recompute when contactable fields change.

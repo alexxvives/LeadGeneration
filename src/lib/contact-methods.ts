@@ -73,14 +73,21 @@ export function contactMethodLabel(method: ContactMethod): string {
   return "contact form";
 }
 
-export function contactMethodsFollowUpNote(methods: ContactMethod[]): string {
-  if (methods.length === 0) return "Contact registered";
-  if (methods.length === 1) {
+export function contactMethodsFollowUpNote(
+  methods: ContactMethod[],
+  byName?: string | null,
+): string {
+  let base: string;
+  if (methods.length === 0) base = "Contact registered";
+  else if (methods.length === 1) {
     const m = methods[0]!;
-    if (m === "email") return "Contacted by email";
-    if (m === "phone") return "Contacted by phone";
-    return "Contacted via contact form";
+    if (m === "email") base = "Contacted by email";
+    else if (m === "phone") base = "Contacted by phone";
+    else base = "Contacted via contact form";
+  } else {
+    const labels = methods.map(contactMethodLabel).join(", ");
+    base = `Contacted via ${labels}`;
   }
-  const labels = methods.map(contactMethodLabel).join(", ");
-  return `Contacted via ${labels}`;
+  const who = byName?.trim();
+  return who ? `${base} — ${who}` : base;
 }

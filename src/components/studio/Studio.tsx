@@ -35,7 +35,11 @@ import {
   PipelineSkeleton,
   useDeferredLoading,
 } from "./skeletons";
-import { recordWarmupSend, warmupStatus } from "@/lib/email/warmup";
+import {
+  recordWarmupSend,
+  todayKey,
+  warmupStatus,
+} from "@/lib/email/warmup";
 import {
   draftFlagsFromProfile,
   hydrateOutreachProfilesFromServer,
@@ -270,6 +274,8 @@ export function Studio() {
     todayCount: number;
     softCap: number;
   } | null>(null);
+  /** Soft daily cap alert — once per day after the recommend is crossed. */
+  const warmupWarnShownDayRef = useRef<string | null>(null);
   const [verifyWarn, setVerifyWarn] = useState<{
     outreachId: string;
     email: string | null;
@@ -1443,12 +1449,17 @@ export function Studio() {
     const softCap = warmupStatus().softCap;
     const todayCount = ws.sendsToday ?? 0;
     if (todayCount >= softCap) {
-      setWarmupWarn({
-        outreachId,
-        todayCount,
-        softCap,
-      });
-      return false;
+      const dayKey = todayKey();
+      if (warmupWarnShownDayRef.current !== dayKey) {
+        warmupWarnShownDayRef.current = dayKey;
+        setWarmupWarn({
+          outreachId,
+          todayCount,
+          softCap,
+        });
+        return false;
+      }
+      // Already alerted today — soft recommend only, don't block every send.
     }
     return runSend(outreachId);
   };
@@ -1818,14 +1829,27 @@ export function Studio() {
   const cardsLeads = useActiveLeads(layout === "cards", filteredLeads);
   const mapLeads = useActiveLeads(layout === "map", filteredLeads);
 
-  // Warm geocodes while user is on Pipeline/table — map opens with cache hits.
+  // Background geocode for the whole board — any studio page, not only Map.
+  // Hash locations so CRM/status patches don’t cancel an in-flight prefetch.
+  const geocodePrefetchKey = useMemo(() => {
+    const leads = board?.leads ?? [];
+    let h = leads.length >>> 0;
+    for (const l of leads) {
+      const s = l.location?.trim().toLowerCase() ?? "";
+      for (let i = 0; i < s.length; i++) {
+        h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0;
+      }
+    }
+    return `${board?.activeBoardId ?? ""}|${board?.run?.location?.trim() ?? ""}|${h}`;
+  }, [board?.activeBoardId, board?.leads, board?.run?.location]);
+
   useEffect(() => {
-    if (view !== "leads" && view !== "pipeline") return;
+    if (!board?.leads.length) return;
     prefetchLeadGeocodes({
-      locations: filteredLeads.map((l) => l.location),
-      locationHint: board?.run?.location ?? null,
+      locations: board.leads.map((l) => l.location),
+      locationHint: board.run?.location ?? null,
     });
-  }, [view, filteredLeads, board?.run?.location]);
+  }, [geocodePrefetchKey, board]);
 
   // Yield one frame so Leads chrome paints before mounting heavy table/cards.
   // Warm revisits (data + current layout already known) skip the blank frame.
