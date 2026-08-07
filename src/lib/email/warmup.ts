@@ -13,8 +13,6 @@ export type { MailboxAgeBand, MailboxVolumeBand };
 
 export const WARMUP_STORAGE_KEY = "hermes_warmup_v1";
 const WARMUP_LEGACY_KEYS = ["leadify_warmup_v1", "lodestar_warmup_v1"];
-/** Calendar day we already showed the soft-cap modal (once per day). */
-const WARMUP_WARN_DAY_KEY = "hermes_warmup_softcap_warned_day";
 
 export type WarmupProfile = {
   /** ISO date (YYYY-MM-DD) when we started tracking this sender. */
@@ -166,25 +164,6 @@ export function warmupStatus(profile = loadWarmupProfile()): {
     ageBand: profile.ageBand ?? "new",
     effectiveBand: effectiveAgeBand(profile),
   };
-}
-
-/** True if we already showed today’s soft-cap recommend (survives remounts). */
-export function hasShownWarmupSoftCapWarnToday(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(WARMUP_WARN_DAY_KEY) === todayKey();
-  } catch {
-    return false;
-  }
-}
-
-export function markWarmupSoftCapWarnShownToday(): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(WARMUP_WARN_DAY_KEY, todayKey());
-  } catch {
-    /* private mode */
-  }
 }
 
 function daysSince(isoDate: string): number {

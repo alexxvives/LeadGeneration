@@ -148,13 +148,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   one-per-workspace. First access seeds the **active** profile from legacy
   columns when the map is empty; other profiles get empty shells.
 
-### 2026-08-07 — Contact actor in Notes; soft send-cap alert once/day
+### 2026-08-07 — Contact actor in Notes; kill soft-cap send modal
 - Pipeline no longer shows a `contactedByName` chip — send journals
   `Email sent by {name}` (manual method notes append `— {name}`). Drawer
   “Contacted by” line removed; Notes/follow-ups are the source.
-- Soft daily warmup recommend modal shows **once per calendar day** when the
-  cap is first crossed (`localStorage` day key — not a React ref, which reset
-  on Studio remount and re-nagged every send). Later sends that day proceed.
+- Soft daily warmup recommend **no longer blocks Send** (once-per-day modal
+  still re-nagged in practice). Hint stays on Outreach Contacted column only.
 
 ### 2026-08-07 — Map geocode prefetch on every studio page
 - Prefetch was gated to Pipeline/Leads, so pins only advanced while those

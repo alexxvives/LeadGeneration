@@ -22,8 +22,8 @@ first, and update the top block at the end of any session that changes state.**
 - Map pin geocode prefetch runs on **any** studio page (not only Pipeline/Leads
   / Map on screen).
 - Contact actor → Notes (`Email sent by …`), not a pipeline card tag.
-- Soft daily send-cap alert once per day via `localStorage` (ref alone reset on
-  remount and re-nagged every send).
+- Soft daily send-cap **modal removed** — Send never interrupts; Outreach
+  Contacted column still shows the ~N/day suggest hint.
 
 ### Next
 1. Deploy + hard-refresh to pick up UI/flow fixes.

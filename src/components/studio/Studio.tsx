@@ -35,12 +35,7 @@ import {
   PipelineSkeleton,
   useDeferredLoading,
 } from "./skeletons";
-import {
-  hasShownWarmupSoftCapWarnToday,
-  markWarmupSoftCapWarnShownToday,
-  recordWarmupSend,
-  warmupStatus,
-} from "@/lib/email/warmup";
+import { recordWarmupSend } from "@/lib/email/warmup";
 import {
   draftFlagsFromProfile,
   hydrateOutreachProfilesFromServer,
@@ -270,11 +265,6 @@ export function Studio() {
   const importRunIdRef = useRef<string | null>(null);
   const importConfirmedRef = useRef(0);
   const [pendingSendId, setPendingSendId] = useState<string | null>(null);
-  const [warmupWarn, setWarmupWarn] = useState<{
-    outreachId: string;
-    todayCount: number;
-    softCap: number;
-  } | null>(null);
   const [verifyWarn, setVerifyWarn] = useState<{
     outreachId: string;
     email: string | null;
@@ -1423,7 +1413,7 @@ export function Studio() {
     }
   };
 
-  /** Real delivery needs a provider; otherwise confirm simulate-or-settings. Soft warmup warn if over recommend. */
+  /** Real delivery needs a provider; otherwise confirm simulate-or-settings. */
   const requestSend = async (outreachId: string): Promise<boolean> => {
     // Send click is the per-lead human gate — promote draft → approved first.
     const lead = findLeadByOutreach(outreachId);
@@ -1445,19 +1435,8 @@ export function Studio() {
       setUpgrade({ kind: "sends", planId: ws.planId });
       return false;
     }
-    const softCap = warmupStatus().softCap;
-    const todayCount = ws.sendsToday ?? 0;
-    // Soft recommend: interrupt once per calendar day, then never again today
-    // (persisted — Studio remounts / refresh must not re-nag every send).
-    if (todayCount >= softCap && !hasShownWarmupSoftCapWarnToday()) {
-      markWarmupSoftCapWarnShownToday();
-      setWarmupWarn({
-        outreachId,
-        todayCount,
-        softCap,
-      });
-      return false;
-    }
+    // Soft daily warmup recommend is non-blocking (Outreach Contacted column
+    // hint only) — never interrupt Send with a modal.
     return runSend(outreachId);
   };
 
@@ -1481,14 +1460,6 @@ export function Studio() {
   const confirmSimulateSend = async () => {
     const id = pendingSendId;
     setPendingSendId(null);
-    if (!id) return;
-    const ok = await runSend(id);
-    if (ok) closeLeadDrawer();
-  };
-
-  const confirmWarmupSend = async () => {
-    const id = warmupWarn?.outreachId;
-    setWarmupWarn(null);
     if (!id) return;
     const ok = await runSend(id);
     if (ok) closeLeadDrawer();
@@ -2681,41 +2652,6 @@ export function Studio() {
             Simulate send
           </button>
         </div>
-      </Modal>
-
-      <Modal
-        open={!!warmupWarn}
-        onClose={() => setWarmupWarn(null)}
-        title="Soft warmup recommend"
-        className="max-w-md border-amber-400/20"
-      >
-        {warmupWarn ? (
-          <>
-            <p className="text-sm text-mist-300">
-              You&apos;ve sent{" "}
-              <span className="text-mist-100">{warmupWarn.todayCount}</span> today. For a
-              newer sender we recommend staying around{" "}
-              <span className="text-mist-100">{warmupWarn.softCap}</span>/day so inbox
-              placement stays healthier. You can ignore this and send anyway.
-            </p>
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setWarmupWarn(null)}
-                className="rounded-full px-4 py-2 text-sm font-medium text-mist-400 hover:text-mist-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmWarmupSend()}
-                className="rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-[1.03]"
-              >
-                Send anyway
-              </button>
-            </div>
-          </>
-        ) : null}
       </Modal>
 
       <Modal
