@@ -354,7 +354,7 @@ export function OutreachView({
                       type="button"
                       onClick={() => void onDraftAll()}
                       disabled={busySet.has("draft-all")}
-                      title="Draft (or redraft) all email leads into Ready to contact"
+                      title="Draft (or redraft) all email leads — stays in Contact Draft until Approve"
                       className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
                     >
                       {busySet.has("draft-all") ? (

@@ -36,8 +36,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
    detail drawer. Edit subject/body/recipient, then **Approve**. There is no
    Reject-draft control — only clear junk (disposable / no-reply) is stripped
    at verify; soft “Invalid” keeps the address and offers **Send anyway**.
-   Nothing sends on approval alone. **Outreach → Draft all** drafts and
-   approves into Ready; **send stays per-lead** (Art. I.1).
+   Nothing sends on approval alone. **Outreach → Draft all** writes drafts
+   into Contact Draft (still needs Approve); **send stays per-lead** (Art. I.1).
 5. **Send** — From the drawer, Approve then Send. From the Outreach queue,
    Send may auto-approve the draft first (the click is the per-lead human
    gate). Soft verify blocks show a confirm modal; hard junk removes the
@@ -82,8 +82,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
   - **Pipeline** (`?view=pipeline`) — CRM kanban for the active board filter
     (**All** = every board) across four active stages (*New · Contacted · In
-    Conversation · Closed*) plus *Not Interested*. Drag cards between columns,
-    or use quick-advance. Bulk draft/approve lives on **Outreach**, not here.
+    Conversation · Closed*) plus *Not Interested*. Drag cards between columns.
+    Bulk draft lives on **Outreach** (Approve stays per-lead).
     CRM **New** = needs human review (there is no separate “In review” tag).
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
@@ -93,13 +93,13 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     when available (or a Google search plan-B when no website).
 
   - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (Create /
-    Review; unapproved drafts stay here) → **Ready** (after Approve, or after
-    **Draft all**) → **Contacted**. **Draft all** drafts + approves every
-    email lead into Ready (and stays available to redraft after profile edits).
-    Single-lead Create still lands in Contact Draft until Approve. Closing the
-    draft drawer without Approve does not advance. The sidebar Board picker
-    activates that board’s linked outreach profile. Send remains per-lead after
-    approve (constitution Art. I.1).
+    Review; unapproved drafts stay here) → **Ready** (after Approve) →
+    **Contacted**. **Draft all** writes (or rewrites) drafts for every
+    non-sent email lead and leaves them in Contact Draft until Approve
+    (button stays available after profile edits). Closing the draft drawer
+    without Approve does not advance. The sidebar Board picker activates that
+    board’s linked outreach profile. Send remains per-lead after approve
+    (constitution Art. I.1).
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.

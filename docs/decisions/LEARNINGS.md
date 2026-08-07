@@ -147,11 +147,20 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   one-per-workspace. First access seeds the **active** profile from legacy
   columns when the map is empty; other profiles get empty shells.
 
+### 2026-08-07 — Draft all stays in Contact Draft (no auto-approve)
+- Reverted 2026-08-04: **Draft all** must leave status `draft` so leads stay
+  in **Contact Draft** until the human Approves. Auto-approve into Ready
+  skipped the per-lead review gate. Button still stays available for redraft
+  after profile / pitch edits; send remains per-lead.
+
+### 2026-08-07 — Pipeline cards: no stage select; tags beside FitMeter
+- Per-card stage dropdown (`id=stage-lead_…`) duplicated drag-to-move and
+  crowded the card. Removed it. Meta chips (bounced / follow-up / method icons
+  / replied) stay on one nowrap row to the right of FitMeter so cards stay short.
+
 ### 2026-08-04 — Draft all → Ready + keep button for redraft
-- Outreach **Draft all** previously left status `draft` (Contact Draft /
-  “Review”). Now each draft is auto-approved into **Ready to contact**; send
-  remains per-lead. Button stays visible after the first pass so a profile /
-  pitch change can redraft all non-sent email leads again.
+- *(Superseded 2026-08-07.)* Outreach **Draft all** briefly auto-approved into
+  Ready; that skipped Contact Draft review and was reverted.
 
 ### 2026-08-04 — Resend bounce webhook never updated CRM (tags shape)
 - Prod had **0** `delivery_status=bounced` rows; Resend webhook endpoint was

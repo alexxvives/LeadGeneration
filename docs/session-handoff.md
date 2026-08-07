@@ -9,21 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-07 (per-board verify + register flash + type menu)
+## ⏱️ Status — updated 2026-08-07 (Draft all + pipeline card polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0029** remote applied; **0030** needs apply + deploy.  
-**Note:** Deploy needed for this pass.
+**Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Fixed Contacted “register” flash: merge no longer lets empty `contactMethods`
-  wipe cached methods; sent rows skip the nag.
-- Outreach type filter: custom glass menu (not native select).
-- Verify-before-send is **per board** (ADR 0025 / migration 0030). Settings
-  switch UI unchanged — targets active sidebar board; Boards cards have toggles.
+- **Draft all** no longer auto-approves — drafts stay in Contact Draft until
+  Approve (reverts 2026-08-04 Ready shortcut).
+- Pipeline cards: removed per-card stage `<select>`; tags (follow-up / bounced /
+  methods / replied) sit on the same row as FitMeter (cards stay shorter).
 
 ### Next
-1. `npm run cf:migrate` (0030) + deploy + hard-refresh.
+1. Deploy + hard-refresh to pick up UI/flow fixes.
 2. Optional later: annual Stripe Price IDs; async search queue; Pro mailbox.
 
 ---

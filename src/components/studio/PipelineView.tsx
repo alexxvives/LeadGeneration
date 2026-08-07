@@ -107,7 +107,6 @@ function MainStageColumn({
   stageCount,
   backfilling,
   onOpen,
-  onMoveStage,
   activeId,
 }: {
   col: (typeof MAIN_COLUMNS)[number];
@@ -115,7 +114,6 @@ function MainStageColumn({
   stageCount?: number;
   backfilling: boolean;
   onOpen: (id: string) => void;
-  onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
 }) {
   const colLeads = useStageLeads(allLeads, col.stage, backfilling);
@@ -125,7 +123,6 @@ function MainStageColumn({
       leads={colLeads}
       count={stageCount ?? colLeads.length}
       onOpen={onOpen}
-      onMoveStage={onMoveStage}
       activeId={activeId}
     />
   );
@@ -139,7 +136,6 @@ function ParkedStageColumn({
   open,
   onToggle,
   onOpen,
-  onMoveStage,
   activeId,
 }: {
   col: (typeof PARKED_COLUMNS)[number];
@@ -149,7 +145,6 @@ function ParkedStageColumn({
   open: boolean;
   onToggle: () => void;
   onOpen: (id: string) => void;
-  onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
 }) {
   const colLeads = useStageLeads(allLeads, col.stage, backfilling);
@@ -161,7 +156,6 @@ function ParkedStageColumn({
       open={open}
       onToggle={onToggle}
       onOpen={onOpen}
-      onMoveStage={onMoveStage}
       activeId={activeId}
     />
   );
@@ -228,7 +222,7 @@ export function PipelineView({
     <div className="flex h-full min-h-0 flex-col gap-3">
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
-        {leads.length === 1 ? "" : "s"} · click for info · drag or use stage menu
+        {leads.length === 1 ? "" : "s"} · click for info · drag to move stage
       </p>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -247,7 +241,6 @@ export function PipelineView({
                 stageCount={stageCounts?.[col.stage]}
                 backfilling={backfilling}
                 onOpen={openIfClick}
-                onMoveStage={(id, stage) => onMoveStage(id, stage)}
                 activeId={activeId}
               />
             ))}
@@ -269,7 +262,6 @@ export function PipelineView({
                   }))
                 }
                 onOpen={openIfClick}
-                onMoveStage={(id, stage) => onMoveStage(id, stage)}
                 activeId={activeId}
               />
             ))}
@@ -291,12 +283,6 @@ export function PipelineView({
   );
 }
 
-/** Same chrome as main columns: header + body, one border, divider line only. */
-const ALL_STAGES: { stage: CrmStage; label: string }[] = [
-  ...MAIN_COLUMNS.map((c) => ({ stage: c.stage, label: c.title })),
-  ...PARKED_COLUMNS.map((c) => ({ stage: c.stage, label: c.title })),
-];
-
 function ParkedStage({
   col,
   leads,
@@ -304,7 +290,6 @@ function ParkedStage({
   open,
   onToggle,
   onOpen,
-  onMoveStage,
   activeId,
 }: {
   col: (typeof PARKED_COLUMNS)[number];
@@ -313,7 +298,6 @@ function ParkedStage({
   open: boolean;
   onToggle: () => void;
   onOpen: (id: string) => void;
-  onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.stage });
@@ -355,7 +339,6 @@ function ParkedStage({
                     key={l.id}
                     lead={l}
                     onOpen={onOpen}
-                    onMoveStage={onMoveStage}
                     isDragging={l.id === activeId}
                   />
                 ))}
@@ -372,14 +355,12 @@ function PipelineColumn({
   leads,
   count,
   onOpen,
-  onMoveStage,
   activeId,
 }: {
   col: (typeof MAIN_COLUMNS)[number] | (typeof PARKED_COLUMNS)[number];
   leads: LeadWithOutreach[];
   count: number;
   onOpen: (id: string) => void;
-  onMoveStage: (leadId: string, stage: CrmStage) => void;
   activeId: string | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.stage });
@@ -422,7 +403,6 @@ function PipelineColumn({
               key={l.id}
               lead={l}
               onOpen={onOpen}
-              onMoveStage={onMoveStage}
               isDragging={l.id === activeId}
             />
           ))
@@ -445,12 +425,10 @@ function MethodIcons({ methods }: { methods: ContactMethod[] }) {
 function DraggablePipelineCard({
   lead,
   onOpen,
-  onMoveStage,
   isDragging,
 }: {
   lead: LeadWithOutreach;
   onOpen: (id: string) => void;
-  onMoveStage: (leadId: string, stage: CrmStage) => void;
   isDragging: boolean;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
@@ -461,12 +439,6 @@ function DraggablePipelineCard({
   const methods = lead.contactMethods ?? [];
   const needsMethod = lead.crmStage === "contacted" && methods.length === 0;
   const contactedBy = lead.contactedByName?.trim() || null;
-  const showMeta =
-    replied ||
-    needsMethod ||
-    Boolean(contactedBy) ||
-    (lead.crmStage !== "new" &&
-      (pendingFollowUps > 0 || methods.length > 0));
 
   return (
     <div
@@ -502,78 +474,47 @@ function DraggablePipelineCard({
         {subtitle && (
           <p className="mt-0.5 truncate text-xs leading-snug text-mist-500">{subtitle}</p>
         )}
-        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
+        {/* Fit + tags on one row so cards stay short (no wrap under the meter). */}
+        <div className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden">
           <FitMeter score={lead.fitScore} compact />
           {bounced ? (
-            <span className="rounded-full bg-rose-400/20 px-1.5 py-0.5 text-[10px] font-medium text-rose-200">
+            <span className="shrink-0 rounded-full bg-rose-400/20 px-1.5 py-0.5 text-[10px] font-medium text-rose-200">
               Bounced
             </span>
           ) : null}
           {lead.crmStage !== "new" && pendingFollowUps > 0 ? (
-            <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+            <span className="shrink-0 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
               {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
             </span>
           ) : null}
           {lead.crmStage !== "new" && methods.length > 0 ? (
             <span
-              className="inline-flex items-center gap-1 rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-300 ring-1 ring-ink-600/40"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-300 ring-1 ring-ink-600/40"
               title={methods.join(", ")}
             >
               <MethodIcons methods={methods} />
             </span>
           ) : null}
+          {replied ? (
+            <span className="shrink-0 rounded-full bg-sky-400/20 px-1.5 py-0.5 text-[10px] font-medium text-sky-200">
+              Replied
+            </span>
+          ) : null}
+          {needsMethod ? (
+            <span className="shrink-0 rounded-full bg-amber-400/25 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
+              How contacted?
+            </span>
+          ) : null}
+          {contactedBy ? (
+            <span
+              className="min-w-0 truncate rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-400 ring-1 ring-ink-600/40"
+              title={`Contacted by ${contactedBy}`}
+            >
+              {contactedBy}
+            </span>
+          ) : null}
         </div>
-        {showMeta &&
-        (replied || needsMethod || Boolean(contactedBy)) ? (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {replied && (
-              <span className="rounded-full bg-sky-400/20 px-1.5 py-0.5 text-[10px] font-medium text-sky-200">
-                Replied
-              </span>
-            )}
-            {needsMethod && (
-              <span className="rounded-full bg-amber-400/25 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
-                How contacted?
-              </span>
-            )}
-            {contactedBy ? (
-              <span
-                className="max-w-[9rem] truncate rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-400 ring-1 ring-ink-600/40"
-                title={`Contacted by ${contactedBy}`}
-              >
-                {contactedBy}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
       </div>
-
-      <label
-        className="sr-only"
-        htmlFor={`stage-${lead.id}`}
-      >
-        Move {lead.company} to stage
-      </label>
-      <select
-        id={`stage-${lead.id}`}
-        value={lead.crmStage}
-        aria-label={`Stage for ${lead.company}`}
-        title="Move to stage"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        onChange={(e) => {
-          e.stopPropagation();
-          const next = e.target.value as CrmStage;
-          if (next !== lead.crmStage) onMoveStage(lead.id, next);
-        }}
-        className="max-w-[5.5rem] shrink-0 truncate rounded-md border border-white/10 bg-ink-950/80 px-1 py-1 text-[10px] text-mist-300 sm:max-w-[6.5rem]"
-      >
-        {ALL_STAGES.map((s) => (
-          <option key={s.stage} value={s.stage}>
-            {s.label}
-          </option>
-        ))}
-      </select>
 
       <button
         type="button"
