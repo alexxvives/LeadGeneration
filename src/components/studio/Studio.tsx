@@ -36,8 +36,9 @@ import {
   useDeferredLoading,
 } from "./skeletons";
 import {
+  hasShownWarmupSoftCapWarnToday,
+  markWarmupSoftCapWarnShownToday,
   recordWarmupSend,
-  todayKey,
   warmupStatus,
 } from "@/lib/email/warmup";
 import {
@@ -274,8 +275,6 @@ export function Studio() {
     todayCount: number;
     softCap: number;
   } | null>(null);
-  /** Soft daily cap alert — once per day after the recommend is crossed. */
-  const warmupWarnShownDayRef = useRef<string | null>(null);
   const [verifyWarn, setVerifyWarn] = useState<{
     outreachId: string;
     email: string | null;
@@ -1448,18 +1447,16 @@ export function Studio() {
     }
     const softCap = warmupStatus().softCap;
     const todayCount = ws.sendsToday ?? 0;
-    if (todayCount >= softCap) {
-      const dayKey = todayKey();
-      if (warmupWarnShownDayRef.current !== dayKey) {
-        warmupWarnShownDayRef.current = dayKey;
-        setWarmupWarn({
-          outreachId,
-          todayCount,
-          softCap,
-        });
-        return false;
-      }
-      // Already alerted today — soft recommend only, don't block every send.
+    // Soft recommend: interrupt once per calendar day, then never again today
+    // (persisted — Studio remounts / refresh must not re-nag every send).
+    if (todayCount >= softCap && !hasShownWarmupSoftCapWarnToday()) {
+      markWarmupSoftCapWarnShownToday();
+      setWarmupWarn({
+        outreachId,
+        todayCount,
+        softCap,
+      });
+      return false;
     }
     return runSend(outreachId);
   };

@@ -153,7 +153,8 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   `Email sent by {name}` (manual method notes append `— {name}`). Drawer
   “Contacted by” line removed; Notes/follow-ups are the source.
 - Soft daily warmup recommend modal shows **once per calendar day** when the
-  cap is first crossed; later sends that day proceed without re-prompting.
+  cap is first crossed (`localStorage` day key — not a React ref, which reset
+  on Studio remount and re-nagged every send). Later sends that day proceed.
 
 ### 2026-08-07 — Map geocode prefetch on every studio page
 - Prefetch was gated to Pipeline/Leads, so pins only advanced while those
