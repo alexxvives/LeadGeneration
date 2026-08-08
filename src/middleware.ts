@@ -52,7 +52,7 @@ const authMiddleware = auth((req) => {
   const smokeKey = env.smokeApiKey();
   if (
     smokeKey &&
-    process.env.NODE_ENV !== "production" &&
+    !env.isProduction() &&
     req.headers.get("x-smoke-key") === smokeKey
   ) {
     return NextResponse.next();

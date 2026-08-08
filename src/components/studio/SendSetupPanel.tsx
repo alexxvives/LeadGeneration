@@ -22,7 +22,7 @@ type PublicSend = {
   replyTo: string | null;
   physicalAddress: string | null;
   easyEmailProvider: EasyEmailProvider;
-  preferredSendPath: "easy" | "pro" | null;
+  preferredSendPath: "easy" | null;
   smtpHost: string | null;
   smtpPort: number | null;
   smtpUser: string | null;
@@ -235,7 +235,6 @@ export function SendSetupPanel({
               initial={sendValues}
               defaults={defaults}
               canEdit={canEdit}
-              variant="easy"
               easyProvider={easyProvider}
               onEasyProviderChange={setEasyProvider}
               profileId={profileId}
@@ -257,8 +256,8 @@ export function SendSetupPanel({
       <div className="rounded-xl2 border border-white/10 p-5">
         <h3 className="text-sm font-semibold text-mist-100">Send a test email</h3>
         <p className="mt-1 text-xs text-mist-500">
-          Uses the active profile&apos;s Easy setup
-          {profileName ? ` (${profileName})` : ""}. Enter any inbox to confirm
+          Uses the active profile&apos;s Easy setup (Resend, Maileroo, or SMTP)
+          {profileName ? ` · ${profileName}` : ""}. Enter any inbox to confirm
           delivery.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">

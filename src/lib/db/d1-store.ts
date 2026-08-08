@@ -227,8 +227,8 @@ function rowToWorkspace(r: WorkspaceRow): Workspace {
     smtpPass: r.smtp_pass ?? null,
     easyEmailProvider: normalizeEasyEmailProvider(r.easy_email_provider),
     preferredSendPath:
-      r.preferred_send_path === "pro" || r.preferred_send_path === "easy"
-        ? r.preferred_send_path
+      r.preferred_send_path === "easy" || r.preferred_send_path === "pro"
+        ? "easy"
         : null,
     // D1 may return INTEGER 0/1 or boolean — treat only explicit off as false.
     emailVerifyEnabled: !isSqliteOff(r.email_verify_enabled),
@@ -1077,6 +1077,51 @@ export class D1Store implements LeadRepository {
       .bind(this.workspaceId)
       .all<RunRow>();
     return results.map(rowToRun);
+  }
+
+  async getLatestRun(opts?: {
+    boardId?: string | null;
+    status?: Run["status"];
+  }): Promise<Run | null> {
+    const boardId = opts?.boardId?.trim() || null;
+    const status = opts?.status;
+    if (boardId && status) {
+      const row = await this.db
+        .prepare(
+          `SELECT * FROM runs WHERE workspace_id = ? AND board_id = ? AND status = ?
+           ORDER BY created_at DESC LIMIT 1`,
+        )
+        .bind(this.workspaceId, boardId, status)
+        .first<RunRow>();
+      return row ? rowToRun(row) : null;
+    }
+    if (boardId) {
+      const row = await this.db
+        .prepare(
+          `SELECT * FROM runs WHERE workspace_id = ? AND board_id = ?
+           ORDER BY created_at DESC LIMIT 1`,
+        )
+        .bind(this.workspaceId, boardId)
+        .first<RunRow>();
+      return row ? rowToRun(row) : null;
+    }
+    if (status) {
+      const row = await this.db
+        .prepare(
+          `SELECT * FROM runs WHERE workspace_id = ? AND status = ?
+           ORDER BY created_at DESC LIMIT 1`,
+        )
+        .bind(this.workspaceId, status)
+        .first<RunRow>();
+      return row ? rowToRun(row) : null;
+    }
+    const row = await this.db
+      .prepare(
+        `SELECT * FROM runs WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 1`,
+      )
+      .bind(this.workspaceId)
+      .first<RunRow>();
+    return row ? rowToRun(row) : null;
   }
 
   // ---- Leads ----

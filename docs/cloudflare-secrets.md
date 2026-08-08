@@ -12,15 +12,13 @@ Worker name (must match): `leadgeneration` (`wrangler.jsonc` → `"name"`).
 |--------|---------|
 | `AUTH_SECRET` | Auth.js — production login |
 | `BOOTSTRAP_ADMIN_PASSWORD` | **First boot only.** Password for `admin@tryhermesmail.com` when no `is_admin` user exists yet. Once an admin row exists, this secret is unused — you may delete it. Rotate via D1 `users.password_hash`, not this env. |
-| `NEXTAUTH_URL` | Canonical app URL (magic links + Gmail OAuth redirect) |
+| `NEXTAUTH_URL` | Canonical app URL (magic links + Auth.js redirects) |
 | `RESEND_API_KEY` | Magic link + board-invite / platform transactional email |
 | `MAILEROO_API_KEY` | Optional platform Maileroo *sending* key (board invites fallback) |
 | `STRIPE_SECRET_KEY` | Billing (use `sk_live_…` in prod; `sk_test_…` only in `.env.local`) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing (`whsec_…` — live endpoint in prod) |
 | `STRIPE_*_PRICE_ID` | Live Price IDs for Starter / Pro / Agency |
 | `FIRECRAWL_API_KEY` | Live search / scrape |
-| `GMAIL_OAUTH_CLIENT_ID` | Pro mailbox Connect Google |
-| `GMAIL_OAUTH_CLIENT_SECRET` | Pro mailbox Connect Google |
 | `GROQ_API_KEY` | Optional pitch/blurb fallback when Workers AI fails |
 | `GEMINI_API_KEY` | Optional pitch/blurb fallback after Groq |
 | `MYEMAILVERIFIER_API_KEY` | Email verify at send (ADR 0024; ~100 free credits/day) |
@@ -101,7 +99,10 @@ npx wrangler secret delete ZERUH_API_KEY
 
 Paste the value when prompted. Never commit secret values to git.
 
-## After rotating Google OAuth
+**Removed (ADR 0026):** `GMAIL_OAUTH_CLIENT_ID` / `GMAIL_OAUTH_CLIENT_SECRET`
+(Pro mailbox send). Safe to delete leftover Wrangler secrets:
 
-If you recreate the Google Cloud client, update **both** Gmail secrets and confirm
-`NEXTAUTH_URL` is still `https://leadgeneration.alexxvives.workers.dev`.
+```bash
+npx wrangler secret delete GMAIL_OAUTH_CLIENT_ID
+npx wrangler secret delete GMAIL_OAUTH_CLIENT_SECRET
+```

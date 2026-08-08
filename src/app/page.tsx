@@ -69,7 +69,7 @@ const CAPABILITIES = [
   },
   {
     title: "Your domain, your voice",
-    body: "Send from your brand (Resend, Maileroo, or Gmail). Track delivery as replies come in.",
+    body: "Send from your brand (Resend, Maileroo, or SMTP). Track delivery as replies come in.",
     icon: GlobeIcon,
   },
 ];
@@ -237,7 +237,7 @@ export default function LandingPage() {
               },
               {
                 title: "Your sending identity",
-                body: "Connect your domain or mailbox. Rate limits stay on by default.",
+                body: "Connect your domain (Resend / Maileroo) or SMTP. Rate limits stay on by default.",
               },
             ].map((item) => (
               <li key={item.title} className="border-l-2 border-aurora-400/50 pl-5">

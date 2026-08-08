@@ -21,8 +21,8 @@ verify story we want.
 2. **Remove** Zeruh client code, env aliases, and capability ORs.
 3. **Delete** leftover Wrangler secrets `MAILEROO_VERIFY_API_KEY` /
    `ZERUH_API_KEY` when present.
-4. Keep deprecated route alias `GET /api/providers/zeruh/usage` → verify/usage
-   so old bookmarks do not 404 (handler is MEV-only).
+4. ~~Keep deprecated route alias `GET /api/providers/zeruh/usage`~~ — **removed
+   2026-08-08** (hygiene cleanup). Use `GET /api/providers/verify/usage`.
 5. Provider failures still hard-block send when verify is on; error text must
    surface MEV’s message (e.g. `Invalid API Key`) so ops is not guessing.
 

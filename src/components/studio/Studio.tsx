@@ -2,7 +2,6 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
 import {
   api,
   LEAD_PAGE_CHUNK,
@@ -181,8 +180,6 @@ function queryForView(next: StudioView, boardId?: string | null): string {
 
 export function Studio() {
   const router = useRouter();
-  const { data: session } = useSession();
-  const isAdmin = session?.isAdmin === true;
   const searchParams = useSearchParams();
   const rawView = searchParams.get("view");
   const view = viewFromParams(rawView);

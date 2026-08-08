@@ -507,4 +507,3 @@ export type VerifyUsage = {
 };
 
 /** @deprecated Use VerifyUsage. */
-export type ZeruhUsage = VerifyUsage;

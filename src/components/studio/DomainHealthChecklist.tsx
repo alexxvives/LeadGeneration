@@ -29,17 +29,35 @@ type StatusItem = {
 
 function itemsFromHealth(health: DomainHealthResult | null): StatusItem[] {
   if (health && health.records.length > 0) {
-    return health.records.map((r, i) => {
-      const ok = r.status === "verified";
-      const optional = r.optional === true;
+    // Resend returns two rows both named "SPF" (MX feedback + TXT). Collapse
+    // compact chips to one label per record family.
+    const byLabel = new Map<string, DomainDnsRecord[]>();
+    for (const r of health.records) {
+      const label = r.record.trim() || "DNS";
+      const list = byLabel.get(label) ?? [];
+      list.push(r);
+      byLabel.set(label, list);
+    }
+    return [...byLabel.entries()].map(([label, group]) => {
+      const optional = group.every((r) => r.optional === true);
+      const ok = group.every((r) => r.status === "verified");
+      const pending = group.find((r) => r.status !== "verified");
       const tip = ok
-        ? `${r.record} verified`
+        ? group.length > 1
+          ? `${label} verified (${group.length} DNS rows)`
+          : `${label} verified`
         : optional
-          ? `${r.record}: recommended (optional) — SPF + DKIM are enough to send. p=none is fine.`
-          : `${r.record}: ${r.status}${r.value ? ` — expected ${r.type} ${r.name}` : ""}`;
+          ? `${label}: recommended (optional) — SPF + DKIM are enough to send. p=none is fine.`
+          : pending
+            ? `${label}: ${pending.status}${
+                pending.value
+                  ? ` — expected ${pending.type} ${pending.name}`
+                  : ""
+              }`
+            : `${label}: pending`;
       return {
-        key: `${r.record}-${r.type}-${i}`,
-        label: r.record,
+        key: label.toLowerCase(),
+        label,
         ok,
         optional,
         tip,

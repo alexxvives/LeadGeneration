@@ -59,7 +59,7 @@ const PatchSchema = z.object({
   ),
   smtpPass: optionalKey,
   easyEmailProvider: z.enum(["resend", "maileroo", "smtp"]).optional(),
-  preferredSendPath: z.enum(["easy", "pro"]).nullable().optional(),
+  preferredSendPath: z.enum(["easy"]).nullable().optional(),
   /** MyEmailVerifier list-hygiene at send (requires server verify key). */
   emailVerifyEnabled: z.boolean().optional(),
   /** When true, clear Resend key (explicit wipe). */

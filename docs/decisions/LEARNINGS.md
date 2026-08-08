@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-08 — Hygiene cleanup: Pro/Gmail + Zeruh alias gone
+- Deleted Pro mailbox stack (`/api/mailbox*`, `mailbox.ts`, Gmail branch in
+  `sendEmail`). Easy SMTP (Hostinger) kept. ADR 0026 supersedes 0010.
+- Removed `/api/providers/zeruh/usage` alias; verify = `/api/providers/verify/usage`.
+- Safe deletes: ProfilePicker, identity.ts, root LUMIA dumps, `.firecrawl/`,
+  tracked `scripts/.wrangler/tmp`, stale `AUDIT_REPORT.md`.
+- Board chrome: `getLatestRun` LIMIT 1 instead of full `listRuns()`.
+- `NODE_ENV` via `env.isProduction()` in `config.ts` (cf + middleware).
+
 ### 2026-08-07 — Contacted “register” flash; per-board verify
 - Temporary “How contacted? — open to register” on every Contacted row: 
   `mergeSlimIntoCached` used `incoming.contactMethods ?? prev` so a slim `[]`

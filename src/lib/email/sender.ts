@@ -1,5 +1,4 @@
 import { env, getCapabilities } from "@/lib/config";
-import { sendViaGmail } from "@/lib/email/mailbox";
 import { sendViaMaileroo } from "@/lib/email/maileroo";
 import {
   looksLikeHtml,
@@ -8,7 +7,6 @@ import {
 } from "@/lib/outreach/rich-text";
 import {
   normalizeEasyEmailProvider,
-  type ConnectedMailbox,
   type EasyEmailProvider,
 } from "@/lib/types";
 
@@ -42,19 +40,13 @@ export interface WorkspaceEmailSettings {
   smtpPass?: string | null;
   /** Preferred Easy provider when both keys could exist. */
   easyEmailProvider?: EasyEmailProvider | null;
-  /** Settings tab: Easy vs Pro. Google only when `"pro"`. */
-  preferredSendPath?: "easy" | "pro" | null;
-  /** Pro path — connected Google/Microsoft mailbox (ADR 0010). */
-  connectedMailbox?: ConnectedMailbox | null;
 }
 
 export interface SendResult {
   ok: boolean;
-  provider: "google" | "resend" | "maileroo" | "smtp" | "demo";
+  provider: "resend" | "maileroo" | "smtp" | "demo";
   id?: string;
   error?: string;
-  /** Updated mailbox after token refresh — caller should persist. */
-  connectedMailbox?: ConnectedMailbox;
 }
 
 function finalizeBody(body: string, replyToOrFrom: string): string {
@@ -99,11 +91,6 @@ async function sendWithResendKey(
   }
 }
 
-/** Product send path is Easy-only (Resend / Maileroo / SMTP). Pro mailbox UI removed. */
-function resolveSendPath(): "easy" | "pro" {
-  return "easy";
-}
-
 /**
  * Send a single already-approved email.
  *
@@ -127,29 +114,6 @@ export async function sendEmail(
   const from = `${fromName} <${fromEmail}>`;
   const replyToHeader = replyTo || undefined;
   const tags = input.tags?.length ? input.tags : undefined;
-
-  const path = resolveSendPath();
-  const mailbox = ws?.connectedMailbox;
-
-  const tryGoogle = async (): Promise<SendResult | null> => {
-    if (mailbox?.provider !== "google" || !mailbox.refreshTokenEnc) return null;
-    const result = await sendViaGmail({
-      mailbox,
-      to: input.to,
-      subject: input.subject,
-      body: text,
-      html,
-      fromName,
-      replyTo: replyToHeader,
-    });
-    if (!result.ok) return { ok: false, provider: "google", error: result.error };
-    return {
-      ok: true,
-      provider: "google",
-      id: result.id,
-      connectedMailbox: result.mailbox,
-    };
-  };
 
   const wsResendKey = ws?.resendApiKey?.trim() || "";
   const wsMailerooKey = ws?.mailerooApiKey?.trim() || "";
@@ -237,21 +201,10 @@ export async function sendEmail(
     return null;
   };
 
-  let proGoogleFail: SendResult | null = null;
-
-  if (path === "pro") {
-    const g = await tryGoogle();
-    if (g?.ok) return g;
-    if (g && !g.ok) proGoogleFail = g;
-    const easy = await tryEasyKeys();
-    if (easy) return easy; // success or BYO failure
-  } else {
-    const easy = await tryEasyKeys();
-    // Return BYO success or failure — never fall through to platform Resend
-    // when the user configured Easy (would show Resend "domain not verified").
-    if (easy) return easy;
-    // Easy path does not auto-use Google (user chose Easy in Settings).
-  }
+  const easy = await tryEasyKeys();
+  // Return BYO success or failure — never fall through to platform Resend
+  // when the user configured Easy (would show Resend "domain not verified").
+  if (easy) return easy;
 
   // Platform Resend — only when no workspace Easy key is configured.
   if (caps.resend) {
@@ -282,8 +235,6 @@ export async function sendEmail(
       replyTo: replyToHeader,
     });
   }
-
-  if (proGoogleFail) return proGoogleFail;
 
   // Demo mode — no provider configured.
   console.log(

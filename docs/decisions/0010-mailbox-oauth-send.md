@@ -1,7 +1,8 @@
 # 0010. Google / Microsoft mailbox OAuth behind sendEmail()
-- Status: accepted
+- Status: superseded by [0026](0026-remove-pro-gmail-mailbox.md)
 - Date: 2026-07-15
 - Amended: 2026-07-15 (warmup free DIY; multi-inbox deferred)
+- Superseded: 2026-08-08 — Pro/Gmail send removed; Easy Resend/Maileroo/SMTP only
 
 ## Context
 

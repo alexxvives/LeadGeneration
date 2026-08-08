@@ -16,7 +16,7 @@ export type ProfileSendSettings = {
   replyTo: string | null;
   physicalAddress: string | null;
   easyEmailProvider: EasyEmailProvider;
-  preferredSendPath: "easy" | "pro" | null;
+  preferredSendPath: "easy" | null;
   resendApiKey: string | null;
   /** Auto-registered Resend webhook for this profile's API key (per account). */
   resendWebhookId: string | null;
@@ -35,7 +35,7 @@ export type PublicProfileSendSettings = {
   replyTo: string | null;
   physicalAddress: string | null;
   easyEmailProvider: EasyEmailProvider;
-  preferredSendPath: "easy" | "pro" | null;
+  preferredSendPath: "easy" | null;
   smtpHost: string | null;
   smtpPort: number | null;
   smtpUser: string | null;
@@ -58,8 +58,10 @@ export function emptyProfileSendSettings(
       partial?.easyEmailProvider ?? "resend",
     ),
     preferredSendPath:
-      partial?.preferredSendPath === "pro" || partial?.preferredSendPath === "easy"
-        ? partial.preferredSendPath
+      partial?.preferredSendPath === "easy" ||
+      (partial as { preferredSendPath?: unknown } | undefined)?.preferredSendPath ===
+        "pro"
+        ? "easy"
         : null,
     resendApiKey: partial?.resendApiKey ?? null,
     resendWebhookId:
@@ -228,7 +230,6 @@ export function toPublicProfileSendSettings(
 
 export function profileSendSettingsToWorkspaceEmail(
   s: ProfileSendSettings,
-  ws: Pick<Workspace, "connectedMailbox">,
 ): WorkspaceEmailSettings {
   return {
     fromName: s.fromName,
@@ -242,8 +243,6 @@ export function profileSendSettingsToWorkspaceEmail(
     smtpUser: s.smtpUser,
     smtpPass: s.smtpPass,
     easyEmailProvider: s.easyEmailProvider,
-    preferredSendPath: s.preferredSendPath,
-    connectedMailbox: ws.connectedMailbox,
   };
 }
 

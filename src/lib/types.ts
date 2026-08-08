@@ -95,7 +95,7 @@ export interface SavedIcp {
  */
 export type PlanId = "free" | "starter" | "pro" | "agency" | "insider";
 
-/** Easy-path transactional sender (Settings). Pro = mailbox OAuth. */
+/** Easy-path transactional sender (Settings). */
 export type EasyEmailProvider = "resend" | "maileroo" | "smtp";
 
 /** Normalize persisted / client Easy provider strings. */
@@ -125,39 +125,23 @@ export interface ImportLeadRow {
  * how multi-tenancy + plan/quota enforcement is scoped (constitution Art. II.2).
  * Local dev / demo mode uses a single implicit workspace with id "local".
  */
-/** Pro mailbox connect (ADR 0010) — Google first; Microsoft later. */
-export type MailboxProvider = "google" | "microsoft";
+/** Self-report warmup bands (Settings From / SMTP age picker). */
 export type MailboxAgeBand = "new" | "weeks" | "months" | "established";
 export type MailboxVolumeBand = "none" | "light" | "regular";
 
 /**
- * Connected send mailbox. Refresh/access token ciphertext never leaves the
- * server (not included in client-safe snapshots).
+ * Legacy Pro mailbox JSON (migration 0008). Kept for D1/JSON round-trip only —
+ * Gmail OAuth send was removed (ADR 0026). Never used for send.
  */
 export interface ConnectedMailbox {
-  provider: MailboxProvider;
+  provider: "google" | "microsoft";
   email: string;
-  /** AES-GCM ciphertext of the OAuth refresh token. */
   refreshTokenEnc: string;
   accessTokenEnc: string | null;
   accessTokenExpiresAt: string | null;
   ageBand: MailboxAgeBand | null;
   volumeBand: MailboxVolumeBand | null;
   connectedAt: string;
-}
-
-/** Safe subset for Settings / board UI — no tokens. */
-export interface MailboxPublicStatus {
-  connected: boolean;
-  provider: MailboxProvider | null;
-  email: string | null;
-  ageBand: MailboxAgeBand | null;
-  volumeBand: MailboxVolumeBand | null;
-  connectedAt: string | null;
-  /** Platform Google OAuth client configured (Connect button enabled). */
-  googleReady: boolean;
-  /** Microsoft not shipped yet. */
-  microsoftReady: boolean;
 }
 
 export interface Workspace {
@@ -203,11 +187,8 @@ export interface Workspace {
   smtpPass: string | null;
   /** Which Easy transactional provider the workspace prefers. */
   easyEmailProvider: EasyEmailProvider;
-  /**
-   * Which send path Settings last chose. When unset: Pro if a mailbox is
-   * connected, otherwise Easy. Google send only runs when this is `"pro"`.
-   */
-  preferredSendPath: "easy" | "pro" | null;
+  /** Always Easy send (Resend / Maileroo / SMTP). Legacy `"pro"` coerced to `"easy"`. */
+  preferredSendPath: "easy" | null;
   /**
    * When true (default) and the server has MYEMAILVERIFIER_API_KEY, verify
    * recipient emails at send. Off skips the check (saves credits). ADR 0024.
@@ -218,7 +199,7 @@ export interface Workspace {
    * Admin-controlled — used to pause Insider (or any) search without a plan change.
    */
   findLeadsEnabled: boolean;
-  /** Pro path: one connected mailbox (multi-inbox deferred — ADR 0010). */
+  /** Legacy Pro mailbox JSON (unused for send — ADR 0026). */
   connectedMailbox: ConnectedMailbox | null;
   /**
    * JSON ProfileStore (`profiles` + `activeId`) for drafting voice/pitch.
@@ -228,7 +209,6 @@ export interface Workspace {
   /**
    * JSON map of profileId → Easy Sending identity (From + provider keys).
    * Secrets stay server-only. Legacy workspace From/key columns remain as fallback.
-   * Pro mailbox is still workspace-scoped (ADR 0010).
    */
   profileSendSettingsJson: string | null;
 }

@@ -53,7 +53,6 @@ import type {
   BoardMemberRole,
   BoardSummary,
   ContactMethod,
-  ConnectedMailbox,
   CrmStage,
   EasyEmailProvider,
   CreateRunInput,
@@ -64,9 +63,6 @@ import type {
   FollowUp,
   Lead,
   LeadWithOutreach,
-  MailboxAgeBand,
-  MailboxPublicStatus,
-  MailboxVolumeBand,
   Outreach,
   PlanId,
   Run,
@@ -76,7 +72,6 @@ import type {
 import { normalizeCrmStage } from "@/lib/types";
 
 const LOCK_TTL_MS = 150_000; // 2.5 minutes
-import { mailboxPublicStatus } from "@/lib/email/mailbox";
 import { scoreImportedLead } from "@/lib/fit-score";
 import {
   contactMethodsEqual,
@@ -952,14 +947,12 @@ export async function getLatestBoard(
     };
   }
 
-  const runs = await leadDb.listRuns();
   const run =
     (active
-      ? runs.find((r) => r.boardId === active && r.status === "complete")
+      ? await leadDb.getLatestRun({ boardId: active, status: "complete" })
       : null) ??
-    runs.find((r) => r.status === "complete") ??
-    runs[0] ??
-    null;
+    (await leadDb.getLatestRun({ status: "complete" })) ??
+    (await leadDb.getLatestRun());
 
   const offset = Math.max(0, opts?.leadOffset ?? 0);
   const limit = opts?.leadLimit;
@@ -1466,7 +1459,7 @@ export async function sendApprovedOutreach(
   // Production (metered): never treat demo/no-transport as a real send.
   if (result.ok && result.provider === "demo" && ctx.metered) {
     const msg =
-      "No email transport configured. Add Resend, Maileroo, or SMTP in Settings → Easy, or Connect Google on Pro.";
+      "No email transport configured. Add Resend, Maileroo, or SMTP in Settings → Easy.";
     const updated = await db.updateOutreach(outreachId, {
       status: "failed",
       error: msg,
@@ -1481,12 +1474,6 @@ export async function sendApprovedOutreach(
   }
 
   if (result.ok) {
-    if (result.connectedMailbox) {
-      await db.updateWorkspace(ctx.workspaceId, {
-        connectedMailbox: result.connectedMailbox,
-        updatedAt: nowIso(),
-      });
-    }
     const updated = await db.updateOutreach(outreachId, {
       status: "sent",
       deliveryStatus: "sent",
@@ -1614,20 +1601,13 @@ export async function sendTestEmail(
     sendIdentity,
   );
 
-  if (result.connectedMailbox) {
-    await ctx.db.updateWorkspace(ctx.workspaceId, {
-      connectedMailbox: result.connectedMailbox,
-      updatedAt: nowIso(),
-    });
-  }
-
   if (result.ok && result.provider === "demo") {
     if (ctx.metered) {
       return {
         ok: false,
         provider: "demo",
         error:
-          "No email transport configured. Add Resend, Maileroo, or SMTP in Settings → Easy, or Connect Google on Pro.",
+          "No email transport configured. Add Resend, Maileroo, or SMTP in Settings → Easy.",
       };
     }
     return {
@@ -1796,7 +1776,7 @@ export async function setOutreachDeliveryStatus(
 
 function resolveSendIdentity(ws: Workspace, profileId?: string | null) {
   const { settings } = resolveProfileSendSettings(ws, profileId);
-  return profileSendSettingsToWorkspaceEmail(settings, ws);
+  return profileSendSettingsToWorkspaceEmail(settings);
 }
 
 /** Board-linked profile for a lead, else null (caller falls back to active). */
@@ -1841,7 +1821,7 @@ function mergeProfileSendPatch(
     smtpUser?: string | null;
     smtpPass?: string | null;
     easyEmailProvider?: EasyEmailProvider;
-    preferredSendPath?: "easy" | "pro" | null;
+    preferredSendPath?: "easy" | null;
   },
 ): ProfileSendSettings {
   const next = { ...base };
@@ -1855,7 +1835,7 @@ function mergeProfileSendPatch(
     next.easyEmailProvider = patch.easyEmailProvider;
   }
   if (patch.preferredSendPath !== undefined) {
-    next.preferredSendPath = patch.preferredSendPath;
+    next.preferredSendPath = patch.preferredSendPath === "easy" ? "easy" : null;
   }
   if (patch.resendApiKey !== undefined) next.resendApiKey = patch.resendApiKey;
   if (patch.mailerooApiKey !== undefined) {
@@ -1942,7 +1922,7 @@ export async function updateWorkspaceEmailSettings(
     smtpUser?: string | null;
     smtpPass?: string | null;
     easyEmailProvider?: EasyEmailProvider;
-    preferredSendPath?: "easy" | "pro" | null;
+    preferredSendPath?: "easy" | null;
     emailVerifyEnabled?: boolean;
     outreachProfilesJson?: string | null;
   },
@@ -2019,7 +1999,8 @@ export async function updateWorkspaceEmailSettings(
         nextPatch.easyEmailProvider = patch.easyEmailProvider;
       }
       if (patch.preferredSendPath !== undefined) {
-        nextPatch.preferredSendPath = patch.preferredSendPath;
+        nextPatch.preferredSendPath =
+          patch.preferredSendPath === "easy" ? "easy" : null;
       }
       if (patch.resendApiKey !== undefined) {
         nextPatch.resendApiKey = patch.resendApiKey;
@@ -2138,80 +2119,6 @@ export async function updateWorkspaceEmailSettings(
   return {
     emailVerifyEnabled: updated.emailVerifyEnabled !== false,
   };
-}
-
-/** Public mailbox status for Settings (no tokens). */
-export async function getMailboxStatus(ctx: Ctx): Promise<MailboxPublicStatus> {
-  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
-  return mailboxPublicStatus(ws);
-}
-
-/** Persist a newly connected mailbox after OAuth callback. */
-export async function connectMailbox(
-  ctx: Ctx,
-  mailbox: ConnectedMailbox,
-): Promise<void> {
-  const existing = await ensureProfileSendSettingsMigrated(ctx);
-  const activeId = activeProfileIdFromJson(existing?.outreachProfilesJson);
-  const map = parseProfileSendSettingsMap(existing?.profileSendSettingsJson);
-  const nextPatch: Partial<Workspace> = {
-    connectedMailbox: mailbox,
-    preferredSendPath: "pro",
-    updatedAt: nowIso(),
-  };
-  // Prefer mailbox email as From only when user hasn't set one yet.
-  if (!existing?.fromEmail?.trim()) {
-    nextPatch.fromEmail = mailbox.email;
-  }
-  if (activeId) {
-    const base =
-      map[activeId] ??
-      (existing
-        ? resolveProfileSendSettings(existing, activeId).settings
-        : emptyProfileSendSettings());
-    const next: ProfileSendSettings = {
-      ...base,
-      preferredSendPath: "pro",
-      fromEmail: base.fromEmail?.trim() ? base.fromEmail : mailbox.email,
-    };
-    map[activeId] = next;
-    nextPatch.profileSendSettingsJson = serializeProfileSendSettingsMap(map);
-    nextPatch.preferredSendPath = "pro";
-    if (!existing?.fromEmail?.trim()) {
-      nextPatch.fromEmail = next.fromEmail;
-    }
-  }
-  await ctx.db.updateWorkspace(ctx.workspaceId, nextPatch);
-}
-
-/** Disconnect Pro mailbox (tokens wiped). Easy Resend path unchanged. */
-export async function disconnectMailbox(ctx: Ctx): Promise<void> {
-  await ctx.db.updateWorkspace(ctx.workspaceId, {
-    connectedMailbox: null,
-    updatedAt: nowIso(),
-  });
-}
-
-/** Soft warmup self-report on an already-connected mailbox. */
-export async function updateMailboxWarmupProfile(
-  ctx: Ctx,
-  patch: { ageBand?: MailboxAgeBand | null; volumeBand?: MailboxVolumeBand | null },
-): Promise<MailboxPublicStatus> {
-  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
-  if (!ws?.connectedMailbox) {
-    return mailboxPublicStatus(ws);
-  }
-  const next: ConnectedMailbox = {
-    ...ws.connectedMailbox,
-    ageBand: patch.ageBand !== undefined ? patch.ageBand : ws.connectedMailbox.ageBand,
-    volumeBand:
-      patch.volumeBand !== undefined ? patch.volumeBand : ws.connectedMailbox.volumeBand,
-  };
-  await ctx.db.updateWorkspace(ctx.workspaceId, {
-    connectedMailbox: next,
-    updatedAt: nowIso(),
-  });
-  return mailboxPublicStatus({ ...ws, connectedMailbox: next });
 }
 
 /** Permanently remove a lead and its outreach. */

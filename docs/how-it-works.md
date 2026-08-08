@@ -135,7 +135,7 @@ The app detects capabilities from environment variables (`config.ts`):
 | --- | --- | --- |
 | Search + enrichment | Realistic generated sample leads | Real web results (Firecrawl) |
 | Drafting / editing / approval | Full | Full |
-| Email send | Simulated + logged, never delivered | Delivered via connected Gmail, Resend, or SMTP |
+| Email send | Simulated + logged, never delivered | Delivered via Easy Resend, Maileroo, or BYO SMTP |
 
 This is a hard product invariant: the whole UI works with zero keys. The
 **Getting Started** wizard walks new users from fallback → live (search key,
@@ -188,8 +188,8 @@ the local JSON-store path is always unmetered/demo.
 - **`src/lib/outreach/draft.ts`** — locale-aware template personalization
   (language from lead location). No auto compliance footer (ADR 0012). Swap in
   an LLM here without touching the approve/send flow.
-- **`src/lib/email/`** — `sendEmail()` (Google mailbox → Resend → SMTP → demo),
-  domain health, mailbox OAuth helpers, and a rolling rate limit.
+- **`src/lib/email/`** — `sendEmail()` (workspace Resend / Maileroo / SMTP →
+  platform Resend/SMTP → demo), domain health, and a rolling rate limit.
   per-minute `rate-limit.ts`.
 - **`src/auth.config.ts` / `src/auth.ts`** — Auth.js v5. The `.config` file is
   edge-safe (Credentials for keyless dev only — used by middleware). `auth.ts`

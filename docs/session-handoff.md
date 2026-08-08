@@ -9,25 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-07 (Draft all + pipeline card polish)
+## ⏱️ Status — updated 2026-08-08 (Hygiene deletes + Easy-only send)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- **Draft all** no longer auto-approves — drafts stay in Contact Draft until
-  Approve (reverts 2026-08-04 Ready shortcut).
-- Pipeline cards: removed per-card stage `<select>`; tags (follow-up / bounced /
-  methods / replied) sit on the same row as FitMeter (cards stay shorter).
-- Map pin geocode prefetch runs on **any** studio page (not only Pipeline/Leads
-  / Map on screen).
-- Contact actor → Notes (`Email sent by …`), not a pipeline card tag.
-- Soft daily send-cap **modal removed** — Send never interrupts; Outreach
-  Contacted column still shows the ~N/day suggest hint.
+- Hygiene audit executed: safe deletes; **Pro/Gmail mailbox removed** (ADR
+  0026); **Zeruh usage alias removed**; Easy Resend/Maileroo/**SMTP** kept.
+- Quick wins: `getLatestRun` LIMIT 1; `env.isProduction()`; docs + secrets.
+- Report: [`docs/hygiene-audit-2026-08-08.md`](hygiene-audit-2026-08-08.md).
 
 ### Next
-1. Deploy + hard-refresh to pick up UI/flow fixes.
-2. Optional later: annual Stripe Price IDs; async search queue; Pro mailbox.
+1. Optional: `wrangler secret delete GMAIL_OAUTH_*` (and leftover Zeruh keys).
+2. Deploy after `tsc`/`lint` green.
+3. Later: async search queue; indexed dedupe; conditional quota + encrypt BYO keys.
 
 ---
 

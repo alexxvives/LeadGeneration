@@ -124,6 +124,11 @@ export interface LeadRepository {
   updateRun(id: string, patch: Partial<Run>): Promise<Run | null>;
   getRun(id: string): Promise<Run | null>;
   listRuns(): Promise<Run[]>;
+  /** Latest run for board chrome (optional board filter). */
+  getLatestRun(opts?: {
+    boardId?: string | null;
+    status?: Run["status"];
+  }): Promise<Run | null>;
 
   // Leads
   createLeads(leads: Lead[]): Promise<Lead[]>;

@@ -25,7 +25,7 @@ export interface EmailSettingsValues {
   smtpPort?: number | null;
   smtpUser?: string | null;
   easyEmailProvider: EasyEmailProvider;
-  preferredSendPath?: "easy" | "pro" | null;
+  preferredSendPath?: "easy" | null;
   hasResendKey?: boolean;
   hasMailerooKey?: boolean;
   hasSmtpPass?: boolean;
@@ -44,10 +44,6 @@ export function EmailSettingsForm({
   defaults,
   canEdit,
   liveAppUrl,
-  /** Easy = name / from / provider key. Pro = name (From from mailbox when linked). */
-  variant = "easy",
-  /** When set (Pro connected), From email is read-only. */
-  lockedFromEmail,
   /** Controlled Easy provider (SendSetupPanel owns the picker). */
   easyProvider,
   onEasyProviderChange,
@@ -58,8 +54,6 @@ export function EmailSettingsForm({
   defaults: EmailSettingsDefaults;
   canEdit: boolean;
   liveAppUrl?: string;
-  variant?: "easy" | "pro";
-  lockedFromEmail?: string | null;
   easyProvider?: EasyEmailProvider;
   onEasyProviderChange?: (p: EasyEmailProvider) => void;
   profileId?: string | null;
@@ -124,13 +118,8 @@ export function EmailSettingsForm({
     initial.smtpUser,
   ]);
 
-  const isPro = variant === "pro";
-  const fromLocked = isPro && !!lockedFromEmail;
-  // SMTP removed from product UI — legacy smtp workspaces edit as Resend until switched.
-  const rawProvider: EasyEmailProvider =
-    easyProvider ?? values.easyEmailProvider ?? "resend";
   const provider: EasyEmailProvider =
-    rawProvider === "smtp" ? "resend" : rawProvider;
+    easyProvider ?? values.easyEmailProvider ?? "resend";
 
   const setField = (key: "fromName" | "fromEmail", v: string) => {
     setSaved(false);
@@ -139,10 +128,31 @@ export function EmailSettingsForm({
     setValues((prev) => ({ ...prev, [key]: v || null }));
   };
 
+  const setSmtpField = (
+    key: "smtpHost" | "smtpPort" | "smtpUser",
+    v: string,
+  ) => {
+    setSaved(false);
+    setSavedHint(null);
+    lastField.current = key;
+    setValues((prev) => ({ ...prev, [key]: v }));
+  };
+
   const setProvider = (p: EasyEmailProvider) => {
     setSaved(false);
     setSavedHint(null);
-    setValues((prev) => ({ ...prev, easyEmailProvider: p }));
+    setValues((prev) => {
+      // Prefill Hostinger defaults when switching to SMTP with empty host.
+      if (p === "smtp" && !prev.smtpHost.trim()) {
+        return {
+          ...prev,
+          easyEmailProvider: p,
+          smtpHost: "smtp.hostinger.com",
+          smtpPort: prev.smtpPort.trim() || "465",
+        };
+      }
+      return { ...prev, easyEmailProvider: p };
+    });
     onEasyProviderChange?.(p);
   };
 
@@ -204,31 +214,34 @@ export function EmailSettingsForm({
     setError(null);
     const activeProvider = opts?.providerOverride ?? provider;
     try {
-      const payload: Record<string, unknown> = isPro
-        ? {
-            fromName: values.fromName,
-            preferredSendPath: "pro",
-            ...(fromLocked ? { fromEmail: lockedFromEmail } : {}),
-          }
-        : {
-            fromName: values.fromName,
-            fromEmail: values.fromEmail,
-            easyEmailProvider: activeProvider,
-            preferredSendPath: "easy",
-          };
+      const payload: Record<string, unknown> = {
+        fromName: values.fromName,
+        fromEmail: values.fromEmail,
+        easyEmailProvider: activeProvider,
+        preferredSendPath: "easy",
+      };
       if (profileId) payload.profileId = profileId;
 
-      if (!isPro) {
-        if (isNewKey(resendDraft)) payload.resendApiKey = resendDraft.trim();
-        if (isNewKey(mailerooDraft)) payload.mailerooApiKey = mailerooDraft.trim();
-        if (activeProvider === "smtp" || values.smtpHost || values.smtpUser) {
-          payload.smtpHost = values.smtpHost.trim() || null;
-          const portNum = Number.parseInt(values.smtpPort.trim(), 10);
-          payload.smtpPort = Number.isFinite(portNum) ? portNum : 465;
-          payload.smtpUser = values.smtpUser.trim() || null;
+      if (isNewKey(resendDraft)) payload.resendApiKey = resendDraft.trim();
+      if (isNewKey(mailerooDraft)) payload.mailerooApiKey = mailerooDraft.trim();
+      if (activeProvider === "smtp" || values.smtpHost || values.smtpUser) {
+        const host =
+          values.smtpHost.trim() ||
+          (activeProvider === "smtp" ? "smtp.hostinger.com" : "");
+        const portNum = Number.parseInt(values.smtpPort.trim(), 10);
+        payload.smtpHost = host || null;
+        payload.smtpPort = Number.isFinite(portNum) ? portNum : 465;
+        payload.smtpUser = values.smtpUser.trim() || null;
+        // Keep local fields in sync when we applied Hostinger defaults on switch.
+        if (activeProvider === "smtp" && !values.smtpHost.trim()) {
+          setValues((prev) => ({
+            ...prev,
+            smtpHost: host,
+            smtpPort: String(payload.smtpPort),
+          }));
         }
-        if (isNewKey(smtpPassDraft)) payload.smtpPass = smtpPassDraft.trim();
       }
+      if (isNewKey(smtpPassDraft)) payload.smtpPass = smtpPassDraft.trim();
 
       const res = await fetch("/api/workspace/settings", {
         method: "PATCH",
@@ -255,17 +268,15 @@ export function EmailSettingsForm({
             /* ignore local sync */
           }
         }
-        if (!isPro) {
-          const nextHasResend = isNewKey(resendDraft) || hasResendKey;
-          const nextHasMaileroo = isNewKey(mailerooDraft) || hasMailerooKey;
-          const nextHasSmtp = isNewKey(smtpPassDraft) || hasSmtpPass;
-          setHasResendKey(nextHasResend);
-          setHasMailerooKey(nextHasMaileroo);
-          setHasSmtpPass(nextHasSmtp);
-          setResendDraft(nextHasResend ? SAVED_KEY_MASK : "");
-          setMailerooDraft(nextHasMaileroo ? SAVED_KEY_MASK : "");
-          setSmtpPassDraft(nextHasSmtp ? SAVED_KEY_MASK : "");
-        }
+        const nextHasResend = isNewKey(resendDraft) || hasResendKey;
+        const nextHasMaileroo = isNewKey(mailerooDraft) || hasMailerooKey;
+        const nextHasSmtp = isNewKey(smtpPassDraft) || hasSmtpPass;
+        setHasResendKey(nextHasResend);
+        setHasMailerooKey(nextHasMaileroo);
+        setHasSmtpPass(nextHasSmtp);
+        setResendDraft(nextHasResend ? SAVED_KEY_MASK : "");
+        setMailerooDraft(nextHasMaileroo ? SAVED_KEY_MASK : "");
+        setSmtpPassDraft(nextHasSmtp ? SAVED_KEY_MASK : "");
         setSaved(true);
         setSavedHint(lastField.current);
         if (savedTimer.current) clearTimeout(savedTimer.current);
@@ -291,6 +302,7 @@ export function EmailSettingsForm({
     "w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-2.5 text-sm text-mist-100 outline-none transition-colors placeholder:text-mist-600 focus:border-aurora-400/60 disabled:opacity-40";
 
   const isMaileroo = provider === "maileroo";
+  const isSmtp = provider === "smtp";
 
   const onKeyDraftChange = (
     which: "resend" | "maileroo" | "smtpPass",
@@ -349,7 +361,7 @@ export function EmailSettingsForm({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] lg:items-start">
         <Field
           label="Your name"
-          hint={fromLocked ? undefined : "Shown as the inbox From name"}
+          hint="Shown as the inbox From name"
           saved={saved && savedHint === "fromName"}
         >
           <input
@@ -364,35 +376,32 @@ export function EmailSettingsForm({
         </Field>
         <Field
           label="From email"
-          hint={fromLocked ? "From your connected mailbox" : undefined}
           saved={saved && savedHint === "fromEmail"}
         >
           <input
             type="email"
-            value={fromLocked ? lockedFromEmail! : (values.fromEmail ?? "")}
+            value={values.fromEmail ?? ""}
             onChange={(e) => setField("fromEmail", e.target.value)}
             onFocus={captureFocus}
-            onBlur={() => {
-              if (!fromLocked) void saveIfChanged();
-            }}
+            onBlur={() => void saveIfChanged()}
             placeholder={defaults.fromEmail}
-            disabled={!canEdit || fromLocked}
+            disabled={!canEdit}
             className={inputCls}
           />
         </Field>
         <MailboxAgePicker disabled={!canEdit} />
       </div>
 
-      {!isPro && (
-        <div data-tour="resend-key" className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
+      <div data-tour="resend-key" className="space-y-4">
+          <div className={`flex flex-col ${isSmtp ? "gap-4" : "gap-3 sm:flex-row sm:items-end sm:gap-4"}`}>
             <div className="shrink-0">
               <p className="mb-1.5 text-sm font-medium text-mist-100">Sending provider</p>
-              <div className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1">
+              <div className="inline-flex flex-wrap rounded-full border border-white/10 bg-ink-900/60 p-1">
                 {(
                   [
                     ["resend", "Resend"],
                     ["maileroo", "Maileroo"],
+                    ["smtp", "SMTP"],
                   ] as const
                 ).map(([id, label]) => (
                   <button
@@ -412,8 +421,83 @@ export function EmailSettingsForm({
               </div>
             </div>
 
-            <div className="min-w-0 flex-1">
-              {isMaileroo ? (
+            <div className={isSmtp ? "min-w-0" : "min-w-0 flex-1"}>
+              {isSmtp ? (
+                <div className="space-y-4">
+                  <p className="text-[11px] leading-relaxed text-mist-500">
+                    Hostinger example: host{" "}
+                    <code className="text-mist-300">smtp.hostinger.com</code>, port{" "}
+                    <code className="text-mist-300">465</code>, user = full mailbox
+                    email. Sent copies often appear in that mailbox&apos;s Sent folder.
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field
+                      label="SMTP host"
+                      saved={saved && savedHint === "smtpHost"}
+                    >
+                      <input
+                        value={values.smtpHost}
+                        onChange={(e) => setSmtpField("smtpHost", e.target.value)}
+                        onFocus={captureFocus}
+                        onBlur={() => void saveIfChanged()}
+                        placeholder="smtp.hostinger.com"
+                        disabled={!canEdit}
+                        className={inputCls}
+                        autoComplete="off"
+                      />
+                    </Field>
+                    <Field
+                      label="Port"
+                      saved={saved && savedHint === "smtpPort"}
+                    >
+                      <input
+                        value={values.smtpPort}
+                        onChange={(e) => setSmtpField("smtpPort", e.target.value)}
+                        onFocus={captureFocus}
+                        onBlur={() => void saveIfChanged()}
+                        placeholder="465"
+                        disabled={!canEdit}
+                        className={inputCls}
+                        inputMode="numeric"
+                        autoComplete="off"
+                      />
+                    </Field>
+                    <Field
+                      label="Username"
+                      saved={saved && savedHint === "smtpUser"}
+                    >
+                      <input
+                        value={values.smtpUser}
+                        onChange={(e) => setSmtpField("smtpUser", e.target.value)}
+                        onFocus={captureFocus}
+                        onBlur={() => void saveIfChanged()}
+                        placeholder="info@yourdomain.com"
+                        disabled={!canEdit}
+                        className={inputCls}
+                        autoComplete="username"
+                      />
+                    </Field>
+                    <Field
+                      label="Password"
+                      saved={saved && savedHint === "smtpPass"}
+                    >
+                      <PasswordField
+                        value={smtpPassDraft}
+                        savedMask={SAVED_KEY_MASK}
+                        onChange={(e) =>
+                          onKeyDraftChange("smtpPass", e.target.value)
+                        }
+                        onFocus={captureFocus}
+                        onBlur={() => void saveIfChanged()}
+                        placeholder="Mailbox password"
+                        disabled={!canEdit}
+                        inputClassName={`${inputCls} pr-11`}
+                        autoComplete="current-password"
+                      />
+                    </Field>
+                  </div>
+                </div>
+              ) : isMaileroo ? (
                 <Field
                   label="Maileroo sending key"
                   saved={saved && savedHint === "mailerooKey"}
@@ -478,7 +562,6 @@ export function EmailSettingsForm({
           </div>
           {isMaileroo ? <WebhookHint liveAppUrl={liveAppUrl} /> : null}
         </div>
-      )}
 
       {(error || saving) && (
         <div className="flex items-center justify-end gap-3">

@@ -48,7 +48,7 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0007 — Auth.js session strategy: JWT + split edge/server config](0007-authjs-jwt-sessions.md)
 - [0008 — Stripe billing + service-layer quota model](0008-stripe-quota-model.md)
 - [0009 — Resend for send, Maileroo/Zeruh for verify](0009-resend-send-maileroo-verify.md) _(amended by 0011 for Easy send; **verify → [0016](0016-myemailverifier-primary-verify.md)**)_
-- [0010 — Google / Microsoft mailbox OAuth behind sendEmail()](0010-mailbox-oauth-send.md) _(accepted — Google first; multi-inbox deferred)_
+- [0010 — Google / Microsoft mailbox OAuth behind sendEmail()](0010-mailbox-oauth-send.md) _(superseded by [0026](0026-remove-pro-gmail-mailbox.md))_
 - [0011 — Easy send: Resend or Maileroo (BYO)](0011-easy-resend-or-maileroo.md) _(amended by [0021](0021-per-profile-sending-identity.md) for per-profile From/keys)_
 - [0012 — Natural email bodies — no STOP footer](0012-natural-email-bodies-no-stop-footer.md) _(amends constitution Art. I.3)_
 - [0013 — Pitch AI: no heuristic fallback](0013-pitch-ai-no-heuristic-fallback.md)
@@ -59,10 +59,11 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0018 — Insider shows raw Firecrawl remaining credits](0018-insider-raw-firecrawl-credits.md)
 - [0019 — Admin Find-leads toggle + account deletion](0019-find-leads-toggle-account-deletion.md)
 - [0020 — Cursor API is not a Firecrawl alternative](0020-no-cursor-api-for-search.md) _(deferred: Insider Grok/LLM extract on FC markdown)_
-- [0021 — Per-profile Easy Sending identity](0021-per-profile-sending-identity.md) _(amends 0011; Pro mailbox still ADR 0010)_
+- [0021 — Per-profile Easy Sending identity](0021-per-profile-sending-identity.md) _(amends 0011; Pro mailbox removed by [0026](0026-remove-pro-gmail-mailbox.md))_
 - [0022 — Board ↔ outreach profile alignment](0022-board-outreach-profile.md) _(amends 0014 + 0021)_
 - [0023 — No auto-created Default board](0023-no-auto-default-board.md) _(amends 0014)_
-- [0024 — Remove Zeruh / Maileroo Verify — MyEmailVerifier only](0024-remove-zeruh-verify.md) _(amends 0016)_
+- [0024 — Remove Zeruh / Maileroo Verify — MyEmailVerifier only](0024-remove-zeruh-verify.md) _(amends 0016; zeruh route alias removed 2026-08-08)_
 - [0025 — Per-board email verify toggle](0025-per-board-email-verify.md) _(amends 0016)_
+- [0026 — Remove Pro Gmail mailbox send path](0026-remove-pro-gmail-mailbox.md) _(supersedes 0010; Easy Resend/Maileroo/SMTP only)_
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

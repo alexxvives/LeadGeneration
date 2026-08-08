@@ -1,3 +1,4 @@
+import { env } from "@/lib/config";
 import type { D1Database } from "@/lib/db/d1-store";
 
 /**
@@ -17,7 +18,7 @@ export async function getD1Binding(): Promise<D1Database | undefined> {
   // NODE_ENV="development"; the OpenNext build sets "production". This keeps
   // `npm run dev` in pure JSON-store demo mode even if a local D1 proxy is
   // available (constitution Art. I.2). Use `npm run cf:preview` for local D1.
-  if (process.env.NODE_ENV !== "production") return undefined;
+  if (!env.isProduction()) return undefined;
   try {
     const { getCloudflareContext } = await import("@opennextjs/cloudflare");
     const { env } = await getCloudflareContext({ async: true });

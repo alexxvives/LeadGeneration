@@ -29,8 +29,7 @@ repository interface, provider-agnostic search (Firecrawl) and email
 | [`docs/session-handoff.md`](docs/session-handoff.md) | **At session start.** Current state, what's in flight, next steps. |
 | [`docs/AUDIT.md`](docs/AUDIT.md) | Full-repo audit task board (bugs/risks + fix status). |
 | [`docs/roadmap-next.md`](docs/roadmap-next.md) | Next value plan + copy-paste execution prompt for agents. |
-| [`docs/roadmap-send-paths.md`](docs/roadmap-send-paths.md) | Easy Resend vs Pro mailbox send plan + OSS backlog. |
-| [`docs/gmail-oauth-setup.md`](docs/gmail-oauth-setup.md) | Step-by-step Google Cloud OAuth client for Gmail send. |
+| [`docs/roadmap-send-paths.md`](docs/roadmap-send-paths.md) | Historical Easy vs Pro send plan (Pro removed — ADR 0026). |
 | [`docs/cloudflare-secrets.md`](docs/cloudflare-secrets.md) | Which Wrangler secrets must exist (Gmail / Groq / Gemini…). |
 | [`docs/constitution.md`](docs/constitution.md) | **Always first (before coding).** Principles + rules all code must follow. |
 | [`docs/how-it-works.md`](docs/how-it-works.md) | Understand the product, the user flow, and the architecture. |
@@ -121,7 +120,7 @@ src/lib/
   db/                Repository (LeadRepository) + JsonStore (dev) & D1Store (prod), workspace-scoped.
   search/            Firecrawl provider, enrichment, demo fallback.
   outreach/          Locale-aware draft templates + compliance footer.
-  email/             Rate-limited sender (resend/smtp/google mailbox/demo).
+  email/             Rate-limited sender (resend/maileroo/smtp/demo).
   billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.

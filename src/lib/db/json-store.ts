@@ -50,9 +50,9 @@ function normalizeWorkspace(w: Workspace): Workspace {
     smtpPass: (raw.smtpPass as string | undefined) ?? null,
     easyEmailProvider: normalizeEasyEmailProvider(raw.easyEmailProvider),
     preferredSendPath:
-      (raw.preferredSendPath as Workspace["preferredSendPath"] | undefined) === "pro" ||
-      (raw.preferredSendPath as Workspace["preferredSendPath"] | undefined) === "easy"
-        ? (raw.preferredSendPath as "easy" | "pro")
+      (raw.preferredSendPath as string | undefined) === "pro" ||
+      (raw.preferredSendPath as string | undefined) === "easy"
+        ? "easy"
         : null,
     emailVerifyEnabled: raw.emailVerifyEnabled === false ? false : true,
     findLeadsEnabled: raw.findLeadsEnabled === false ? false : true,
@@ -559,6 +559,21 @@ export class JsonStore implements LeadRepository {
   async listRuns(): Promise<Run[]> {
     const data = await this.read();
     return data.runs.filter((r) => this.inScope(r)).map(normalizeRun);
+  }
+
+  async getLatestRun(opts?: {
+    boardId?: string | null;
+    status?: Run["status"];
+  }): Promise<Run | null> {
+    const runs = await this.listRuns();
+    const boardId = opts?.boardId?.trim() || null;
+    const status = opts?.status;
+    const match = runs.find((r) => {
+      if (boardId && r.boardId !== boardId) return false;
+      if (status && r.status !== status) return false;
+      return true;
+    });
+    return match ?? null;
   }
 
   // ---- Leads ----
