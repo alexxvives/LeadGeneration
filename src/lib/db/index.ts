@@ -9,6 +9,7 @@ import type {
   Run,
   Workspace,
 } from "@/lib/types";
+import type { LeadHydrateLane } from "@/lib/lead-lanes";
 import { JsonStore } from "./json-store";
 import { D1Store, type D1Database } from "./d1-store";
 
@@ -41,6 +42,8 @@ export interface LeadListFilter {
   limit?: number;
   /** Skip first N rows (with `limit`). */
   offset?: number;
+  /** Pipeline / Outreach hydrate lane (with `limit`/`offset` per lane). */
+  lane?: LeadHydrateLane;
 }
 
 export interface LeadRepository {

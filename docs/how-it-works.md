@@ -128,12 +128,12 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   - **Lead detail drawer** — opens from any lead card/row/pin. Contact info
     (incl. full address), about blurb, CRM stage, dated notes journal
     (**Add Note** for a log line; **Follow up** pre-fills “Follow up” one week
-    out and shows on Calendar; **Missed call** journals a miss without moving
-    the lead to Contacted). Toggling **Phone** opens a call log starting
-    with `Phone call by {name}:` so email and phone stay
-    separate notes. A bounce deletes that address and returns the lead to New
-    — it is not a follow-up. The outreach composer (draft → edit → approve →
-    send) is on the draft pane.
+    out and shows on Calendar; **Missed call** writes the journal line
+    immediately — no composer). Notes can be edited or deleted. Toggling
+    **Phone** opens a call log with the caret after `Phone call by {name}:`.
+    A bounce deletes that address and returns the lead to New — it is not a
+    follow-up. The outreach composer (draft → edit → approve → send) is on
+    the draft pane.
 
 - **`/app/settings`** — sender profile (language flag persists as
   `templateLang` and only changes the **preview** — template editors stay as
@@ -249,8 +249,11 @@ to reset); in production on Cloudflare Workers, `getDb()` receives a D1 binding
 and uses `D1Store` instead. Pipeline/Leads respect the sidebar board filter
 (**All** by default). Boards are user-created (ADR 0014 / 0023).
 
-Board hydrate is **progressive + slim**: first ~150 leads, then chunks of ~400,
-without email bodies / about blurbs / notes (`detailLoaded: false`). Opening a
+Board hydrate is **progressive + slim**: **50 leads per Pipeline /
+Outreach lane** (New split into Contact Draft vs Ready, then Contacted /
+In Conversation / Closed / Not Interested), then the same 50-per-lane
+again in the background until the board is complete. Rows are slim — no
+email bodies / about blurbs (`detailLoaded: false`). Opening a
 lead drawer fetches full detail via `GET /api/leads/:id`. Pipeline and Outreach
 stay mounted after first visit so switching back is instant.
 

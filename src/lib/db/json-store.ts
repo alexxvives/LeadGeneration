@@ -14,6 +14,7 @@ import {
   type Workspace,
 } from "@/lib/types";
 import { parseContactMethods } from "@/lib/contact-methods";
+import { leadHydrateLane } from "@/lib/lead-lanes";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -637,12 +638,18 @@ export class JsonStore implements LeadRepository {
         if (aSent !== bSent) return bSent.localeCompare(aSent);
         return b.createdAt.localeCompare(a.createdAt);
       });
+    const byLane = filter?.lane
+      ? sorted.filter((l) => {
+          const o = dataFull.outreach.find((x) => x.leadId === l.id) ?? null;
+          return leadHydrateLane(l, o) === filter.lane;
+        })
+      : sorted;
     const offset = Math.max(0, filter?.offset ?? 0);
     if (filter?.limit != null && filter.limit >= 0) {
-      return sorted.slice(offset, offset + filter.limit);
+      return byLane.slice(offset, offset + filter.limit);
     }
-    if (offset > 0) return sorted.slice(offset);
-    return sorted;
+    if (offset > 0) return byLane.slice(offset);
+    return byLane;
   }
 
   async countLeads(filter?: LeadListFilter): Promise<number> {

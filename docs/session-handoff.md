@@ -9,16 +9,15 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-18 (Calendar marks + notes ≠ follow-ups)
+## ⏱️ Status — updated 2026-08-18 (Missed call + lane hydrate)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Calendar days: mail / phone / calendar icons instead of tiny dots.
-- Outreach Review / Approve / Send / Call are icon buttons.
-- Pipeline follow-up chip only for real reminders — legacy journal lines
-  (e.g. Dra. Barriga) count as notes.
+- Missed call: one click, no composer/banner. Call caret after the prefix.
+- Notes: edit + delete. Outreach action icons ~60% smaller.
+- Lead hydrate: 50 per Pipeline/Outreach lane, then background pages.
 
 ### Next
 1. Deploy after `tsc`/`lint` green.

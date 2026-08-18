@@ -30,7 +30,6 @@ import {
   missedCallNotePrefix,
   phoneCallNotePrefix,
   resolveFollowUpKind,
-  stripCallNotePrefix,
   todayIsoDate,
 } from "@/lib/follow-ups";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
@@ -160,6 +159,9 @@ export function LeadDrawer(props: DrawerProps) {
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editText, setEditText] = useState("");
 
   const dirty = useMemo(
     () => !sameDraft({ subject, body, toEmail }, savedDraft),
@@ -275,7 +277,13 @@ export function LeadDrawer(props: DrawerProps) {
 
   useEffect(() => {
     if (!showAddNote) return;
-    const t = window.setTimeout(() => noteInputRef.current?.focus(), 80);
+    const t = window.setTimeout(() => {
+      const el = noteInputRef.current;
+      if (!el) return;
+      el.focus();
+      const end = el.value.length;
+      el.setSelectionRange(end, end);
+    }, 80);
     return () => window.clearTimeout(t);
   }, [showAddNote, lead.id, callPrompt, composerKind]);
 
@@ -401,15 +409,8 @@ export function LeadDrawer(props: DrawerProps) {
 
   const promptingCall = Boolean(promptNote) || Boolean(callPrompt);
 
-  const openComposer = (kind: "note" | "follow_up" | "missed") => {
+  const openComposer = (kind: "note" | "follow_up") => {
     setShowAddNote(true);
-    if (kind === "missed") {
-      setCallPrompt("missed");
-      setComposerKind("note");
-      setNewNoteDate(todayIsoDate());
-      setNewNoteText(missedCallNotePrefix(actorName));
-      return;
-    }
     setCallPrompt(false);
     setComposerKind(kind);
     if (kind === "follow_up") {
@@ -426,7 +427,7 @@ export function LeadDrawer(props: DrawerProps) {
     const callMode = variant ?? (callPrompt || (promptNote ? promptNote : false));
     let text = newNoteText.trim();
     if (callMode === "missed") {
-      text = `${missedCallNotePrefix(actorName)}${stripCallNotePrefix(newNoteText)}`.trim();
+      text = missedCallNotePrefix(actorName).trim();
     } else if (callMode === "call" && !text) {
       text = phoneCallNotePrefix(actorName).trim();
     }
@@ -504,6 +505,23 @@ export function LeadDrawer(props: DrawerProps) {
   const deleteFollowUp = async (fuId: string) => {
     const updated = followUps.filter((f) => f.id !== fuId);
     setFollowUps(updated);
+    if (editingId === fuId) setEditingId(null);
+    await props.onUpdateCrm(lead.id, { followUps: updated });
+  };
+
+  const startEditFollowUp = (fu: FollowUp) => {
+    setEditingId(fu.id);
+    setEditDate(fu.date);
+    setEditText(fu.note);
+  };
+
+  const saveEditFollowUp = async () => {
+    if (!editingId || !editDate || !editText.trim()) return;
+    const updated = followUps.map((f) =>
+      f.id === editingId ? { ...f, date: editDate, note: editText.trim() } : f,
+    );
+    setFollowUps(updated);
+    setEditingId(null);
     await props.onUpdateCrm(lead.id, { followUps: updated });
   };
 
@@ -830,7 +848,7 @@ export function LeadDrawer(props: DrawerProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => openComposer("missed")}
+                  onClick={() => void addNote("missed")}
                   className="text-[11px] text-amber-200 hover:underline"
                 >
                   Missed call
@@ -850,14 +868,7 @@ export function LeadDrawer(props: DrawerProps) {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-aurora-200">
-                        {callPrompt === "missed" || promptNote === "missed"
-                          ? "Log a missed call"
-                          : "Log the call"}
-                      </p>
-                      <p className="mt-0.5 text-[11px] leading-snug text-mist-400">
-                        {callPrompt === "missed" || promptNote === "missed"
-                          ? "Stays in Ready — this is a journal line, not a contact."
-                          : "Save or skip to mark Contacted. Missed call stays in Ready."}
+                        Log the call
                       </p>
                     </div>
                     {props.onUndoMarkContacted ? (
@@ -922,9 +933,7 @@ export function LeadDrawer(props: DrawerProps) {
                     >
                       Save
                     </button>
-                    {promptingCall &&
-                    callPrompt !== "missed" &&
-                    promptNote !== "missed" ? (
+                    {promptingCall ? (
                       <button
                         type="button"
                         onClick={() => void addNote("missed")}
@@ -938,11 +947,7 @@ export function LeadDrawer(props: DrawerProps) {
                       type="button"
                       onClick={() => {
                         if (promptingCall) {
-                          void addNote(
-                            callPrompt === "missed" || promptNote === "missed"
-                              ? "missed"
-                              : "call",
-                          );
+                          void addNote("call");
                           return;
                         }
                         setShowAddNote(false);
@@ -1038,28 +1043,74 @@ export function LeadDrawer(props: DrawerProps) {
                               {tagText}
                             </span>
                           )}
-                          <p
-                            className={`min-w-0 flex-1 text-sm leading-relaxed ${
-                              isFollow && fu.done
-                                ? "text-mist-500 line-through"
-                                : "text-mist-300"
-                            }`}
-                          >
-                            <span className="font-semibold text-mist-100">
-                              {formatNoteDate(fu.date)}
-                              {` · ${kindLabel}`}
-                              :
-                            </span>{" "}
-                            {fu.note || "—"}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => void deleteFollowUp(fu.id)}
-                            className="mt-0.5 text-mist-600 hover:text-rose-400"
-                            aria-label="Delete note"
-                          >
-                            <XIcon className="h-3 w-3" />
-                          </button>
+                          {editingId === fu.id ? (
+                            <div className="min-w-0 flex-1 space-y-2">
+                              <input
+                                type="date"
+                                value={editDate}
+                                onChange={(e) => setEditDate(e.target.value)}
+                                className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+                              />
+                              <textarea
+                                value={editText}
+                                onChange={(e) => setEditText(e.target.value)}
+                                rows={3}
+                                className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+                              />
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void saveEditFollowUp()}
+                                  disabled={!editDate || !editText.trim()}
+                                  className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent disabled:opacity-40"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingId(null)}
+                                  className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p
+                              className={`min-w-0 flex-1 text-sm leading-relaxed ${
+                                isFollow && fu.done
+                                  ? "text-mist-500 line-through"
+                                  : "text-mist-300"
+                              }`}
+                            >
+                              <span className="font-semibold text-mist-100">
+                                {formatNoteDate(fu.date)}
+                                {` · ${kindLabel}`}
+                                :
+                              </span>{" "}
+                              {fu.note || "—"}
+                            </p>
+                          )}
+                          {editingId === fu.id ? null : (
+                            <div className="mt-0.5 flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => startEditFollowUp(fu)}
+                                className="text-mist-600 hover:text-mist-200"
+                                aria-label="Edit note"
+                              >
+                                <PencilIcon className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void deleteFollowUp(fu.id)}
+                                className="text-mist-600 hover:text-rose-400"
+                                aria-label="Delete note"
+                              >
+                                <XIcon className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
                         </li>
                       );
                     })}

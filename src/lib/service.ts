@@ -76,6 +76,7 @@ import {
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
 import { collapseEmailSentFollowUps, isBounceNote, isEmailSentNote, resolveFollowUpKind } from "@/lib/follow-ups";
+import { LEAD_HYDRATE_LANES } from "@/lib/lead-lanes";
 import {
   companyGuessFromEmail,
   isFreeMailDomain,
@@ -915,6 +916,9 @@ export async function getLatestBoard(
     /** Cap rows returned (progressive hydrate). Omit for all. */
     leadLimit?: number;
     leadOffset?: number;
+    /** Round-robin hydrate: N rows from each Pipeline/Outreach lane. */
+    leadPerLane?: number;
+    leadLaneOffset?: number;
   },
 ): Promise<{
   run: Run | null;
@@ -989,24 +993,56 @@ export async function getLatestBoard(
     (await leadDb.getLatestRun({ status: "complete" })) ??
     (await leadDb.getLatestRun());
 
+  const perLane =
+    opts?.leadPerLane != null && opts.leadPerLane > 0
+      ? Math.floor(opts.leadPerLane)
+      : null;
+  const laneOffset = Math.max(0, opts?.leadLaneOffset ?? 0);
   const offset = Math.max(0, opts?.leadOffset ?? 0);
   const limit = opts?.leadLimit;
-  const [leadsTotal, summary, rawLeads] = await Promise.all([
+  const listLeads =
+    perLane != null
+      ? Promise.all(
+          LEAD_HYDRATE_LANES.map((lane) =>
+            leadDb.listLeads({
+              ...filter,
+              lane,
+              limit: perLane,
+              offset: laneOffset,
+            }),
+          ),
+        ).then((pages) => ({
+          raw: pages.flat(),
+          hasMore: pages.some((p) => p.length >= perLane),
+        }))
+      : leadDb
+          .listLeads({
+            ...filter,
+            ...(limit != null ? { limit, offset } : {}),
+          })
+          .then((raw) => ({
+            raw,
+            hasMore: false,
+          }));
+  const [leadsTotal, summary, listed] = await Promise.all([
     leadDb.countLeads(filter),
     leadDb.summarizeLeads(filter),
-    leadDb.listLeads({
-      ...filter,
-      ...(limit != null ? { limit, offset } : {}),
-    }),
+    listLeads,
   ]);
+  const rawLeads = listed.raw;
   const leads = await persistCleanedLeadNames(leadDb, rawLeads);
-  const loadedThrough = offset + leads.length;
+  const leadsHasMore =
+    perLane != null
+      ? listed.hasMore
+      : limit != null
+        ? offset + leads.length < leadsTotal
+        : false;
   return {
     run,
     // Slim list: no email bodies / blurbs — drawer fetches full detail on open.
     leads: await attachOutreach(leadDb, leads, { slim: true }),
     leadsTotal,
-    leadsHasMore: loadedThrough < leadsTotal,
+    leadsHasMore,
     crmStageCounts: toStageCounts(summary.byCrmStage),
     boards,
     activeBoardId: active,

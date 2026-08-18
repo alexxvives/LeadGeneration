@@ -17,6 +17,7 @@ import {
   parseContactMethods,
   serializeContactMethods,
 } from "@/lib/contact-methods";
+import { hydrateLaneSql } from "@/lib/lead-lanes";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -1303,58 +1304,32 @@ export class D1Store implements LeadRepository {
     const limit =
       filter?.limit != null && filter.limit >= 0 ? Math.floor(filter.limit) : null;
     const offset = Math.max(0, Math.floor(filter?.offset ?? 0));
-    // Pagination only when `limit` is set (Studio progressive hydrate).
     const pageSql = limit != null ? ` LIMIT ? OFFSET ?` : "";
     const pageBind = limit != null ? [limit, offset] : [];
-    // Recent sends first (Pipeline Contacted top), then newest created.
     const orderSql = `ORDER BY
          CASE WHEN o.status = 'sent' THEN o.sent_at ELSE NULL END DESC,
          l.created_at DESC`;
-
-    if (filter?.runId && filter?.boardId) {
-      const { results } = await this.db
-        .prepare(
-          `SELECT l.* FROM leads l
-           LEFT JOIN outreach o ON o.lead_id = l.id
-           WHERE l.workspace_id = ? AND l.run_id = ? AND l.board_id = ?
-           ${orderSql}${pageSql}`,
-        )
-        .bind(this.workspaceId, filter.runId, filter.boardId, ...pageBind)
-        .all<LeadRow>();
-      return results.map(rowToLead);
-    }
+    const bind: unknown[] = [this.workspaceId];
+    let where = `WHERE l.workspace_id = ?`;
     if (filter?.runId) {
-      const { results } = await this.db
-        .prepare(
-          `SELECT l.* FROM leads l
-           LEFT JOIN outreach o ON o.lead_id = l.id
-           WHERE l.workspace_id = ? AND l.run_id = ?
-           ${orderSql}${pageSql}`,
-        )
-        .bind(this.workspaceId, filter.runId, ...pageBind)
-        .all<LeadRow>();
-      return results.map(rowToLead);
+      where += ` AND l.run_id = ?`;
+      bind.push(filter.runId);
     }
     if (filter?.boardId) {
-      const { results } = await this.db
-        .prepare(
-          `SELECT l.* FROM leads l
-           LEFT JOIN outreach o ON o.lead_id = l.id
-           WHERE l.workspace_id = ? AND l.board_id = ?
-           ${orderSql}${pageSql}`,
-        )
-        .bind(this.workspaceId, filter.boardId, ...pageBind)
-        .all<LeadRow>();
-      return results.map(rowToLead);
+      where += ` AND l.board_id = ?`;
+      bind.push(filter.boardId);
+    }
+    if (filter?.lane) {
+      where += ` AND (${hydrateLaneSql(filter.lane)})`;
     }
     const { results } = await this.db
       .prepare(
         `SELECT l.* FROM leads l
          LEFT JOIN outreach o ON o.lead_id = l.id
-         WHERE l.workspace_id = ?
+         ${where}
          ${orderSql}${pageSql}`,
       )
-      .bind(this.workspaceId, ...pageBind)
+      .bind(...bind, ...pageBind)
       .all<LeadRow>();
     return results.map(rowToLead);
   }

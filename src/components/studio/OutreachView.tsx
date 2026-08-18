@@ -425,9 +425,9 @@ export function OutreachView({
 }
 
 const ACTION_BTN =
-  "inline-flex h-8 min-h-8 items-center justify-center gap-1 rounded-full text-[11px] font-medium leading-none";
-const ACTION_ICON_BTN = `${ACTION_BTN} w-8 min-w-8 px-0`;
-const ACTION_TEXT_BTN = `${ACTION_BTN} min-w-[1.75rem] px-2.5`;
+  "inline-flex h-6 min-h-6 items-center justify-center gap-1 rounded-full text-[11px] font-medium leading-none";
+const ACTION_ICON_BTN = `${ACTION_BTN} w-6 min-w-6 px-0`;
+const ACTION_TEXT_BTN = `${ACTION_BTN} min-w-[1.5rem] px-2`;
 
 function OutreachRow({
   lead,
@@ -571,11 +571,11 @@ function OutreachRow({
               className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
             >
               {busy ? (
-                <Spinner className="h-3.5 w-3.5" />
+                <Spinner className="h-2.5 w-2.5" />
               ) : hasDraft ? (
-                <EyeIcon className="h-3.5 w-3.5" />
+                <EyeIcon className="h-2.5 w-2.5" />
               ) : (
-                <PlusIcon className="h-3.5 w-3.5" />
+                <PlusIcon className="h-2.5 w-2.5" />
               )}
             </button>
             <button
@@ -592,7 +592,7 @@ function OutreachRow({
               }
               className={`${ACTION_ICON_BTN} bg-amber-400 text-on-accent disabled:opacity-50`}
             >
-              {busy ? <Spinner className="h-3.5 w-3.5" /> : <CheckIcon className="h-3.5 w-3.5" />}
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : <CheckIcon className="h-2.5 w-2.5" />}
             </button>
             <button
               type="button"
@@ -610,7 +610,7 @@ function OutreachRow({
               }
               className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
             >
-              {busy ? <Spinner className="h-3.5 w-3.5" /> : <SendIcon className="h-3.5 w-3.5" />}
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : <SendIcon className="h-2.5 w-2.5" />}
             </button>
           </div>
         )}
@@ -625,7 +625,7 @@ function OutreachRow({
                   title="Edit draft"
                   className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
                 >
-                  <PencilIcon className="h-3.5 w-3.5" />
+                  <PencilIcon className="h-2.5 w-2.5" />
                 </button>
               ) : null}
               {email ? (
@@ -637,7 +637,7 @@ function OutreachRow({
                   title={canSendEmail ? "Send" : "Send (simulate)"}
                   className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
                 >
-                  {busy ? <Spinner className="h-3.5 w-3.5" /> : <SendIcon className="h-3.5 w-3.5" />}
+                  {busy ? <Spinner className="h-2.5 w-2.5" /> : <SendIcon className="h-2.5 w-2.5" />}
                 </button>
               ) : phoneOnly ? (
                 <button
@@ -651,7 +651,7 @@ function OutreachRow({
                   title="Log the call. Missed stays in Ready; connected moves to Contacted."
                   className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
                 >
-                  {busy ? <Spinner className="h-3.5 w-3.5" /> : <PhoneIcon className="h-3.5 w-3.5" />}
+                  {busy ? <Spinner className="h-2.5 w-2.5" /> : <PhoneIcon className="h-2.5 w-2.5" />}
                 </button>
               ) : (
                 <button

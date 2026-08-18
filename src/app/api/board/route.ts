@@ -14,6 +14,8 @@ export async function GET(req: Request) {
   const chunkOnly = url.searchParams.get("chunk") === "1";
   const limitRaw = url.searchParams.get("limit");
   const offsetRaw = url.searchParams.get("offset");
+  const perLaneRaw = url.searchParams.get("perLane");
+  const laneOffsetRaw = url.searchParams.get("laneOffset");
   const leadLimit =
     limitRaw != null && limitRaw !== ""
       ? Math.max(0, Math.min(2000, Number.parseInt(limitRaw, 10) || 0))
@@ -22,11 +24,21 @@ export async function GET(req: Request) {
     offsetRaw != null && offsetRaw !== ""
       ? Math.max(0, Number.parseInt(offsetRaw, 10) || 0)
       : 0;
+  const leadPerLane =
+    perLaneRaw != null && perLaneRaw !== ""
+      ? Math.max(1, Math.min(200, Number.parseInt(perLaneRaw, 10) || 0))
+      : undefined;
+  const leadLaneOffset =
+    laneOffsetRaw != null && laneOffsetRaw !== ""
+      ? Math.max(0, Number.parseInt(laneOffsetRaw, 10) || 0)
+      : 0;
 
   const board = await getLatestBoard(ctx, boardParam, {
     includeLeads: !lite,
     leadLimit: lite ? undefined : leadLimit,
     leadOffset: lite ? undefined : leadOffset,
+    leadPerLane: lite ? undefined : leadPerLane,
+    leadLaneOffset: lite ? undefined : leadLaneOffset,
   });
 
   // Background pages: leads only (client already has workspace/caps).

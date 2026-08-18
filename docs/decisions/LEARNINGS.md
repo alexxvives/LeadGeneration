@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-18 — Missed call one-click; note edit; lane hydrate
+- Missed call from Notes saves immediately (prefix only) — no “Stays in Ready”
+  banner, no textarea. Connected-call composer caret starts after
+  `Phone call by {name}: `.
+- Journal lines are editable (pencil), not delete-only.
+- Outreach Draft/Ready action icons: 24×24 hit target, 10px glyphs (~60% of
+  the previous 32px / 14px).
+- Board hydrate takes **50 per lane** (Contact Draft, Ready, Contacted,
+  In Conversation, Closed, Not Interested) then repeats in the background,
+  so thin columns aren’t empty while New backfills.
+
 ### 2026-08-18 — Calendar marks, outreach icons, notes ≠ follow-ups
 - Calendar day cells used 6px dots — swapped to mail / phone / calendar icons
   so a day with activity is scannable.

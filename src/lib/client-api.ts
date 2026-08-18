@@ -46,10 +46,7 @@ export interface BoardLeadsChunk {
   activeBoardId: string | null;
 }
 
-/** First paint size for progressive lead hydrate. */
-export const LEAD_PAGE_INITIAL = 150;
-/** Background chunk size after the first page. */
-export const LEAD_PAGE_CHUNK = 400;
+export { LEAD_PAGE_PER_LANE } from "@/lib/lead-lanes";
 
 /** Error thrown when a request is rejected for exceeding a plan quota (402). */
 export class QuotaExceededError extends Error {
@@ -128,7 +125,13 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 export const api = {
   board: (
     boardId?: string | null,
-    opts?: { lite?: boolean; limit?: number; offset?: number },
+    opts?: {
+      lite?: boolean;
+      limit?: number;
+      offset?: number;
+      perLane?: number;
+      laneOffset?: number;
+    },
   ) => {
     const params = new URLSearchParams();
     params.set(
@@ -136,9 +139,16 @@ export const api = {
       boardId && boardId !== "all" ? boardId : "all",
     );
     if (opts?.lite) params.set("lite", "1");
-    if (opts?.limit != null) params.set("limit", String(opts.limit));
-    if (opts?.offset != null && opts.offset > 0) {
-      params.set("offset", String(opts.offset));
+    if (opts?.perLane != null) {
+      params.set("perLane", String(opts.perLane));
+      if (opts.laneOffset != null && opts.laneOffset > 0) {
+        params.set("laneOffset", String(opts.laneOffset));
+      }
+    } else {
+      if (opts?.limit != null) params.set("limit", String(opts.limit));
+      if (opts?.offset != null && opts.offset > 0) {
+        params.set("offset", String(opts.offset));
+      }
     }
     // Local calendar day for workspace “sent today” (Contacted header).
     const dayStart = new Date();
@@ -150,7 +160,7 @@ export const api = {
   /** Background lead pages after the first board paint. */
   boardLeadsChunk: (
     boardId: string | null | undefined,
-    opts: { limit: number; offset: number },
+    opts: { perLane: number; laneOffset: number },
   ) => {
     const params = new URLSearchParams();
     params.set(
@@ -158,8 +168,8 @@ export const api = {
       boardId && boardId !== "all" ? boardId : "all",
     );
     params.set("chunk", "1");
-    params.set("limit", String(opts.limit));
-    params.set("offset", String(opts.offset));
+    params.set("perLane", String(opts.perLane));
+    params.set("laneOffset", String(opts.laneOffset));
     return jsonFetch<BoardLeadsChunk>(`/api/board?${params.toString()}`);
   },
 

@@ -5,8 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   api,
-  LEAD_PAGE_CHUNK,
-  LEAD_PAGE_INITIAL,
+  LEAD_PAGE_PER_LANE,
   QuotaExceededError,
   RateLimitedError,
   type BoardResponse,
@@ -400,7 +399,7 @@ export function Studio() {
       prev.leads.length > 0;
 
     // Always page — never pull all ~3k fat/slim rows in one soft-refresh.
-    const pageOpts = { limit: LEAD_PAGE_INITIAL, offset: 0 };
+    const pageOpts = { perLane: LEAD_PAGE_PER_LANE, laneOffset: 0 };
 
     const data = await api.board(boardKey, pageOpts);
     if (leadsGenRef.current !== gen) return data;
@@ -427,13 +426,13 @@ export function Studio() {
       if (data.leadsHasMore) {
         setLeadsBackfilling(true);
         void (async () => {
-          let offset = data.leads.length;
+          let offset = LEAD_PAGE_PER_LANE;
           try {
             while (true) {
               if (leadsGenRef.current !== gen) return;
               const chunk = await api.boardLeadsChunk(null, {
-                limit: LEAD_PAGE_CHUNK,
-                offset,
+                perLane: LEAD_PAGE_PER_LANE,
+                laneOffset: offset,
               });
               if (leadsGenRef.current !== gen) return;
               setBoard((b) => {
@@ -447,7 +446,7 @@ export function Studio() {
                   leadsHasMore: chunk.leadsHasMore,
                 };
               });
-              offset += chunk.leads.length;
+              offset += LEAD_PAGE_PER_LANE;
               if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
             }
           } catch {
@@ -515,14 +514,14 @@ export function Studio() {
       if (stillMore && !leadsBackfilling) {
         setLeadsBackfilling(true);
         void (async () => {
-          let offset = merged.length;
+          let offset = LEAD_PAGE_PER_LANE;
           try {
             while (true) {
               if (leadsGenRef.current !== gen) return;
               if (filterBoardIdRef.current !== boardKey) return;
               const chunk = await api.boardLeadsChunk(boardKey, {
-                limit: LEAD_PAGE_CHUNK,
-                offset,
+                perLane: LEAD_PAGE_PER_LANE,
+                laneOffset: offset,
               });
               if (leadsGenRef.current !== gen) return;
               setBoard((b) => {
@@ -536,7 +535,7 @@ export function Studio() {
                   leadsHasMore: chunk.leadsHasMore,
                 };
               });
-              offset += chunk.leads.length;
+              offset += LEAD_PAGE_PER_LANE;
               if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
             }
           } catch {
@@ -560,15 +559,15 @@ export function Studio() {
               if (leadsGenRef.current !== gen) return;
               if (filterBoardIdRef.current !== boardKey) return;
               const chunk = await api.boardLeadsChunk(boardKey, {
-                limit: LEAD_PAGE_CHUNK,
-                offset,
+                perLane: LEAD_PAGE_PER_LANE,
+                laneOffset: offset,
               });
               if (leadsGenRef.current !== gen) return;
               for (const l of chunk.leads) {
                 ids.add(l.id);
                 byId.set(l.id, l);
               }
-              offset += chunk.leads.length;
+              offset += LEAD_PAGE_PER_LANE;
               if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
             }
             setBoard((b) => {
@@ -614,14 +613,14 @@ export function Studio() {
       if (data.leadsHasMore) {
         setLeadsBackfilling(true);
         void (async () => {
-          let offset = data.leads.length;
+          let offset = LEAD_PAGE_PER_LANE;
           try {
             while (true) {
               if (leadsGenRef.current !== gen) return;
               if (filterBoardIdRef.current !== boardKey) return;
               const chunk = await api.boardLeadsChunk(boardKey, {
-                limit: LEAD_PAGE_CHUNK,
-                offset,
+                perLane: LEAD_PAGE_PER_LANE,
+                laneOffset: offset,
               });
               if (leadsGenRef.current !== gen) return;
               setBoard((b) => {
@@ -635,7 +634,7 @@ export function Studio() {
                   leadsHasMore: chunk.leadsHasMore,
                 };
               });
-              offset += chunk.leads.length;
+              offset += LEAD_PAGE_PER_LANE;
               if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
             }
           } catch {
@@ -656,14 +655,14 @@ export function Studio() {
     if (data.leadsHasMore) {
       setLeadsBackfilling(true);
       void (async () => {
-        let offset = data.leads.length;
+        let offset = LEAD_PAGE_PER_LANE;
         try {
           while (true) {
             if (leadsGenRef.current !== gen) return;
             if (filterBoardIdRef.current !== boardKey) return;
             const chunk = await api.boardLeadsChunk(boardKey, {
-              limit: LEAD_PAGE_CHUNK,
-              offset,
+              perLane: LEAD_PAGE_PER_LANE,
+              laneOffset: offset,
             });
             if (leadsGenRef.current !== gen) return;
             setBoard((b) => {
@@ -677,7 +676,7 @@ export function Studio() {
                 leadsHasMore: chunk.leadsHasMore,
               };
             });
-            offset += chunk.leads.length;
+            offset += LEAD_PAGE_PER_LANE;
             if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
           }
         } catch {
