@@ -88,7 +88,11 @@ export function resolveFollowUpKind(fu: FollowUp): FollowUpKind {
   // phone call via + Follow-up used to save kind: follow_up (the checkbox).
   if (inferred === "phone" || inferred === "email") return inferred;
   if (isBounceNote(fu.note)) return "note";
-  return fu.kind ?? inferred;
+  if (fu.kind) return fu.kind;
+  // Legacy rows with no kind: completed journal lines are notes, open ones
+  // are reminders (otherwise every undated comment became "1 follow-up").
+  if (fu.done) return "note";
+  return inferred;
 }
 
 /** User-authored reminder — not a note, send, call, or bounce. */

@@ -70,8 +70,6 @@ import type {
   Workspace,
 } from "@/lib/types";
 import { normalizeCrmStage } from "@/lib/types";
-
-const LOCK_TTL_MS = 150_000; // 2.5 minutes
 import { scoreImportedLead } from "@/lib/fit-score";
 import {
   contactMethodsEqual,
@@ -83,6 +81,39 @@ import {
   isFreeMailDomain,
   websiteFromEmail,
 } from "@/lib/website";
+import {
+  cleanLeadIdentity,
+  sanitizeCompanyName,
+  sanitizeContactName,
+} from "@/lib/lead-text";
+
+const LOCK_TTL_MS = 150_000; // 2.5 minutes
+
+/** Persist scraped/imported names after stripping emoji and decorative punctuation. */
+async function persistCleanedLeadNames(
+  db: LeadRepository,
+  leads: Lead[],
+): Promise<Lead[]> {
+  const patches: Array<{ id: string; patch: Partial<Lead> }> = [];
+  const next = leads.map((l) => {
+    const cleaned = cleanLeadIdentity(l);
+    if (
+      cleaned.company !== l.company ||
+      (cleaned.contactName ?? null) !== (l.contactName ?? null)
+    ) {
+      patches.push({
+        id: l.id,
+        patch: {
+          company: cleaned.company,
+          contactName: cleaned.contactName ?? null,
+        },
+      });
+    }
+    return cleaned;
+  });
+  if (patches.length) await db.updateLeads(patches);
+  return next;
+}
 
 /**
  * Application services. API routes stay thin and call into these functions,
@@ -743,11 +774,11 @@ export async function createAndRunSearch(
       workspaceId: ctx.workspaceId,
       runId: run.id,
       boardId,
-      company: l.company,
+      company: sanitizeCompanyName(l.company),
       website: l.website,
       emails: l.emails,
       phones: l.phones,
-      contactName: l.contactName,
+      contactName: sanitizeContactName(l.contactName),
       location: l.location,
       aboutBlurb: l.aboutBlurb,
       companyType: suggestCompanyType(
@@ -864,7 +895,10 @@ export async function getRunWithLeads(
 ): Promise<{ run: Run; leads: LeadWithOutreach[] } | null> {
   const run = await ctx.db.getRun(runId);
   if (!run) return null;
-  const leads = await ctx.db.listLeads({ runId });
+  const leads = await persistCleanedLeadNames(
+    ctx.db,
+    await ctx.db.listLeads({ runId }),
+  );
   const withOutreach = await attachOutreach(ctx.db, leads);
   return { run, leads: withOutreach };
 }
@@ -957,7 +991,7 @@ export async function getLatestBoard(
 
   const offset = Math.max(0, opts?.leadOffset ?? 0);
   const limit = opts?.leadLimit;
-  const [leadsTotal, summary, leads] = await Promise.all([
+  const [leadsTotal, summary, rawLeads] = await Promise.all([
     leadDb.countLeads(filter),
     leadDb.summarizeLeads(filter),
     leadDb.listLeads({
@@ -965,6 +999,7 @@ export async function getLatestBoard(
       ...(limit != null ? { limit, offset } : {}),
     }),
   ]);
+  const leads = await persistCleanedLeadNames(leadDb, rawLeads);
   const loadedThrough = offset + leads.length;
   return {
     run,
@@ -1071,7 +1106,8 @@ export async function getLeadWithOutreach(
     }
   }
   if (!lead) return null;
-  const [row] = await attachOutreach(db, [lead], { slim: false });
+  const [cleaned] = await persistCleanedLeadNames(db, [lead]);
+  const [row] = await attachOutreach(db, [cleaned ?? lead], { slim: false });
   return row ?? null;
 }
 
@@ -2278,6 +2314,9 @@ export async function updateLeadCrm(
     contactedByUserId?: string | null;
     contactedByName?: string | null;
   } = { ...patch };
+  if (next.company !== undefined) {
+    next.company = sanitizeCompanyName(next.company);
+  }
 
   const stageAfterPreview =
     patch.crmStage ?? lead.crmStage;
@@ -2357,7 +2396,7 @@ export async function updateLeadCrm(
     const ws = await ctx.db.getWorkspace(ctx.workspaceId);
     const scored = scoreImportedLead(
       {
-        company: patch.company ?? lead.company,
+        company: next.company ?? lead.company,
         website: patch.website !== undefined ? patch.website : lead.website,
         emails: patch.emails ?? lead.emails,
         phones: patch.phones ?? lead.phones,
@@ -2548,11 +2587,13 @@ export async function importLeads(
 
   const cleaned = rows
     .map((r) => ({
-      company: (r.company ?? "").trim(),
+      company: r.company?.trim()
+        ? sanitizeCompanyName(r.company)
+        : "",
       website: normalizeWebsiteUrl(r.website) ?? null,
       emails: (r.emails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean),
       phones: (r.phones ?? []).map((p) => p.trim()).filter(Boolean),
-      contactName: r.contactName?.trim() || null,
+      contactName: sanitizeContactName(r.contactName?.trim() || null),
       location: r.location?.trim() || null,
       companyType: r.companyType?.trim() || null,
       crmStage: r.crmStage ?? null,
@@ -2804,7 +2845,9 @@ export async function importLeads(
         r.company.trim() ||
         companyGuessFromEmail(fromEmail) ||
         "Unknown company";
-      const company = rawCompany.replace(/^./, (c) => c.toUpperCase());
+      const company = sanitizeCompanyName(
+        rawCompany.replace(/^./, (c) => c.toUpperCase()),
+      );
       // Never invent https://gmail.com (etc.) from a free-mail inbox.
       const website = r.website || websiteFromEmail(fromEmail);
       const location = r.location;

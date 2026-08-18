@@ -21,14 +21,14 @@ import {
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 const KIND_DOT: Record<FollowUpKind, string> = {
-  follow_up: "bg-amber-400",
+  follow_up: "bg-violet-400",
   note: "bg-mist-500",
   email: "bg-aurora-400",
   phone: "bg-sky-400",
 };
 
 const KIND_CHIP: Record<FollowUpKind, string> = {
-  follow_up: "bg-amber-400/15 text-amber-200",
+  follow_up: "bg-violet-400/15 text-violet-200",
   note: "bg-white/10 text-mist-300",
   email: "bg-aurora-400/15 text-aurora-200",
   phone: "bg-sky-400/15 text-sky-200",
@@ -56,7 +56,7 @@ function KindMark({ kind }: { kind: FollowUpKind }) {
   if (kind === "phone") return <PhoneIcon className="h-3.5 w-3.5" aria-hidden />;
   return (
     <span
-      className="inline-block h-2 w-2 rounded-full bg-amber-400"
+      className={`inline-block h-2 w-2 rounded-full ${KIND_DOT[kind]}`}
       aria-hidden
     />
   );
@@ -364,7 +364,7 @@ function DayGroup({
                   className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors ${
                     ev.done
                       ? "border-aurora-400/40 bg-aurora-400/20 text-aurora-200"
-                      : "border-white/15 text-mist-500 hover:border-amber-400/40 hover:text-amber-200"
+                      : "border-violet-400/40 text-violet-300 hover:border-violet-400/70 hover:text-violet-200"
                   }`}
                 >
                   {ev.done ? <CheckIcon className="h-3 w-3" /> : null}

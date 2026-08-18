@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-18 — Outreach icons, notes vs follow-up, name hygiene
+- Outreach Contacted channel tags went back to **icons** (mail / phone / form),
+  matching Pipeline cards. Text "Email"/"Phone" chips were too loud.
+- Pipeline was labeling journal comments as **"1 follow-up"** (legacy rows with
+  no `kind` inferred as reminders). Notes now show **"1 note"**; **pending
+  follow-ups** are a separate **violet** chip (calendar + label). Calendar
+  follow-up dots/chips match. Violet is a status color on ink, not purple-on-white.
+- Company/contact names: strip emojis and quotes/`™`/etc. Keep letters (ñ),
+  digits, spaces, dots, hyphens. Applied at scrape, import, CRM edit, and a
+  one-shot persist when a board (or run) is loaded.
+
 ### 2026-08-18 — First-run “what next” (search / call / empty)
 - Optional location blocked **Find leads** until you picked a geocode
   suggestion (`locationConfirmed`). Typed text is kept and submit is allowed.

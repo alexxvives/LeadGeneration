@@ -824,7 +824,7 @@ export function LeadDrawer(props: DrawerProps) {
                 <button
                   type="button"
                   onClick={() => openComposer("follow_up")}
-                  className="text-[11px] text-aurora-400 hover:underline"
+                  className="text-[11px] text-violet-300 hover:underline"
                 >
                   Follow up
                 </button>
@@ -998,7 +998,9 @@ export function LeadDrawer(props: DrawerProps) {
                             ? missed
                               ? "bg-amber-400/15 text-amber-200"
                               : "bg-sky-400/15 text-sky-200"
-                            : "bg-white/10 text-mist-300";
+                            : kind === "follow_up"
+                              ? "bg-violet-400/15 text-violet-200"
+                              : "bg-white/10 text-mist-300";
                       const tagText =
                         kind === "email"
                           ? "Email"
@@ -1022,7 +1024,7 @@ export function LeadDrawer(props: DrawerProps) {
                               className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
                                 fu.done
                                   ? "border-aurora-400/40 bg-aurora-400/20 text-aurora-200"
-                                  : "border-white/15 text-mist-500 hover:border-amber-400/40"
+                                  : "border-violet-400/40 text-violet-300 hover:border-violet-400/70"
                               }`}
                             >
                               {fu.done ? <CheckIcon className="h-3 w-3" /> : null}

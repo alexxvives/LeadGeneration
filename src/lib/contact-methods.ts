@@ -84,5 +84,5 @@ export function contactMethodAddedNote(
     return { note: who ? `${base} — ${who}` : base, kind: "email" };
   }
   const base = "Contacted via contact form";
-  return { note: who ? `${base} — ${who}` : base, kind: "follow_up" };
+  return { note: who ? `${base} — ${who}` : base, kind: "note" };
 }

@@ -29,6 +29,11 @@ html[data-theme="dark"] {
   --amber-400: #f7b955;
   --amber-500: #eb9d2f;
 
+  /* Follow-up reminder only (not a brand color). On ink, not purple-on-white. */
+  --violet-200: #ddd6fe;
+  --violet-300: #c4b5fd;
+  --violet-400: #a78bfa;
+
   --mist-100: #eaf1fb;
   --mist-200: #d5e0f0;
   --mist-300: #b6c4dc;
@@ -74,6 +79,10 @@ html[data-theme="light"] {
   --amber-400: #d97706;
   --amber-500: #92400e;
 
+  --violet-200: #5b21b6;
+  --violet-300: #6d28d9;
+  --violet-400: #7c3aed;
+
   --mist-100: #0c1524;
   --mist-200: #1e293b;
   --mist-300: #334155;
@@ -118,6 +127,10 @@ html[data-theme="light"] {
   --color-amber-300: var(--amber-300);
   --color-amber-400: var(--amber-400);
   --color-amber-500: var(--amber-500);
+
+  --color-violet-200: var(--violet-200);
+  --color-violet-300: var(--violet-300);
+  --color-violet-400: var(--violet-400);
 
   --color-mist-100: var(--mist-100);
   --color-mist-200: var(--mist-200);

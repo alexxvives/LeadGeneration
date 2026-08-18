@@ -38,7 +38,10 @@ not replace find+fetch.
      ` — `, `:`), skips generic segments ("Contact Us", "Home", "About", "Welcome
      to"), and takes the first non-generic brand segment. If no title segment
      survives, falls back to a prettified domain base ("bright-dental" →
-     "Bright Dental").
+     "Bright Dental"). Names are then stripped of emojis and decorative
+     punctuation (quotes, bullets, TM); letters including ñ, digits, spaces,
+     dots, and hyphens stay. The same sanitizer runs on CSV/Excel import and
+     heals existing leads the next time a board is loaded.
    - **Email extraction**: regex pull of email addresses, then a hygiene pipeline:
      plausibility check (single `@`, valid TLD length, no edge/double dots),
      disposable-domain block list, junk-pattern filter (`noreply`, `donotreply`,

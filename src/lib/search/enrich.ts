@@ -1,6 +1,8 @@
 // Lightweight extraction helpers used to turn scraped page text/markdown into
 // contact hints. Intentionally conservative to avoid capturing junk.
 
+import { sanitizeCompanyName, sanitizeContactName } from "@/lib/lead-text";
+
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 // Matches common US-style and international-ish phone formats.
 const PHONE_RE = /(\+?\d{1,2}[\s.-]?)?(\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/g;
@@ -91,7 +93,7 @@ export function extractContactName(text: string): string | null {
   );
   const name = m?.[1]?.trim();
   if (!name || name.length < 3 || name.length > 60) return null;
-  return name;
+  return sanitizeContactName(name);
 }
 
 export function extractEmails(text: string): string[] {
@@ -234,13 +236,13 @@ export function companyFromTitleOrUrl(title: string | null, url: string | null):
       .map((s) => s.trim())
       .filter(Boolean);
     const branded = segments.find((s) => !isGenericSegment(s) && s.length > 1 && s.length < 60);
-    if (branded) return branded;
+    if (branded) return sanitizeCompanyName(branded);
   }
   const domain = domainFromUrl(url);
   if (domain) {
     const base = domain.split(".")[0] ?? domain;
     const pretty = prettifyDomainBase(base);
-    if (pretty) return pretty;
+    if (pretty) return sanitizeCompanyName(pretty);
   }
   return "Unknown company";
 }

@@ -15,9 +15,9 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
-import { MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
+import { MailIcon, PhoneIcon, FormIcon, InfoIcon, CalendarIcon } from "@/components/icons";
 import { displayWebsite } from "@/lib/website";
-import { isUserFollowUp } from "@/lib/follow-ups";
+import { isUserFollowUp, resolveFollowUpKind } from "@/lib/follow-ups";
 import { Bone, useStableDuringLoad } from "./skeletons";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
@@ -432,6 +432,9 @@ function DraggablePipelineCard({
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
   const pendingFollowUps =
     lead.followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
+  const journalNotes =
+    lead.followUps?.filter((f) => resolveFollowUpKind(f) === "note").length ?? 0;
+  const noteCount = journalNotes > 0 ? journalNotes : lead.notes?.trim() ? 1 : 0;
   const subtitle = cardSubtitle(lead);
   const replied = lead.outreach?.deliveryStatus === "replied";
   const bounced = lead.outreach?.deliveryStatus === "bounced";
@@ -478,9 +481,24 @@ function DraggablePipelineCard({
               Bounced
             </span>
           ) : null}
-          {lead.crmStage !== "new" && pendingFollowUps > 0 ? (
-            <span className="shrink-0 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-              {pendingFollowUps} follow-up{pendingFollowUps > 1 ? "s" : ""}
+          {pendingFollowUps > 0 ? (
+            <span
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-400/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300"
+              title={
+                pendingFollowUps === 1
+                  ? "Pending follow-up"
+                  : `${pendingFollowUps} pending follow-ups`
+              }
+            >
+              <CalendarIcon className="h-2.5 w-2.5" />
+              {pendingFollowUps === 1
+                ? "Follow-up"
+                : `${pendingFollowUps} follow-ups`}
+            </span>
+          ) : null}
+          {noteCount > 0 ? (
+            <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-mist-300">
+              {noteCount} note{noteCount === 1 ? "" : "s"}
             </span>
           ) : null}
           {lead.crmStage !== "new" && methods.length > 0 ? (

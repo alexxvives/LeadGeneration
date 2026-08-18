@@ -6,6 +6,7 @@ import { warmupStatus } from "@/lib/email/warmup";
 import { Spinner } from "@/components/ui";
 import {
   CheckIcon,
+  FormIcon,
   InfoIcon,
   MailIcon,
   PhoneIcon,
@@ -689,16 +690,29 @@ function OutreachRow({
             <div className="flex flex-wrap justify-end gap-1">
               {sent || methods.includes("email") ? (
                 <span
-                  className={`${ACTION_BTN} border border-aurora-400/30 bg-aurora-400/10 text-aurora-200`}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-aurora-400/10 text-aurora-200 ring-1 ring-aurora-400/30"
+                  title="Email"
+                  aria-label="Email"
                 >
-                  Email
+                  <MailIcon className="h-3 w-3" />
                 </span>
               ) : null}
               {methods.includes("phone") ? (
                 <span
-                  className={`${ACTION_BTN} border border-sky-400/30 bg-sky-400/10 text-sky-200`}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-sky-400/10 text-sky-200 ring-1 ring-sky-400/30"
+                  title="Phone"
+                  aria-label="Phone"
                 >
-                  Phone
+                  <PhoneIcon className="h-3 w-3" />
+                </span>
+              ) : null}
+              {methods.includes("contact_form") ? (
+                <span
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink-800/80 text-mist-300 ring-1 ring-ink-600/40"
+                  title="Contact form"
+                  aria-label="Contact form"
+                >
+                  <FormIcon className="h-3 w-3" />
                 </span>
               ) : null}
             </div>
