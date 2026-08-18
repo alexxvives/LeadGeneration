@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-18 — Calendar marks, outreach icons, notes ≠ follow-ups
+- Calendar day cells used 6px dots — swapped to mail / phone / calendar icons
+  so a day with activity is scannable.
+- Outreach Review / Approve / Send / Call were still text labels; they are
+  icon-only (eye / check / paper-plane / phone) with `aria-label` + title.
+- Pipeline “N follow-ups” was counting legacy journal comments. Before the
+  Note vs Follow up split, drawer notes were stored as `kind: follow_up`.
+  A follow-up is only an explicit reminder (default “Follow up” copy, a
+  future date from the Follow up control, or “Reply received”). Everything
+  else is a **note**. Opening the lead heals stored kind.
+
 ### 2026-08-18 — Outreach icons, notes vs follow-up, name hygiene
 - Outreach Contacted channel tags went back to **icons** (mail / phone / form),
   matching Pipeline cards. Text "Email"/"Phone" chips were too loud.

@@ -6,10 +6,14 @@ import { warmupStatus } from "@/lib/email/warmup";
 import { Spinner } from "@/components/ui";
 import {
   CheckIcon,
+  EyeIcon,
   FormIcon,
   InfoIcon,
   MailIcon,
+  PencilIcon,
   PhoneIcon,
+  PlusIcon,
+  SendIcon,
 } from "@/components/icons";
 import { useStableDuringLoad } from "./skeletons";
 
@@ -421,7 +425,9 @@ export function OutreachView({
 }
 
 const ACTION_BTN =
-  "inline-flex h-7 min-h-7 min-w-[1.75rem] items-center justify-center gap-1 rounded-full px-2.5 text-[11px] font-medium leading-none";
+  "inline-flex h-8 min-h-8 items-center justify-center gap-1 rounded-full text-[11px] font-medium leading-none";
+const ACTION_ICON_BTN = `${ACTION_BTN} w-8 min-w-8 px-0`;
+const ACTION_TEXT_BTN = `${ACTION_BTN} min-w-[1.75rem] px-2.5`;
 
 function OutreachRow({
   lead,
@@ -562,9 +568,15 @@ function OutreachRow({
                     ? "Create draft from active profile"
                     : "Create draft (add email in the composer if needed)"
               }
-              className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
+              className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
             >
-              {busy ? <Spinner className="h-2.5 w-2.5" /> : hasDraft ? "Review" : "Create"}
+              {busy ? (
+                <Spinner className="h-3.5 w-3.5" />
+              ) : hasDraft ? (
+                <EyeIcon className="h-3.5 w-3.5" />
+              ) : (
+                <PlusIcon className="h-3.5 w-3.5" />
+              )}
             </button>
             <button
               type="button"
@@ -578,9 +590,9 @@ function OutreachRow({
                     ? "Create & approve — move to Ready"
                     : "Needs an email to draft"
               }
-              className={`${ACTION_BTN} bg-amber-400 text-on-accent disabled:opacity-50`}
+              className={`${ACTION_ICON_BTN} bg-amber-400 text-on-accent disabled:opacity-50`}
             >
-              {busy ? <Spinner className="h-2.5 w-2.5" /> : "Approve"}
+              {busy ? <Spinner className="h-3.5 w-3.5" /> : <CheckIcon className="h-3.5 w-3.5" />}
             </button>
             <button
               type="button"
@@ -596,9 +608,9 @@ function OutreachRow({
                     ? "Approve & send now"
                     : "Approve & send (simulate)"
               }
-              className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
+              className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
             >
-              {busy ? <Spinner className="h-2.5 w-2.5" /> : "Send"}
+              {busy ? <Spinner className="h-3.5 w-3.5" /> : <SendIcon className="h-3.5 w-3.5" />}
             </button>
           </div>
         )}
@@ -609,9 +621,11 @@ function OutreachRow({
                 <button
                   type="button"
                   onClick={onOpenDraft}
-                  className={`${ACTION_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
+                  aria-label="Edit draft"
+                  title="Edit draft"
+                  className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
                 >
-                  Edit
+                  <PencilIcon className="h-3.5 w-3.5" />
                 </button>
               ) : null}
               {email ? (
@@ -621,9 +635,9 @@ function OutreachRow({
                   onClick={() => void onSend()}
                   aria-label={canSendEmail ? "Send" : "Send (simulate)"}
                   title={canSendEmail ? "Send" : "Send (simulate)"}
-                  className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
+                  className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
                 >
-                  {busy ? <Spinner className="h-2.5 w-2.5" /> : "Send"}
+                  {busy ? <Spinner className="h-3.5 w-3.5" /> : <SendIcon className="h-3.5 w-3.5" />}
                 </button>
               ) : phoneOnly ? (
                 <button
@@ -635,16 +649,16 @@ function OutreachRow({
                   }}
                   aria-label="Log a call — stays in Ready until you save as connected"
                   title="Log the call. Missed stays in Ready; connected moves to Contacted."
-                  className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
+                  className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
                 >
-                  {busy ? <Spinner className="h-2.5 w-2.5" /> : "Call"}
+                  {busy ? <Spinner className="h-3.5 w-3.5" /> : <PhoneIcon className="h-3.5 w-3.5" />}
                 </button>
               ) : (
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => setPickingMethod((v) => !v)}
-                  className={`${ACTION_BTN} border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 disabled:opacity-50`}
+                  className={`${ACTION_TEXT_BTN} border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 disabled:opacity-50`}
                 >
                   Log contact
                 </button>
@@ -668,7 +682,7 @@ function OutreachRow({
                         promptNote: true,
                       });
                     }}
-                    className={`${ACTION_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-100 disabled:opacity-50`}
+                    className={`${ACTION_TEXT_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-100 disabled:opacity-50`}
                   >
                     {label}
                   </button>
@@ -682,7 +696,7 @@ function OutreachRow({
             <button
               type="button"
               onClick={openComposer}
-              className={`${ACTION_BTN} border border-amber-400/40 bg-amber-400/15 text-amber-100`}
+              className={`${ACTION_TEXT_BTN} border border-amber-400/40 bg-amber-400/15 text-amber-100`}
             >
               Register
             </button>

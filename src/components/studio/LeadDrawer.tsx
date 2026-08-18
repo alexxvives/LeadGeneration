@@ -1008,7 +1008,9 @@ export function LeadDrawer(props: DrawerProps) {
                             ? missed
                               ? "Missed"
                               : "Call"
-                            : "Note";
+                            : kind === "follow_up"
+                              ? "Follow-up"
+                              : "Note";
                       return (
                         <li key={fu.id} className="flex items-start gap-2">
                           {isFollow ? (
@@ -1045,7 +1047,7 @@ export function LeadDrawer(props: DrawerProps) {
                           >
                             <span className="font-semibold text-mist-100">
                               {formatNoteDate(fu.date)}
-                              {isFollow ? "" : ` · ${kindLabel}`}
+                              {` · ${kindLabel}`}
                               :
                             </span>{" "}
                             {fu.note || "—"}

@@ -94,11 +94,12 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     Table shows a short city label; the drawer keeps the full scraped address
     when available (or a Google search plan-B when no website).
 
-  - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (Create /
-    Review / Approve / Send; unapproved drafts stay here) → **Ready** (after
-    Approve) → **Contacted**. Phone-only Ready rows have **Call**, which opens
-    the call log without leaving Ready. **Save** or **Skip details** marks
-    Contacted; **Missed call** journals the miss and stays in Ready.
+  - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (icon
+    actions: create/review, approve, send; unapproved drafts stay here) →
+    **Ready** (after Approve; send or call as icons) → **Contacted**.
+    Phone-only Ready rows open a call log without leaving Ready. **Save** or
+    **Skip details** marks Contacted; **Missed call** journals the miss and
+    stays in Ready.
     The same miss path exists from the lead’s **Notes**.
     **Draft all** writes (or rewrites) drafts for every
     non-sent email lead and leaves them in Contact Draft until Approve
@@ -109,9 +110,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
   - **Calendar** (`?view=calendar`) — month view of the active board filter.
     Each day lists **follow-ups** (dated reminders from **Follow up**),
-    **emails sent**, and **phone calls** logged that day. Plain notes stay on
-    the lead only. Click an item to open the lead. Tick a follow-up to mark it
-    done.
+    **emails sent**, and **phone calls** logged that day — shown as calendar /
+    mail / phone icons on the day cell. Plain notes stay on
+    the lead only and never count as follow-ups. Click an item to open the lead.
+    Tick a follow-up to mark it done.
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.

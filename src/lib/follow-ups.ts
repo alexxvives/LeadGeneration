@@ -79,20 +79,34 @@ export function inferFollowUpKind(note: string): FollowUpKind {
   if (isBounceNote(note)) return "note";
   if (isEmailSentNote(note)) return "email";
   if (isPhoneCallNote(note)) return "phone";
-  return "follow_up";
+  return "note";
+}
+
+/** Composer default (“Follow up”) or the auto “Reply received” reminder. */
+function looksLikeFollowUpReminder(note: string): boolean {
+  const t = note.trim();
+  if (/^follow[\s-]?up\b/i.test(t)) return true;
+  if (/^reply received$/i.test(t)) return true;
+  return false;
 }
 
 export function resolveFollowUpKind(fu: FollowUp): FollowUpKind {
   const inferred = inferFollowUpKind(fu.note);
-  // Call / send / bounce text wins over a stored "follow_up" — logging a
-  // phone call via + Follow-up used to save kind: follow_up (the checkbox).
+  // Call / send / bounce text wins over a stored kind — logging a phone
+  // call via Follow up used to save kind: follow_up (the checkbox).
   if (inferred === "phone" || inferred === "email") return inferred;
   if (isBounceNote(fu.note)) return "note";
-  if (fu.kind) return fu.kind;
-  // Legacy rows with no kind: completed journal lines are notes, open ones
-  // are reminders (otherwise every undated comment became "1 follow-up").
-  if (fu.done) return "note";
-  return inferred;
+  if (fu.kind === "note" || fu.kind === "email" || fu.kind === "phone") {
+    return fu.kind;
+  }
+  // Explicit Follow up control: default copy, or a future date (composer +7d).
+  // Older drawer notes were stored as kind: follow_up — those are notes.
+  if (fu.kind === "follow_up") {
+    if (looksLikeFollowUpReminder(fu.note)) return "follow_up";
+    if (fu.date > todayIsoDate()) return "follow_up";
+    return "note";
+  }
+  return "note";
 }
 
 /** User-authored reminder — not a note, send, call, or bounce. */

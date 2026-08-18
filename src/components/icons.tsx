@@ -36,6 +36,27 @@ export function MailIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Paper plane — send / approve-and-send. */
+export function SendIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path
+        d="M3.5 11.2 20.5 4.4l-6.6 17.2-2.6-7.2-7.8-3.2Z"
+        strokeLinejoin="round"
+      />
+      <path d="m11.3 14.4 8.4-9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function PlusIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function CheckIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" {...props}>

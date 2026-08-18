@@ -113,7 +113,7 @@ token becomes the page color in light mode).
 
 ## Icons
 All icons live in `src/components/icons.tsx` — inline SVG, no dependency.
-Available: `SearchIcon ArrowIcon MailIcon CheckIcon XIcon GlobeIcon PhoneIcon
+Available: `SearchIcon ArrowIcon MailIcon SendIcon PlusIcon CheckIcon XIcon GlobeIcon PhoneIcon
 SparkIcon StarIcon ShieldIcon SettingsIcon EyeIcon EyeOffIcon CalendarIcon`.
 Add new icons there (same pattern: `SVGProps<SVGSVGElement>`, `currentColor`).
 

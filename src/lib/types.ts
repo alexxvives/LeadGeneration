@@ -56,8 +56,10 @@ export function normalizeCrmStage(raw: unknown): CrmStage {
 export type ContactMethod = "email" | "phone" | "contact_form";
 
 /**
- * Calendar / journal kind. Legacy rows omit this — `resolveFollowUpKind`
- * infers from the note text.
+ * Calendar / journal kind. A **note** is a log line; a **follow_up** is a
+ * dated reminder (Calendar + pipeline chip). Legacy rows omit this —
+ * `resolveFollowUpKind` infers from the note text (never treat a comment
+ * as a reminder unless it was created via Follow up).
  */
 export type FollowUpKind = "follow_up" | "note" | "email" | "phone";
 

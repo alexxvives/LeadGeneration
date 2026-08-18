@@ -9,17 +9,16 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-18 (Pipeline / Outreach polish)
+## ⏱️ Status — updated 2026-08-18 (Calendar marks + notes ≠ follow-ups)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Outreach Contacted: channel tags are icons again (not Email/Phone text).
-- Pipeline: "1 note" for journal notes; pending follow-up is a violet chip.
-  Calendar follow-ups are violet to match.
-- Lead names: strip emojis/quotes/decorative punctuation on scrape, import,
-  and existing rows when a board loads.
+- Calendar days: mail / phone / calendar icons instead of tiny dots.
+- Outreach Review / Approve / Send / Call are icon buttons.
+- Pipeline follow-up chip only for real reminders — legacy journal lines
+  (e.g. Dra. Barriga) count as notes.
 
 ### Next
 1. Deploy after `tsc`/`lint` green.

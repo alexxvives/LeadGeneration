@@ -11,6 +11,7 @@ import {
   type CalendarEvent,
 } from "@/lib/follow-ups";
 import {
+  CalendarIcon,
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -54,11 +55,35 @@ function monthLabel(year: number, month: number): string {
 function KindMark({ kind }: { kind: FollowUpKind }) {
   if (kind === "email") return <MailIcon className="h-3.5 w-3.5" aria-hidden />;
   if (kind === "phone") return <PhoneIcon className="h-3.5 w-3.5" aria-hidden />;
+  if (kind === "follow_up") {
+    return <CalendarIcon className="h-3.5 w-3.5" aria-hidden />;
+  }
   return (
     <span
-      className={`inline-block h-2 w-2 rounded-full ${KIND_DOT[kind]}`}
+      className={`inline-block h-2.5 w-2.5 rounded-full ${KIND_DOT[kind]}`}
       aria-hidden
     />
+  );
+}
+
+function DayKindMark({ kind }: { kind: FollowUpKind }) {
+  if (kind === "email") {
+    return (
+      <MailIcon className="h-3.5 w-3.5 text-aurora-400 drop-shadow-[0_0_4px_rgba(52,211,153,0.45)]" aria-hidden />
+    );
+  }
+  if (kind === "phone") {
+    return (
+      <PhoneIcon className="h-3.5 w-3.5 text-sky-400 drop-shadow-[0_0_4px_rgba(56,189,248,0.45)]" aria-hidden />
+    );
+  }
+  if (kind === "follow_up") {
+    return (
+      <CalendarIcon className="h-3.5 w-3.5 text-violet-300 drop-shadow-[0_0_4px_rgba(167,139,250,0.55)]" aria-hidden />
+    );
+  }
+  return (
+    <span className={`h-2.5 w-2.5 rounded-full ${KIND_DOT[kind]}`} aria-hidden />
   );
 }
 
@@ -252,12 +277,9 @@ export function CalendarView({
                     {cell.day}
                   </span>
                   {kinds.length > 0 ? (
-                    <span className="mt-auto flex flex-wrap items-center gap-0.5 pt-1">
+                    <span className="mt-auto flex flex-wrap items-center gap-1 pt-1">
                       {kinds.map((k) => (
-                        <span
-                          key={k}
-                          className={`h-1.5 w-1.5 rounded-full ${KIND_DOT[k]}`}
-                        />
+                        <DayKindMark key={k} kind={k} />
                       ))}
                       {pending > 0 ? (
                         <span className="sr-only">
@@ -274,15 +296,15 @@ export function CalendarView({
 
         <ul className="mt-3 flex shrink-0 flex-wrap items-center justify-center gap-4 text-[11px] text-mist-400">
           <li className="inline-flex items-center gap-1.5">
-            <span className={`h-2 w-2 rounded-full ${KIND_DOT.follow_up}`} />
+            <CalendarIcon className="h-3.5 w-3.5 text-violet-300" aria-hidden />
             Follow-up
           </li>
           <li className="inline-flex items-center gap-1.5">
-            <span className={`h-2 w-2 rounded-full ${KIND_DOT.email}`} />
+            <MailIcon className="h-3.5 w-3.5 text-aurora-400" aria-hidden />
             Email sent
           </li>
           <li className="inline-flex items-center gap-1.5">
-            <span className={`h-2 w-2 rounded-full ${KIND_DOT.phone}`} />
+            <PhoneIcon className="h-3.5 w-3.5 text-sky-400" aria-hidden />
             Phone call
           </li>
         </ul>
