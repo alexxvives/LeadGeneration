@@ -26,6 +26,7 @@ Browser tools available (Playwright MCP / chrome-devtools). Target URL + scope f
 - `/app?view=pipeline` Pipeline kanban
 - `/app?view=leads` All leads (table/cards/map)
 - `/app?view=outreach` Outreach queue
+- `/app?view=calendar` Follow-ups / sends / calls
 - Lead drawer: draft → approve → send (HITL)
 - Settings sending identity
 

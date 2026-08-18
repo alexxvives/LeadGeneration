@@ -17,6 +17,7 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
 import { displayWebsite } from "@/lib/website";
+import { isUserFollowUp } from "@/lib/follow-ups";
 import { Bone, useStableDuringLoad } from "./skeletons";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
@@ -429,7 +430,8 @@ function DraggablePipelineCard({
   isDragging: boolean;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
-  const pendingFollowUps = lead.followUps?.filter((f) => !f.done).length ?? 0;
+  const pendingFollowUps =
+    lead.followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
   const subtitle = cardSubtitle(lead);
   const replied = lead.outreach?.deliveryStatus === "replied";
   const bounced = lead.outreach?.deliveryStatus === "bounced";

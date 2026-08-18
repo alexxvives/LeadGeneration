@@ -24,6 +24,7 @@ import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
 import { PipelineView } from "./PipelineView";
 import { OutreachView } from "./OutreachView";
+import { CalendarView } from "./CalendarView";
 import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
@@ -32,6 +33,7 @@ import {
   LeadsLayoutSkeleton,
   OutreachSkeleton,
   PipelineSkeleton,
+  CalendarSkeleton,
   useDeferredLoading,
 } from "./skeletons";
 import { recordWarmupSend } from "@/lib/email/warmup";
@@ -76,6 +78,7 @@ type StudioView =
   | "pipeline"
   | "leads"
   | "outreach"
+  | "calendar"
   | "runs"
   | "dashboard"
   | "boards"
@@ -143,6 +146,7 @@ function viewFromParams(view: string | null): StudioView {
   if (view === "pipeline") return "pipeline";
   if (view === "leads") return "leads";
   if (view === "outreach") return "outreach";
+  if (view === "calendar") return "calendar";
   if (view === "runs") return "runs";
   if (view === "dashboard") return "dashboard";
   if (view === "boards") return "boards";
@@ -166,6 +170,7 @@ function queryForView(next: StudioView, boardId?: string | null): string {
   if (next === "pipeline") params.set("view", "pipeline");
   else if (next === "leads") params.set("view", "leads");
   else if (next === "outreach") params.set("view", "outreach");
+  else if (next === "calendar") params.set("view", "calendar");
   else if (next === "runs") params.set("view", "runs");
   else if (next === "dashboard") params.set("view", "dashboard");
   else if (next === "boards") params.set("view", "boards");
@@ -789,6 +794,7 @@ export function Studio() {
       view === "pipeline" ||
       view === "leads" ||
       view === "outreach" ||
+      view === "calendar" ||
       view === "board" ||
       view === "runs";
     if (!needsLeads || !boardLiteRef.current) return;
@@ -1849,7 +1855,10 @@ export function Studio() {
   const canSearchLive = board?.capabilities.canSearchLive ?? false;
   /** Pipeline / outreach / leads fill the shell; other views scroll inside it. */
   const fillViewport =
-    view === "pipeline" || view === "outreach" || view === "leads";
+    view === "pipeline" ||
+    view === "outreach" ||
+    view === "leads" ||
+    view === "calendar";
   const showLeadSearch =
     hasLeads &&
     (view === "leads" || view === "pipeline" || view === "outreach");
@@ -1871,6 +1880,7 @@ export function Studio() {
     view === "pipeline" ||
     view === "leads" ||
     view === "outreach" ||
+    view === "calendar" ||
     view === "runs";
   if (loading && !board && needsBoardPayload) {
     return <StudioViewSkeleton view={view} />;
@@ -1954,6 +1964,8 @@ export function Studio() {
                       ? "Leads"
                       : view === "outreach"
                         ? "Outreach"
+                        : view === "calendar"
+                          ? "Calendar"
                         : view === "runs"
                           ? "Search runs"
                           : view === "admin"
@@ -1984,6 +1996,8 @@ export function Studio() {
                     ? "All prospects on this board — filter, edit, and export."
                     : view === "outreach"
                       ? "Draft, approve, and send outreach one lead at a time."
+                      : view === "calendar"
+                        ? "Follow-ups, emails sent, and phone calls — day by day."
                       : view === "runs"
                         ? "History of searches in this workspace."
                         : view === "admin"
@@ -2430,6 +2444,30 @@ export function Studio() {
               }}
               onDraftAll={onDraftAllOutreach}
               onMarkContacted={onMarkContacted}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Calendar — follow-ups, sends, and calls by day */}
+      {view === "calendar" && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {loading || leadsHydrating || !board ? (
+            <div role="status" aria-busy="true" aria-label="Loading calendar">
+              <CalendarSkeleton />
+            </div>
+          ) : (
+            <CalendarView
+              leads={board.leads}
+              onOpenLead={openInfo}
+              onToggleFollowUp={(leadId, fuId, done) => {
+                const lead = board.leads.find((l) => l.id === leadId);
+                if (!lead) return;
+                const followUps = (lead.followUps ?? []).map((f) =>
+                  f.id === fuId ? { ...f, done } : f,
+                );
+                void onUpdateLeadCrm(leadId, { followUps });
+              }}
             />
           )}
         </div>

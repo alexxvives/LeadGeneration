@@ -19,7 +19,13 @@ import {
 } from "@/components/icons";
 import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
-import { collapseEmailSentFollowUps } from "@/lib/follow-ups";
+import {
+  collapseEmailSentFollowUps,
+  followUpKindLabel,
+  formatNoteDate,
+  resolveFollowUpKind,
+  todayIsoDate,
+} from "@/lib/follow-ups";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
 import { toggleContactMethod } from "@/lib/contact-methods";
@@ -33,31 +39,6 @@ function sameDraft(
     a.body === b.body &&
     a.toEmail === b.toEmail
   );
-}
-
-function todayIsoDate(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/** "1st March 2025" style for note journal lines. */
-function formatNoteDate(iso: string): string {
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  const day = d.getDate();
-  const ord =
-    day % 10 === 1 && day !== 11
-      ? "st"
-      : day % 10 === 2 && day !== 12
-        ? "nd"
-        : day % 10 === 3 && day !== 13
-          ? "rd"
-          : "th";
-  const month = d.toLocaleString("en-GB", { month: "long" });
-  return `${day}${ord} ${month} ${d.getFullYear()}`;
 }
 
 interface DrawerProps {
@@ -225,7 +206,8 @@ export function LeadDrawer(props: DrawerProps) {
         id: newId("fu"),
         date: sentDay,
         note: actor ? `Email sent by ${actor}` : "Email sent",
-        done: false,
+        done: true,
+        kind: "email",
       },
       ...collapsed,
     ];
@@ -356,7 +338,13 @@ export function LeadDrawer(props: DrawerProps) {
   const addNote = async () => {
     const text = newNoteText.trim();
     if (!newNoteDate || !text) return;
-    const fu: FollowUp = { id: newId("fu"), date: newNoteDate, note: text, done: false };
+    const fu: FollowUp = {
+      id: newId("fu"),
+      date: newNoteDate,
+      note: text,
+      done: false,
+      kind: "follow_up",
+    };
     const updated = [...followUps, fu];
     setFollowUps(updated);
     setShowAddNote(false);
@@ -364,6 +352,14 @@ export function LeadDrawer(props: DrawerProps) {
     setNewNoteText("");
     await props.onUpdateCrm(lead.id, { followUps: updated, notes: null });
     if (promptNote) props.onPromptNoteDone?.();
+  };
+
+  const toggleFollowUpDone = async (fuId: string) => {
+    const updated = followUps.map((f) =>
+      f.id === fuId ? { ...f, done: !f.done } : f,
+    );
+    setFollowUps(updated);
+    await props.onUpdateCrm(lead.id, { followUps: updated });
   };
 
   const deleteFollowUp = async (fuId: string) => {
@@ -671,7 +667,12 @@ export function LeadDrawer(props: DrawerProps) {
           {/* Notes column — grows independently so the left profile stays readable */}
           <aside className="flex min-h-0 flex-col border-t border-white/5 bg-ink-950/40 sm:border-l sm:border-t-0">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/5 px-4 py-3">
-              <SectionLabel>Notes</SectionLabel>
+              <div>
+                <SectionLabel>Notes</SectionLabel>
+                <p className="mt-0.5 text-[11px] text-mist-500">
+                  Dated follow-ups appear on Calendar
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -680,7 +681,7 @@ export function LeadDrawer(props: DrawerProps) {
                 }}
                 className="text-[11px] text-aurora-400 hover:underline"
               >
-                + Add
+                + Follow-up
               </button>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
@@ -726,18 +727,23 @@ export function LeadDrawer(props: DrawerProps) {
 
               {showAddNote && (
                 <div className="space-y-2 rounded-xl border border-white/10 bg-ink-900/60 p-3">
-                  <input
-                    type="date"
-                    value={newNoteDate}
-                    onChange={(e) => setNewNoteDate(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
-                  />
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] uppercase tracking-wider text-mist-500">
+                      Follow up on
+                    </span>
+                    <input
+                      type="date"
+                      value={newNoteDate}
+                      onChange={(e) => setNewNoteDate(e.target.value)}
+                      className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+                    />
+                  </label>
                   <textarea
                     ref={noteInputRef}
                     value={newNoteText}
                     onChange={(e) => setNewNoteText(e.target.value)}
                     rows={3}
-                    placeholder="What happened…"
+                    placeholder="Call back, send a recap…"
                     className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60"
                   />
                   <div className="flex flex-wrap gap-2">
@@ -780,30 +786,75 @@ export function LeadDrawer(props: DrawerProps) {
 
               {followUps.length === 0 && !showAddNote ? (
                 <p className="text-xs text-mist-600">
-                  No notes yet. Add a dated entry (defaults to today).
+                  No notes yet. Add a dated follow-up — it shows on Calendar
+                  with sends and calls.
                 </p>
               ) : (
                 <ul className="space-y-2">
                   {[...followUps]
-                    .sort((a, b) => a.date.localeCompare(b.date))
-                    .map((fu) => (
-                      <li key={fu.id} className="flex items-start gap-2">
-                        <p className="min-w-0 flex-1 text-sm leading-relaxed text-mist-300">
-                          <span className="font-semibold text-mist-100">
-                            {formatNoteDate(fu.date)}:
-                          </span>{" "}
-                          {fu.note || "—"}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => void deleteFollowUp(fu.id)}
-                          className="mt-0.5 text-mist-600 hover:text-rose-400"
-                          aria-label="Delete note"
-                        >
-                          <XIcon className="h-3 w-3" />
-                        </button>
-                      </li>
-                    ))}
+                    .sort((a, b) => {
+                      if (a.done !== b.done) return a.done ? 1 : -1;
+                      return b.date.localeCompare(a.date);
+                    })
+                    .map((fu) => {
+                      const kind = resolveFollowUpKind(fu);
+                      const isFollow = kind === "follow_up";
+                      return (
+                        <li key={fu.id} className="flex items-start gap-2">
+                          {isFollow ? (
+                            <button
+                              type="button"
+                              onClick={() => void toggleFollowUpDone(fu.id)}
+                              aria-pressed={fu.done}
+                              aria-label={
+                                fu.done
+                                  ? "Mark follow-up not done"
+                                  : "Mark follow-up done"
+                              }
+                              className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                                fu.done
+                                  ? "border-aurora-400/40 bg-aurora-400/20 text-aurora-200"
+                                  : "border-white/15 text-mist-500 hover:border-amber-400/40"
+                              }`}
+                            >
+                              {fu.done ? <CheckIcon className="h-3 w-3" /> : null}
+                            </button>
+                          ) : (
+                            <span
+                              className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                                kind === "email"
+                                  ? "bg-aurora-400/15 text-aurora-200"
+                                  : "bg-sky-400/15 text-sky-200"
+                              }`}
+                            >
+                              {kind === "email" ? "Email" : "Call"}
+                            </span>
+                          )}
+                          <p
+                            className={`min-w-0 flex-1 text-sm leading-relaxed ${
+                              fu.done
+                                ? "text-mist-500 line-through"
+                                : "text-mist-300"
+                            }`}
+                          >
+                            <span className="font-semibold text-mist-100">
+                              {formatNoteDate(fu.date)}
+                              {isFollow ? "" : ` · ${followUpKindLabel(kind)}`}
+                              :
+                            </span>{" "}
+                            {fu.note || "—"}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void deleteFollowUp(fu.id)}
+                            className="mt-0.5 text-mist-600 hover:text-rose-400"
+                            aria-label="Delete note"
+                          >
+                            <XIcon className="h-3 w-3" />
+                          </button>
+                        </li>
+                      );
+                    })}
                 </ul>
               )}
             </div>

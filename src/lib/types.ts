@@ -55,12 +55,19 @@ export function normalizeCrmStage(raw: unknown): CrmStage {
 /** How a prospect was first reached. Set when crmStage → "contacted". */
 export type ContactMethod = "email" | "phone" | "contact_form";
 
-/** A single follow-up reminder on a lead. */
+/**
+ * Calendar / journal kind. Legacy rows omit this — `resolveFollowUpKind`
+ * infers from the note text.
+ */
+export type FollowUpKind = "follow_up" | "email" | "phone";
+
+/** A dated journal line: scheduled follow-up, email send, or phone call. */
 export interface FollowUp {
   id: string;
   date: string;      // ISO date string, e.g. "2026-08-01"
   note: string;
   done: boolean;
+  kind?: FollowUpKind;
 }
 
 export type OutreachStatus =
@@ -404,7 +411,7 @@ export interface Lead {
   contactedByUserId: string | null;
   contactedByName: string | null;
   notes: string | null; // legacy freeform; prefer dated followUps journal
-  followUps: FollowUp[]; // dated notes / follow-up journal entries
+  followUps: FollowUp[]; // dated notes / follow-ups / send & call log (Calendar)
   /** User-defined table column values (column id → string). */
   customFields: Record<string, string>;
   createdAt: string;

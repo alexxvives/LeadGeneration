@@ -77,7 +77,7 @@ import {
   contactMethodsEqual,
   contactMethodsFollowUpNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, inferFollowUpKind } from "@/lib/follow-ups";
 import {
   companyGuessFromEmail,
   isFreeMailDomain,
@@ -1518,7 +1518,8 @@ export async function sendApprovedOutreach(
             id: newId("fu"),
             date: today,
             note: emailSentNote,
-            done: false,
+            done: true,
+            kind: "email",
           },
           ...followUps,
         ];
@@ -1722,7 +1723,13 @@ export async function setOutreachDeliveryStatus(
       );
       if (!hasReplyNote) {
         patch.followUps = [
-          { id: newId("fu"), date: today, note: "Reply received", done: false },
+          {
+            id: newId("fu"),
+            date: today,
+            note: "Reply received",
+            done: false,
+            kind: "follow_up",
+          },
           ...existingFu,
         ];
       }
@@ -1763,7 +1770,13 @@ export async function setOutreachDeliveryStatus(
       );
       if (!hasBounceNote) {
         patch.followUps = [
-          { id: newId("fu"), date: today, note: bounceNote, done: false },
+          {
+            id: newId("fu"),
+            date: today,
+            note: bounceNote,
+            done: false,
+            kind: "follow_up",
+          },
           ...existingFu,
         ];
       }
@@ -2305,8 +2318,17 @@ export async function updateLeadCrm(
       (f) => f.note.trim().toLowerCase() === note.toLowerCase() && f.date === today,
     );
     if (!already) {
+      const kind = patch.contactMethods.includes("phone")
+        ? "phone"
+        : inferFollowUpKind(note);
       next.followUps = [
-        { id: newId("fu"), date: today, note, done: false },
+        {
+          id: newId("fu"),
+          date: today,
+          note,
+          done: kind !== "follow_up",
+          kind,
+        },
         ...existing,
       ];
     }

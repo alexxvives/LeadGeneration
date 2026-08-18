@@ -58,7 +58,7 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   when set). `/login` only redirects here (Auth.js `pages.signIn`). Unauth
   `/app` → `/?signin=1&callbackUrl=/app`.
 - **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar
-  nav: **Dashboard · Search · Pipeline · Leads · Outreach · Runs · Boards**.
+  nav: **Dashboard · Search · Pipeline · Leads · Outreach · Calendar · Runs · Boards**.
   Board filter (**All** or one board) sits above the account card. Settings
   opens from the **account card** at the bottom of the sidebar (not a Workspace
   nav item). **Platform admins** get a slim ops nav (**Dashboard · Users**) and
@@ -101,6 +101,11 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     board’s linked outreach profile. Send remains per-lead after approve
     (constitution Art. I.1).
 
+  - **Calendar** (`?view=calendar`) — month view of the active board filter.
+    Each day lists **follow-ups** (from the lead drawer notes, with a date),
+    **emails sent**, and **phone calls** logged that day. Click an item to
+    open the lead. Tick a follow-up to mark it done.
+
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.
 
@@ -112,8 +117,9 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     Settings → Boards.
 
   - **Lead detail drawer** — opens from any lead card/row/pin. Contact info
-    (incl. full address), about blurb, fit-score reasons, CRM stage, dated notes
-    journal, and the outreach composer (draft → edit → approve → send).
+    (incl. full address), about blurb, CRM stage, dated notes journal
+    (**+ Follow-up** registers a dated reminder on Calendar), and the outreach
+    composer (draft → edit → approve → send).
 
 - **`/app/settings`** — sender profile (language flag persists as
   `templateLang` and only changes the **preview** — template editors stay as

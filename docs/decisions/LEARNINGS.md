@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-18 — Calendar tab from dated notes
+- Follow-ups are the existing `Lead.followUps` JSON journal (no new table).
+  User notes from the drawer get `kind: "follow_up"`; sends get `email`;
+  phone contact logs get `phone`. Legacy rows infer kind from note text.
+- Calendar reads slim board leads (follow-ups already on the list payload).
+- Pipeline “N follow-ups” badge now counts only user reminders (`isUserFollowUp`),
+  not “Email sent” / “Contacted by phone” activity lines.
+- Agent rule: push to GitHub after every completed change (`AGENTS.md`).
+
 ### 2026-08-18 — Hide fit UI; delete from drawer; collapse “Email sent”
 - Fit meter / % / “Why this score” removed from Pipeline, Outreach, Leads
   table, cards, and the info drawer. Score still stored; not used to rank.

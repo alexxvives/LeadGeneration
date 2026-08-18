@@ -207,6 +207,33 @@ export function RunsSkeleton() {
   );
 }
 
+export function CalendarSkeleton() {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+      <div className="glass min-w-0 flex-1 rounded-xl2 p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <Bone className="h-7 w-40" />
+          <Bone className="h-8 w-16 rounded-full" />
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({ length: 35 }, (_, i) => (
+            <Bone key={i} className="min-h-[3.25rem] rounded-xl sm:min-h-[4.25rem]" />
+          ))}
+        </div>
+      </div>
+      <div className="glass w-full rounded-xl2 p-5 lg:w-[22rem]">
+        <Bone className="h-3 w-24" />
+        <Bone className="mt-2 h-6 w-36" />
+        <div className="mt-4 space-y-2">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Bone key={i} className="h-16 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PipelineSkeleton() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -729,6 +756,7 @@ export function StudioViewSkeleton({
     | "pipeline"
     | "leads"
     | "outreach"
+    | "calendar"
     | "runs"
     | "dashboard"
     | "boards"
@@ -746,13 +774,15 @@ export function StudioViewSkeleton({
             ? "Leads"
             : view === "outreach"
               ? "Outreach"
-              : view === "runs"
-                ? "Search runs"
-                : view === "admin"
-                  ? "Dashboard"
-                  : view === "admin-users"
-                    ? "Users"
-                    : "Search";
+              : view === "calendar"
+                ? "Calendar"
+                : view === "runs"
+                  ? "Search runs"
+                  : view === "admin"
+                    ? "Dashboard"
+                    : view === "admin-users"
+                      ? "Users"
+                      : "Search";
 
   const showUsage =
     view !== "admin" && view !== "admin-users" && view !== "boards";
@@ -774,6 +804,10 @@ export function StudioViewSkeleton({
       <div className="min-h-0 flex-1">
         <OutreachSkeleton />
       </div>
+    ) : view === "calendar" ? (
+      <div className="min-h-0 flex-1">
+        <CalendarSkeleton />
+      </div>
     ) : view === "runs" ? (
       <RunsSkeleton />
     ) : view === "admin" ? (
@@ -785,7 +819,10 @@ export function StudioViewSkeleton({
     );
 
   const fill =
-    view === "pipeline" || view === "outreach" || view === "leads";
+    view === "pipeline" ||
+    view === "outreach" ||
+    view === "leads" ||
+    view === "calendar";
 
   return (
     <main

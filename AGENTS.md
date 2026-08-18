@@ -11,6 +11,10 @@ this repository. Read it first. It is intentionally short: the details live in
 > **Start-of-session:** read [`docs/session-handoff.md`](docs/session-handoff.md)
 > for where we left off, and **update it at the end of any session that changes
 > state.** (You do not need to be told to read it — it's part of this index.)
+>
+> **After every completed change: commit and `git push` to GitHub.** Do this
+> without waiting to be asked. Never force-push `main`/`master`. Skip only when
+> the user explicitly says not to.
 
 ---
 
@@ -74,11 +78,12 @@ Also see [`README.md`](README.md) for setup/run instructions.
      why. Constitution changes need explicit justification.
    Stale documentation is treated as a bug, not a nice-to-have (constitution
    Article V.3).
-8. **Commit and push after every meaningful change (for now).** While we are
-   iterating quickly, end each completed batch of work with a git commit **and**
-   `git push` to the current branch (unless the user says not to). Follow the
-   repo’s commit-message style; never force-push `main`/`master`. Update
-   `docs/session-handoff.md` in the same commit when state changed.
+8. **Always commit and push to GitHub after every change.** After each completed
+   batch of work, create a git commit **and** `git push` to the current branch.
+   Do not wait to be asked. Follow the repo’s commit-message style. Never
+   force-push `main`/`master`. Update `docs/session-handoff.md` in the same
+   commit when state changed. Skip commit/push only when the user explicitly
+   says not to.
 
 ## Commands
 

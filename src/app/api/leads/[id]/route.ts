@@ -47,6 +47,7 @@ const PatchSchema = z.object({
         date: z.string(),
         note: z.string(),
         done: z.boolean(),
+        kind: z.enum(["follow_up", "email", "phone"]).optional(),
       }),
     )
     .optional(),

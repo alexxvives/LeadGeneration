@@ -9,15 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-18 (Hide fit UI + drawer delete)
+## ⏱️ Status — updated 2026-08-18 (Calendar + follow-up notes)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Studio no longer shows fit meters / % / reason lists.
-- Delete lead from the info (and draft) drawer, any view.
-- Collapse duplicate “Email sent” + “Email sent by alexxvives” journal lines.
+- Lead drawer **+ Follow-up** saves a dated reminder on the lead (registered in
+  `followUps`). Sends and phone logs already journal the same way.
+- New studio **Calendar** tab (`?view=calendar`): month grid of follow-ups,
+  emails sent, and phone calls. Click an item to open the lead; tick follow-ups
+  done.
+- `AGENTS.md`: commit **and** `git push` after every change (no waiting to be asked).
 
 ### Next
 1. Deploy after `tsc`/`lint` green.
