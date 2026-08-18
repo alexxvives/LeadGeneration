@@ -9,6 +9,8 @@
  *   2. Refine unique city/region keys (capped).
  *   3. Background street-level refine for every unique full address (batched;
  *      pins update as each batch lands so markers move to exact spots).
+ *   Hydrate paging adds pins in place and keeps the current zoom. Viewport
+ *   only resets when the board (or location hint) changes.
  *
  * Important: Leaflet mutates the DOM node passed to L.map(). We keep a nested
  * `mapEl` that React never reconciles children into, and we clear `_leaflet_id`
@@ -145,10 +147,13 @@ function buildPinsAround(
 export function LeadMap({
   leads,
   locationHint,
+  boardId,
   onOpen,
 }: {
   leads: LeadWithOutreach[];
   locationHint: string | null;
+  /** Board switch (not hydrate paging) resets pins + viewport. */
+  boardId?: string | null;
   onOpen: (id: string) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -156,6 +161,10 @@ export function LeadMap({
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
   const didFitRef = useRef(false);
+  const geoGenRef = useRef(0);
+  const resetKeyRef = useRef("");
+  const centersRef = useRef(new Map<string, Coords>());
+  const exactRef = useRef(new Map<string, Coords>());
   const onOpenRef = useRef(onOpen);
   onOpenRef.current = onOpen;
 
@@ -199,24 +208,61 @@ export function LeadMap({
     return String(h);
   }, [mapLeads]);
 
+  // Board identity — hydrate paging and hint fallback must not reset zoom.
+  const resetKey = boardId ?? "";
+
   useEffect(() => {
     let cancelled = false;
-    didFitRef.current = false;
-    (async () => {
-      setLoadingPins(true);
+    const boardChanged = resetKeyRef.current !== resetKey;
+    if (boardChanged) {
+      resetKeyRef.current = resetKey;
+      geoGenRef.current += 1;
+      centersRef.current = new Map();
+      exactRef.current = new Map();
+      didFitRef.current = false;
+      setPins([]);
       setRemaining(0);
+      setLoadingPins(true);
+    }
+    const gen = geoGenRef.current;
+    const centers = centersRef.current;
+    const exact = exactRef.current;
+    const stillThisRun = () => !cancelled && gen === geoGenRef.current;
+
+    (async () => {
       const hintLower = hint.trim().toLowerCase();
       const base = hint ? await geocode(hint) : null;
-      if (cancelled) return;
+      if (!stillThisRun()) return;
 
-      // Seed city centers from the board hint + each lead's own city key.
-      const centers = new Map<string, Coords>();
       if (base && hintLower) centers.set(cityKey(hint), base);
 
-      const emptyPending = new Set<string>();
-      const immediate = applyPins(centers, undefined, {
-        refining: false,
-        streetPending: emptyPending,
+      const cities = new Set<string>();
+      const streets: string[] = [];
+      const seenStreet = new Set<string>();
+      for (const l of mapLeads) {
+        const loc = l.location?.trim();
+        if (!loc) continue;
+        const key = cityKey(loc);
+        if (key && !centers.has(key)) cities.add(key);
+        if (!isStreetCandidate(loc)) continue;
+        const locKey = loc.toLowerCase();
+        if (seenStreet.has(locKey)) continue;
+        seenStreet.add(locKey);
+        streets.push(locKey);
+      }
+
+      for (const loc of streets) {
+        if (exact.has(loc)) continue;
+        const cached = peekGeocodeCache(loc);
+        if (cached) exact.set(loc, cached);
+      }
+
+      const streetPending = new Set(
+        streets.filter((loc) => !exact.has(loc)),
+      );
+      const immediate = applyPins(centers, exact, {
+        refining: streetPending.size > 0,
+        streetPending,
       });
       setError(
         immediate.pins.length === 0 && immediate.remaining === mapLeads.length
@@ -225,73 +271,39 @@ export function LeadMap({
       );
       setLoadingPins(false);
 
-      // Refine: unique city/region keys only (not every street), capped + pooled.
-      const cities = new Set<string>();
-      for (const l of mapLeads) {
-        const loc = l.location?.trim();
-        if (!loc) continue;
-        const key = cityKey(loc);
-        if (key && !centers.has(key)) cities.add(key);
-      }
       const toResolve = [...cities].slice(0, MAX_CITY_GEOCODES);
-
-      // Street-level: every unique full address, in background batches.
-      const streets: string[] = [];
-      const seenStreet = new Set<string>();
-      for (const l of mapLeads) {
-        const loc = l.location?.trim();
-        if (!loc || !isStreetCandidate(loc)) continue;
-        const key = loc.toLowerCase();
-        if (seenStreet.has(key)) continue;
-        seenStreet.add(key);
-        streets.push(key);
-      }
-
-      const needRefine = toResolve.length > 0 || streets.length > 0;
-      if (!needRefine) return;
-
       if (toResolve.length > 0) {
         await mapPool(toResolve, GEOCODE_CONCURRENCY, async (key) => {
-          if (cancelled) return;
+          if (!stillThisRun()) return;
           const coords = await geocode(key);
-          if (coords) centers.set(key, coords);
+          if (coords && stillThisRun()) centers.set(key, coords);
         });
-        if (cancelled) return;
-        applyPins(centers, undefined, {
-          refining: true,
-          streetPending: new Set(streets),
+        if (!stillThisRun()) return;
+        applyPins(centers, exact, {
+          refining: streetPending.size > 0,
+          streetPending,
         });
       }
 
-      const exact = new Map<string, Coords>();
-      const pending: string[] = [];
-      for (const loc of streets) {
-        const cached = peekGeocodeCache(loc);
-        if (cached === undefined) {
-          pending.push(loc);
-        } else if (cached) {
-          exact.set(loc, cached);
-        }
-      }
-      const streetPending = new Set(pending);
-      applyPins(centers, exact, { refining: true, streetPending });
-
+      const pending = streets.filter((loc) => !exact.has(loc));
       for (let i = 0; i < pending.length; i += STREET_BATCH) {
-        if (cancelled) return;
+        if (!stillThisRun()) return;
         const batch = pending.slice(i, i + STREET_BATCH);
         await mapPool(batch, GEOCODE_CONCURRENCY, async (loc) => {
-          if (cancelled) return;
+          if (!stillThisRun()) return;
           const coords = await geocode(loc);
+          if (!stillThisRun()) return;
           if (coords) exact.set(loc, coords);
           streetPending.delete(loc);
         });
-        if (cancelled) return;
+        if (!stillThisRun()) return;
         applyPins(centers, exact, { refining: true, streetPending });
         if (i + STREET_BATCH < pending.length) {
           await new Promise((r) => setTimeout(r, STREET_BATCH_PAUSE_MS));
         }
       }
 
+      if (!stillThisRun()) return;
       applyPins(centers, exact, {
         refining: false,
         streetPending: new Set(),
@@ -301,7 +313,7 @@ export function LeadMap({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadKey, hint]);
+  }, [leadKey, hint, resetKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -411,8 +423,8 @@ export function LeadMap({
         latLngs.push([pin.coords.lat, pin.coords.lng]);
       }
 
-      // Fit once on first pin set — background street refine updates markers
-      // in place without yanking the viewport.
+      // Fit once on first pin set. Hydrate paging and street refine only
+      // add/move markers — they must not reset zoom or pan.
       if (!didFitRef.current && latLngs.length > 0) {
         didFitRef.current = true;
         if (latLngs.length === 1) {
@@ -424,7 +436,6 @@ export function LeadMap({
           });
         }
       }
-      setTimeout(() => mapRef.current?.invalidateSize(), 80);
     })();
 
     return () => {

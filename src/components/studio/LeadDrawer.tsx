@@ -1005,7 +1005,7 @@ export function LeadDrawer(props: DrawerProps) {
                               : "bg-sky-400/15 text-sky-200"
                             : kind === "follow_up"
                               ? "bg-violet-400/15 text-violet-200"
-                              : "bg-white/10 text-mist-300";
+                              : "bg-amber-400/15 text-amber-200";
                       const tagText =
                         kind === "email"
                           ? "Email"

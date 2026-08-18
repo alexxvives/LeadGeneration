@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-18 — Note chip amber; outreach hydrate spinner; map zoom
+- Pipeline / drawer / calendar **note** tags are amber again (`bg-amber-400/15`),
+  not gray — follow-ups stay violet.
+- Outreach column titles show a spinner while the board is still paging in.
+- LeadMap was resetting `didFit` and the loading overlay on every hydrate
+  `leadKey` change, so zoom jumped as pages landed. Fit/skeleton now only
+  reset on board or location-hint change; extra pins merge in place.
+
 ### 2026-08-18 — Missed call one-click; note edit; lane hydrate
 - Missed call from Notes saves immediately (prefix only) — no “Stays in Ready”
   banner, no textarea. Connected-call composer caret starts after

@@ -9,15 +9,15 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-18 (Missed call + lane hydrate)
+## ⏱️ Status — updated 2026-08-18 (Note color + map zoom)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Missed call: one click, no composer/banner. Call caret after the prefix.
-- Notes: edit + delete. Outreach action icons ~60% smaller.
-- Lead hydrate: 50 per Pipeline/Outreach lane, then background pages.
+- Pipeline note chip is amber again (not gray).
+- Outreach Contact Draft / Ready / Contacted headers spin while hydrating.
+- Map keeps zoom/pan as more leads page in; refit only on board change.
 
 ### Next
 1. Deploy after `tsc`/`lint` green.

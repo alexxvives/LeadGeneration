@@ -23,14 +23,14 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 const KIND_DOT: Record<FollowUpKind, string> = {
   follow_up: "bg-violet-400",
-  note: "bg-mist-500",
+  note: "bg-amber-400",
   email: "bg-aurora-400",
   phone: "bg-sky-400",
 };
 
 const KIND_CHIP: Record<FollowUpKind, string> = {
   follow_up: "bg-violet-400/15 text-violet-200",
-  note: "bg-white/10 text-mist-300",
+  note: "bg-amber-400/15 text-amber-200",
   email: "bg-aurora-400/15 text-aurora-200",
   phone: "bg-sky-400/15 text-sky-200",
 };

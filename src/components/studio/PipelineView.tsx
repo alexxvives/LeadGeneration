@@ -497,7 +497,7 @@ function DraggablePipelineCard({
             </span>
           ) : null}
           {noteCount > 0 ? (
-            <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-mist-300">
+            <span className="shrink-0 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
               {noteCount} note{noteCount === 1 ? "" : "s"}
             </span>
           ) : null}

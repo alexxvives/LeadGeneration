@@ -92,7 +92,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     cards / map) with a shared **Pipeline** stage filter; Notes + Type columns
     always on. Pipeline header menu sorts or filters by stage. **Export Excel**.
     Table shows a short city label; the drawer keeps the full scraped address
-    when available (or a Google search plan-B when no website).
+    when available (or a Google search plan-B when no website). Map pins
+    accumulate as the board hydrates; zoom/pan stay put until you change board.
 
   - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (icon
     actions: create/review, approve, send; unapproved drafts stay here) →

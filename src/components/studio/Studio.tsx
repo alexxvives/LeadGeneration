@@ -2392,6 +2392,7 @@ export function Studio() {
                     <LeadMap
                       leads={mapLeads}
                       locationHint={board.run?.location ?? null}
+                      boardId={board.activeBoardId}
                       onOpen={openInfo}
                     />
                   </div>
