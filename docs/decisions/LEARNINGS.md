@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-18 — Call notes vs email notes; missed calls
+- Toggling both email + phone used to write one “Contacted via email, phone”
+  line. Journal only the channel just added; phone never auto-writes — the
+  drawer prefills `Phone call by {user}:` (or `Missed call by {user}:`).
+- Outreach Contacted: drop the Sent timestamp; show Email and Phone tags.
+- Ready phone-only: Call + Missed. Sidebar nav ~15% smaller. Type filter
+  chevron uses ChevronDownIcon (the ▾ at 10px was the tiny arrow).
+
 ### 2026-08-18 — Calendar tab from dated notes
 - Follow-ups are the existing `Lead.followUps` JSON journal (no new table).
   User notes from the drawer get `kind: "follow_up"`; sends get `email`;

@@ -2,6 +2,7 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   api,
   LEAD_PAGE_CHUNK,
@@ -186,6 +187,11 @@ function queryForView(next: StudioView, boardId?: string | null): string {
 export function Studio() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
+  const actorName =
+    (session?.user?.name as string | undefined)?.trim() ||
+    (session?.user?.email as string | undefined)?.split("@")[0] ||
+    null;
   const rawView = searchParams.get("view");
   const view = viewFromParams(rawView);
   const boardParam = searchParams.get("board");
@@ -207,7 +213,9 @@ export function Studio() {
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
-  const [drawerPromptNote, setDrawerPromptNote] = useState(false);
+  const [drawerPromptNote, setDrawerPromptNote] = useState<
+    false | "call" | "missed"
+  >(false);
   const [layout, setLayout] = useState<LeadsLayout>("table");
   /** Toggle highlight — updates urgently; `layout` (pane) may lag in a transition. */
   const [layoutTab, setLayoutTab] = useState<LeadsLayout>("table");
@@ -1531,19 +1539,27 @@ export function Studio() {
   const onMarkContacted = async (
     leadId: string,
     method: ContactMethod,
-    opts?: { promptNote?: boolean },
+    opts?: { promptNote?: boolean; missed?: boolean },
   ) => {
     markOutreachBusy(leadId);
     try {
-      await onMoveStage(leadId, "contacted", [method]);
+      const existing =
+        boardRef.current?.leads.find((l) => l.id === leadId)?.contactMethods ??
+        [];
+      const methods = existing.includes(method)
+        ? existing
+        : [...existing, method];
+      await onMoveStage(leadId, "contacted", methods);
       toast(
         "ok",
         method === "phone"
-          ? "Logged as called — moved to Contacted."
+          ? opts?.missed
+            ? "Logged as missed call — moved to Contacted."
+            : "Logged as called — moved to Contacted."
           : "Logged contact form — moved to Contacted.",
       );
       if (opts?.promptNote) {
-        setDrawerPromptNote(true);
+        setDrawerPromptNote(opts.missed ? "missed" : "call");
         setDrawerMode("info");
         setSelectedId(leadId);
         void ensureLeadDetail(leadId);
@@ -2494,6 +2510,7 @@ export function Studio() {
           lead={selected}
           mode={drawerMode}
           promptNote={drawerPromptNote}
+          actorName={actorName}
           capabilities={board.capabilities}
           onClose={closeLeadDrawer}
           onUndoMarkContacted={

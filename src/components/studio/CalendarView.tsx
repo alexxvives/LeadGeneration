@@ -6,6 +6,7 @@ import {
   calendarEventsFromLeads,
   followUpKindLabel,
   formatNoteDate,
+  isMissedCallNote,
   todayIsoDate,
   type CalendarEvent,
 } from "@/lib/follow-ups";
@@ -334,7 +335,9 @@ function DayGroup({
         {title}
       </h4>
       <ul className="space-y-2">
-        {events.map((ev) => (
+        {events.map((ev) => {
+          const missed = ev.kind === "phone" && isMissedCallNote(ev.note);
+          return (
           <li key={ev.id}>
             <div className="flex items-start gap-2 rounded-xl border border-white/5 bg-ink-950/40 p-2.5">
               {onToggleFollowUp && ev.kind === "follow_up" ? (
@@ -355,8 +358,10 @@ function DayGroup({
                 </button>
               ) : (
                 <span
-                  className={`mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${KIND_CHIP[ev.kind]}`}
-                  title={followUpKindLabel(ev.kind)}
+                  className={`mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                    missed ? "bg-amber-400/15 text-amber-200" : KIND_CHIP[ev.kind]
+                  }`}
+                  title={missed ? "Missed call" : followUpKindLabel(ev.kind)}
                 >
                   <KindMark kind={ev.kind} />
                 </span>
@@ -366,12 +371,19 @@ function DayGroup({
                 onClick={() => onOpenLead(ev.leadId)}
                 className="min-w-0 flex-1 text-left"
               >
-                <p
-                  className={`truncate text-sm font-medium ${
-                    ev.done ? "text-mist-400 line-through" : "text-mist-100"
-                  }`}
-                >
-                  {ev.company}
+                <p className="flex min-w-0 items-baseline gap-1.5">
+                  <span
+                    className={`truncate text-sm font-medium ${
+                      ev.done ? "text-mist-400 line-through" : "text-mist-100"
+                    }`}
+                  >
+                    {ev.company}
+                  </span>
+                  {missed ? (
+                    <span className="shrink-0 text-[10px] font-medium text-amber-200">
+                      Missed
+                    </span>
+                  ) : null}
                 </p>
                 <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-mist-400">
                   {ev.note || followUpKindLabel(ev.kind)}
@@ -379,7 +391,8 @@ function DayGroup({
               </button>
             </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </section>
   );

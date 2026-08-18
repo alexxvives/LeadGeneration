@@ -23,7 +23,12 @@ import {
   collapseEmailSentFollowUps,
   followUpKindLabel,
   formatNoteDate,
+  inferFollowUpKind,
+  isMissedCallNote,
+  missedCallNotePrefix,
+  phoneCallNotePrefix,
   resolveFollowUpKind,
+  stripCallNotePrefix,
   todayIsoDate,
 } from "@/lib/follow-ups";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
@@ -46,8 +51,10 @@ interface DrawerProps {
   capabilities: Capabilities;
   /** info = CRM/profile only; draft = outreach composer only */
   mode?: "info" | "draft";
-  /** Open the dated-note composer (today preselected) — phone contact flow. */
-  promptNote?: boolean;
+  /** Open the dated-note composer for a call log (connected or missed). */
+  promptNote?: false | "call" | "missed";
+  /** Display name of the signed-in user — used in "Phone call by …" prefixes. */
+  actorName?: string | null;
   /** Undo a mistaken Ready→Contacted mark (phone / form log). */
   onUndoMarkContacted?: () => Promise<void>;
   /** Clear the post-call prompt chrome after the user saves a note. */
@@ -112,6 +119,10 @@ export function LeadDrawer(props: DrawerProps) {
   const { lead, capabilities, onClose } = props;
   const mode = props.mode ?? "info";
   const promptNote = props.promptNote ?? false;
+  const actorName =
+    props.actorName?.trim() ||
+    lead.contactedByName?.trim() ||
+    "you";
   const outreach = lead.outreach;
 
   const initialTo = outreach?.toEmail ?? lead.emails[0] ?? "";
@@ -131,9 +142,19 @@ export function LeadDrawer(props: DrawerProps) {
     lead.contactMethods ?? [],
   );
   const [followUps, setFollowUps] = useState<FollowUp[]>(lead.followUps ?? []);
-  const [showAddNote, setShowAddNote] = useState(promptNote);
+  const [showAddNote, setShowAddNote] = useState(Boolean(promptNote));
   const [newNoteDate, setNewNoteDate] = useState(todayIsoDate);
-  const [newNoteText, setNewNoteText] = useState("");
+  const [newNoteText, setNewNoteText] = useState(() =>
+    promptNote === "missed"
+      ? missedCallNotePrefix(actorName)
+      : promptNote === "call"
+        ? phoneCallNotePrefix(actorName)
+        : "",
+  );
+  /** Local call composer when Phone is toggled in the drawer (not from Ready). */
+  const [callPrompt, setCallPrompt] = useState<false | "call" | "missed">(
+    promptNote,
+  );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -164,16 +185,27 @@ export function LeadDrawer(props: DrawerProps) {
       collapseEmailSentFollowUps(lead.followUps ?? [], lead.contactedByName),
     );
     setConfirmDelete(false);
+  }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, lead.contactedByName]);
+
+  useEffect(() => {
     if (promptNote) {
       setShowAddNote(true);
+      setCallPrompt(promptNote);
       setNewNoteDate(todayIsoDate());
-      setNewNoteText("");
+      setNewNoteText(
+        promptNote === "missed"
+          ? missedCallNotePrefix(actorName)
+          : phoneCallNotePrefix(actorName),
+      );
     } else {
       setShowAddNote(false);
+      setCallPrompt(false);
       setNewNoteDate(todayIsoDate());
       setNewNoteText("");
     }
-  }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, lead.contactedByName, promptNote]);
+    // Don't depend on actorName — session hydrate must not wipe a typed call note.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead.id, promptNote]);
 
   // Heal: older sends wrote status but skipped the dated journal. Never add a
   // bare "Email sent" next to an existing "Email sent by …" line.
@@ -316,12 +348,19 @@ export function LeadDrawer(props: DrawerProps) {
     });
   };
 
-  /** Toggle a contact method (multi-select). */
+  /** Toggle a contact method (multi-select). Adding phone opens a call log. */
   const toggleMethod = async (method: ContactMethod) => {
+    const addedPhone = method === "phone" && !contactMethods.includes("phone");
     const next = toggleContactMethod(contactMethods, method);
     const stage =
       next.length > 0 && crmStage === "new" ? "contacted" : crmStage;
     await commitStage(stage, next);
+    if (addedPhone) {
+      setCallPrompt("call");
+      setShowAddNote(true);
+      setNewNoteDate(todayIsoDate());
+      setNewNoteText(phoneCallNotePrefix(actorName));
+    }
   };
 
   const isPastNew =
@@ -334,20 +373,31 @@ export function LeadDrawer(props: DrawerProps) {
   /** Pipeline/CRM contacted — log methods/notes, don't push email approve/send. */
   const registerOnly = isPastNew && !outreachSent;
 
+  const promptingCall = Boolean(promptNote) || Boolean(callPrompt);
+
   // ── Dated notes (journal) ──
-  const addNote = async () => {
-    const text = newNoteText.trim();
+  const addNote = async (variant?: "call" | "missed") => {
+    const callMode = variant ?? (callPrompt || (promptNote ? promptNote : false));
+    let text = newNoteText.trim();
+    if (callMode === "missed") {
+      text = `${missedCallNotePrefix(actorName)}${stripCallNotePrefix(newNoteText)}`.trim();
+    } else if (callMode === "call" && !text) {
+      text = phoneCallNotePrefix(actorName).trim();
+    }
     if (!newNoteDate || !text) return;
+    const kind = inferFollowUpKind(text);
+    const isCall = kind === "phone" || callMode === "call" || callMode === "missed";
     const fu: FollowUp = {
       id: newId("fu"),
       date: newNoteDate,
       note: text,
-      done: false,
-      kind: "follow_up",
+      done: isCall,
+      kind: isCall ? "phone" : "follow_up",
     };
     const updated = [...followUps, fu];
     setFollowUps(updated);
     setShowAddNote(false);
+    setCallPrompt(false);
     setNewNoteDate(todayIsoDate());
     setNewNoteText("");
     await props.onUpdateCrm(lead.id, { followUps: updated, notes: null });
@@ -401,9 +451,9 @@ export function LeadDrawer(props: DrawerProps) {
                 Loading full details…
               </p>
             ) : null}
-            {mode === "info" ? (
+            {mode === "info" && lead.crmStage && lead.crmStage !== "new" ? (
               <div className="flex items-center gap-2">
-                <CrmStagePill stage={lead.crmStage ?? "new"} />
+                <CrmStagePill stage={lead.crmStage} />
               </div>
             ) : null}
             {mode === "draft" ? (
@@ -417,7 +467,13 @@ export function LeadDrawer(props: DrawerProps) {
                 <p className="mt-1 truncate text-sm text-mist-500">{lead.company}</p>
               </>
             ) : (
-              <div className={`min-w-0 ${mode === "info" ? "mt-3" : ""}`}>
+              <div
+                className={`min-w-0 ${
+                  mode === "info" && lead.crmStage && lead.crmStage !== "new"
+                    ? "mt-3"
+                    : ""
+                }`}
+              >
                 <input
                   id="lead-drawer-title"
                   key={`${lead.id}-company-${lead.company}`}
@@ -676,8 +732,10 @@ export function LeadDrawer(props: DrawerProps) {
               <button
                 type="button"
                 onClick={() => {
+                  setCallPrompt(false);
                   setShowAddNote(true);
                   setNewNoteDate(todayIsoDate());
+                  setNewNoteText("");
                 }}
                 className="text-[11px] text-aurora-400 hover:underline"
               >
@@ -692,15 +750,17 @@ export function LeadDrawer(props: DrawerProps) {
                 </p>
               )}
 
-              {promptNote ? (
+              {promptingCall ? (
                 <div className="rounded-xl border border-aurora-400/25 bg-aurora-400/10 px-3 py-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-aurora-200">
-                        Logged as called
+                        {callPrompt === "missed" || promptNote === "missed"
+                          ? "Log a missed call"
+                          : "Log the call"}
                       </p>
                       <p className="mt-0.5 text-[11px] leading-snug text-mist-400">
-                        Add a note, or undo if you opened this by mistake.
+                        Write how it went after the name, or mark it missed.
                       </p>
                     </div>
                     {props.onUndoMarkContacted ? (
@@ -729,7 +789,7 @@ export function LeadDrawer(props: DrawerProps) {
                 <div className="space-y-2 rounded-xl border border-white/10 bg-ink-900/60 p-3">
                   <label className="block">
                     <span className="mb-1 block text-[11px] uppercase tracking-wider text-mist-500">
-                      Follow up on
+                      {promptingCall ? "Call date" : "Follow up on"}
                     </span>
                     <input
                       type="date"
@@ -743,7 +803,11 @@ export function LeadDrawer(props: DrawerProps) {
                     value={newNoteText}
                     onChange={(e) => setNewNoteText(e.target.value)}
                     rows={3}
-                    placeholder="Call back, send a recap…"
+                    placeholder={
+                      promptingCall
+                        ? "how the conversation went…"
+                        : "Call back, send a recap…"
+                    }
                     className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60"
                   />
                   <div className="flex flex-wrap gap-2">
@@ -755,16 +819,31 @@ export function LeadDrawer(props: DrawerProps) {
                     >
                       Save
                     </button>
+                    {promptingCall ? (
+                      <button
+                        type="button"
+                        onClick={() => void addNote("missed")}
+                        disabled={!newNoteDate}
+                        className="rounded-full border border-amber-400/30 px-3 py-1 text-xs font-medium text-amber-200 hover:bg-amber-400/10 disabled:opacity-40"
+                      >
+                        Missed call
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => {
+                        if (promptingCall) {
+                          void addNote("call");
+                          return;
+                        }
                         setShowAddNote(false);
+                        setCallPrompt(false);
                         setNewNoteText("");
                         setNewNoteDate(todayIsoDate());
                       }}
                       className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
                     >
-                      {promptNote ? "Skip note" : "Cancel"}
+                      {promptingCall ? "Skip details" : "Cancel"}
                     </button>
                     {promptNote && props.onUndoMarkContacted ? (
                       <button
@@ -799,6 +878,10 @@ export function LeadDrawer(props: DrawerProps) {
                     .map((fu) => {
                       const kind = resolveFollowUpKind(fu);
                       const isFollow = kind === "follow_up";
+                      const missed = isMissedCallNote(fu.note);
+                      const kindLabel = missed
+                        ? "Missed call"
+                        : followUpKindLabel(kind);
                       return (
                         <li key={fu.id} className="flex items-start gap-2">
                           {isFollow ? (
@@ -824,10 +907,12 @@ export function LeadDrawer(props: DrawerProps) {
                               className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
                                 kind === "email"
                                   ? "bg-aurora-400/15 text-aurora-200"
-                                  : "bg-sky-400/15 text-sky-200"
+                                  : missed
+                                    ? "bg-amber-400/15 text-amber-200"
+                                    : "bg-sky-400/15 text-sky-200"
                               }`}
                             >
-                              {kind === "email" ? "Email" : "Call"}
+                              {kind === "email" ? "Email" : missed ? "Missed" : "Call"}
                             </span>
                           )}
                           <p
@@ -839,7 +924,7 @@ export function LeadDrawer(props: DrawerProps) {
                           >
                             <span className="font-semibold text-mist-100">
                               {formatNoteDate(fu.date)}
-                              {isFollow ? "" : ` · ${followUpKindLabel(kind)}`}
+                              {isFollow ? "" : ` · ${kindLabel}`}
                               :
                             </span>{" "}
                             {fu.note || "—"}

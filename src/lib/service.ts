@@ -75,9 +75,9 @@ const LOCK_TTL_MS = 150_000; // 2.5 minutes
 import { scoreImportedLead } from "@/lib/fit-score";
 import {
   contactMethodsEqual,
-  contactMethodsFollowUpNote,
+  contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, inferFollowUpKind } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, isEmailSentNote } from "@/lib/follow-ups";
 import {
   companyGuessFromEmail,
   isFreeMailDomain,
@@ -2306,32 +2306,43 @@ export async function updateLeadCrm(
     ctx.userEmail?.trim() ||
     null;
 
-  // When the user explicitly sets how they contacted, journal a follow-up note.
+  // Journal only channels that were just added. Phone logs are written in the
+  // drawer as "Phone call by …" / "Missed call by …" so we don't invent a
+  // combined "Contacted via email, phone" line here.
   if (
     patch.contactMethods &&
     !contactMethodsEqual(patch.contactMethods, lead.contactMethods)
   ) {
-    const note = contactMethodsFollowUpNote(patch.contactMethods, actorName);
     const today = nowIso().slice(0, 10);
     const existing = patch.followUps ?? lead.followUps ?? [];
-    const already = existing.some(
-      (f) => f.note.trim().toLowerCase() === note.toLowerCase() && f.date === today,
+    const added = patch.contactMethods.filter(
+      (m) => !lead.contactMethods.includes(m),
     );
-    if (!already) {
-      const kind = patch.contactMethods.includes("phone")
-        ? "phone"
-        : inferFollowUpKind(note);
-      next.followUps = [
+    let followUps = existing;
+    for (const method of added) {
+      if (method === "phone") continue;
+      if (method === "email" && followUps.some((f) => isEmailSentNote(f.note))) {
+        continue;
+      }
+      const entry = contactMethodAddedNote(method, actorName);
+      const already = followUps.some(
+        (f) =>
+          f.note.trim().toLowerCase() === entry.note.toLowerCase() &&
+          f.date === today,
+      );
+      if (already) continue;
+      followUps = [
         {
           id: newId("fu"),
           date: today,
-          note,
-          done: kind !== "follow_up",
-          kind,
+          note: entry.note,
+          done: true,
+          kind: entry.kind,
         },
-        ...existing,
+        ...followUps,
       ];
     }
+    if (followUps !== existing) next.followUps = followUps;
     if (!patch.crmStage && lead.crmStage === "new") {
       next.crmStage = "contacted";
     }

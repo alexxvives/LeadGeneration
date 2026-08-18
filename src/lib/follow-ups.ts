@@ -32,10 +32,36 @@ export function isEmailSentNote(note: string): boolean {
 
 export function isPhoneCallNote(note: string): boolean {
   const t = note.trim().toLowerCase();
+  if (t.startsWith("phone call by")) return true;
+  if (t.startsWith("missed call by")) return true;
   if (t.startsWith("contacted by phone")) return true;
   if (t.startsWith("called")) return true;
   if (t.startsWith("logged as called")) return true;
   return t.startsWith("contacted via") && /\bphone\b/.test(t);
+}
+
+export function isMissedCallNote(note: string): boolean {
+  return /^missed call by\b/i.test(note.trim());
+}
+
+export function callNoteActor(name?: string | null): string {
+  const t = name?.trim();
+  return t || "you";
+}
+
+export function phoneCallNotePrefix(name?: string | null): string {
+  return `Phone call by ${callNoteActor(name)}: `;
+}
+
+export function missedCallNotePrefix(name?: string | null): string {
+  return `Missed call by ${callNoteActor(name)}: `;
+}
+
+/** Strip a connected/missed call prefix so we can switch Connected ↔ Missed. */
+export function stripCallNotePrefix(note: string): string {
+  return note
+    .replace(/^phone call by [^:]+:\s*/i, "")
+    .replace(/^missed call by [^:]+:\s*/i, "");
 }
 
 export function inferFollowUpKind(note: string): FollowUpKind {

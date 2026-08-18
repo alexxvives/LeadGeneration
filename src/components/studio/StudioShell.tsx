@@ -479,7 +479,7 @@ export function StudioShell({
                     href={boardHref(item.href)}
                     onClick={() => setPendingNavView(viewKey)}
                     title={item.label}
-                    className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                    className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors ${
                       wide ? "justify-center sm:justify-start" : "justify-center"
                     } ${
                       item.active
@@ -488,7 +488,7 @@ export function StudioShell({
                     }`}
                   >
                     <Icon
-                      className={`h-5 w-5 shrink-0 transition-transform duration-300 ease-out group-hover:scale-125 group-hover:-translate-y-0.5 group-hover:rotate-[-6deg] ${
+                      className={`h-4 w-4 shrink-0 transition-transform duration-300 ease-out group-hover:scale-125 group-hover:-translate-y-0.5 group-hover:rotate-[-6deg] ${
                         item.active ? "text-aurora-300" : "text-mist-500 group-hover:text-aurora-300"
                       }`}
                     />

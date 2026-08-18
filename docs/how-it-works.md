@@ -118,8 +118,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
   - **Lead detail drawer** — opens from any lead card/row/pin. Contact info
     (incl. full address), about blurb, CRM stage, dated notes journal
-    (**+ Follow-up** registers a dated reminder on Calendar), and the outreach
-    composer (draft → edit → approve → send).
+    (**+ Follow-up** registers a dated reminder on Calendar). Toggling **Phone**
+    opens a call log starting with `Phone call by {name}:` (or **Missed call**)
+    so email and phone stay separate notes. The outreach composer
+    (draft → edit → approve → send) is on the draft pane.
 
 - **`/app/settings`** — sender profile (language flag persists as
   `templateLang` and only changes the **preview** — template editors stay as

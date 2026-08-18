@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronDownIcon } from "@/components/icons";
 
 /** Soft title-case for ALL-CAPS company types without changing filter values. */
 function displayType(raw: string): string {
@@ -64,9 +65,12 @@ export function TypeFilterMenu({
         className="inline-flex h-full min-w-[9.75rem] items-center justify-between gap-2 rounded-xl border border-white/10 bg-ink-900/60 py-0 pl-3 pr-2.5 text-sm text-mist-100 outline-none transition-colors hover:border-white/20 focus-visible:border-aurora-400/50"
       >
         <span className="truncate">{label}</span>
-        <span className="shrink-0 text-[10px] text-mist-500" aria-hidden>
-          ▾
-        </span>
+        <ChevronDownIcon
+          className={`h-4 w-4 shrink-0 text-mist-400 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+          aria-hidden
+        />
       </button>
       {open ? (
         <ul

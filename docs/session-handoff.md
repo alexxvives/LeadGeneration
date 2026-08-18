@@ -9,22 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-18 (Calendar + follow-up notes)
+## ⏱️ Status — updated 2026-08-18 (Call logs + Contacted tags)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Lead drawer **+ Follow-up** saves a dated reminder on the lead (registered in
-  `followUps`). Sends and phone logs already journal the same way.
-- New studio **Calendar** tab (`?view=calendar`): month grid of follow-ups,
-  emails sent, and phone calls. Click an item to open the lead; tick follow-ups
-  done.
-- `AGENTS.md`: commit **and** `git push` after every change (no waiting to be asked).
+- Email and phone no longer share one “Contacted via email, phone” note.
+  Phone opens a log starting `Phone call by {user}:` (or **Missed call**).
+- Outreach Contacted: no Sent timestamp; Email + Phone (+ Missed) tags.
+- Sidebar nav ~15% smaller; Outreach type dropdown chevron sized with the icon.
+- Info drawer hides the **New** stage pill above the title.
 
 ### Next
 1. Deploy after `tsc`/`lint` green.
-2. Optional: wrangler secret delete leftover Gmail / Zeruh keys.
 
 ---
 

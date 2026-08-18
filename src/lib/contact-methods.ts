@@ -1,4 +1,4 @@
-import type { ContactMethod } from "@/lib/types";
+import type { ContactMethod, FollowUpKind } from "@/lib/types";
 
 const METHODS: readonly ContactMethod[] = [
   "email",
@@ -73,21 +73,16 @@ export function contactMethodLabel(method: ContactMethod): string {
   return "contact form";
 }
 
-export function contactMethodsFollowUpNote(
-  methods: ContactMethod[],
+/** Note for a newly added channel. Phone is omitted — the drawer writes the call log. */
+export function contactMethodAddedNote(
+  method: Exclude<ContactMethod, "phone">,
   byName?: string | null,
-): string {
-  let base: string;
-  if (methods.length === 0) base = "Contact registered";
-  else if (methods.length === 1) {
-    const m = methods[0]!;
-    if (m === "email") base = "Contacted by email";
-    else if (m === "phone") base = "Contacted by phone";
-    else base = "Contacted via contact form";
-  } else {
-    const labels = methods.map(contactMethodLabel).join(", ");
-    base = `Contacted via ${labels}`;
-  }
+): { note: string; kind: FollowUpKind } {
   const who = byName?.trim();
-  return who ? `${base} — ${who}` : base;
+  if (method === "email") {
+    const base = "Contacted by email";
+    return { note: who ? `${base} — ${who}` : base, kind: "email" };
+  }
+  const base = "Contacted via contact form";
+  return { note: who ? `${base} — ${who}` : base, kind: "follow_up" };
 }

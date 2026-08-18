@@ -12,6 +12,7 @@ import {
   PhoneIcon,
 } from "@/components/icons";
 import { useStableDuringLoad } from "./skeletons";
+import { isMissedCallNote } from "@/lib/follow-ups";
 
 type OutreachBucket = "review" | "ready" | "contacted";
 /** Ready-column contact-channel filter. */
@@ -176,7 +177,7 @@ export function OutreachView({
   onMarkContacted: (
     leadId: string,
     method: ContactMethod,
-    opts?: { promptNote?: boolean },
+    opts?: { promptNote?: boolean; missed?: boolean },
   ) => Promise<void>;
 }) {
   const busySet = useMemo(() => new Set(busyIds), [busyIds]);
@@ -438,7 +439,7 @@ function OutreachRow({
   onSend: () => void | Promise<void>;
   onMarkContacted: (
     method: ContactMethod,
-    opts?: { promptNote?: boolean },
+    opts?: { promptNote?: boolean; missed?: boolean },
   ) => Promise<void>;
 }) {
   const email = leadEmail(lead);
@@ -524,14 +525,6 @@ function OutreachRow({
         {needsMethod ? (
           <p className="mt-1 text-[10px] font-medium text-amber-300/90">
             How contacted? — open to register
-          </p>
-        ) : null}
-        {bucket === "contacted" && sent ? (
-          <p className="mt-1 text-[10px] font-medium text-aurora-300/90">
-            Sent
-            {lead.outreach?.sentAt
-              ? ` · ${new Date(lead.outreach.sentAt).toLocaleString()}`
-              : ""}
           </p>
         ) : null}
         {lead.outreach?.status === "failed" && lead.outreach.error ? (
@@ -620,16 +613,35 @@ function OutreachRow({
                   {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
                 </button>
               ) : phoneOnly ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void onMarkContacted("phone", { promptNote: true })}
-                  aria-label="Mark called — move to Contacted"
-                  title="After you call — move to Contacted and add a note"
-                  className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
-                >
-                  {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
-                </button>
+                <div className="flex items-center justify-end gap-1">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      void onMarkContacted("phone", { promptNote: true })
+                    }
+                    aria-label="Mark called — move to Contacted"
+                    title="After you call — move to Contacted and add a note"
+                    className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
+                  >
+                    {busy ? <Spinner className="h-2.5 w-2.5" /> : "Call"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      void onMarkContacted("phone", {
+                        promptNote: true,
+                        missed: true,
+                      })
+                    }
+                    aria-label="Log missed call — move to Contacted"
+                    title="They didn’t pick up — log a missed call"
+                    className={`${ACTION_BTN} border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 disabled:opacity-50`}
+                  >
+                    Missed
+                  </button>
+                </div>
               ) : (
                 <button
                   type="button"
@@ -645,17 +657,21 @@ function OutreachRow({
               <div className="flex flex-wrap justify-end gap-1">
                 {(
                   [
-                    ["phone", "Called"],
-                    ["contact_form", "Form"],
+                    ["phone", "Called", false],
+                    ["phone", "Missed", true],
+                    ["contact_form", "Form", false],
                   ] as const
-                ).map(([method, label]) => (
+                ).map(([method, label, missed]) => (
                   <button
-                    key={method}
+                    key={`${method}-${label}`}
                     type="button"
                     disabled={busy}
                     onClick={() => {
                       setPickingMethod(false);
-                      void onMarkContacted(method, { promptNote: true });
+                      void onMarkContacted(method, {
+                        promptNote: true,
+                        missed,
+                      });
                     }}
                     className={`${ACTION_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-100 disabled:opacity-50`}
                   >
@@ -667,19 +683,39 @@ function OutreachRow({
           </div>
         )}
         {bucket === "contacted" ? (
-          <button
-            type="button"
-            onClick={openComposer}
-            className={`${ACTION_BTN} ${
-              needsMethod
-                ? "border border-amber-400/40 bg-amber-400/15 text-amber-100"
-                : sent
-                  ? "border border-aurora-400/30 bg-aurora-400/10 text-aurora-200 hover:bg-aurora-400/15"
-                  : "border border-white/15 text-mist-400 hover:bg-white/5"
-            }`}
-          >
-            {sent ? "Email" : "Register"}
-          </button>
+          needsMethod ? (
+            <button
+              type="button"
+              onClick={openComposer}
+              className={`${ACTION_BTN} border border-amber-400/40 bg-amber-400/15 text-amber-100`}
+            >
+              Register
+            </button>
+          ) : (
+            <div className="flex flex-wrap justify-end gap-1">
+              {sent || methods.includes("email") ? (
+                <span
+                  className={`${ACTION_BTN} border border-aurora-400/30 bg-aurora-400/10 text-aurora-200`}
+                >
+                  Email
+                </span>
+              ) : null}
+              {methods.includes("phone") ? (
+                <span
+                  className={`${ACTION_BTN} border border-sky-400/30 bg-sky-400/10 text-sky-200`}
+                >
+                  Phone
+                </span>
+              ) : null}
+              {(lead.followUps ?? []).some((f) => isMissedCallNote(f.note)) ? (
+                <span
+                  className={`${ACTION_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-200`}
+                >
+                  Missed
+                </span>
+              ) : null}
+            </div>
+          )
         ) : null}
       </div>
     </li>
