@@ -114,27 +114,6 @@ export function BoardsView({
     }
   }
 
-  async function handleVerifyToggle(id: string, next: boolean) {
-    setBusy(true);
-    setErr(null);
-    try {
-      const { board } = await api.updateBoard(id, { emailVerifyEnabled: next });
-      setBoards((prev) => {
-        const updated = prev.map((b) =>
-          b.id === board.id
-            ? { ...b, emailVerifyEnabled: board.emailVerifyEnabled }
-            : b,
-        );
-        onBoardsChange?.(updated);
-        return updated;
-      });
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not update verify");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleDelete(id: string) {
     if (
       !confirm(
@@ -229,7 +208,6 @@ export function BoardsView({
               onCancelEdit={() => setEditingId(null)}
               onDelete={() => void handleDelete(b.id)}
               onInvite={() => setInviteBoard(b)}
-              onToggleVerify={(next) => void handleVerifyToggle(b.id, next)}
             />
           ))}
         {invites.map((inv) => (
@@ -279,7 +257,6 @@ export function BoardsView({
               onCancelEdit={() => setEditingId(null)}
               onDelete={() => void handleDelete(b.id)}
               onInvite={() => setInviteBoard(b)}
-              onToggleVerify={(next) => void handleVerifyToggle(b.id, next)}
             />
           ))}
       </ul>
@@ -313,7 +290,6 @@ function BoardCard({
   onCancelEdit,
   onDelete,
   onInvite,
-  onToggleVerify,
 }: {
   board: BoardSummary;
   editingId: string | null;
@@ -325,7 +301,6 @@ function BoardCard({
   onCancelEdit: () => void;
   onDelete: () => void;
   onInvite: () => void;
-  onToggleVerify: (next: boolean) => void;
 }) {
   return (
     <li className="group relative">
@@ -454,35 +429,6 @@ function BoardCard({
             </div>
           </div>
         </dl>
-        {!b.shared ? (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={b.emailVerifyEnabled !== false}
-            title="Verify emails before sending on this board"
-            className="mt-4 flex w-full items-center justify-between gap-2 rounded-lg border border-white/8 px-2.5 py-2 text-left transition-colors hover:border-white/15"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleVerify(!(b.emailVerifyEnabled !== false));
-            }}
-          >
-            <span className="text-[11px] font-medium text-mist-300">
-              Verify before send
-            </span>
-            <span
-              className={`switch-track relative h-5 w-9 shrink-0 rounded-full transition-colors ${
-                b.emailVerifyEnabled !== false ? "bg-aurora-400" : ""
-              }`}
-              data-on={b.emailVerifyEnabled !== false ? "true" : "false"}
-            >
-              <span
-                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-md ring-1 ring-black/10 transition-transform ${
-                  b.emailVerifyEnabled !== false ? "left-4" : "left-0.5"
-                }`}
-              />
-            </span>
-          </button>
-        ) : null}
       </div>
     </li>
   );

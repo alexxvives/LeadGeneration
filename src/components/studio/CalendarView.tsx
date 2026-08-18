@@ -139,6 +139,7 @@ export function CalendarView({
   const followUps = dayEvents.filter((e) => e.kind === "follow_up");
   const emails = dayEvents.filter((e) => e.kind === "email");
   const calls = dayEvents.filter((e) => e.kind === "phone");
+  const weekRows = cells.length / 7;
 
   const shiftMonth = (delta: number) => {
     setCursor((c) => {
@@ -162,9 +163,9 @@ export function CalendarView({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 pb-6 lg:flex-row lg:items-start">
-      <section className="glass min-w-0 flex-1 rounded-xl2 p-4 sm:p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:flex-row lg:items-stretch lg:overflow-hidden">
+      <section className="glass flex min-h-0 min-w-0 flex-1 flex-col rounded-xl2 p-4 sm:p-5">
+        <div className="relative mb-3 flex shrink-0 items-center justify-center">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -189,13 +190,89 @@ export function CalendarView({
           <button
             type="button"
             onClick={goToday}
-            className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-mist-300 transition-colors hover:border-aurora-400/40 hover:text-mist-100"
+            className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-mist-300 transition-colors hover:border-aurora-400/40 hover:text-mist-100"
           >
             Today
           </button>
         </div>
 
-        <ul className="mb-3 flex flex-wrap gap-3 text-[11px] text-mist-400">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div
+            role="grid"
+            aria-label={`Calendar for ${monthLabel(cursor.year, cursor.month)}`}
+            className="grid min-h-0 flex-1 grid-cols-7 gap-1"
+            style={{
+              gridTemplateRows: `auto repeat(${weekRows}, minmax(0, 1fr))`,
+            }}
+          >
+            {WEEKDAYS.map((d) => (
+              <div
+                key={d}
+                role="columnheader"
+                className="px-1 py-1 text-center text-[11px] font-medium uppercase tracking-wider text-mist-500"
+              >
+                {d}
+              </div>
+            ))}
+            {cells.map((cell) => {
+              const dayEvs = byDate.get(cell.iso) ?? [];
+              const kinds = [...new Set(dayEvs.map((e) => e.kind))];
+              const isToday = cell.iso === today;
+              const isSelected = cell.iso === selected;
+              const pending = dayEvs.filter(
+                (e) => e.kind === "follow_up" && !e.done,
+              ).length;
+              const summary = dayEvs.length
+                ? `${dayEvs.length} item${dayEvs.length === 1 ? "" : "s"}`
+                : "no items";
+              return (
+                <button
+                  key={cell.iso}
+                  type="button"
+                  role="gridcell"
+                  aria-selected={isSelected}
+                  aria-current={isToday ? "date" : undefined}
+                  aria-label={`${formatNoteDate(cell.iso)}, ${summary}`}
+                  onClick={() => setSelected(cell.iso)}
+                  className={`flex h-full min-h-0 flex-col items-start rounded-xl px-1.5 py-1.5 text-left transition-colors ${
+                    isSelected
+                      ? "bg-aurora-400/15 ring-1 ring-aurora-400/50"
+                      : isToday
+                        ? "bg-white/[0.04] ring-1 ring-white/15"
+                        : "hover:bg-white/[0.04]"
+                  } ${cell.inMonth ? "" : "opacity-40"}`}
+                >
+                  <span
+                    className={`text-xs tabular-nums ${
+                      isToday
+                        ? "font-semibold text-aurora-300"
+                        : "text-mist-200"
+                    }`}
+                  >
+                    {cell.day}
+                  </span>
+                  {kinds.length > 0 ? (
+                    <span className="mt-auto flex flex-wrap items-center gap-0.5 pt-1">
+                      {kinds.map((k) => (
+                        <span
+                          key={k}
+                          className={`h-1.5 w-1.5 rounded-full ${KIND_DOT[k]}`}
+                        />
+                      ))}
+                      {pending > 0 ? (
+                        <span className="sr-only">
+                          {pending} open follow-up{pending === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <ul className="mt-3 flex shrink-0 flex-wrap items-center justify-center gap-4 text-[11px] text-mist-400">
           <li className="inline-flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${KIND_DOT.follow_up}`} />
             Follow-up
@@ -209,80 +286,9 @@ export function CalendarView({
             Phone call
           </li>
         </ul>
-
-        <div
-          role="grid"
-          aria-label={`Calendar for ${monthLabel(cursor.year, cursor.month)}`}
-          className="grid grid-cols-7 gap-1"
-        >
-          {WEEKDAYS.map((d) => (
-            <div
-              key={d}
-              role="columnheader"
-              className="px-1 py-1 text-center text-[11px] font-medium uppercase tracking-wider text-mist-500"
-            >
-              {d}
-            </div>
-          ))}
-          {cells.map((cell) => {
-            const dayEvs = byDate.get(cell.iso) ?? [];
-            const kinds = [...new Set(dayEvs.map((e) => e.kind))];
-            const isToday = cell.iso === today;
-            const isSelected = cell.iso === selected;
-            const pending = dayEvs.filter(
-              (e) => e.kind === "follow_up" && !e.done,
-            ).length;
-            const summary = dayEvs.length
-              ? `${dayEvs.length} item${dayEvs.length === 1 ? "" : "s"}`
-              : "no items";
-            return (
-              <button
-                key={cell.iso}
-                type="button"
-                role="gridcell"
-                aria-selected={isSelected}
-                aria-current={isToday ? "date" : undefined}
-                aria-label={`${formatNoteDate(cell.iso)}, ${summary}`}
-                onClick={() => setSelected(cell.iso)}
-                className={`flex min-h-[3.25rem] flex-col items-start rounded-xl px-1.5 py-1.5 text-left transition-colors sm:min-h-[4.25rem] ${
-                  isSelected
-                    ? "bg-aurora-400/15 ring-1 ring-aurora-400/50"
-                    : isToday
-                      ? "bg-white/[0.04] ring-1 ring-white/15"
-                      : "hover:bg-white/[0.04]"
-                } ${cell.inMonth ? "" : "opacity-40"}`}
-              >
-                <span
-                  className={`text-xs tabular-nums ${
-                    isToday
-                      ? "font-semibold text-aurora-300"
-                      : "text-mist-200"
-                  }`}
-                >
-                  {cell.day}
-                </span>
-                {kinds.length > 0 ? (
-                  <span className="mt-auto flex flex-wrap items-center gap-0.5 pt-1">
-                    {kinds.map((k) => (
-                      <span
-                        key={k}
-                        className={`h-1.5 w-1.5 rounded-full ${KIND_DOT[k]}`}
-                      />
-                    ))}
-                    {pending > 0 ? (
-                      <span className="sr-only">
-                        {pending} open follow-up{pending === 1 ? "" : "s"}
-                      </span>
-                    ) : null}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
       </section>
 
-      <aside className="glass flex w-full shrink-0 flex-col rounded-xl2 p-4 sm:p-5 lg:max-h-[min(70dvh,40rem)] lg:w-[22rem] lg:overflow-hidden">
+      <aside className="glass flex min-h-0 w-full shrink-0 flex-col self-stretch rounded-xl2 p-4 sm:p-5 lg:w-[22rem] lg:overflow-hidden">
         <p className="text-[11px] uppercase tracking-wider text-mist-500">
           {selected === today ? "Today" : formatNoteDate(selected)}
         </p>

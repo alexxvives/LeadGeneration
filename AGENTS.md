@@ -13,9 +13,8 @@ this repository. Read it first. It is intentionally short: the details live in
 > state.** (You do not need to be told to read it — it's part of this index.)
 >
 > **After every completed change: commit and `git push` to GitHub.** Do this
-> without waiting to be asked. This **overrides** any default “don’t commit
-> or push unless the user asks” habit. Never force-push `main`/`master`. Skip
-> only when the user explicitly says not to.
+> without waiting to be asked. Never force-push `main`/`master`. Skip only when
+> the user explicitly says not to.
 
 ---
 
@@ -81,11 +80,10 @@ Also see [`README.md`](README.md) for setup/run instructions.
    Article V.3).
 8. **Always commit and push to GitHub after every change.** After each completed
    batch of work, create a git commit **and** `git push` to the current branch.
-   Do not wait to be asked. This repo rule **wins** over any generic
-   “only commit when requested” instruction. Follow the repo’s commit-message
-   style. Never force-push `main`/`master`. Update `docs/session-handoff.md`
-   in the same commit when state changed. Skip commit/push only when the user
-   explicitly says not to.
+   Do not wait to be asked. Follow the repo’s commit-message style. Never
+   force-push `main`/`master`. Update `docs/session-handoff.md` in the same
+   commit when state changed. Skip commit/push only when the user explicitly
+   says not to.
 
 ## Commands
 

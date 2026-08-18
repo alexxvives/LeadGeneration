@@ -9,16 +9,16 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-18 (Sidebar / missed / calendar)
+## ⏱️ Status — updated 2026-08-18 (Calendar layout / sidebar)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Sidebar: tighter logo + Board/account block (more room for nav).
-- Ready: dropped the **Missed** control (it moved leads to Contacted).
-- Notes: **Add Note**, **Follow up**, **Missed call** (miss stays in Ready).
-- Calendar: extra bottom margin so it doesn’t sit on the viewport edge.
+- Calendar fills remaining height with a visible bottom gutter (padding was
+  clipped before). Day list matches calendar card height.
+- Month/year centered at top; legend centered under the grid.
+- Sidebar ~10% narrower (16.5rem). Board cards: no Verify-before-send switch.
 
 ### Next
 1. Deploy after `tsc`/`lint` green.

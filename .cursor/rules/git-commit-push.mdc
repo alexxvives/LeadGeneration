@@ -1,0 +1,8 @@
+---
+description: Always commit and push after completed work
+alwaysApply: true
+---
+
+# Git
+
+After every completed batch of work, create a git commit and `git push` to the current branch. Do not wait. Never force-push `main`/`master`. Skip only when the user explicitly says not to. Update `docs/session-handoff.md` in the same commit when session state changed.

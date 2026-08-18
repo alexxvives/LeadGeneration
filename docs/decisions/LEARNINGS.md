@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-18 — Calendar height + sidebar 10%
+- Calendar `pb-6` on a `flex-1` child was clipped by the studio’s
+  `overflow-hidden` shell — the month grid’s min-heights overflowed the
+  viewport, so padding sat off-screen. Constrain the view to remaining
+  height (`min-h-0`), stretch the day cells, gutter via the parent `pb-6`.
+- Day-detail pane stretches to the calendar card (`items-stretch`, no max-h).
+- Legend under the grid, centered; month/year centered at the top.
+- Sidebar width 18.4rem → 16.5rem (~10%).
+- Board cards: dropped the **Verify before send** switch (still in Settings).
+
 ### 2026-08-18 — Missed call stays in Ready
 - Ready column “Missed” looked like a status tag and moved the lead to
   Contacted. Removed it. Log a miss from the info drawer Notes

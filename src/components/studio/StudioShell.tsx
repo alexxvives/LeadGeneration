@@ -417,7 +417,7 @@ export function StudioShell({
 
       <aside
         className={`sticky top-0 z-30 flex h-screen flex-col border-r border-white/5 bg-ink-950/90 py-3 backdrop-blur-xl transition-[width] duration-200 ease-out ${
-          wide ? "relative w-16 sm:w-[18.4rem] sm:px-4" : "relative w-16"
+          wide ? "relative w-16 sm:w-[16.5rem] sm:px-3" : "relative w-16"
         }`}
       >
         {wide ? (
@@ -456,7 +456,7 @@ export function StudioShell({
           </span>
         </Link>
 
-        <nav className="flex flex-1 flex-col gap-4 overflow-y-auto">
+        <nav className="flex flex-1 flex-col gap-3 overflow-y-auto">
           {navSections.map((section) => (
             <div key={section.label} className="flex flex-col gap-1">
               <p
@@ -479,7 +479,7 @@ export function StudioShell({
                     href={boardHref(item.href)}
                     onClick={() => setPendingNavView(viewKey)}
                     title={item.label}
-                    className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors ${
+                    className={`group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
                       wide ? "justify-center sm:justify-start" : "justify-center"
                     } ${
                       item.active
