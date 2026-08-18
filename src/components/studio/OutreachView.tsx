@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
 import { warmupStatus } from "@/lib/email/warmup";
-import { FitMeter, Spinner } from "@/components/ui";
+import { Spinner } from "@/components/ui";
 import {
   ArrowIcon,
   CheckIcon,
@@ -69,19 +69,17 @@ function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   return null;
 }
 
-/** Fit desc, then company A–Z (stable when many share the same score). */
-function byFitThenCompany(a: LeadWithOutreach, b: LeadWithOutreach): number {
-  const fit = (b.fitScore ?? 0) - (a.fitScore ?? 0);
-  if (fit !== 0) return fit;
+/** Company A–Z (stable). */
+function byCompany(a: LeadWithOutreach, b: LeadWithOutreach): number {
   return a.company.localeCompare(b.company, undefined, { sensitivity: "base" });
 }
 
-/** Contacted: newest sends first, then fit, then company. */
+/** Contacted: newest sends first, then company. */
 function byContactedRecent(a: LeadWithOutreach, b: LeadWithOutreach): number {
   const aSent = a.outreach?.sentAt ?? "";
   const bSent = b.outreach?.sentAt ?? "";
   if (aSent !== bSent) return bSent.localeCompare(aSent);
-  return byFitThenCompany(a, b);
+  return byCompany(a, b);
 }
 
 const BUCKET_META: Record<
@@ -229,12 +227,12 @@ export function OutreachView({
 
   const reviewRows = useStableDuringLoad(
     grouped.review,
-    byFitThenCompany,
+    byCompany,
     backfilling,
   );
   const readyRows = useStableDuringLoad(
     grouped.ready,
-    byFitThenCompany,
+    byCompany,
     backfilling,
   );
   const contactedRows = useStableDuringLoad(
@@ -541,9 +539,6 @@ function OutreachRow({
         ) : null}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <div className="origin-right scale-90">
-          <FitMeter score={lead.fitScore} />
-        </div>
         {bucket === "review" && (
           <div className="flex items-center justify-end gap-1">
             <button

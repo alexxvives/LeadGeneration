@@ -24,7 +24,7 @@ const FLOW = [
   {
     n: "02",
     title: "Enrich",
-    body: "Contacts, blurbs, and a transparent fit score.",
+    body: "Website, emails, phones, and an about blurb.",
     icon: SparkIcon,
   },
   {
@@ -53,8 +53,8 @@ const CAPABILITIES = [
     icon: PipelineIcon,
   },
   {
-    title: "Fit scores you can trust",
-    body: "Every score comes with reasons — so you spend time on the right leads, not noise.",
+    title: "Human in the loop",
+    body: "Every send is an explicit yes on that lead. There is no blast-all.",
     icon: SparkIcon,
   },
   {
@@ -221,8 +221,8 @@ export default function LandingPage() {
             </h2>
             <p className="mt-4 text-base leading-relaxed text-mist-200 sm:text-lg">
               Most tools optimize for volume. Hermes Mail optimizes for sends you
-              stand behind — personalized drafts, transparent fit scores, and a
-              hard gate before anything hits an inbox.
+              stand behind — personalized drafts and a hard gate before anything
+              hits an inbox.
             </p>
           </div>
           <ul className="space-y-6">

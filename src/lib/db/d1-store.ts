@@ -1306,11 +1306,9 @@ export class D1Store implements LeadRepository {
     // Pagination only when `limit` is set (Studio progressive hydrate).
     const pageSql = limit != null ? ` LIMIT ? OFFSET ?` : "";
     const pageBind = limit != null ? [limit, offset] : [];
-    // Recent sends first (Pipeline Contacted top), then high-fit (Contact Draft),
-    // so progressive pages fill the top of columns before the bottom.
+    // Recent sends first (Pipeline Contacted top), then newest created.
     const orderSql = `ORDER BY
          CASE WHEN o.status = 'sent' THEN o.sent_at ELSE NULL END DESC,
-         l.fit_score DESC,
          l.created_at DESC`;
 
     if (filter?.runId && filter?.boardId) {

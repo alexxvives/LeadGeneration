@@ -26,7 +26,7 @@ const STEPS = [
   {
     n: "02",
     title: "Enrich",
-    body: "Each prospect is scraped for a website, emails, phones, and an about blurb, then scored for fit — transparently.",
+    body: "Each prospect is scraped for a website, emails, phones, and an about blurb.",
     icon: SparkIcon,
   },
   {

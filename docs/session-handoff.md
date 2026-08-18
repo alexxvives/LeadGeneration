@@ -9,21 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-08 (Hygiene deletes + Easy-only send)
+## ⏱️ Status — updated 2026-08-18 (Hide fit UI + drawer delete)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Hygiene audit executed: safe deletes; **Pro/Gmail mailbox removed** (ADR
-  0026); **Zeruh usage alias removed**; Easy Resend/Maileroo/**SMTP** kept.
-- Quick wins: `getLatestRun` LIMIT 1; `env.isProduction()`; docs + secrets.
-- Report: [`docs/hygiene-audit-2026-08-08.md`](hygiene-audit-2026-08-08.md).
+- Studio no longer shows fit meters / % / reason lists.
+- Delete lead from the info (and draft) drawer, any view.
+- Collapse duplicate “Email sent” + “Email sent by alexxvives” journal lines.
 
 ### Next
-1. Optional: `wrangler secret delete GMAIL_OAUTH_*` (and leftover Zeruh keys).
-2. Deploy after `tsc`/`lint` green.
-3. Later: async search queue; indexed dedupe; conditional quota + encrypt BYO keys.
+1. Deploy after `tsc`/`lint` green.
+2. Optional: wrangler secret delete leftover Gmail / Zeruh keys.
 
 ---
 

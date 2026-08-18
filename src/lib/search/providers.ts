@@ -4,6 +4,8 @@ export interface PageResult {
   title: string | null;
   description: string | null;
   content: string; // markdown or plain text, may be empty
+  /** Live fetch timed out or the origin was down — do not register as a lead. */
+  unreachable?: boolean;
 }
 
 export interface SearchProvider {

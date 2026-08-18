@@ -169,9 +169,13 @@ function DashboardLoaded({
         <StatCard label="Emails sent" value={data.sentCount} />
         <StatCard label="Drafts ready" value={data.draftedCount} />
         <StatCard
-          label="Avg fit score"
-          value={data.avgFitScore}
-          hint={filter === "all" ? "Across all leads" : `On ${scopeLabel}`}
+          label="Contacted"
+          value={
+            (data.byCrmStage.contacted ?? 0) +
+            (data.byCrmStage.in_conversation ?? 0) +
+            (data.byCrmStage.closed ?? 0)
+          }
+          hint={filter === "all" ? "Past New across boards" : `On ${scopeLabel}`}
         />
       </div>
 

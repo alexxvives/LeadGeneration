@@ -48,41 +48,6 @@ export function crmStageLabel(stage: CrmStage): string {
   return CRM_STAGE_STYLES[stage]?.label ?? stage;
 }
 
-export function FitMeter({
-  score,
-  compact = false,
-}: {
-  score: number;
-  /** Smaller bar for dense surfaces (pipeline cards). */
-  compact?: boolean;
-}) {
-  const tone =
-    score >= 75 ? "text-aurora-300" : score >= 55 ? "text-amber-300" : "text-mist-500";
-  const bar =
-    score >= 75 ? "bg-aurora-400" : score >= 55 ? "bg-amber-400" : "bg-mist-500";
-  return (
-    <div className="flex items-center gap-1.5" title={`Fit score ${score}`}>
-      <div
-        className={`meter-track overflow-hidden rounded-full ${
-          compact ? "h-1 w-10" : "h-1.5 w-16"
-        }`}
-      >
-        <div
-          className={`h-full rounded-full ${bar} transition-all`}
-          style={{ width: `${Math.max(6, score)}%` }}
-        />
-      </div>
-      <span
-        className={`font-semibold tabular-nums ${tone} ${
-          compact ? "text-[10px]" : "text-xs"
-        }`}
-      >
-        {score}
-      </span>
-    </div>
-  );
-}
-
 export function Spinner({ className = "" }: { className?: string }) {
   return (
     <span

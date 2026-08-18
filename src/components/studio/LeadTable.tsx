@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
-import { CrmStagePill, FitMeter, StatusPill, crmStageLabel } from "@/components/ui";
+import { CrmStagePill, StatusPill, crmStageLabel } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import { CheckIcon, MailIcon, PhoneIcon, TrashIcon, XIcon } from "@/components/icons";
 import { displayWebsite } from "@/lib/website";
@@ -30,7 +30,7 @@ const STAGE_ORDER: Record<CrmStage, number> = {
 /** Approx row height (py-3.5 + two-line company/contact). */
 const ROW_ESTIMATE_PX = 56;
 
-type SortKey = "company" | "location" | "contact" | "fit" | "status" | "companyType" | "created";
+type SortKey = "company" | "location" | "contact" | "status" | "companyType" | "created";
 
 export function LeadTable({
   leads,
@@ -84,7 +84,7 @@ export function LeadTable({
   const showNotes = !!vis.notes;
   const canDelete = Boolean(onDeleteLead || onDeleteLeads) && !editLocked;
   const colCount =
-    (canDelete ? 1 : 0) + 7 + (showNotes ? 1 : 0) + visibleCustom.length;
+    (canDelete ? 1 : 0) + 6 + (showNotes ? 1 : 0) + visibleCustom.length;
 
   const sortedLeads = useMemo(() => {
     const dir = sort.dir === "asc" ? 1 : -1;
@@ -103,9 +103,6 @@ export function LeadTable({
           cmp = (a.emails[0] ?? "").localeCompare(b.emails[0] ?? "", undefined, {
             sensitivity: "base",
           });
-          break;
-        case "fit":
-          cmp = a.fitScore - b.fitScore;
           break;
         case "created":
           cmp = a.createdAt.localeCompare(b.createdAt);
@@ -145,7 +142,7 @@ export function LeadTable({
       if (prev.key === key) {
         return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
       }
-      const dir = key === "fit" ? "desc" : "asc";
+      const dir = "asc";
       return { key, dir };
     });
   };
@@ -268,15 +265,6 @@ export function LeadTable({
                   className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
                 >
                   Contact{sortMark("contact")}
-                </button>
-              </th>
-              <th className="px-5 py-3 font-medium">
-                <button
-                  type="button"
-                  onClick={() => toggleSort("fit")}
-                  className="inline-flex items-center gap-0.5 uppercase tracking-widest text-mist-500 hover:text-mist-200"
-                >
-                  Fit{sortMark("fit")}
                 </button>
               </th>
               <th className="relative px-5 py-3 font-medium">
@@ -482,9 +470,6 @@ export function LeadTable({
                         </span>
                       </span>
                     </div>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <FitMeter score={l.fitScore} />
                   </td>
                   <td className="relative px-5 py-3.5 whitespace-nowrap">
                     {onMoveStage && !editLocked ? (

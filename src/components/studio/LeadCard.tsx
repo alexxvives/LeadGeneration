@@ -1,7 +1,7 @@
 "use client";
 
 import type { LeadWithOutreach } from "@/lib/types";
-import { CrmStagePill, FitMeter } from "@/components/ui";
+import { CrmStagePill } from "@/components/ui";
 import { GlobeIcon, MailIcon, PhoneIcon } from "@/components/icons";
 import { displayWebsite } from "@/lib/website";
 
@@ -73,8 +73,7 @@ export function LeadCard({
         </span>
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
-        <FitMeter score={lead.fitScore} />
+      <div className="mt-4 flex items-center justify-end border-t border-white/5 pt-4">
         <span className="text-xs font-medium text-aurora-300 opacity-0 transition-opacity group-hover:opacity-100">
           Open →
         </span>

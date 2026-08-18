@@ -77,6 +77,7 @@ import {
   contactMethodsEqual,
   contactMethodsFollowUpNote,
 } from "@/lib/contact-methods";
+import { collapseEmailSentFollowUps } from "@/lib/follow-ups";
 import {
   companyGuessFromEmail,
   isFreeMailDomain,
@@ -1522,7 +1523,7 @@ export async function sendApprovedOutreach(
           ...followUps,
         ];
       }
-      crmPatch.followUps = followUps;
+      crmPatch.followUps = collapseEmailSentFollowUps(followUps, actor);
     }
     await db.updateLead(outreach.leadId, crmPatch);
     await db.incrementWorkspaceUsage(ctx.workspaceId, { sends: 1 });
@@ -2335,11 +2336,17 @@ export async function updateLeadCrm(
         location: patch.location !== undefined ? patch.location : lead.location,
         tags: lead.tags,
         contactName: lead.contactName,
+        companyType: lead.companyType,
       },
       pitchContextFromWorkspace(ws),
     );
     next.fitScore = scored.score;
     next.fitReasons = scored.reasons;
+  }
+
+  const fus = next.followUps ?? patch.followUps;
+  if (fus) {
+    next.followUps = collapseEmailSentFollowUps(fus, actorName);
   }
 
   return db.updateLead(leadId, next);
@@ -2776,6 +2783,7 @@ export async function importLeads(
           location,
           tags: ["imported"],
           contactName: r.contactName,
+          companyType,
         },
         offerNotes || null,
       );

@@ -9,7 +9,7 @@ instructions see [`../README.md`](../README.md); for principles see
 ## 1. The product in one sentence
 
 You describe an ideal customer; Hermes Mail finds matching businesses on the web,
-enriches each with contact info + a fit score, writes a personalized first email
+enriches each with contact info, writes a personalized first email
 for each, and lets you review, approve, and send — one lead at a time.
 
 ## 2. The five-step flow
@@ -22,8 +22,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
    "dentist clinics") and an optional **location**. Submitting creates a `Run`.
    After a successful search (or demo load), the app navigates to **Pipeline**.
 2. **Enrich** — Each web result is turned into a `Lead`: company name, website,
-   emails, phones, an "about" blurb, plus a transparent **fit score (0–100)**
-   where every point is explained. (See
+   emails, phones, an "about" blurb. Fit score is still computed internally
+   but is not shown in the studio (unreliable as a ranking UI). (See
    [`search-and-enrichment.md`](search-and-enrichment.md).)
 3. **Draft** — An `Outreach` email is **auto-generated for every lead** as part
    of the run (lead email-status becomes `queued`). CRM stage stays **New** until

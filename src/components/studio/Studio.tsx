@@ -1879,6 +1879,7 @@ export function Studio() {
   const onDeleteLead = async (leadId: string) => {
     // Stop any in-flight CSV import so rows don’t reappear after delete.
     importAbortRef.current?.abort();
+    setSelectedId((cur) => (cur === leadId ? null : cur));
     setBoard((b) =>
       b ? { ...b, leads: b.leads.filter((l) => l.id !== leadId) } : b,
     );
@@ -2469,6 +2470,14 @@ export function Studio() {
           onSend={requestSend}
           onSetDelivery={onSetDelivery}
           onUpdateCrm={onUpdateLeadCrm}
+          onDeleteLead={
+            editLocked
+              ? undefined
+              : async (id) => {
+                  closeLeadDrawer();
+                  await onDeleteLead(id);
+                }
+          }
         />
       )}
 

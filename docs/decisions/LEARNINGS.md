@@ -4,6 +4,33 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-18 — Hide fit UI; delete from drawer; collapse “Email sent”
+- Fit meter / % / “Why this score” removed from Pipeline, Outreach, Leads
+  table, cards, and the info drawer. Score still stored; not used to rank.
+- Info/draft drawer: trash → confirm Delete lead (same control on Pipeline,
+  Outreach, Leads, Map).
+- Duplicate notes: drawer heal required exact `"Email sent"`, so after the
+  alexxvives backfill it appended a second row. Collapse to one
+  “Email sent by {name}” per day; D1 cleaned the same way.
+
+### 2026-08-18 — Fit score “wir, wir, wir” + dead import websites
+- Imported LUMIA lead `awirutmasajebarcelona.com` scored **56%** with reasons
+  “Strong niche match (wir, wir, wir) / Phone / Has a website”. Site HEAD
+  times out. Import never fetches URLs (Worker budget). Search now drops
+  timeout/down origins; import still trusts the spreadsheet URL.
+- 56 = **50 fake niche** + 4 phone + 2 website. “wir” was a 3-letter pitch
+  token (German *we*) substring-matched inside `awirut…`. Tokens were not
+  de-duplicated, so one hit printed three times. “Weak niche signal (uns)” is
+  the same bug (German *us*, or any 3-letter syllable inside a longer word).
+- Pitch-as-niche used the first 200 chars of the sales email, stuffed into
+  `hay.includes(token)`. Tags from search echoed the query, so live search
+  also got a free strong match. Fix: whole-word tokens, min length 4, no URL
+  / tag hay, pitch reduced to distinctive words.
+- Retroactive D1: email-contacted leads in alexxvives’s workspace now have
+  `contacted_by_name = alexxvives`; notes “Email sent” / “Contacted by email”
+  appended with that name. Stored fit scores stay until a field edit (except
+  the awirut sample row, rescored to 1%).
+
 ### 2026-08-08 — Hygiene cleanup: Pro/Gmail + Zeruh alias gone
 - Deleted Pro mailbox stack (`/api/mailbox*`, `mailbox.ts`, Gmail branch in
   `sendEmail`). Easy SMTP (Hostinger) kept. ADR 0026 supersedes 0010.

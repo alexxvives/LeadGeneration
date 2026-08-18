@@ -2,7 +2,7 @@
 
 **Navigate to your next customer.** A human-in-the-loop lead generation studio.
 Describe an ideal customer in plain English → Hermes Mail searches the web,
-enriches each prospect, scores fit, drafts a personalized outreach email, and
+enriches each prospect, drafts a personalized outreach email, and
 puts every message in an approval queue. **Nothing is sent without your explicit
 per-lead approval.**
 
@@ -34,7 +34,7 @@ Open <http://localhost:3000> for the landing page, or go straight to
 1. **Search** — Enter a niche/ICP (e.g. "dentist clinics") and optional location
    on the studio **Search** view.
 2. **Enrich** — Each result is scraped for website, emails, phones, and an about
-   blurb, then given a transparent 0–100 **fit score** (every point is explained).
+   blurb.
 3. **Draft** — A personalized first email is **auto-generated for every lead** as
    part of the run. Open any lead to edit or **Regenerate** the draft.
 4. **Approve** — Review in the drawer, then **Approve** or **Reject** per lead.

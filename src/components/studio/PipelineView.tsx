@@ -16,7 +16,6 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { MailIcon, PhoneIcon, FormIcon, InfoIcon } from "@/components/icons";
-import { FitMeter } from "@/components/ui";
 import { displayWebsite } from "@/lib/website";
 import { Bone, useStableDuringLoad } from "./skeletons";
 
@@ -82,8 +81,6 @@ function compareColumnLeads(stage: CrmStage) {
       const bSent = b.outreach?.sentAt ?? "";
       if (aSent !== bSent) return bSent.localeCompare(aSent);
     }
-    const fit = b.fitScore - a.fitScore;
-    if (fit !== 0) return fit;
     return a.company.localeCompare(b.company, undefined, { sensitivity: "base" });
   };
 }
@@ -473,9 +470,7 @@ function DraggablePipelineCard({
         {subtitle && (
           <p className="mt-0.5 truncate text-xs leading-snug text-mist-500">{subtitle}</p>
         )}
-        {/* Fit + tags on one row so cards stay short (no wrap under the meter). */}
         <div className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden">
-          <FitMeter score={lead.fitScore} compact />
           {bounced ? (
             <span className="shrink-0 rounded-full bg-rose-400/20 px-1.5 py-0.5 text-[10px] font-medium text-rose-200">
               Bounced

@@ -29,8 +29,10 @@ not replace find+fetch.
 2. **Firecrawl search + scrape:** `/v1/search`, then per hit: scrape the
    **landing** page (`onlyMainContent: false` — header/footer) first. If still
    no email → `/contacto` then `/contact`. **No `/map`**. Skip scrape when the
-   search snippet already has an email. Regex: emails, phones, address;
-   `suggestCompanyType` for category. AI blurb polish is optional/cheap.
+   search snippet already has an email (still probe that the origin responds).
+   If the site **times out or is down**, the candidate is dropped — we do not
+   register a lead whose website we could not load. Regex: emails, phones,
+   address; `suggestCompanyType` for category. AI blurb polish is optional/cheap.
 3. **Enrichment** (`enrich.ts`) — Phase B improvements shipped 2026-07-14:
    - **Company name**: splits the page title on common separators (` | `, ` - `,
      ` — `, `:`), skips generic segments ("Contact Us", "Home", "About", "Welcome
@@ -54,13 +56,22 @@ not replace find+fetch.
 5. **Fit score** (`fit-score.ts`): **niche + location first** (up to ~75), then
    contactability (up to ~25) scaled down when relevance is weak — so a random
    email with no niche signal stays low. No free points for “appeared in
-   search”. Location mismatch can erase the score. Imports use the same rubric
-   via `scoreImportedLead` (contactability-led when there is no niche). CSV/Excel
-   import scores from spreadsheet columns only (no per-row website fetch) so
-   large lists stay fast. Manual “Add lead” starts at 0% (blank row); editing
-   company/website/emails/phones/location/blurb rescores the same way, using
-   the active outreach pitch as soft niche context. Every point is explained
-   in `fitReasons` in the Lead detail drawer.
+   search”. Location mismatch can erase the score.
+   - Niche tokens are **whole words** (not substrings), de-duplicated, length ≥4
+     (plus a short allowlist: spa, gym, …). Filler like German *wir*/*uns* or
+     Spanish *por*/*que* is ignored. Matching looks at company, blurb, location,
+     and category — **not** the website URL and **not** tags (tags used to echo
+     the search query, which guaranteed a fake “strong match”).
+   - Imports use the same rubric via `scoreImportedLead`. The sales pitch is
+     reduced to distinctive words (not the first 200 characters of the email as
+     a fake ICP). CSV/Excel import still does **no per-row website fetch** so
+     large lists stay fast — a timeout check on 2k rows would blow the Worker
+     budget. Live **search** drops a candidate when the origin times out or is
+     down (`probeWebsite` / Firecrawl scrape abort).
+   - Manual “Add lead” starts at 0% (blank row); editing
+     company/website/emails/phones/location/blurb rescores internally.
+     The studio no longer shows a fit meter or “why this score” list — the
+     heuristic was too noisy to rank by.
 6. **Fallback**: no key, zero results, or any provider error → deterministic
    **demo leads** from `demo.ts` so the UI always works (constitution Art. I.2).
 
@@ -80,9 +91,9 @@ about the limitations:
   dead. This is the single biggest quality lever for outreach.
 - **Shallow personalization signal.** The "about" blurb is the first long
   sentence — fine, but not a real summary of what the business does or a hook.
-- **The fit score is relevance-first** (niche tokens + location), with
+- **The fit score is relevance-first** (whole-word niche tokens + location), with
   contactability as a secondary boost. It is still heuristic — not LLM ICP
-  reasoning.
+  reasoning. A phone + URL with no real niche overlap should stay low.
 - **Contact pages were shallow.** Mitigated 2026-07-20 (Firecrawl deepen +
   optional JSON extract). Still no full-site crawl or people-DB email finder.
 

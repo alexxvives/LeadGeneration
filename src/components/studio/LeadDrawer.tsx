@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
-import { CrmStagePill, FitMeter, Spinner } from "@/components/ui";
+import { CrmStagePill, Spinner } from "@/components/ui";
 import {
   ArrowIcon,
   CheckIcon,
@@ -14,10 +14,12 @@ import {
   PhoneIcon,
   PinIcon,
   SparkIcon,
+  TrashIcon,
   XIcon,
 } from "@/components/icons";
 import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
+import { collapseEmailSentFollowUps } from "@/lib/follow-ups";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
 import { toggleContactMethod } from "@/lib/contact-methods";
@@ -96,6 +98,8 @@ interface DrawerProps {
       followUps?: FollowUp[];
     },
   ) => Promise<void>;
+  /** Delete this lead (info + draft drawers). Omit when the board is view-only. */
+  onDeleteLead?: (leadId: string) => Promise<void> | void;
 }
 
 function parseList(raw: string): string[] {
@@ -103,15 +107,6 @@ function parseList(raw: string): string[] {
     .split(/[,;\n]+/)
     .map((s) => s.trim())
     .filter(Boolean);
-}
-
-/** Normalize legacy fit-reason strings for display. */
-function formatFitReason(raw: string): string | null {
-  const t = raw.trim();
-  if (!t) return null;
-  if (/^imported from your file$/i.test(t)) return null;
-  if (/^in target location\b/i.test(t)) return "In target location";
-  return t;
 }
 
 // ─── CRM stage config ─────────────────────────────────────────────────────────
@@ -158,6 +153,7 @@ export function LeadDrawer(props: DrawerProps) {
   const [showAddNote, setShowAddNote] = useState(promptNote);
   const [newNoteDate, setNewNoteDate] = useState(todayIsoDate);
   const [newNoteText, setNewNoteText] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const dirty = useMemo(
@@ -183,7 +179,10 @@ export function LeadDrawer(props: DrawerProps) {
   useEffect(() => {
     setCrmStage(lead.crmStage ?? "new");
     setContactMethods(lead.contactMethods ?? []);
-    setFollowUps(lead.followUps ?? []);
+    setFollowUps(
+      collapseEmailSentFollowUps(lead.followUps ?? [], lead.contactedByName),
+    );
+    setConfirmDelete(false);
     if (promptNote) {
       setShowAddNote(true);
       setNewNoteDate(todayIsoDate());
@@ -193,21 +192,42 @@ export function LeadDrawer(props: DrawerProps) {
       setNewNoteDate(todayIsoDate());
       setNewNoteText("");
     }
-  }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, promptNote]);
+  }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, lead.contactedByName, promptNote]);
 
-  // Heal: older sends wrote status but skipped the dated "Email sent" journal.
+  // Heal: older sends wrote status but skipped the dated journal. Never add a
+  // bare "Email sent" next to an existing "Email sent by …" line.
   useEffect(() => {
     if (outreach?.status !== "sent" || !outreach.sentAt) return;
     const sentDay = outreach.sentAt.slice(0, 10);
     const existing = lead.followUps ?? [];
-    const has = existing.some(
-      (f) =>
-        f.note.trim().toLowerCase() === "email sent" && f.date === sentDay,
+    const collapsed = collapseEmailSentFollowUps(
+      existing,
+      lead.contactedByName,
     );
-    if (has) return;
+    const has = collapsed.some(
+      (f) =>
+        f.date === sentDay &&
+        f.note.trim().toLowerCase().startsWith("email sent"),
+    );
+    const notesChanged =
+      collapsed.length !== existing.length ||
+      collapsed.some((f, i) => f.note !== existing[i]?.note || f.id !== existing[i]?.id);
+    if (has) {
+      if (notesChanged) {
+        setFollowUps(collapsed);
+        void props.onUpdateCrm(lead.id, { followUps: collapsed });
+      }
+      return;
+    }
+    const actor = lead.contactedByName?.trim();
     const updated: FollowUp[] = [
-      { id: newId("fu"), date: sentDay, note: "Email sent", done: false },
-      ...existing,
+      {
+        id: newId("fu"),
+        date: sentDay,
+        note: actor ? `Email sent by ${actor}` : "Email sent",
+        done: false,
+      },
+      ...collapsed,
     ];
     setFollowUps(updated);
     void props.onUpdateCrm(lead.id, { followUps: updated });
@@ -388,7 +408,6 @@ export function LeadDrawer(props: DrawerProps) {
             {mode === "info" ? (
               <div className="flex items-center gap-2">
                 <CrmStagePill stage={lead.crmStage ?? "new"} />
-                <FitMeter score={lead.fitScore} />
               </div>
             ) : null}
             {mode === "draft" ? (
@@ -420,15 +439,49 @@ export function LeadDrawer(props: DrawerProps) {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={requestClose}
-            className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100"
-            aria-label="Close (Esc)"
-            title="Close (Esc)"
-          >
-            <XIcon className="h-5 w-5" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {props.onDeleteLead ? (
+              confirmDelete ? (
+                <div className="mr-1 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void props.onDeleteLead!(lead.id);
+                    }}
+                    className="rounded-full bg-rose-400 px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-rose-300"
+                  >
+                    Delete lead
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    className="rounded-full px-2 py-1.5 text-xs text-mist-400 hover:text-mist-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300"
+                  aria-label={`Delete ${lead.company}`}
+                  title="Delete lead"
+                >
+                  <TrashIcon className="h-5 w-5" />
+                </button>
+              )
+            ) : null}
+            <button
+              type="button"
+              onClick={requestClose}
+              className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100"
+              aria-label="Close (Esc)"
+              title="Close (Esc)"
+            >
+              <XIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <div
@@ -612,38 +665,6 @@ export function LeadDrawer(props: DrawerProps) {
                 }
               }}
             />
-          </section>
-
-          {/* Fit score reasoning */}
-          <section>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <SectionLabel>Why this fit score</SectionLabel>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`font-display text-2xl font-semibold tabular-nums leading-none ${
-                    lead.fitScore >= 75
-                      ? "text-aurora-300"
-                      : lead.fitScore >= 55
-                        ? "text-amber-300"
-                        : "text-mist-400"
-                  }`}
-                >
-                  {lead.fitScore}
-                  <span className="text-sm font-normal text-mist-500">%</span>
-                </span>
-              </div>
-            </div>
-            <ul className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
-              {lead.fitReasons
-                .map(formatFitReason)
-                .filter((r): r is string => Boolean(r))
-                .map((r) => (
-                  <li key={r} className="flex items-start gap-2 text-sm text-mist-300">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-aurora-400" />
-                    {r}
-                  </li>
-                ))}
-            </ul>
           </section>
           </div>
 

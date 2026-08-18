@@ -1,4 +1,5 @@
 import { env } from "@/lib/config";
+import { probeWebsite } from "@/lib/website";
 import { extractEmails } from "./enrich";
 import type { PageResult, SearchProvider } from "./providers";
 
@@ -29,6 +30,7 @@ interface FirecrawlItem {
 
 interface ScrapeResult {
   markdown: string;
+  timedOut: boolean;
 }
 
 async function firecrawlFetch(url: string, body: unknown): Promise<Response> {
@@ -97,15 +99,20 @@ async function scrapePage(pageUrl: string): Promise<ScrapeResult> {
       formats: ["markdown"],
       onlyMainContent: false,
     });
-    if (!res.ok) return { markdown: "" };
+    if (!res.ok) return { markdown: "", timedOut: false };
     const json = (await res.json()) as {
       data?: { markdown?: string; content?: string };
     };
     return {
       markdown: json.data?.markdown ?? json.data?.content ?? "",
+      timedOut: false,
     };
-  } catch {
-    return { markdown: "" };
+  } catch (err) {
+    const msg = err instanceof Error ? `${err.name} ${err.message}` : "";
+    return {
+      markdown: "",
+      timedOut: /timeout|aborted|AbortError/i.test(msg),
+    };
   }
 }
 
@@ -179,21 +186,38 @@ function mergeContent(base: string, extra: string): string {
 /**
  * Landing header/footer first (blurb + address + often email/phone) →
  * /contacto then /contact only if still no email.
- * Always keep whatever contact we find. Never drops for missing email.
+ * Missing email is fine. Unreachable origins (timeout / down) set
+ * `page.unreachable` so search will not register the lead.
  */
 export async function enrichFirecrawlPage(page: PageResult): Promise<void> {
   let merged = page.content ?? "";
+  const snippetHadEmail = extractEmails(merged).length > 0;
 
-  // Search snippet already has an email — keep phones/address from it; done.
-  if (extractEmails(merged).length > 0) {
+  // Search snippet already has an email — still confirm the origin is live.
+  if (snippetHadEmail) {
+    const live = await probeWebsite(page.url);
+    if (live === "timeout" || live === "down") {
+      page.unreachable = true;
+      return;
+    }
     page.content = merged;
     return;
   }
 
   // Homepage first — one credit; often enough for email + phone + address.
   const landing = await scrapePage(page.url);
+  if (landing.timedOut) {
+    page.unreachable = true;
+    return;
+  }
   if (landing.markdown) {
     merged = mergeContent(merged, landing.markdown);
+  } else {
+    const live = await probeWebsite(page.url);
+    if (live === "timeout" || live === "down") {
+      page.unreachable = true;
+      return;
+    }
   }
   if (extractEmails(merged).length > 0) {
     page.content = merged;

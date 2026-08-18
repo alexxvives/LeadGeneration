@@ -218,6 +218,7 @@ export async function runSearch(input: CreateRunInput): Promise<SearchOutcome> {
     for (const page of chunk) {
       if (strategy === "standard" && collected.length >= target) break;
       if (strategy === "complete" && withEmail >= target) break;
+      if (page.unreachable) continue;
 
       const raw = pageToRawLead(page, input);
       const haystack = `${page.title ?? ""}\n${page.description ?? ""}\n${page.content}`;

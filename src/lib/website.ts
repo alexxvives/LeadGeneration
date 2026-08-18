@@ -98,3 +98,35 @@ export function normalizeWebsiteUrl(website: string | null | undefined): string 
     return null;
   }
 }
+
+export type WebsiteProbe = "ok" | "timeout" | "down" | "invalid";
+
+/**
+ * Cheap live check (Worker GET, 5s). Used when Firecrawl did not confirm the
+ * page exists. Timeout / 5xx → caller should drop the search candidate.
+ * Imports do not call this (too slow for spreadsheet batches).
+ */
+export async function probeWebsite(
+  website: string | null | undefined,
+  timeoutMs = 5_000,
+): Promise<WebsiteProbe> {
+  const url = normalizeWebsiteUrl(website);
+  if (!url) return "invalid";
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: {
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        "User-Agent": "HermesMail-LeadCheck/1.0",
+      },
+    });
+    if (res.status >= 500) return "down";
+    return "ok";
+  } catch (err) {
+    const msg = err instanceof Error ? `${err.name} ${err.message}` : "";
+    if (/timeout|aborted|AbortError/i.test(msg)) return "timeout";
+    return "down";
+  }
+}

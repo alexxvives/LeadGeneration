@@ -9,6 +9,7 @@ export interface RawLead {
   location: string | null;
   tags: string[];
   contactName?: string | null;
+  companyType?: string | null;
 }
 
 /**
@@ -29,31 +30,36 @@ export function scoreLead(
 ): { score: number; reasons: string[] } {
   const reasons: string[] = [];
   const blurb = lead.aboutBlurb?.trim() ?? "";
-  const hay = [
+  // Company / blurb / location / type only. Never the website URL or tags —
+  // tags often echo the search query, and URLs substring-match junk tokens
+  // (e.g. German “wir” inside “awirutmasajebarcelona.com”).
+  const hayText = [
     lead.company,
     blurb,
-    lead.tags.join(" "),
-    lead.website ?? "",
     lead.location ?? "",
-  ]
-    .join(" ")
-    .toLowerCase();
+    lead.companyType ?? "",
+  ].join(" ");
+  const hayTokens = new Set(nicheTokens(hayText));
 
   // ── Niche relevance (0–50) ────────────────────────────────────────────────
   let nicheScore = 0;
   const niche = input.niche?.toLowerCase().trim() ?? "";
   const tokens = niche ? nicheTokens(niche) : [];
   if (tokens.length > 0) {
-    const hits = tokens.filter((t) => hay.includes(t));
+    const hits = uniqueHits(tokens, hayTokens);
     const ratio = hits.length / tokens.length;
     if (hits.length === 0) {
-      reasons.push("No clear niche match in name, blurb, or tags");
-    } else if (ratio >= 0.6 || hits.length >= 3) {
+      reasons.push("No clear niche match in name, blurb, or category");
+    } else if (hits.length >= 3 || ratio >= 0.5) {
       nicheScore = 50;
       reasons.push(`Strong niche match (${hits.slice(0, 3).join(", ")})`);
-    } else if (hits.length >= 2 || ratio >= 0.35) {
+    } else if (hits.length >= 2 || (hits.length === 1 && hits[0]!.length >= 5)) {
       nicheScore = 32;
-      reasons.push(`Partial niche match (${hits.slice(0, 2).join(", ")})`);
+      reasons.push(
+        hits.length >= 2
+          ? `Partial niche match (${hits.slice(0, 2).join(", ")})`
+          : `Niche match (“${hits[0]}”)`,
+      );
     } else {
       nicheScore = 16;
       reasons.push(`Weak niche signal (“${hits[0]}”)`);
@@ -76,7 +82,7 @@ export function scoreLead(
       );
     } else if (
       city &&
-      /\b(ny|nyc|new york|usa|united states)\b/i.test(hay) &&
+      /\b(ny|nyc|new york|usa|united states)\b/i.test(hayText) &&
       /spain|españa|catalonia|catalunya/i.test(wantLoc)
     ) {
       locationScore = -35;
@@ -155,11 +161,7 @@ export function scoreImportedLead(
   score: number;
   reasons: string[];
 } {
-  const nicheFromPitch = (offerNotes ?? "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 200);
+  const nicheFromPitch = pitchToNicheContext(offerNotes);
   const { score, reasons } = scoreLead(lead, {
     niche: nicheFromPitch,
     location: lead.location,
@@ -169,6 +171,43 @@ export function scoreImportedLead(
     reasons: reasons.filter((r) => !r.startsWith("No email")),
   };
 }
+
+/** Distinctive words from a sales pitch — not the whole email as a fake ICP. */
+function pitchToNicheContext(offerNotes?: string | null): string {
+  const plain = (offerNotes ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\{[^}]+\}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!plain) return "";
+  return [...new Set(nicheTokens(plain))].slice(0, 24).join(" ");
+}
+
+function uniqueHits(tokens: string[], hayTokens: Set<string>): string[] {
+  const seen = new Set<string>();
+  const hits: string[] = [];
+  for (const t of tokens) {
+    if (seen.has(t) || !hayTokens.has(t)) continue;
+    seen.add(t);
+    hits.push(t);
+  }
+  return hits;
+}
+
+/** 3-letter ICPs we still want to match (spa, gym, …). */
+const SHORT_NICHE = new Set([
+  "spa",
+  "gym",
+  "seo",
+  "b2b",
+  "app",
+  "law",
+  "vet",
+  "bar",
+  "pub",
+  "prp",
+  "med",
+]);
 
 function nicheTokens(niche: string): string[] {
   const stop = new Set([
@@ -191,7 +230,43 @@ function nicheTokens(niche: string): string[] {
     "company",
     "business",
     "businesses",
-    // Romance / Germanic articles that leak into niche strings
+    "that",
+    "this",
+    "from",
+    "have",
+    "been",
+    "they",
+    "them",
+    "their",
+    "your",
+    "our",
+    "are",
+    "was",
+    "were",
+    "will",
+    "would",
+    "could",
+    "should",
+    "about",
+    "into",
+    "over",
+    "more",
+    "only",
+    "than",
+    "then",
+    "some",
+    "just",
+    "very",
+    "also",
+    "what",
+    "when",
+    "which",
+    "while",
+    "these",
+    "those",
+    "imported",
+    "demo-data",
+    // Romance / Germanic articles and filler that leak into niche / pitch
     "el",
     "la",
     "los",
@@ -199,6 +274,43 @@ function nicheTokens(niche: string): string[] {
     "del",
     "una",
     "uno",
+    "unos",
+    "unas",
+    "por",
+    "para",
+    "con",
+    "que",
+    "como",
+    "este",
+    "esta",
+    "esto",
+    "desde",
+    "somos",
+    "hemos",
+    "tiene",
+    "entre",
+    "sobre",
+    "pero",
+    "muy",
+    "sus",
+    "les",
+    "nos",
+    "wir",
+    "uns",
+    "ihr",
+    "sie",
+    "eine",
+    "einer",
+    "einen",
+    "nicht",
+    "sich",
+    "dass",
+    "oder",
+    "auch",
+    "nach",
+    "kein",
+    "sind",
+    "wird",
     "der",
     "die",
     "das",
@@ -212,8 +324,14 @@ function nicheTokens(niche: string): string[] {
     "dei",
     "delle",
   ]);
-  return niche
-    .split(/[^a-z0-9à-ÿ]+/i)
-    .map((t) => t.trim().toLowerCase())
-    .filter((t) => t.length >= 3 && !stop.has(t));
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of niche.split(/[^a-z0-9à-ÿ]+/i)) {
+    const t = raw.trim().toLowerCase();
+    if (!t || seen.has(t) || stop.has(t)) continue;
+    if (t.length < 4 && !SHORT_NICHE.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
 }
