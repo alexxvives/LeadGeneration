@@ -9,16 +9,13 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-18 (Calendar layout / sidebar)
+## ⏱️ Status — updated 2026-08-18 (Sidebar nav type)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Calendar fills remaining height with a visible bottom gutter (padding was
-  clipped before). Day list matches calendar card height.
-- Month/year centered at top; legend centered under the grid.
-- Sidebar ~10% narrower (16.5rem). Board cards: no Verify-before-send switch.
+- Sidebar nav labels/icons ~20% larger (section `12px`, items `text-sm`, icons 20px).
 
 ### Next
 1. Deploy after `tsc`/`lint` green.
