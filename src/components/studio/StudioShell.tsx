@@ -217,8 +217,14 @@ export function StudioShell({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const ok = isGuestSession();
-    if (!ok && !authRequired && status !== "authenticated") {
+    if (status === "loading") return;
+    // Local / demo: studio is already usable. Don't drop a sign-in overlay
+    // on top of Search — Sign in stays on the account card.
+    if (!authRequired && status !== "authenticated") {
+      markGuestSession();
+      return;
+    }
+    if (authRequired && status === "unauthenticated") {
       setAuthOpen(true);
     }
   }, [authRequired, status]);
@@ -319,17 +325,6 @@ export function StudioShell({
     }[];
   }[] = [
     {
-      label: "Overview",
-      items: [
-        {
-          href: "/app?view=dashboard",
-          label: "Dashboard",
-          icon: DashboardIcon,
-          active: onApp && displayView === "dashboard",
-        },
-      ],
-    },
-    {
       label: "Find",
       items: [
         {
@@ -383,6 +378,12 @@ export function StudioShell({
           label: "Runs",
           icon: HistoryIcon,
           active: onApp && displayView === "runs",
+        },
+        {
+          href: "/app?view=dashboard",
+          label: "Dashboard",
+          icon: DashboardIcon,
+          active: onApp && displayView === "dashboard",
         },
       ],
     },

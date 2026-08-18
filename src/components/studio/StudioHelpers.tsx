@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Spinner } from "@/components/ui";
 import { SparkIcon } from "@/components/icons";
 
@@ -28,14 +29,26 @@ export function LayoutToggle({
 }
 
 /** Compact empty CTA — no full-bleed image/gradient (that bled into Search). */
-export function EmptyState() {
+export function EmptyState({
+  actionHref = "/app",
+  actionLabel = "Find leads",
+}: {
+  actionHref?: string;
+  actionLabel?: string;
+}) {
   return (
     <div className="rounded-xl2 border border-dashed border-white/10 px-6 py-10 text-center sm:px-8">
       <SparkIcon className="mx-auto h-7 w-7 text-aurora-300" />
       <h2 className="mt-3 font-display text-xl font-semibold text-mist-100">Your board is clear</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-mist-300">
-        Run a search, import a list, or use Add lead to fill one in by hand.
+        Search a niche, import a list, or add a lead by hand — then approve and send one at a time.
       </p>
+      <Link
+        href={actionHref}
+        className="mt-5 inline-flex items-center justify-center rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
+      >
+        {actionLabel}
+      </Link>
     </div>
   );
 }

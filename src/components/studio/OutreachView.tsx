@@ -5,14 +5,12 @@ import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
 import { warmupStatus } from "@/lib/email/warmup";
 import { Spinner } from "@/components/ui";
 import {
-  ArrowIcon,
   CheckIcon,
   InfoIcon,
   MailIcon,
   PhoneIcon,
 } from "@/components/icons";
 import { useStableDuringLoad } from "./skeletons";
-import { isMissedCallNote } from "@/lib/follow-ups";
 
 type OutreachBucket = "review" | "ready" | "contacted";
 /** Ready-column contact-channel filter. */
@@ -161,6 +159,7 @@ export function OutreachView({
   onSend,
   onDraftAll,
   onMarkContacted,
+  onLogCall,
 }: {
   leads: LeadWithOutreach[];
   /** Workspace DB count of emails sent since local midnight. */
@@ -185,6 +184,8 @@ export function OutreachView({
     method: ContactMethod,
     opts?: { promptNote?: boolean; missed?: boolean },
   ) => Promise<void>;
+  /** Ready phone-only: open the call log without moving to Contacted yet. */
+  onLogCall?: (leadId: string) => void;
 }) {
   const busySet = useMemo(() => new Set(busyIds), [busyIds]);
   const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
@@ -403,6 +404,9 @@ export function OutreachView({
                       onMarkContacted={(method, opts) =>
                         onMarkContacted(lead.id, method, opts)
                       }
+                      onLogCall={
+                        onLogCall ? () => onLogCall(lead.id) : undefined
+                      }
                     />
                   ))
                 )}
@@ -416,7 +420,7 @@ export function OutreachView({
 }
 
 const ACTION_BTN =
-  "inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-medium leading-none";
+  "inline-flex h-7 min-h-7 min-w-[1.75rem] items-center justify-center gap-1 rounded-full px-2.5 text-[11px] font-medium leading-none";
 
 function OutreachRow({
   lead,
@@ -431,6 +435,7 @@ function OutreachRow({
   onApproveAndSend,
   onSend,
   onMarkContacted,
+  onLogCall,
 }: {
   lead: LeadWithOutreach;
   bucket: OutreachBucket;
@@ -447,6 +452,7 @@ function OutreachRow({
     method: ContactMethod,
     opts?: { promptNote?: boolean; missed?: boolean },
   ) => Promise<void>;
+  onLogCall?: () => void;
 }) {
   const email = leadEmail(lead);
   const phone = leadPhone(lead);
@@ -573,7 +579,7 @@ function OutreachRow({
               }
               className={`${ACTION_BTN} bg-amber-400 text-on-accent disabled:opacity-50`}
             >
-              {busy ? <Spinner className="h-2.5 w-2.5" /> : <CheckIcon className="h-2.5 w-2.5" />}
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : "Approve"}
             </button>
             <button
               type="button"
@@ -591,7 +597,7 @@ function OutreachRow({
               }
               className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
             >
-              {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
+              {busy ? <Spinner className="h-2.5 w-2.5" /> : "Send"}
             </button>
           </div>
         )}
@@ -616,17 +622,18 @@ function OutreachRow({
                   title={canSendEmail ? "Send" : "Send (simulate)"}
                   className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
                 >
-                  {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
+                  {busy ? <Spinner className="h-2.5 w-2.5" /> : "Send"}
                 </button>
               ) : phoneOnly ? (
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() =>
-                    void onMarkContacted("phone", { promptNote: true })
-                  }
-                  aria-label="Mark called — move to Contacted"
-                  title="After you call — move to Contacted and add a note"
+                  onClick={() => {
+                    if (onLogCall) onLogCall();
+                    else void onMarkContacted("phone", { promptNote: true });
+                  }}
+                  aria-label="Log a call — stays in Ready until you save as connected"
+                  title="Log the call. Missed stays in Ready; connected moves to Contacted."
                   className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
                 >
                   {busy ? <Spinner className="h-2.5 w-2.5" /> : "Call"}
@@ -692,13 +699,6 @@ function OutreachRow({
                   className={`${ACTION_BTN} border border-sky-400/30 bg-sky-400/10 text-sky-200`}
                 >
                   Phone
-                </span>
-              ) : null}
-              {(lead.followUps ?? []).some((f) => isMissedCallNote(f.note)) ? (
-                <span
-                  className={`${ACTION_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-200`}
-                >
-                  Missed
                 </span>
               ) : null}
             </div>

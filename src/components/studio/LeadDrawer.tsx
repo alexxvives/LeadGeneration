@@ -455,7 +455,41 @@ export function LeadDrawer(props: DrawerProps) {
     setComposerKind("note");
     setNewNoteDate(todayIsoDate());
     setNewNoteText("");
-    await props.onUpdateCrm(lead.id, { followUps: updated, notes: null });
+    // Missed = journal only. A connected call (Save / Skip details) is what
+    // advances CRM — otherwise Ready phone-only leads jumped to Contacted.
+    let crmPatch: {
+      followUps: FollowUp[];
+      notes: null;
+      crmStage?: CrmStage;
+      contactMethods?: ContactMethod[];
+    } = { followUps: updated, notes: null };
+    if (callMode === "missed") {
+      const methods = contactMethods.filter((m) => m !== "phone");
+      const stage =
+        methods.length === 0 && (crmStage === "contacted" || crmStage === "new")
+          ? "new"
+          : crmStage;
+      crmPatch = {
+        ...crmPatch,
+        crmStage: stage,
+        contactMethods: methods,
+      };
+      setCrmStage(stage);
+      setContactMethods(methods);
+    } else if (callMode === "call") {
+      const methods: ContactMethod[] = contactMethods.includes("phone")
+        ? contactMethods
+        : [...contactMethods, "phone"];
+      const stage = crmStage === "new" ? "contacted" : crmStage;
+      crmPatch = {
+        ...crmPatch,
+        crmStage: stage,
+        contactMethods: methods,
+      };
+      setCrmStage(stage);
+      setContactMethods(methods);
+    }
+    await props.onUpdateCrm(lead.id, crmPatch);
     if (promptNote) props.onPromptNoteDone?.();
   };
 
@@ -821,7 +855,9 @@ export function LeadDrawer(props: DrawerProps) {
                           : "Log the call"}
                       </p>
                       <p className="mt-0.5 text-[11px] leading-snug text-mist-400">
-                        Write how it went after the name, or mark it missed.
+                        {callPrompt === "missed" || promptNote === "missed"
+                          ? "Stays in Ready — this is a journal line, not a contact."
+                          : "Save or skip to mark Contacted. Missed call stays in Ready."}
                       </p>
                     </div>
                     {props.onUndoMarkContacted ? (

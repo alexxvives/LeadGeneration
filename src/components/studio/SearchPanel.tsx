@@ -99,9 +99,9 @@ function LocationCombobox({
 
   const handleInput = (raw: string) => {
     setInputValue(raw);
-    // Typing clears confirmation — must pick from the list again.
+    // Typing clears the geocode pick — free-text is still a valid optional location.
     onConfirmedChange(false);
-    onChange("");
+    onChange(raw);
     setActiveIndex(-1);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (raw.trim().length < 2) {
@@ -176,7 +176,7 @@ function LocationCombobox({
           onChange={(e) => handleInput(e.target.value)}
           onKeyDown={onKeyDown}
           onFocus={() => suggestions.length > 0 && setOpen(true)}
-          placeholder="Type a city, then pick from the list"
+          placeholder="City or region"
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
@@ -185,7 +185,7 @@ function LocationCombobox({
           className={`w-full rounded-lg border bg-ink-900/60 px-4 py-3 pr-8 text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60 ${
             needsPick ? "border-amber-400/40" : "border-white/10"
           }`}
-          aria-invalid={needsPick}
+          aria-describedby={needsPick ? `${listId}-hint` : undefined}
         />
         {loading && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -205,8 +205,8 @@ function LocationCombobox({
       </div>
 
       {needsPick && (
-        <p className="mt-1.5 text-xs text-amber-200/80">
-          Pick a place from the suggestions
+        <p id={`${listId}-hint`} className="mt-1.5 text-xs text-amber-200/80">
+          Pick a suggestion, or Find leads with what you typed
         </p>
       )}
 
@@ -328,10 +328,7 @@ export function SearchPanel({
   // stay on the server (402) so a Firecrawl usage blip can't look like "Search
   // disabled" when the admin toggle is On.
   const canSubmit =
-    findLeadsEnabled &&
-    niche.trim().length > 0 &&
-    locationConfirmed &&
-    !running;
+    findLeadsEnabled && niche.trim().length > 0 && !running;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -411,11 +408,11 @@ export function SearchPanel({
             autoFocus
             value={niche}
             onChange={(e) => setNiche(e.target.value)}
-            placeholder=""
+            placeholder="e.g. dentist clinics"
             className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-4 py-3 text-mist-100 outline-none transition-colors placeholder:text-mist-500 focus:border-aurora-400/60"
           />
         </Field>
-        <Field label="Location" hint="Optional — pick from suggestions">
+        <Field label="Location" hint="Optional">
           <LocationCombobox
             value={location}
             confirmed={locationConfirmed}
@@ -425,13 +422,13 @@ export function SearchPanel({
         </Field>
       </div>
 
-      {(icps.length > 0 || niche.trim()) && (
+      {icps.length > 0 ? (
         <div className="mt-4 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-widest text-mist-500">
-              Saved ICPs
+              Saved searches
             </p>
-            {niche.trim() && (
+            {niche.trim() ? (
               <button
                 type="button"
                 onClick={() => setShowSave((v) => !v)}
@@ -439,9 +436,9 @@ export function SearchPanel({
               >
                 {showSave ? "Cancel" : "Save current"}
               </button>
-            )}
+            ) : null}
           </div>
-          {showSave && (
+          {showSave ? (
             <div className="mt-2 flex flex-wrap gap-2">
               <input
                 value={saveName}
@@ -457,37 +454,66 @@ export function SearchPanel({
                 Save
               </button>
             </div>
-          )}
-          {icps.length > 0 ? (
-            <ul className="mt-2 flex flex-wrap gap-2">
-              {icps.map((icp) => (
-                <li key={icp.id} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-ink-900/50 pl-3 pr-1 py-1 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => applyIcp(icp)}
-                    className="font-medium text-mist-100 hover:text-aurora-300"
-                    title={`${icp.niche}${icp.location ? ` · ${icp.location}` : ""}`}
-                  >
-                    {icp.name}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteIcp(icp.id)}
-                    className="rounded-full px-1.5 py-0.5 text-mist-500 hover:bg-white/5 hover:text-mist-200"
-                    aria-label={`Delete ${icp.name}`}
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
+          ) : null}
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {icps.map((icp) => (
+              <li key={icp.id} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-ink-900/50 pl-3 pr-1 py-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => applyIcp(icp)}
+                  className="font-medium text-mist-100 hover:text-aurora-300"
+                  title={`${icp.niche}${icp.location ? ` · ${icp.location}` : ""}`}
+                >
+                  {icp.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteIcp(icp.id)}
+                  className="rounded-full px-1.5 py-0.5 text-mist-500 hover:bg-white/5 hover:text-mist-200"
+                  aria-label={`Delete ${icp.name}`}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : niche.trim() ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {showSave ? (
+            <>
+              <input
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="Name this search"
+                className="min-w-[10rem] flex-1 rounded-lg border border-white/10 bg-ink-900/60 px-3 py-1.5 text-sm outline-none focus:border-aurora-400/60"
+              />
+              <button
+                type="button"
+                onClick={handleSaveIcp}
+                className="rounded-full bg-aurora-400 px-3 py-1.5 text-xs font-medium text-on-accent"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSave(false)}
+                className="text-xs text-mist-500 hover:text-mist-300"
+              >
+                Cancel
+              </button>
+            </>
           ) : (
-            <p className="mt-2 text-xs text-mist-500">
-              Save niche + location + offer as a reusable template (stored in this browser).
-            </p>
+            <button
+              type="button"
+              onClick={() => setShowSave(true)}
+              className="text-xs font-medium text-mist-500 hover:text-aurora-300"
+            >
+              Save this search for later
+            </button>
           )}
         </div>
-      )}
+      ) : null}
 
       <div className="mt-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

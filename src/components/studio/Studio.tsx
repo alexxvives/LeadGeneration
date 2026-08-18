@@ -968,6 +968,16 @@ export function Studio() {
   };
 
   const requestSearch = (v: SearchValues) => {
+    const list = boards.length ? boards : board?.boards ?? [];
+    const preferred =
+      (filterBoardId && list.some((b) => b.id === filterBoardId)
+        ? filterBoardId
+        : null) ?? list[0]?.id ?? null;
+    // Sidebar already names the board — skip the extra picker click.
+    if (preferred) {
+      void executeSearch(v, preferred);
+      return;
+    }
     setPendingSearch(v);
     setPendingImport(null);
     setAssignMode("search");
@@ -1569,6 +1579,13 @@ export function Studio() {
     }
   };
 
+  const onLogCall = (leadId: string) => {
+    setDrawerPromptNote("call");
+    setDrawerMode("info");
+    setSelectedId(leadId);
+    void ensureLeadDetail(leadId);
+  };
+
   const onUndoMarkContacted = async (leadId: string) => {
     await onMoveStage(leadId, "new", []);
     setDrawerPromptNote(false);
@@ -1868,6 +1885,7 @@ export function Studio() {
   }, [view]);
 
   const hasLeads = (board?.leads.length ?? 0) > 0;
+  const searchHref = `/app${queryForView("board", filterBoardId)}`;
   const canSearchLive = board?.capabilities.canSearchLive ?? false;
   /** Pipeline / outreach / leads fill the shell; other views scroll inside it. */
   const fillViewport =
@@ -2192,6 +2210,19 @@ export function Studio() {
           {!running && (
             <ImportLeadsPanel
               onPickFile={async (leads) => {
+                const list = boards.length ? boards : board?.boards ?? [];
+                const preferred =
+                  (filterBoardId && list.some((b) => b.id === filterBoardId)
+                    ? filterBoardId
+                    : null) ?? list[0]?.id ?? null;
+                if (preferred) {
+                  try {
+                    await executeImport(leads, { boardId: preferred });
+                  } catch (e) {
+                    handleError(e);
+                  }
+                  return;
+                }
                 setPendingImport(leads);
                 setPendingSearch(null);
                 setAssignMode("import");
@@ -2215,6 +2246,8 @@ export function Studio() {
             <div role="status" aria-busy="true" aria-label="Loading pipeline">
               <PipelineSkeleton />
             </div>
+          ) : !hasLeads ? (
+            <EmptyState actionHref={searchHref} />
           ) : (
             <>
               {leadsBackfilling ? (
@@ -2344,7 +2377,7 @@ export function Studio() {
             {loading || leadsHydrating || !board ? (
               <LeadsLayoutSkeleton layout={layoutTab} />
             ) : !hasLeads ? (
-              <EmptyState />
+              <EmptyState actionHref={searchHref} />
             ) : (
               <>
                 {/* Mount heavy panes only after Leads chrome has painted. */}
@@ -2439,6 +2472,8 @@ export function Studio() {
             <div role="status" aria-busy="true" aria-label="Loading outreach">
               <OutreachSkeleton />
             </div>
+          ) : !hasLeads ? (
+            <EmptyState actionHref={searchHref} />
           ) : (
             <OutreachView
               key={filterBoardId ?? "all"}
@@ -2460,6 +2495,7 @@ export function Studio() {
               }}
               onDraftAll={onDraftAllOutreach}
               onMarkContacted={onMarkContacted}
+              onLogCall={onLogCall}
             />
           )}
         </div>
@@ -2472,6 +2508,8 @@ export function Studio() {
             <div role="status" aria-busy="true" aria-label="Loading calendar">
               <CalendarSkeleton />
             </div>
+          ) : !hasLeads ? (
+            <EmptyState actionHref={searchHref} actionLabel="Find leads to follow up" />
           ) : (
             <CalendarView
               leads={board.leads}
@@ -2514,7 +2552,7 @@ export function Studio() {
           capabilities={board.capabilities}
           onClose={closeLeadDrawer}
           onUndoMarkContacted={
-            drawerPromptNote
+            drawerPromptNote && (selected.crmStage ?? "new") !== "new"
               ? () => onUndoMarkContacted(selected.id)
               : undefined
           }

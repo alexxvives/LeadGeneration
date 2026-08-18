@@ -139,7 +139,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="outreach-queue"]',
       prefer: "right",
       title: "Send from Outreach",
-      body: "Draft → approve → send lives here.",
+      body: "Draft → approve → send lives here. Call a phone-only lead or set a follow-up from the drawer — follow-ups show on Calendar.",
       scrollBlock: "start",
     },
     {
@@ -166,7 +166,7 @@ function buildSteps(): TourStep[] {
       path: "/app",
       target: null,
       title: "You’re ready",
-      body: "Try a search, review drafts under Outreach, and only approve what you’d send yourself.",
+      body: "Search a niche, approve outreach one lead at a time, and set follow-ups so Calendar reminds you.",
     },
   ];
 }

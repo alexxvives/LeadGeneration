@@ -4,6 +4,19 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-18 — First-run “what next” (search / call / empty)
+- Optional location blocked **Find leads** until you picked a geocode
+  suggestion (`locationConfirmed`). Typed text is kept and submit is allowed.
+- Ready **Call** moved to Contacted before the note. A composer **Missed call**
+  then left a Missed tag on Contacted. Call now opens the log only; Save / Skip
+  details = Contacted; Missed = journal, stay Ready. Contacted column no longer
+  shows a Missed status chip.
+- Local `!authRequired` auto-opened the sign-in overlay after session resolve
+  and interrupted Search. Implicit guest; Sign in stays on the account card.
+- Extra clicks: board picker skipped when the sidebar already has a board;
+  Saved ICPs box no longer appears on the first keystroke; Search is first in
+  the nav; empty Pipeline / Outreach / Calendar / Leads have a Find leads CTA.
+
 ### 2026-08-18 — Calendar height + sidebar 10%
 - Calendar `pb-6` on a `flex-1` child was clipped by the studio’s
   `overflow-hidden` shell — the month grid’s min-heights overflowed the

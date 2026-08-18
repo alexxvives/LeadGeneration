@@ -9,13 +9,16 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-18 (Sidebar nav type)
+## ⏱️ Status — updated 2026-08-18 (First-run loop)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Sidebar nav labels/icons ~20% larger (section `12px`, items `text-sm`, icons 20px).
+- Product review + P1s: optional location no longer blocks Find leads; Call
+  logs before Contacted (missed stays Ready); skip board picker when a board
+  is selected; no local sign-in overlay on `/app`; Search-first nav; empty
+  views CTA to Find leads; Outreach Approve/Send labeled.
 
 ### Next
 1. Deploy after `tsc`/`lint` green.

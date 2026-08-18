@@ -58,8 +58,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   when set). `/login` only redirects here (Auth.js `pages.signIn`). Unauth
   `/app` → `/?signin=1&callbackUrl=/app`.
 - **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar
-  nav: **Dashboard · Search · Pipeline · Leads · Outreach · Calendar · Runs · Boards**.
-  Board filter (**All** or one board) sits above the account card. Settings
+  nav: **Search · Leads · Pipeline · Outreach · Calendar · Boards · Runs · Dashboard**.
+  Board filter (the active board) sits above the account card. Settings
   opens from the **account card** at the bottom of the sidebar (not a Workspace
   nav item). **Platform admins** get a slim ops nav (**Dashboard · Users**) and
   an ops-only Settings page (no outreach/send profiles). Views use `?view=`:
@@ -69,8 +69,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     (`?view=admin`) instead.
 
   - **Search** (default / no `?view=`) — always-expanded search form + CSV/Excel
-    import. Search and import open a board-picker modal; leads land on the
-    chosen board (create one if the workspace has none). Import dedupes by **company
+    import. Niche is required; location is optional (type free-text or pick a
+    suggestion). If the sidebar already has a board, Find leads / Import skip
+    the board picker and land there; the picker still opens when the workspace
+    has no boards yet (create one). Import dedupes by **company
     name** only (not website/email — aggregators share those). Live search
     when Firecrawl is configured; otherwise load demo data. After a run, the
     app redirects to Pipeline. Integration status lives in Settings (no mode
@@ -93,9 +95,11 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     when available (or a Google search plan-B when no website).
 
   - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (Create /
-    Review; unapproved drafts stay here) → **Ready** (after Approve) →
-    **Contacted**. Phone-only Ready rows have **Call** (moves to Contacted).
-    A missed attempt is logged from the lead’s **Notes** and stays in Ready.
+    Review / Approve / Send; unapproved drafts stay here) → **Ready** (after
+    Approve) → **Contacted**. Phone-only Ready rows have **Call**, which opens
+    the call log without leaving Ready. **Save** or **Skip details** marks
+    Contacted; **Missed call** journals the miss and stays in Ready.
+    The same miss path exists from the lead’s **Notes**.
     **Draft all** writes (or rewrites) drafts for every
     non-sent email lead and leaves them in Contact Draft until Approve
     (button stays available after profile edits). Closing the draft drawer
