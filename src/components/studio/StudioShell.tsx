@@ -416,7 +416,7 @@ export function StudioShell({
       <div className="pointer-events-none fixed inset-0 -z-10 aurora-glow opacity-40" />
 
       <aside
-        className={`sticky top-0 z-30 flex h-screen flex-col border-r border-white/5 bg-ink-950/90 py-5 backdrop-blur-xl transition-[width] duration-200 ease-out ${
+        className={`sticky top-0 z-30 flex h-screen flex-col border-r border-white/5 bg-ink-950/90 py-3 backdrop-blur-xl transition-[width] duration-200 ease-out ${
           wide ? "relative w-16 sm:w-[18.4rem] sm:px-4" : "relative w-16"
         }`}
       >
@@ -444,7 +444,7 @@ export function StudioShell({
 
         <Link
           href="/"
-          className={`mb-8 flex px-1 transition-opacity hover:opacity-80 ${
+          className={`mb-3 flex px-1 transition-opacity hover:opacity-80 ${
             wide ? "justify-center sm:justify-start sm:pr-8" : "justify-center"
           }`}
         >
@@ -503,11 +503,11 @@ export function StudioShell({
         </nav>
 
         {/* Board + outreach profile filters + account card */}
-        <div className="mt-auto border-t border-white/5 pt-5">
+        <div className="mt-auto border-t border-white/5 pt-3">
           {wide &&
           displayView !== "admin" &&
           displayView !== "admin-users" ? (
-            <div className="mb-5 hidden sm:block">
+            <div className="mb-2 hidden sm:block">
               <BoardPicker
                 boards={boards}
                 activeBoardId={activeBoardId}
@@ -530,22 +530,22 @@ export function StudioShell({
           <div className={wide ? "hidden sm:block" : "hidden"}>
             <Link
               href="/app/settings"
-              className={`block rounded-xl border p-3 transition-colors ${
+              className={`block rounded-xl border p-2 transition-colors ${
                 settingsActive
                   ? "border-aurora-400/30 bg-aurora-400/10"
                   : "border-white/8 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.05]"
               }`}
               title="Open settings"
             >
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-aurora-400/15 text-sm font-semibold text-aurora-300">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-aurora-400/15 text-xs font-semibold text-aurora-300">
                   {signedIn ? (displayName?.[0] ?? userEmail?.[0] ?? "U").toUpperCase() : "G"}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-mist-100">
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p className="truncate text-[13px] font-medium text-mist-100">
                     {signedIn ? (displayName ?? userEmail ?? "Account") : "Guest"}
                   </p>
-                  <p className="truncate text-xs text-mist-500">
+                  <p className="truncate text-[11px] text-mist-500">
                     {signedIn && userEmail && displayName
                       ? userEmail
                       : "Settings"}

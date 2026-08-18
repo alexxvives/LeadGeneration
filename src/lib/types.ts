@@ -59,9 +59,9 @@ export type ContactMethod = "email" | "phone" | "contact_form";
  * Calendar / journal kind. Legacy rows omit this — `resolveFollowUpKind`
  * infers from the note text.
  */
-export type FollowUpKind = "follow_up" | "email" | "phone";
+export type FollowUpKind = "follow_up" | "note" | "email" | "phone";
 
-/** A dated journal line: scheduled follow-up, email send, or phone call. */
+/** A dated journal line: note, scheduled follow-up, email send, or phone call. */
 export interface FollowUp {
   id: string;
   date: string;      // ISO date string, e.g. "2026-08-01"

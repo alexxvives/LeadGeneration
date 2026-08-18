@@ -4,6 +4,25 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-18 — Missed call stays in Ready
+- Ready column “Missed” looked like a status tag and moved the lead to
+  Contacted. Removed it. Log a miss from the info drawer Notes
+  (**Missed call**) — journal only, CRM stage stays New / Ready.
+- Notes header: **Add Note**, **Follow up**, **Missed call**.
+- Sidebar: less padding under the logo and a tighter Board + account block
+  so nav items get more room. Calendar: extra bottom margin so the grid
+  isn’t flush with the screen.
+
+### 2026-08-18 — Bounce ≠ follow-up; notes vs reminders
+- Bounce: delete the address, move email-only leads back to New / not
+  Contacted. Do not journal a follow-up. Outreach `isContacted` ignores a
+  bounced send unless they were reached by phone/form.
+- Phone-call text (`Phone call by …`) stored as `kind: follow_up` showed a
+  checkbox. Resolve kind from the note text so it tags as a Call.
+- Notes composer: **+ Note** (today, free text) vs **+ Follow-up** (date +7d,
+  text “Follow up”). Dropped “Dated follow-ups appear on Calendar” and the
+  draft “Sent · timestamp” line.
+
 ### 2026-08-18 — Call notes vs email notes; missed calls
 - Toggling both email + phone used to write one “Contacted via email, phone”
   line. Journal only the channel just added; phone never auto-writes — the

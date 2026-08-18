@@ -77,7 +77,7 @@ import {
   contactMethodsEqual,
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, isEmailSentNote } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, isBounceNote, isEmailSentNote, resolveFollowUpKind } from "@/lib/follow-ups";
 import {
   companyGuessFromEmail,
   isFreeMailDomain,
@@ -1695,10 +1695,53 @@ export async function setOutreachDeliveryStatus(
     return existing;
   }
 
-  const outreach = await ctx.db.updateOutreach(outreachId, {
+  const outreachPatch: Partial<Outreach> = {
     deliveryStatus,
     updatedAt: nowIso(),
-  });
+  };
+
+  // Bounce: address never landed — drop it, undo Contacted. Not a follow-up.
+  if (deliveryStatus === "bounced" && prev !== "bounced") {
+    const lead = await ctx.db.getLead(existing.leadId);
+    if (lead) {
+      const patch: Partial<Lead> = {};
+      const bouncedAddr = (existing.toEmail ?? "").trim().toLowerCase();
+      let nextEmails = lead.emails;
+      if (bouncedAddr && lead.emails.some((e) => e.toLowerCase() === bouncedAddr)) {
+        nextEmails = lead.emails.filter((e) => e.toLowerCase() !== bouncedAddr);
+        patch.emails = nextEmails;
+      } else if (lead.emails.length === 1) {
+        nextEmails = [];
+        patch.emails = [];
+      }
+      if (
+        bouncedAddr &&
+        (existing.toEmail ?? "").trim().toLowerCase() === bouncedAddr
+      ) {
+        outreachPatch.toEmail = nextEmails[0] ?? null;
+      }
+      const methods = lead.contactMethods ?? [];
+      const withoutEmail = methods.filter((m) => m !== "email");
+      if (withoutEmail.length !== methods.length) {
+        patch.contactMethods = withoutEmail;
+      }
+      // Send path moves new → contacted; bounce means that contact didn't happen.
+      if (lead.crmStage === "contacted" && withoutEmail.length === 0) {
+        patch.crmStage = "new";
+      }
+      const withoutBounceNotes = (lead.followUps ?? []).filter(
+        (f) => !f.note.trim().toLowerCase().startsWith("email bounced"),
+      );
+      if (withoutBounceNotes.length !== (lead.followUps ?? []).length) {
+        patch.followUps = withoutBounceNotes;
+      }
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.updateLead(existing.leadId, patch);
+      }
+    }
+  }
+
+  const outreach = await ctx.db.updateOutreach(outreachId, outreachPatch);
   if (!outreach) return null;
 
   // Reply webhook / manual: park lead in In Conversation (Pipeline highlights these).
@@ -1739,52 +1782,6 @@ export async function setOutreachDeliveryStatus(
     }
   }
 
-  // Bounce: email never landed — strip the bad address, undo Contacted, journal.
-  if (deliveryStatus === "bounced" && prev !== "bounced") {
-    const lead = await ctx.db.getLead(outreach.leadId);
-    if (lead) {
-      const patch: Partial<Lead> = {};
-      const bouncedAddr = (outreach.toEmail ?? "").trim().toLowerCase();
-      if (bouncedAddr && lead.emails.some((e) => e.toLowerCase() === bouncedAddr)) {
-        patch.emails = lead.emails.filter((e) => e.toLowerCase() !== bouncedAddr);
-      } else if (lead.emails.length === 1) {
-        // Single known address + bounce → clear so we don't re-send the same one.
-        patch.emails = [];
-      }
-      const methods = lead.contactMethods ?? [];
-      const withoutEmail = methods.filter((m) => m !== "email");
-      if (withoutEmail.length !== methods.length) {
-        patch.contactMethods = withoutEmail;
-      }
-      // Send path moves new → contacted; bounce means that contact didn't happen.
-      if (lead.crmStage === "contacted" && withoutEmail.length === 0) {
-        patch.crmStage = "new";
-      }
-      const today = nowIso().slice(0, 10);
-      const existingFu = lead.followUps ?? [];
-      const bounceNote = bouncedAddr
-        ? `Email bounced (${bouncedAddr})`
-        : "Email bounced";
-      const hasBounceNote = existingFu.some((f) =>
-        f.note.trim().toLowerCase().startsWith("email bounced"),
-      );
-      if (!hasBounceNote) {
-        patch.followUps = [
-          {
-            id: newId("fu"),
-            date: today,
-            note: bounceNote,
-            done: false,
-            kind: "follow_up",
-          },
-          ...existingFu,
-        ];
-      }
-      if (Object.keys(patch).length > 0) {
-        await ctx.db.updateLead(outreach.leadId, patch);
-      }
-    }
-  }
   return outreach;
 }
 
@@ -2379,7 +2376,20 @@ export async function updateLeadCrm(
 
   const fus = next.followUps ?? patch.followUps;
   if (fus) {
-    next.followUps = collapseEmailSentFollowUps(fus, actorName);
+    next.followUps = collapseEmailSentFollowUps(fus, actorName)
+      .filter((f) => !isBounceNote(f.note))
+      .map((f) => {
+        const kind = resolveFollowUpKind(f);
+        if (kind === f.kind) return f;
+        return {
+          ...f,
+          kind,
+          done:
+            kind === "phone" || kind === "email" || kind === "note"
+              ? true
+              : f.done,
+        };
+      });
   }
 
   return db.updateLead(leadId, next);

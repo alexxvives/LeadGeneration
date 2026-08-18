@@ -138,8 +138,9 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   Resend webhook payloads carry tags as a **flat object** (not the
   `{name,value}[]` send shape) — the route normalizes both.
   Bounce/complaint/failed → `deliveryStatus=bounced`, undo auto-Contacted when
-  email was the only contact method, journal “Email bounced”, Pipeline rose
-  highlight + toast on soft refresh. Resend inbound `email.received` →
+  email was the only contact method, strip the bounced address from the lead
+  (and from `outreach.toEmail`), Pipeline toast on soft refresh. No bounce
+  follow-up journal line. Resend inbound `email.received` →
   `replied` (+ CRM In Conversation). Missing signing secret / unexpected
   handler errors return **200 ignored** (not 5xx) so Resend does not
   auto-disable the endpoint. Saving Easy settings auto-registers **one**

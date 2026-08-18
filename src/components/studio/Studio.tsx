@@ -2467,7 +2467,7 @@ export function Studio() {
 
       {/* Calendar — follow-ups, sends, and calls by day */}
       {view === "calendar" && (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col pb-4">
           {loading || leadsHydrating || !board ? (
             <div role="status" aria-busy="true" aria-label="Loading calendar">
               <CalendarSkeleton />

@@ -62,19 +62,19 @@ export function BoardPicker({
   }, []);
 
   return (
-    <div ref={wrapRef} className="relative mb-2">
-      <p className="mb-1.5 px-1 text-[10px] uppercase tracking-wider text-mist-500">
+    <div ref={wrapRef} className="relative mb-1">
+      <p className="mb-1 px-1 text-[10px] uppercase tracking-wider text-mist-500">
         Board
       </p>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5 text-left transition-colors hover:border-white/15 hover:bg-white/[0.05]"
+        className="flex w-full items-center gap-2 rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-left transition-colors hover:border-white/15 hover:bg-white/[0.05]"
         aria-expanded={open}
         aria-haspopup="listbox"
       >
         <BoardsIcon className="h-4 w-4 shrink-0 text-aurora-300" />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-mist-100">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-mist-100">
           {label}
         </span>
         <ChevronDownIcon

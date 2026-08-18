@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, LeadWithOutreach } from "@/lib/types";
+import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
 import { CrmStagePill, Spinner } from "@/components/ui";
 import {
@@ -20,10 +20,12 @@ import {
 import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
 import {
+  addDaysIso,
   collapseEmailSentFollowUps,
   followUpKindLabel,
   formatNoteDate,
   inferFollowUpKind,
+  isBounceNote,
   isMissedCallNote,
   missedCallNotePrefix,
   phoneCallNotePrefix,
@@ -143,6 +145,7 @@ export function LeadDrawer(props: DrawerProps) {
   );
   const [followUps, setFollowUps] = useState<FollowUp[]>(lead.followUps ?? []);
   const [showAddNote, setShowAddNote] = useState(Boolean(promptNote));
+  const [composerKind, setComposerKind] = useState<"note" | "follow_up">("note");
   const [newNoteDate, setNewNoteDate] = useState(todayIsoDate);
   const [newNoteText, setNewNoteText] = useState(() =>
     promptNote === "missed"
@@ -181,10 +184,32 @@ export function LeadDrawer(props: DrawerProps) {
   useEffect(() => {
     setCrmStage(lead.crmStage ?? "new");
     setContactMethods(lead.contactMethods ?? []);
-    setFollowUps(
-      collapseEmailSentFollowUps(lead.followUps ?? [], lead.contactedByName),
-    );
+    const raw = lead.followUps ?? [];
+    const collapsed = collapseEmailSentFollowUps(raw, lead.contactedByName)
+      .filter((f) => !isBounceNote(f.note))
+      .map((f) => {
+        const kind = resolveFollowUpKind(f);
+        if (kind === f.kind) return f;
+        return {
+          ...f,
+          kind,
+          done:
+            kind === "phone" || kind === "email" || kind === "note"
+              ? true
+              : f.done,
+        };
+      });
+    setFollowUps(collapsed);
     setConfirmDelete(false);
+    const changed =
+      collapsed.length !== raw.length ||
+      collapsed.some(
+        (f, i) => f.kind !== raw[i]?.kind || f.done !== raw[i]?.done,
+      );
+    if (changed) {
+      void props.onUpdateCrm(lead.id, { followUps: collapsed });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- heal journal kinds; onUpdateCrm is stable enough
   }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, lead.contactedByName]);
 
   useEffect(() => {
@@ -249,10 +274,10 @@ export function LeadDrawer(props: DrawerProps) {
   }, [lead.id, outreach?.status, outreach?.sentAt]);
 
   useEffect(() => {
-    if (!promptNote || !showAddNote) return;
+    if (!showAddNote) return;
     const t = window.setTimeout(() => noteInputRef.current?.focus(), 80);
     return () => window.clearTimeout(t);
-  }, [promptNote, showAddNote, lead.id]);
+  }, [showAddNote, lead.id, callPrompt, composerKind]);
 
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -358,6 +383,7 @@ export function LeadDrawer(props: DrawerProps) {
     if (addedPhone) {
       setCallPrompt("call");
       setShowAddNote(true);
+      setComposerKind("note");
       setNewNoteDate(todayIsoDate());
       setNewNoteText(phoneCallNotePrefix(actorName));
     }
@@ -375,6 +401,26 @@ export function LeadDrawer(props: DrawerProps) {
 
   const promptingCall = Boolean(promptNote) || Boolean(callPrompt);
 
+  const openComposer = (kind: "note" | "follow_up" | "missed") => {
+    setShowAddNote(true);
+    if (kind === "missed") {
+      setCallPrompt("missed");
+      setComposerKind("note");
+      setNewNoteDate(todayIsoDate());
+      setNewNoteText(missedCallNotePrefix(actorName));
+      return;
+    }
+    setCallPrompt(false);
+    setComposerKind(kind);
+    if (kind === "follow_up") {
+      setNewNoteDate(addDaysIso(7));
+      setNewNoteText("Follow up");
+    } else {
+      setNewNoteDate(todayIsoDate());
+      setNewNoteText("");
+    }
+  };
+
   // ── Dated notes (journal) ──
   const addNote = async (variant?: "call" | "missed") => {
     const callMode = variant ?? (callPrompt || (promptNote ? promptNote : false));
@@ -385,19 +431,28 @@ export function LeadDrawer(props: DrawerProps) {
       text = phoneCallNotePrefix(actorName).trim();
     }
     if (!newNoteDate || !text) return;
-    const kind = inferFollowUpKind(text);
-    const isCall = kind === "phone" || callMode === "call" || callMode === "missed";
+    const inferred = inferFollowUpKind(text);
+    const isCall =
+      inferred === "phone" || callMode === "call" || callMode === "missed";
+    const kind: FollowUpKind = isCall
+      ? "phone"
+      : composerKind === "follow_up"
+        ? "follow_up"
+        : inferred === "email"
+          ? "email"
+          : "note";
     const fu: FollowUp = {
       id: newId("fu"),
       date: newNoteDate,
       note: text,
-      done: isCall,
-      kind: isCall ? "phone" : "follow_up",
+      done: isCall || kind === "note",
+      kind,
     };
     const updated = [...followUps, fu];
     setFollowUps(updated);
     setShowAddNote(false);
     setCallPrompt(false);
+    setComposerKind("note");
     setNewNoteDate(todayIsoDate());
     setNewNoteText("");
     await props.onUpdateCrm(lead.id, { followUps: updated, notes: null });
@@ -723,24 +778,30 @@ export function LeadDrawer(props: DrawerProps) {
           {/* Notes column — grows independently so the left profile stays readable */}
           <aside className="flex min-h-0 flex-col border-t border-white/5 bg-ink-950/40 sm:border-l sm:border-t-0">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/5 px-4 py-3">
-              <div>
-                <SectionLabel>Notes</SectionLabel>
-                <p className="mt-0.5 text-[11px] text-mist-500">
-                  Dated follow-ups appear on Calendar
-                </p>
+              <SectionLabel>Notes</SectionLabel>
+              <div className="flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1">
+                <button
+                  type="button"
+                  onClick={() => openComposer("note")}
+                  className="text-[11px] text-aurora-400 hover:underline"
+                >
+                  Add Note
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openComposer("follow_up")}
+                  className="text-[11px] text-aurora-400 hover:underline"
+                >
+                  Follow up
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openComposer("missed")}
+                  className="text-[11px] text-amber-200 hover:underline"
+                >
+                  Missed call
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setCallPrompt(false);
-                  setShowAddNote(true);
-                  setNewNoteDate(todayIsoDate());
-                  setNewNoteText("");
-                }}
-                className="text-[11px] text-aurora-400 hover:underline"
-              >
-                + Follow-up
-              </button>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
               {lead.notes?.trim() && followUps.length === 0 && (
@@ -789,7 +850,11 @@ export function LeadDrawer(props: DrawerProps) {
                 <div className="space-y-2 rounded-xl border border-white/10 bg-ink-900/60 p-3">
                   <label className="block">
                     <span className="mb-1 block text-[11px] uppercase tracking-wider text-mist-500">
-                      {promptingCall ? "Call date" : "Follow up on"}
+                      {promptingCall
+                        ? "Call date"
+                        : composerKind === "follow_up"
+                          ? "Follow up on"
+                          : "Date"}
                     </span>
                     <input
                       type="date"
@@ -806,7 +871,9 @@ export function LeadDrawer(props: DrawerProps) {
                     placeholder={
                       promptingCall
                         ? "how the conversation went…"
-                        : "Call back, send a recap…"
+                        : composerKind === "follow_up"
+                          ? "Follow up"
+                          : "What happened…"
                     }
                     className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60"
                   />
@@ -819,7 +886,9 @@ export function LeadDrawer(props: DrawerProps) {
                     >
                       Save
                     </button>
-                    {promptingCall ? (
+                    {promptingCall &&
+                    callPrompt !== "missed" &&
+                    promptNote !== "missed" ? (
                       <button
                         type="button"
                         onClick={() => void addNote("missed")}
@@ -833,11 +902,16 @@ export function LeadDrawer(props: DrawerProps) {
                       type="button"
                       onClick={() => {
                         if (promptingCall) {
-                          void addNote("call");
+                          void addNote(
+                            callPrompt === "missed" || promptNote === "missed"
+                              ? "missed"
+                              : "call",
+                          );
                           return;
                         }
                         setShowAddNote(false);
                         setCallPrompt(false);
+                        setComposerKind("note");
                         setNewNoteText("");
                         setNewNoteDate(todayIsoDate());
                       }}
@@ -865,8 +939,7 @@ export function LeadDrawer(props: DrawerProps) {
 
               {followUps.length === 0 && !showAddNote ? (
                 <p className="text-xs text-mist-600">
-                  No notes yet. Add a dated follow-up — it shows on Calendar
-                  with sends and calls.
+                  No notes yet.
                 </p>
               ) : (
                 <ul className="space-y-2">
@@ -882,6 +955,22 @@ export function LeadDrawer(props: DrawerProps) {
                       const kindLabel = missed
                         ? "Missed call"
                         : followUpKindLabel(kind);
+                      const tagClass =
+                        kind === "email"
+                          ? "bg-aurora-400/15 text-aurora-200"
+                          : kind === "phone"
+                            ? missed
+                              ? "bg-amber-400/15 text-amber-200"
+                              : "bg-sky-400/15 text-sky-200"
+                            : "bg-white/10 text-mist-300";
+                      const tagText =
+                        kind === "email"
+                          ? "Email"
+                          : kind === "phone"
+                            ? missed
+                              ? "Missed"
+                              : "Call"
+                            : "Note";
                       return (
                         <li key={fu.id} className="flex items-start gap-2">
                           {isFollow ? (
@@ -904,20 +993,14 @@ export function LeadDrawer(props: DrawerProps) {
                             </button>
                           ) : (
                             <span
-                              className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                                kind === "email"
-                                  ? "bg-aurora-400/15 text-aurora-200"
-                                  : missed
-                                    ? "bg-amber-400/15 text-amber-200"
-                                    : "bg-sky-400/15 text-sky-200"
-                              }`}
+                              className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tagClass}`}
                             >
-                              {kind === "email" ? "Email" : missed ? "Missed" : "Call"}
+                              {tagText}
                             </span>
                           )}
                           <p
                             className={`min-w-0 flex-1 text-sm leading-relaxed ${
-                              fu.done
+                              isFollow && fu.done
                                 ? "text-mist-500 line-through"
                                 : "text-mist-300"
                             }`}
@@ -1072,12 +1155,6 @@ export function LeadDrawer(props: DrawerProps) {
 
                 {sent ? (
                   <div className="space-y-4 pt-1">
-                    <p className="text-center text-sm text-mist-400">
-                      Sent
-                      {outreach.sentAt
-                        ? ` · ${new Date(outreach.sentAt).toLocaleString()}`
-                        : ""}
-                    </p>
                     <div>
                       <p className="mb-2 text-center text-xs font-medium uppercase tracking-widest text-mist-500">
                         Delivery outcome

@@ -22,12 +22,14 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 const KIND_DOT: Record<FollowUpKind, string> = {
   follow_up: "bg-amber-400",
+  note: "bg-mist-500",
   email: "bg-aurora-400",
   phone: "bg-sky-400",
 };
 
 const KIND_CHIP: Record<FollowUpKind, string> = {
   follow_up: "bg-amber-400/15 text-amber-200",
+  note: "bg-white/10 text-mist-300",
   email: "bg-aurora-400/15 text-aurora-200",
   phone: "bg-sky-400/15 text-sky-200",
 };
@@ -87,7 +89,12 @@ export function CalendarView({
     }
     for (const list of map.values()) {
       list.sort((a, b) => {
-        const order = { follow_up: 0, phone: 1, email: 2 };
+        const order: Record<FollowUpKind, number> = {
+          follow_up: 0,
+          phone: 1,
+          email: 2,
+          note: 3,
+        };
         const d = order[a.kind] - order[b.kind];
         if (d !== 0) return d;
         return a.company.localeCompare(b.company);
@@ -155,7 +162,7 @@ export function CalendarView({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-start">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 pb-6 lg:flex-row lg:items-start">
       <section className="glass min-w-0 flex-1 rounded-xl2 p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">

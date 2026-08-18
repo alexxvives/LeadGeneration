@@ -20,11 +20,17 @@ type ReadyChannelFilter = "all" | "email" | "phone";
 
 /** Any pipeline stage past New counts as contacted in the Outreach queue. */
 function isContacted(lead: LeadWithOutreach): boolean {
-  if (lead.outreach?.status === "sent") return true;
   const methods = lead.contactMethods ?? [];
-  if (methods.includes("phone") || methods.includes("contact_form")) {
-    return true;
+  const reachedOtherwise =
+    methods.includes("phone") || methods.includes("contact_form");
+  // A bounce is not contact — strip email and treat as New unless they were
+  // reached another way or later moved to conversation / closed.
+  if (lead.outreach?.deliveryStatus === "bounced" && !reachedOtherwise) {
+    const stage = lead.crmStage;
+    return stage === "in_conversation" || stage === "closed";
   }
+  if (lead.outreach?.status === "sent") return true;
+  if (reachedOtherwise) return true;
   const stage = lead.crmStage;
   return (
     stage === "contacted" ||
@@ -613,35 +619,18 @@ function OutreachRow({
                   {busy ? <Spinner className="h-2.5 w-2.5" /> : <ArrowIcon className="h-2.5 w-2.5" />}
                 </button>
               ) : phoneOnly ? (
-                <div className="flex items-center justify-end gap-1">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      void onMarkContacted("phone", { promptNote: true })
-                    }
-                    aria-label="Mark called — move to Contacted"
-                    title="After you call — move to Contacted and add a note"
-                    className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
-                  >
-                    {busy ? <Spinner className="h-2.5 w-2.5" /> : "Call"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      void onMarkContacted("phone", {
-                        promptNote: true,
-                        missed: true,
-                      })
-                    }
-                    aria-label="Log missed call — move to Contacted"
-                    title="They didn’t pick up — log a missed call"
-                    className={`${ACTION_BTN} border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 disabled:opacity-50`}
-                  >
-                    Missed
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void onMarkContacted("phone", { promptNote: true })
+                  }
+                  aria-label="Mark called — move to Contacted"
+                  title="After you call — move to Contacted and add a note"
+                  className={`${ACTION_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
+                >
+                  {busy ? <Spinner className="h-2.5 w-2.5" /> : "Call"}
+                </button>
               ) : (
                 <button
                   type="button"
@@ -657,11 +646,10 @@ function OutreachRow({
               <div className="flex flex-wrap justify-end gap-1">
                 {(
                   [
-                    ["phone", "Called", false],
-                    ["phone", "Missed", true],
-                    ["contact_form", "Form", false],
+                    ["phone", "Called"],
+                    ["contact_form", "Form"],
                   ] as const
-                ).map(([method, label, missed]) => (
+                ).map(([method, label]) => (
                   <button
                     key={`${method}-${label}`}
                     type="button"
@@ -670,7 +658,6 @@ function OutreachRow({
                       setPickingMethod(false);
                       void onMarkContacted(method, {
                         promptNote: true,
-                        missed,
                       });
                     }}
                     className={`${ACTION_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-100 disabled:opacity-50`}

@@ -94,7 +94,9 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
   - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (Create /
     Review; unapproved drafts stay here) → **Ready** (after Approve) →
-    **Contacted**. **Draft all** writes (or rewrites) drafts for every
+    **Contacted**. Phone-only Ready rows have **Call** (moves to Contacted).
+    A missed attempt is logged from the lead’s **Notes** and stays in Ready.
+    **Draft all** writes (or rewrites) drafts for every
     non-sent email lead and leaves them in Contact Draft until Approve
     (button stays available after profile edits). Closing the draft drawer
     without Approve does not advance. The sidebar Board picker activates that
@@ -102,9 +104,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     (constitution Art. I.1).
 
   - **Calendar** (`?view=calendar`) — month view of the active board filter.
-    Each day lists **follow-ups** (from the lead drawer notes, with a date),
-    **emails sent**, and **phone calls** logged that day. Click an item to
-    open the lead. Tick a follow-up to mark it done.
+    Each day lists **follow-ups** (dated reminders from **Follow up**),
+    **emails sent**, and **phone calls** logged that day. Plain notes stay on
+    the lead only. Click an item to open the lead. Tick a follow-up to mark it
+    done.
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.
@@ -118,10 +121,13 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
 
   - **Lead detail drawer** — opens from any lead card/row/pin. Contact info
     (incl. full address), about blurb, CRM stage, dated notes journal
-    (**+ Follow-up** registers a dated reminder on Calendar). Toggling **Phone**
-    opens a call log starting with `Phone call by {name}:` (or **Missed call**)
-    so email and phone stay separate notes. The outreach composer
-    (draft → edit → approve → send) is on the draft pane.
+    (**Add Note** for a log line; **Follow up** pre-fills “Follow up” one week
+    out and shows on Calendar; **Missed call** journals a miss without moving
+    the lead to Contacted). Toggling **Phone** opens a call log starting
+    with `Phone call by {name}:` so email and phone stay
+    separate notes. A bounce deletes that address and returns the lead to New
+    — it is not a follow-up. The outreach composer (draft → edit → approve →
+    send) is on the draft pane.
 
 - **`/app/settings`** — sender profile (language flag persists as
   `templateLang` and only changes the **preview** — template editors stay as

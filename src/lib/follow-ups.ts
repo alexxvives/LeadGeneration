@@ -8,6 +8,13 @@ export function todayIsoDate(d = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Calendar day `days` after `d` (local date, not UTC). */
+export function addDaysIso(days: number, d = new Date()): string {
+  return todayIsoDate(
+    new Date(d.getFullYear(), d.getMonth(), d.getDate() + days),
+  );
+}
+
 /** "1st March 2025" style for note journal lines. */
 export function formatNoteDate(iso: string): string {
   const d = new Date(`${iso}T12:00:00`);
@@ -44,6 +51,10 @@ export function isMissedCallNote(note: string): boolean {
   return /^missed call by\b/i.test(note.trim());
 }
 
+export function isBounceNote(note: string): boolean {
+  return /^email bounced\b/i.test(note.trim());
+}
+
 export function callNoteActor(name?: string | null): string {
   const t = name?.trim();
   return t || "you";
@@ -65,16 +76,22 @@ export function stripCallNotePrefix(note: string): string {
 }
 
 export function inferFollowUpKind(note: string): FollowUpKind {
+  if (isBounceNote(note)) return "note";
   if (isEmailSentNote(note)) return "email";
   if (isPhoneCallNote(note)) return "phone";
   return "follow_up";
 }
 
 export function resolveFollowUpKind(fu: FollowUp): FollowUpKind {
-  return fu.kind ?? inferFollowUpKind(fu.note);
+  const inferred = inferFollowUpKind(fu.note);
+  // Call / send / bounce text wins over a stored "follow_up" — logging a
+  // phone call via + Follow-up used to save kind: follow_up (the checkbox).
+  if (inferred === "phone" || inferred === "email") return inferred;
+  if (isBounceNote(fu.note)) return "note";
+  return fu.kind ?? inferred;
 }
 
-/** User-authored reminder — not an auto-logged send or call. */
+/** User-authored reminder — not a note, send, call, or bounce. */
 export function isUserFollowUp(fu: FollowUp): boolean {
   return resolveFollowUpKind(fu) === "follow_up";
 }
@@ -82,6 +99,7 @@ export function isUserFollowUp(fu: FollowUp): boolean {
 export function followUpKindLabel(kind: FollowUpKind): string {
   if (kind === "email") return "Email sent";
   if (kind === "phone") return "Phone call";
+  if (kind === "note") return "Note";
   return "Follow-up";
 }
 
@@ -101,6 +119,8 @@ export function calendarEventsFromLeads(
   const out: CalendarEvent[] = [];
   for (const lead of leads) {
     for (const fu of lead.followUps ?? []) {
+      const kind = resolveFollowUpKind(fu);
+      if (kind === "note") continue;
       out.push({
         id: fu.id,
         leadId: lead.id,
@@ -108,7 +128,7 @@ export function calendarEventsFromLeads(
         date: fu.date,
         note: fu.note,
         done: fu.done,
-        kind: resolveFollowUpKind(fu),
+        kind,
       });
     }
   }
