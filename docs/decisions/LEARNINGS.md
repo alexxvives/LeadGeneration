@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Notes/follow-ups flash then reappear
+- Adding a journal row updated local drawer state immediately, then
+  `ensureLeadDetail` (in-flight `GET /api/leads/:id`) or a slim board poll
+  replaced the lead with a snapshot from before the save — the row vanished
+  until the PATCH landed. Slim merge also skipped follow-ups when
+  `detailLoaded` was still false (`return incoming`).
+- Merge journals by id (`mergeFollowUpLists`): keep optimistic rows, append
+  server-only rows (e.g. Reply received), remember deleted ids so a stale
+  snapshot cannot resurrect them. Drawer sync no longer clobbers a longer
+  local journal.
+
 ### 2026-08-19 — Click Email again logs another send today
 - Email chip was a toggle: second click turned the method off. It now stays
   on and opens a journal composer prefilled `Email sent by {name}:` (same

@@ -22,6 +22,7 @@ import { displayWebsite, isUsableWebsite } from "@/lib/website";
 import {
   addDaysIso,
   collapseEmailSentFollowUps,
+  mergeFollowUpLists,
   formatNoteDate,
   inferFollowUpKind,
   emailSentNotePrefix,
@@ -165,6 +166,7 @@ export function LeadDrawer(props: DrawerProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editText, setEditText] = useState("");
+  const followUpsLeadIdRef = useRef(lead.id);
 
   const dirty = useMemo(
     () => !sameDraft({ subject, body, toEmail }, savedDraft),
@@ -206,7 +208,26 @@ export function LeadDrawer(props: DrawerProps) {
               : f.done,
         };
       });
-    setFollowUps(collapsed);
+    const leadChanged = followUpsLeadIdRef.current !== lead.id;
+    followUpsLeadIdRef.current = lead.id;
+    const dropped = lead.droppedFollowUpIds?.length
+      ? new Set(lead.droppedFollowUpIds)
+      : undefined;
+    const next = leadChanged
+      ? collapsed
+      : mergeFollowUpLists(followUps, collapsed, dropped);
+    const journalSame =
+      !leadChanged &&
+      next.length === followUps.length &&
+      next.every(
+        (f, i) =>
+          f.id === followUps[i]?.id &&
+          f.note === followUps[i]?.note &&
+          f.date === followUps[i]?.date &&
+          f.done === followUps[i]?.done &&
+          f.kind === followUps[i]?.kind,
+      );
+    if (!journalSame) setFollowUps(next);
     setConfirmDelete(false);
     const changed =
       collapsed.length !== raw.length ||
@@ -216,10 +237,12 @@ export function LeadDrawer(props: DrawerProps) {
           f.done !== raw[i]?.done ||
           f.note !== raw[i]?.note,
       );
-    if (changed) {
-      void props.onUpdateCrm(lead.id, { followUps: collapsed });
+    // Heal kinds on the merged list — never PATCH a stale subset that would
+    // delete a note the user just added.
+    if (changed && next.length >= raw.length) {
+      void props.onUpdateCrm(lead.id, { followUps: next });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- heal journal kinds; onUpdateCrm is stable enough
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- heal journal kinds; keep local extras across stale props
   }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, lead.contactedByName]);
 
   useEffect(() => {
@@ -262,22 +285,22 @@ export function LeadDrawer(props: DrawerProps) {
       collapsed.some((f, i) => f.note !== existing[i]?.note || f.id !== existing[i]?.id);
     if (has) {
       if (notesChanged) {
-        setFollowUps(collapsed);
-        void props.onUpdateCrm(lead.id, { followUps: collapsed });
+        const updated = mergeFollowUpLists(followUps, collapsed);
+        setFollowUps(updated);
+        void props.onUpdateCrm(lead.id, { followUps: updated });
       }
       return;
     }
     const actor = lead.contactedByName?.trim();
-    const updated: FollowUp[] = [
-      {
-        id: newId("fu"),
-        date: sentDay,
-        note: actor ? `Email sent by ${actor}` : "Email sent",
-        done: true,
-        kind: "email",
-      },
-      ...collapsed,
-    ];
+    const inserted: FollowUp = {
+      id: newId("fu"),
+      date: sentDay,
+      note: actor ? `Email sent by ${actor}` : "Email sent",
+      done: true,
+      kind: "email",
+    };
+    const base = followUps.length ? followUps : collapsed;
+    const updated = mergeFollowUpLists([inserted, ...base], collapsed);
     setFollowUps(updated);
     void props.onUpdateCrm(lead.id, { followUps: updated });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot heal per lead/sentAt

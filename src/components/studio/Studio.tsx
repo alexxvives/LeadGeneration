@@ -10,7 +10,8 @@ import {
   RateLimitedError,
   type BoardResponse,
 } from "@/lib/client-api";
-import type { ContactMethod, CrmStage, LeadWithOutreach, PlanId } from "@/lib/types";
+import type { ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId } from "@/lib/types";
+import { mergeFollowUpLists } from "@/lib/follow-ups";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
 import { LeadTable } from "./LeadTable";
@@ -87,6 +88,29 @@ type StudioView =
 /** Views kept mounted after first visit so filters / sort / scroll survive. */
 type StickyView = "pipeline" | "outreach" | "leads";
 
+function droppedFollowUpIdSet(
+  lead: Pick<LeadWithOutreach, "droppedFollowUpIds">,
+): Set<string> | undefined {
+  const ids = lead.droppedFollowUpIds;
+  return ids?.length ? new Set(ids) : undefined;
+}
+
+function rememberDroppedFollowUps(
+  prior: LeadWithOutreach | undefined,
+  nextFollowUps: FollowUp[] | undefined,
+): string[] | undefined {
+  const prevDropped = prior?.droppedFollowUpIds ?? [];
+  if (!nextFollowUps || !prior?.followUps?.length) {
+    return prevDropped.length ? prevDropped : undefined;
+  }
+  const nextIds = new Set(nextFollowUps.map((f) => f.id));
+  const extra = prior.followUps
+    .filter((f) => !nextIds.has(f.id))
+    .map((f) => f.id);
+  if (extra.length === 0) return prevDropped.length ? prevDropped : undefined;
+  return [...new Set([...prevDropped, ...extra])];
+}
+
 /** Merge a slim board-list row into a cached lead without wiping drawer detail. */
 function mergeSlimIntoCached(
   prev: LeadWithOutreach,
@@ -98,17 +122,13 @@ function mergeSlimIntoCached(
     Boolean(prev.aboutBlurb) ||
     Boolean(prev.notes);
 
-  if (!keepDetail) return incoming;
-
-  // Prefer server for CRM / delivery / emails; keep local body/subject/notes.
-  const prevFu = prev.followUps ?? [];
-  const incFu = incoming.followUps ?? [];
-  const followUps =
-    incFu.length >= prevFu.length
-      ? incFu
-      : prevFu.length
-        ? prevFu
-        : incFu;
+  const dropped = droppedFollowUpIdSet(prev);
+  const followUps = mergeFollowUpLists(
+    prev.followUps ?? [],
+    incoming.followUps ?? [],
+    dropped,
+  );
+  const droppedFollowUpIds = prev.droppedFollowUpIds;
 
   // `??` treats [] as present — a slim/stale empty list was wiping methods and
   // flashing “How contacted? — open to register” on every Contacted row.
@@ -121,6 +141,16 @@ function mergeSlimIntoCached(
         ? prevMethods
         : incMethods;
 
+  if (!keepDetail) {
+    return {
+      ...incoming,
+      contactMethods,
+      followUps,
+      droppedFollowUpIds,
+    };
+  }
+
+  // Prefer server for CRM / delivery / emails; keep local body/subject/notes.
   return {
     ...incoming,
     crmStage: incoming.crmStage ?? prev.crmStage,
@@ -129,6 +159,7 @@ function mergeSlimIntoCached(
     aboutBlurb: incoming.aboutBlurb || prev.aboutBlurb,
     notes: incoming.notes ?? prev.notes,
     followUps,
+    droppedFollowUpIds,
     outreach:
       incoming.outreach && prev.outreach
         ? {
@@ -1152,6 +1183,26 @@ export function Studio() {
     );
   };
 
+  /** Apply a PATCH lead without dropping optimistic journal rows. */
+  const applyServerLead = (leadId: string, lead: Lead) => {
+    setBoard((b) => {
+      if (!b) return b;
+      return {
+        ...b,
+        leads: b.leads.map((l) =>
+          l.id === leadId
+            ? mergeSlimIntoCached(l, {
+                ...l,
+                ...lead,
+                outreach: l.outreach,
+                detailLoaded: true,
+              })
+            : l,
+        ),
+      };
+    });
+  };
+
   const onDraft = async (
     leadId: string,
     opts?: { silent?: boolean },
@@ -1325,7 +1376,15 @@ export function Studio() {
                 crmStage: l.crmStage === "new" ? "contacted" : l.crmStage,
                 contactMethods: methods,
                 outreach: sent,
-                ...(followUps ? { followUps } : {}),
+                ...(followUps
+                  ? {
+                      followUps: mergeFollowUpLists(
+                        l.followUps ?? [],
+                        followUps,
+                        droppedFollowUpIdSet(l),
+                      ),
+                    }
+                  : {}),
               };
             }),
           };
@@ -1537,7 +1596,7 @@ export function Studio() {
     patchLeadLocal(leadId, patch);
     try {
       const { lead } = await api.updateLead(leadId, patch);
-      patchLeadLocal(leadId, lead);
+      applyServerLead(leadId, lead);
     } catch (e) {
       // Revert on failure by refreshing.
       await refresh();
@@ -1597,10 +1656,17 @@ export function Studio() {
     patch: Parameters<typeof api.updateLead>[1],
   ) => {
     const prior = boardRef.current?.leads.find((l) => l.id === leadId);
-    patchLeadLocal(leadId, patch as Partial<LeadWithOutreach>);
+    const droppedFollowUpIds = rememberDroppedFollowUps(
+      prior,
+      patch.followUps,
+    );
+    patchLeadLocal(leadId, {
+      ...(patch as Partial<LeadWithOutreach>),
+      ...(droppedFollowUpIds ? { droppedFollowUpIds } : {}),
+    });
     try {
       const { lead } = await api.updateLead(leadId, patch);
-      patchLeadLocal(leadId, lead);
+      applyServerLead(leadId, lead);
     } catch (e) {
       if (prior) patchLeadLocal(leadId, prior);
       else await refresh();
@@ -1689,7 +1755,17 @@ export function Studio() {
       if (!cur || cur.detailLoaded !== false) return;
       try {
         const { lead } = await api.getLead(id);
-        patchLeadLocal(id, { ...lead, detailLoaded: true });
+        setBoard((b) => {
+          if (!b) return b;
+          return {
+            ...b,
+            leads: b.leads.map((l) =>
+              l.id === id
+                ? mergeSlimIntoCached(l, { ...lead, detailLoaded: true })
+                : l,
+            ),
+          };
+        });
       } catch (e) {
         toast("err", (e as Error).message);
       }

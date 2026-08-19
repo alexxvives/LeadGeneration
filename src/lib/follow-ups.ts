@@ -220,3 +220,40 @@ export function collapseEmailSentFollowUps(
     return [{ ...f, kind: f.kind ?? "email" }];
   });
 }
+
+/**
+ * Reconcile a cached journal with a server/slim snapshot.
+ * Never drops rows the cache already has (optimistic create), and skips
+ * `droppedIds` so a stale poll cannot resurrect a delete. Incoming-only
+ * rows (e.g. webhook “Reply received”) are appended.
+ */
+export function mergeFollowUpLists(
+  cached: FollowUp[],
+  incoming: FollowUp[],
+  droppedIds?: ReadonlySet<string> | null,
+): FollowUp[] {
+  if (cached.length === 0 && incoming.length === 0) return incoming;
+  if (incoming.length === 0) {
+    return droppedIds?.size
+      ? cached.filter((f) => !droppedIds.has(f.id))
+      : cached;
+  }
+  if (cached.length === 0) {
+    return droppedIds?.size
+      ? incoming.filter((f) => !droppedIds.has(f.id))
+      : incoming;
+  }
+  const seen = new Set<string>();
+  const out: FollowUp[] = [];
+  for (const f of cached) {
+    if (droppedIds?.has(f.id)) continue;
+    seen.add(f.id);
+    out.push(f);
+  }
+  for (const f of incoming) {
+    if (seen.has(f.id) || droppedIds?.has(f.id)) continue;
+    seen.add(f.id);
+    out.push(f);
+  }
+  return out;
+}

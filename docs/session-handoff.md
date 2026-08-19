@@ -9,19 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Email chip logs another send)
+## ⏱️ Status — updated 2026-08-19 (Journal flash on add)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Clicking **Email** on lead info (including when it is already on) logs
-  another send for today and opens `Email sent by {name}:` so you can add
-  details. The chip stays selected; it no longer toggles off.
+- Notes / follow-ups no longer flash away after add: in-flight lead GET and
+  slim board polls were overwriting the optimistic journal; merge by id keeps
+  the new row until the save catches up.
 
 ### Next
-1. Deploy Worker so the Email-again journal + missed-call color/icon fixes
-   are live.
+1. Deploy Worker so the journal-merge fix is live.
 
 ---
 

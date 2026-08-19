@@ -269,7 +269,10 @@ Outreach lane** (New split into Contact Draft vs Ready, then Contacted /
 In Conversation / Closed / Not Interested), then the same 50-per-lane
 again in the background until the board is complete. Rows are slim — no
 email bodies / about blurbs (`detailLoaded: false`). Opening a
-lead drawer fetches full detail via `GET /api/leads/:id`. Pipeline and Outreach
+lead drawer fetches full detail via `GET /api/leads/:id`. That GET (and
+Pipeline’s 15s slim poll) is merged into the cached row — journal
+follow-ups are unioned by id so a note added while the fetch is in
+flight does not vanish, then pop back when the save returns. Pipeline and Outreach
 stay mounted after first visit so switching back is instant.
 
 ## 6. Guardrails baked into the flow

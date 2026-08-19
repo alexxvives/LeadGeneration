@@ -457,6 +457,11 @@ export interface LeadWithOutreach extends Lead {
    * `true` / omitted after mutations = full payload available.
    */
   detailLoaded?: boolean;
+  /**
+   * Client-only: journal ids removed this session. Stale GET/poll snapshots
+   * must not resurrect them (mergeFollowUpLists).
+   */
+  droppedFollowUpIds?: string[];
 }
 
 /**
