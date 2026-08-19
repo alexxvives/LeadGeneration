@@ -51,6 +51,12 @@ export function isMissedCallNote(note: string): boolean {
   return /^missed call by\b/i.test(note.trim());
 }
 
+export function leadHasMissedCall(
+  lead: Pick<LeadWithOutreach, "followUps">,
+): boolean {
+  return (lead.followUps ?? []).some((f) => isMissedCallNote(f.note));
+}
+
 export function isBounceNote(note: string): boolean {
   return /^email bounced\b/i.test(note.trim());
 }

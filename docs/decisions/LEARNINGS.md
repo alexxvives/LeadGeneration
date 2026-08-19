@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Missed call still shows the Pipeline phone icon
+- Missed call is journal-only and stays in New / Ready (no `contactMethods`
+  phone, so Outreach does not treat it as Contacted). Pipeline hid method
+  icons on New, so misses were invisible on the board. Show the phone chip
+  when a `Missed call by …` journal line exists.
+
 ### 2026-08-19 — Missed call note has no trailing colon
 - One-click missed call reused the connected-call prefix (`…by {name}: `),
   so the journal showed `Missed call by alexxvives:`. Write

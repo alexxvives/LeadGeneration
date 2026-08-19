@@ -9,19 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Missed call note without colon)
+## ⏱️ Status — updated 2026-08-19 (Missed call shows pipeline phone icon)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Missed-call journal wrote `Missed call by {name}:` (prefix leftover).
-  New lines are `Missed call by {name}`. Migration **0033** + parse/heal
-  strip a trailing colon when there is no extra body.
+- Missed call stayed in New and stripped `contactMethods.phone`, so Pipeline
+  hid the phone chip. Cards now show the phone icon from the missed-call
+  journal line without moving the lead to Contacted.
 
 ### Next
-1. Deploy Worker so new missed-call copy and parse-time normalize are live
-   (D1 data is already cleaned once 0033 is applied).
+1. Deploy Worker so missed-call pipeline icon + earlier bounce/colon fixes are live.
 
 ---
 

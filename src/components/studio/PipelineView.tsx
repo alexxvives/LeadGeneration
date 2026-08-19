@@ -16,7 +16,11 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { MailIcon, PhoneIcon, FormIcon, InfoIcon, CalendarIcon } from "@/components/icons";
-import { isUserFollowUp, resolveFollowUpKind } from "@/lib/follow-ups";
+import {
+  isUserFollowUp,
+  leadHasMissedCall,
+  resolveFollowUpKind,
+} from "@/lib/follow-ups";
 import { Bone, useStableDuringLoad } from "./skeletons";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
@@ -428,6 +432,11 @@ function DraggablePipelineCard({
   const replied = lead.outreach?.deliveryStatus === "replied";
   const bounced = lead.outreach?.deliveryStatus === "bounced";
   const methods = lead.contactMethods ?? [];
+  const missedCall = leadHasMissedCall(lead);
+  const iconMethods: ContactMethod[] =
+    missedCall && !methods.includes("phone")
+      ? [...methods, "phone"]
+      : methods;
   const needsMethod = lead.crmStage === "contacted" && methods.length === 0;
 
   return (
@@ -487,12 +496,16 @@ function DraggablePipelineCard({
               {noteCount} note{noteCount === 1 ? "" : "s"}
             </span>
           ) : null}
-          {lead.crmStage !== "new" && methods.length > 0 ? (
+          {(lead.crmStage !== "new" || missedCall) && iconMethods.length > 0 ? (
             <span
               className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink-800/80 px-1.5 py-0.5 text-[10px] font-medium text-mist-300 ring-1 ring-ink-600/40"
-              title={methods.join(", ")}
+              title={
+                missedCall && !methods.includes("phone")
+                  ? ["missed call", ...methods].filter(Boolean).join(", ")
+                  : iconMethods.join(", ")
+              }
             >
-              <MethodIcons methods={methods} />
+              <MethodIcons methods={iconMethods} />
             </span>
           ) : null}
           {replied ? (

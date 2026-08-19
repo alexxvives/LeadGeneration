@@ -87,6 +87,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     Conversation · Closed*) plus *Not Interested*. Drag cards between columns.
     Bulk draft lives on **Outreach** (Approve stays per-lead).
     CRM **New** = needs human review (there is no separate “In review” tag).
+    A **Missed call** stays in New but still shows the phone method icon
+    (it does not count as Contacted).
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
     cards / map) with a shared **Pipeline** stage filter; Notes + Type columns
