@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Draft all stayed visible after every lead was drafted
+- Contact Draft **Draft all** treated any non-sent email lead as a target
+  (including existing drafts) so a profile change could redraft everyone.
+  After a successful pass, leads stay in Contact Draft as `draft`, so the
+  button never disappeared.
+- Show and run **Draft all** only for leads that still need a first write
+  (no outreach, or `rejected`). Redraft remains per-lead in the drawer.
+
 ### 2026-08-19 — Stale GET/poll overwrote optimistic CRM (same class as journal flash)
 - Journal merge-by-id was not enough. `mergeSlimIntoCached` still preferred
   incoming `crmStage` / non-empty `contactMethods` / `...incoming` company

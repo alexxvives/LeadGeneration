@@ -104,9 +104,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     **Skip details** marks Contacted; **Missed call** journals the miss and
     stays in Ready.
     The same miss path exists from the lead’s **Notes**.
-    **Draft all** writes (or rewrites) drafts for every
-    non-sent email lead and leaves them in Contact Draft until Approve
-    (button stays available after profile edits). Closing the draft drawer
+    **Draft all** writes drafts for email leads that still need one and
+    leaves them in Contact Draft until Approve. The button hides once every
+    Contact Draft row already has a draft (redraft from the lead drawer).
+    Closing the draft drawer
     without Approve does not advance. The sidebar Board picker activates that
     board’s linked outreach profile. Send remains per-lead after approve
     (constitution Art. I.1).

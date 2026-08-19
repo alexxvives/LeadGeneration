@@ -9,19 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Stale-overwrite audit)
+## ⏱️ Status — updated 2026-08-19 (Draft-all button)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Audited optimistic UI vs GET / 15s slim poll. Journal merge-by-id was not
-  enough: CRM stage, contact chips, and drawer fields could still flash.
-- `mergeSlimIntoCached` now lives in `src/lib/lead-cache.ts` and keeps cached
-  user fields when the snapshot started before `lastWriteAt`.
+- Outreach **Draft all** hid after a successful pass. It had stayed visible
+  because existing `draft` rows were still treated as redraft targets.
+- Button + batch now only cover leads that still need a first draft
+  (or a rewrite after reject). Per-lead redraft is unchanged in the drawer.
 
 ### Next
-1. Deploy Worker so journal-merge + immediate-delete + lastWriteAt merge are live.
+1. Deploy Worker so journal-merge + immediate-delete + lastWriteAt merge +
+   Draft-all hide are live.
 
 ---
 

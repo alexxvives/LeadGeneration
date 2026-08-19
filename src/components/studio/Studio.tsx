@@ -29,7 +29,7 @@ import { crmStageLabel, Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
 import { PipelineView } from "./PipelineView";
-import { OutreachView } from "./OutreachView";
+import { OutreachView, needsOutreachDraft } from "./OutreachView";
 import { CalendarView } from "./CalendarView";
 import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
@@ -1679,13 +1679,9 @@ export function Studio() {
 
   const onDraftAllOutreach = async () => {
     if (!board) return;
-    // Email leads not yet sent — includes existing drafts so a profile change
-    // can redraft everyone; they stay in Contact Draft until Approve.
-    const targets = board.leads.filter((l) => {
-      if (l.emails.length === 0) return false;
-      const s = l.outreach?.status;
-      return s !== "sent" && s !== "sending";
-    });
+    // Only leads that still need a first draft (or a rewrite after reject).
+    // Existing drafts stay put — redraft from the lead drawer if the profile changed.
+    const targets = board.leads.filter(needsOutreachDraft);
     if (targets.length === 0) return;
 
     const ac = new AbortController();

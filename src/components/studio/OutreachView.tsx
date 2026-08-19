@@ -82,6 +82,14 @@ function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   return null;
 }
 
+/** Email lead in Contact Draft that still needs a first write (or after reject). */
+export function needsOutreachDraft(lead: LeadWithOutreach): boolean {
+  if (!leadEmail(lead)) return false;
+  if (isContacted(lead)) return false;
+  const s = lead.outreach?.status;
+  return !s || s === "rejected";
+}
+
 /** Company A–Z (stable). */
 function byCompany(a: LeadWithOutreach, b: LeadWithOutreach): number {
   return a.company.localeCompare(b.company, undefined, { sensitivity: "base" });
@@ -265,14 +273,8 @@ export function OutreachView({
   const softCap = warmupStatus().softCap;
   const overSoftCap = sendsToday >= softCap;
 
-  /** Keep Draft all available after first pass so profile edits can redraft. */
   const draftAllAvailable = useMemo(
-    () =>
-      leads.some((l) => {
-        if (l.emails.length === 0) return false;
-        const s = l.outreach?.status;
-        return s !== "sent" && s !== "sending";
-      }),
+    () => leads.some(needsOutreachDraft),
     [leads],
   );
 
@@ -377,7 +379,7 @@ export function OutreachView({
                       type="button"
                       onClick={() => void onDraftAll()}
                       disabled={busySet.has("draft-all")}
-                      title="Draft (or redraft) all email leads — stays in Contact Draft until Approve"
+                      title="Draft remaining email leads — they stay in Contact Draft until Approve"
                       className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
                     >
                       {busySet.has("draft-all") ? (
