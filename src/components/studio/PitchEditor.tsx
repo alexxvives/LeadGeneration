@@ -9,16 +9,10 @@ import {
 } from "react";
 import {
   highlightTemplatePlaceholders,
+  pitchHtmlForEditor,
   plainToRich,
   sanitizePitchHtml,
 } from "@/lib/outreach/rich-text";
-
-function toEditorHtml(value: string): string {
-  const base = /<[a-z][\s\S]*>/i.test(value)
-    ? sanitizePitchHtml(value)
-    : plainToRich(value);
-  return highlightTemplatePlaceholders(base);
-}
 
 /** Character offset of the caret within the editor (text nodes only). */
 function caretTextOffset(root: HTMLElement): number | null {
@@ -87,7 +81,7 @@ export function PitchEditor({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const asHtml = toEditorHtml(value);
+    const asHtml = pitchHtmlForEditor(value);
     if (asHtml === lastExternal.current) return;
     // Never clobber the DOM while the user is typing (incl. caret inside child nodes).
     if (focused.current || (el.contains(document.activeElement) && document.activeElement !== document.body)) {

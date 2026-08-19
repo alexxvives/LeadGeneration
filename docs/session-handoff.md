@@ -9,20 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Draft-all button)
+## ⏱️ Status — updated 2026-08-19 (Sign-off editor)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Outreach **Draft all** hid after a successful pass. It had stayed visible
-  because existing `draft` rows were still treated as redraft targets.
-- Button + batch now only cover leads that still need a first draft
-  (or a rewrite after reject). Per-lead redraft is unchanged in the drawer.
+- Email sign-off template is editable again (was wrapped in a `<label>`, so
+  clicks hit Bold). `&amp;` no longer appears for `&` in one-line sign-offs.
 
 ### Next
-1. Deploy Worker so journal-merge + immediate-delete + lastWriteAt merge +
-   Draft-all hide are live.
+1. Deploy Worker so lastWriteAt merge + Draft-all hide + sign-off editor
+   are live.
 
 ---
 

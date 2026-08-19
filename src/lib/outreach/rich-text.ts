@@ -211,6 +211,33 @@ export function plainToRich(plain: string): string {
     .join("<br>");
 }
 
+/** Sanitizer output can be entity-only (no tags) after a one-line edit. */
+const NAMED_ENTITY_RE = /&(?:amp|lt|gt|quot|nbsp);/i;
+
+/** Undo `&amp;amp;` from older editor passes that re-escaped stored HTML. */
+function collapseDoubleEscapedEntities(html: string): string {
+  let s = html;
+  while (/&amp;(?:amp|lt|gt|quot);/i.test(s)) {
+    s = s.replace(/&amp;/gi, "&");
+  }
+  return s;
+}
+
+/**
+ * HTML for the contenteditable pitch/sign-off editor.
+ * Stored values are already escaped (`&amp;`); treating them as plain text
+ * would show `&amp;` on screen (`&amp;amp;` in the DOM).
+ */
+export function pitchHtmlForEditor(value: string): string {
+  const raw = collapseDoubleEscapedEntities(value.replace(/\r\n/g, "\n"));
+  if (!raw.trim()) return "";
+  const asHtml =
+    looksLikeHtml(raw) || NAMED_ENTITY_RE.test(raw)
+      ? sanitizePitchHtml(raw)
+      : plainToRich(raw);
+  return highlightTemplatePlaceholders(asHtml);
+}
+
 /** Wrap body HTML in a minimal email document fragment for ESP `html` fields. */
 export function toEmailHtmlDocument(bodyHtml: string): string {
   const inner = normalizePitchHtml(bodyHtml);

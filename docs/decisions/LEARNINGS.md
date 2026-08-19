@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Sign-off editor: clicks hit Bold; `&amp;` on screen
+- Settings wrapped **Email sign-off template** in a `<label>`. A label’s
+  first labelable descendant is the Bold toolbar button, so clicks never
+  placed a caret (same trap as the draft drawer). Use a `div`.
+- One-line sign-offs store `Co-founder &amp; CEO` with no tags.
+  Reloading treated that as plain text and escaped again → visible `&amp;`.
+  Parse entity-only strings as HTML; collapse leftover `&amp;amp;`.
+
 ### 2026-08-19 — Draft all stayed visible after every lead was drafted
 - Contact Draft **Draft all** treated any non-sent email lead as a target
   (including existing drafts) so a profile change could redraft everyone.

@@ -703,7 +703,7 @@ export function SenderProfileForm() {
             {genError && <p className="mt-1.5 text-xs text-rose-300">{genError}</p>}
           </div>
 
-          <label className="block">
+          <div className="block">
             <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-xs font-medium text-mist-500">
                 Email sign-off template
@@ -711,6 +711,7 @@ export function SenderProfileForm() {
               <PlaceholderHelp />
               <SavedHint field="signOff" />
             </div>
+            {/* Div, not label: a label click activates Bold (first button), not the caret. */}
             <PitchEditor
               compact
               value={profile.signature}
@@ -719,7 +720,7 @@ export function SenderProfileForm() {
               onBlur={() => saveOnBlur("signOff")}
               placeholder={SIGNATURE_PLACEHOLDER}
             />
-          </label>
+          </div>
         </div>
 
         {preview ? (
