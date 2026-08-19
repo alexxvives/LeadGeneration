@@ -535,7 +535,7 @@ export function LeadDrawer(props: DrawerProps) {
         aria-labelledby="lead-drawer-title"
         className={`animate-float-up relative flex w-full flex-col overflow-hidden border border-white/10 bg-ink-900 shadow-2xl ${
           mode === "info"
-            ? "max-h-[min(90dvh,720px)] max-w-[61rem] rounded-xl2"
+            ? "max-h-[min(90dvh,720px)] max-w-[67.1rem] rounded-xl2"
             : "h-[min(92dvh,900px)] max-w-[56rem] rounded-xl2 sm:h-[min(90dvh,860px)]"
         }`}
       >
@@ -637,7 +637,7 @@ export function LeadDrawer(props: DrawerProps) {
         <div
           className={
             mode === "info"
-              ? "grid min-h-0 flex-1 gap-0 overflow-hidden sm:grid-cols-[minmax(0,1.15fr)_minmax(14rem,0.85fr)]"
+              ? "grid min-h-0 flex-1 gap-0 overflow-hidden sm:grid-cols-[minmax(0,1fr)_minmax(16rem,1fr)]"
               : "min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6"
           }
         >

@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Lead info card wider; notes closer to 50/50
+- Info drawer max width `61rem` → `67.1rem` (+10%). Grid split
+  `1.15fr / 0.85fr` → `1fr / 1fr` so notes have equal horizontal room.
+
 ### 2026-08-19 — Calendar overdue legend; pipeline cards drop website
 - Calendar legend keeps type icons centered; **Overdue** is pinned to the
   bottom-right so it is not read as another event kind.
