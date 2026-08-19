@@ -118,7 +118,16 @@ export function followUpKindLabel(kind: FollowUpKind): string {
   if (kind === "email") return "Email sent";
   if (kind === "phone") return "Phone call";
   if (kind === "note") return "Note";
-  return "Follow-up";
+  return "Follow up";
+}
+
+/** Undone reminder whose date is at least one local day before today. */
+export function isOverdueFollowUp(
+  date: string,
+  done: boolean,
+  today = todayIsoDate(),
+): boolean {
+  return !done && date < today;
 }
 
 export interface CalendarEvent {

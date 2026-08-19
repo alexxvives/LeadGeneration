@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Follow up tag in drawer; overdue calendar days
+- Lead drawer journal: every line gets a kind tag (purple **Follow up**, not a
+  checkbox). Sort is chronological (oldest first). Tick done only on Calendar.
+- Calendar paints a day rose when it has an open follow-up whose date is at
+  least one local day before today.
+
 ### 2026-08-18 — Note chip amber; outreach hydrate spinner; map zoom
 - Pipeline / drawer / calendar **note** tags are amber again (`bg-amber-400/15`),
   not gray — follow-ups stay violet.

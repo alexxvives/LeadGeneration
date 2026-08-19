@@ -22,7 +22,6 @@ import { displayWebsite, isUsableWebsite } from "@/lib/website";
 import {
   addDaysIso,
   collapseEmailSentFollowUps,
-  followUpKindLabel,
   formatNoteDate,
   inferFollowUpKind,
   isBounceNote,
@@ -492,14 +491,6 @@ export function LeadDrawer(props: DrawerProps) {
     }
     await props.onUpdateCrm(lead.id, crmPatch);
     if (promptNote) props.onPromptNoteDone?.();
-  };
-
-  const toggleFollowUpDone = async (fuId: string) => {
-    const updated = followUps.map((f) =>
-      f.id === fuId ? { ...f, done: !f.done } : f,
-    );
-    setFollowUps(updated);
-    await props.onUpdateCrm(lead.id, { followUps: updated });
   };
 
   const deleteFollowUp = async (fuId: string) => {
@@ -986,16 +977,14 @@ export function LeadDrawer(props: DrawerProps) {
                 <ul className="space-y-2">
                   {[...followUps]
                     .sort((a, b) => {
-                      if (a.done !== b.done) return a.done ? 1 : -1;
-                      return b.date.localeCompare(a.date);
+                      const byDate = a.date.localeCompare(b.date);
+                      if (byDate !== 0) return byDate;
+                      return a.id.localeCompare(b.id);
                     })
                     .map((fu) => {
                       const kind = resolveFollowUpKind(fu);
                       const isFollow = kind === "follow_up";
                       const missed = isMissedCallNote(fu.note);
-                      const kindLabel = missed
-                        ? "Missed call"
-                        : followUpKindLabel(kind);
                       const tagClass =
                         kind === "email"
                           ? "bg-aurora-400/15 text-aurora-200"
@@ -1014,35 +1003,15 @@ export function LeadDrawer(props: DrawerProps) {
                               ? "Missed"
                               : "Call"
                             : kind === "follow_up"
-                              ? "Follow-up"
+                              ? "Follow up"
                               : "Note";
                       return (
                         <li key={fu.id} className="flex items-start gap-2">
-                          {isFollow ? (
-                            <button
-                              type="button"
-                              onClick={() => void toggleFollowUpDone(fu.id)}
-                              aria-pressed={fu.done}
-                              aria-label={
-                                fu.done
-                                  ? "Mark follow-up not done"
-                                  : "Mark follow-up done"
-                              }
-                              className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
-                                fu.done
-                                  ? "border-aurora-400/40 bg-aurora-400/20 text-aurora-200"
-                                  : "border-violet-400/40 text-violet-300 hover:border-violet-400/70"
-                              }`}
-                            >
-                              {fu.done ? <CheckIcon className="h-3 w-3" /> : null}
-                            </button>
-                          ) : (
-                            <span
-                              className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tagClass}`}
-                            >
-                              {tagText}
-                            </span>
-                          )}
+                          <span
+                            className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tagClass}`}
+                          >
+                            {tagText}
+                          </span>
                           {editingId === fu.id ? (
                             <div className="min-w-0 flex-1 space-y-2">
                               <input
@@ -1085,10 +1054,8 @@ export function LeadDrawer(props: DrawerProps) {
                             >
                               <span className="font-semibold text-mist-100">
                                 {formatNoteDate(fu.date)}
-                                {` · ${kindLabel}`}
-                                :
-                              </span>{" "}
-                              {fu.note || "—"}
+                              </span>
+                              {fu.note ? <> · {fu.note}</> : null}
                             </p>
                           )}
                           {editingId === fu.id ? null : (

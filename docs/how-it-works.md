@@ -112,9 +112,11 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   - **Calendar** (`?view=calendar`) — month view of the active board filter.
     Each day lists **follow-ups** (dated reminders from **Follow up**),
     **emails sent**, and **phone calls** logged that day — shown as calendar /
-    mail / phone icons on the day cell. Plain notes stay on
-    the lead only and never count as follow-ups. Click an item to open the lead.
-    Tick a follow-up to mark it done.
+    mail / phone icons on the day cell. An open follow-up whose date is at
+    least one day past paints that day **red**. Tick the checkbox on Calendar
+    to mark it done (the lead drawer shows a purple **Follow up** tag, no
+    checkbox). Plain notes stay on the lead only and never count as
+    follow-ups. Click an item to open the lead.
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.
@@ -130,8 +132,11 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     (incl. full address), about blurb, CRM stage, dated notes journal
     (**Add Note** for a log line; **Follow up** pre-fills “Follow up” one week
     out and shows on Calendar; **Missed call** writes the journal line
-    immediately — no composer). Notes can be edited or deleted. Toggling
-    **Phone** opens a call log with the caret after `Phone call by {name}:`.
+    immediately — no composer). Journal lines are chronological (oldest first)
+    with a kind tag (purple **Follow up**, amber Note, …). Notes can be edited
+    or deleted. Done-state for follow-ups is ticked on Calendar only.
+    Toggling **Phone** opens a call log with the caret after
+    `Phone call by {name}:`.
     A bounce deletes that address and returns the lead to New — it is not a
     follow-up. The outreach composer (draft → edit → approve → send) is on
     the draft pane.

@@ -7,6 +7,7 @@ import {
   followUpKindLabel,
   formatNoteDate,
   isMissedCallNote,
+  isOverdueFollowUp,
   todayIsoDate,
   type CalendarEvent,
 } from "@/lib/follow-ups";
@@ -66,7 +67,13 @@ function KindMark({ kind }: { kind: FollowUpKind }) {
   );
 }
 
-function DayKindMark({ kind }: { kind: FollowUpKind }) {
+function DayKindMark({
+  kind,
+  overdue = false,
+}: {
+  kind: FollowUpKind;
+  overdue?: boolean;
+}) {
   if (kind === "email") {
     return (
       <MailIcon className="h-3.5 w-3.5 text-aurora-400 drop-shadow-[0_0_4px_rgba(52,211,153,0.45)]" aria-hidden />
@@ -79,7 +86,14 @@ function DayKindMark({ kind }: { kind: FollowUpKind }) {
   }
   if (kind === "follow_up") {
     return (
-      <CalendarIcon className="h-3.5 w-3.5 text-violet-300 drop-shadow-[0_0_4px_rgba(167,139,250,0.55)]" aria-hidden />
+      <CalendarIcon
+        className={`h-3.5 w-3.5 ${
+          overdue
+            ? "text-rose-400 drop-shadow-[0_0_4px_rgba(251,113,133,0.55)]"
+            : "text-violet-300 drop-shadow-[0_0_4px_rgba(167,139,250,0.55)]"
+        }`}
+        aria-hidden
+      />
     );
   }
   return (
@@ -247,6 +261,11 @@ export function CalendarView({
               const pending = dayEvs.filter(
                 (e) => e.kind === "follow_up" && !e.done,
               ).length;
+              const overdue = dayEvs.some(
+                (e) =>
+                  e.kind === "follow_up" &&
+                  isOverdueFollowUp(e.date, e.done, today),
+              );
               const summary = dayEvs.length
                 ? `${dayEvs.length} item${dayEvs.length === 1 ? "" : "s"}`
                 : "no items";
@@ -257,21 +276,29 @@ export function CalendarView({
                   role="gridcell"
                   aria-selected={isSelected}
                   aria-current={isToday ? "date" : undefined}
-                  aria-label={`${formatNoteDate(cell.iso)}, ${summary}`}
+                  aria-label={`${formatNoteDate(cell.iso)}, ${summary}${
+                    overdue ? ", overdue follow-up" : ""
+                  }`}
                   onClick={() => setSelected(cell.iso)}
                   className={`flex h-full min-h-0 flex-col items-start rounded-xl px-1.5 py-1.5 text-left transition-colors ${
                     isSelected
-                      ? "bg-aurora-400/15 ring-1 ring-aurora-400/50"
-                      : isToday
-                        ? "bg-white/[0.04] ring-1 ring-white/15"
-                        : "hover:bg-white/[0.04]"
+                      ? overdue
+                        ? "bg-rose-400/15 ring-1 ring-rose-400/55"
+                        : "bg-aurora-400/15 ring-1 ring-aurora-400/50"
+                      : overdue
+                        ? "bg-rose-400/10 ring-1 ring-rose-400/45"
+                        : isToday
+                          ? "bg-white/[0.04] ring-1 ring-white/15"
+                          : "hover:bg-white/[0.04]"
                   } ${cell.inMonth ? "" : "opacity-40"}`}
                 >
                   <span
                     className={`text-xs tabular-nums ${
-                      isToday
-                        ? "font-semibold text-aurora-300"
-                        : "text-mist-200"
+                      overdue
+                        ? "font-semibold text-rose-300"
+                        : isToday
+                          ? "font-semibold text-aurora-300"
+                          : "text-mist-200"
                     }`}
                   >
                     {cell.day}
@@ -279,7 +306,11 @@ export function CalendarView({
                   {kinds.length > 0 ? (
                     <span className="mt-auto flex flex-wrap items-center gap-1 pt-1">
                       {kinds.map((k) => (
-                        <DayKindMark key={k} kind={k} />
+                        <DayKindMark
+                          key={k}
+                          kind={k}
+                          overdue={overdue && k === "follow_up"}
+                        />
                       ))}
                       {pending > 0 ? (
                         <span className="sr-only">
@@ -297,7 +328,11 @@ export function CalendarView({
         <ul className="mt-3 flex shrink-0 flex-wrap items-center justify-center gap-4 text-[11px] text-mist-400">
           <li className="inline-flex items-center gap-1.5">
             <CalendarIcon className="h-3.5 w-3.5 text-violet-300" aria-hidden />
-            Follow-up
+            Follow up
+          </li>
+          <li className="inline-flex items-center gap-1.5">
+            <CalendarIcon className="h-3.5 w-3.5 text-rose-400" aria-hidden />
+            Overdue
           </li>
           <li className="inline-flex items-center gap-1.5">
             <MailIcon className="h-3.5 w-3.5 text-aurora-400" aria-hidden />
@@ -372,9 +407,17 @@ function DayGroup({
       <ul className="space-y-2">
         {events.map((ev) => {
           const missed = ev.kind === "phone" && isMissedCallNote(ev.note);
+          const overdue =
+            ev.kind === "follow_up" && isOverdueFollowUp(ev.date, ev.done);
           return (
           <li key={ev.id}>
-            <div className="flex items-start gap-2 rounded-xl border border-white/5 bg-ink-950/40 p-2.5">
+            <div
+              className={`flex items-start gap-2 rounded-xl border p-2.5 ${
+                overdue
+                  ? "border-rose-400/40 bg-rose-400/10"
+                  : "border-white/5 bg-ink-950/40"
+              }`}
+            >
               {onToggleFollowUp && ev.kind === "follow_up" ? (
                 <button
                   type="button"

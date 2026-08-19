@@ -9,15 +9,14 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-18 (Note color + map zoom)
+## ⏱️ Status — updated 2026-08-19 (Follow up tag + overdue days)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Pipeline note chip is amber again (not gray).
-- Outreach Contact Draft / Ready / Contacted headers spin while hydrating.
-- Map keeps zoom/pan as more leads page in; refit only on board change.
+- Drawer notes: purple Follow up tag (no checkbox), chronological.
+- Calendar: checkbox stays; overdue open follow-ups paint the day red.
 
 ### Next
 1. Deploy after `tsc`/`lint` green.
