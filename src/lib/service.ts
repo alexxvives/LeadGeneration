@@ -1753,6 +1753,29 @@ function deliveryRank(s: DeliveryStatus): number {
   }
 }
 
+/** Decode leftover `%20` prefixes / encoded spaces so bounce matching is exact. */
+function normalizeBounceAddr(raw: string | null | undefined): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "";
+  let decoded = trimmed;
+  try {
+    decoded = decodeURIComponent(trimmed);
+  } catch {
+    decoded = trimmed.replace(/%20/gi, " ");
+  }
+  return decoded.trim().toLowerCase();
+}
+
+function emailsWithoutBounced(emails: string[], bouncedAddr: string): string[] {
+  if (bouncedAddr) {
+    const next = emails.filter((e) => normalizeBounceAddr(e) !== bouncedAddr);
+    if (next.length !== emails.length) return next;
+  }
+  // Unknown recipient + a single leftover address: that address is the bounce.
+  if (emails.length === 1) return [];
+  return emails;
+}
+
 /** Manual delivery outcome stub (bounce / reply). Webhooks call the same path. */
 export async function setOutreachDeliveryStatus(
   ctx: Ctx,
@@ -1767,30 +1790,29 @@ export async function setOutreachDeliveryStatus(
     return existing;
   }
 
-  const outreachPatch: Partial<Outreach> = {
-    deliveryStatus,
-    updatedAt: nowIso(),
-  };
+  const outreachPatch: Partial<Outreach> = {};
+  if (deliveryStatus !== prev) {
+    outreachPatch.deliveryStatus = deliveryStatus;
+    outreachPatch.updatedAt = nowIso();
+  }
 
   // Bounce: address never landed — drop it, undo Contacted. Not a follow-up.
-  if (deliveryStatus === "bounced" && prev !== "bounced") {
+  // Idempotent: already-bounced rows from before strip-on-bounce still get cleaned.
+  if (deliveryStatus === "bounced") {
+    const firstBounce = prev !== "bounced";
     const lead = await ctx.db.getLead(existing.leadId);
     if (lead) {
       const patch: Partial<Lead> = {};
-      const bouncedAddr = (existing.toEmail ?? "").trim().toLowerCase();
-      let nextEmails = lead.emails;
-      if (bouncedAddr && lead.emails.some((e) => e.toLowerCase() === bouncedAddr)) {
-        nextEmails = lead.emails.filter((e) => e.toLowerCase() !== bouncedAddr);
+      const bouncedAddr = normalizeBounceAddr(existing.toEmail);
+      const nextEmails = emailsWithoutBounced(lead.emails, bouncedAddr);
+      if (nextEmails.join("\0") !== lead.emails.join("\0")) {
         patch.emails = nextEmails;
-      } else if (lead.emails.length === 1) {
-        nextEmails = [];
-        patch.emails = [];
       }
-      if (
-        bouncedAddr &&
-        (existing.toEmail ?? "").trim().toLowerCase() === bouncedAddr
-      ) {
-        outreachPatch.toEmail = nextEmails[0] ?? null;
+      const nextTo = nextEmails.find((e) => e.trim())?.trim() ?? null;
+      const currentTo = existing.toEmail?.trim() || null;
+      if (currentTo !== nextTo) {
+        outreachPatch.toEmail = nextTo;
+        outreachPatch.updatedAt = nowIso();
       }
       const methods = lead.contactMethods ?? [];
       const withoutEmail = methods.filter((m) => m !== "email");
@@ -1798,7 +1820,7 @@ export async function setOutreachDeliveryStatus(
         patch.contactMethods = withoutEmail;
       }
       // Send path moves new → contacted; bounce means that contact didn't happen.
-      if (lead.crmStage === "contacted" && withoutEmail.length === 0) {
+      if (firstBounce && lead.crmStage === "contacted" && withoutEmail.length === 0) {
         patch.crmStage = "new";
       }
       const withoutBounceNotes = (lead.followUps ?? []).filter(
@@ -1813,8 +1835,11 @@ export async function setOutreachDeliveryStatus(
     }
   }
 
-  const outreach = await ctx.db.updateOutreach(outreachId, outreachPatch);
-  if (!outreach) return null;
+  let outreach: Outreach | null = existing;
+  if (Object.keys(outreachPatch).length > 0) {
+    outreach = await ctx.db.updateOutreach(outreachId, outreachPatch);
+    if (!outreach) return null;
+  }
 
   // Reply webhook / manual: park lead in In Conversation (Pipeline highlights these).
   if (deliveryStatus === "replied") {

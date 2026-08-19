@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Backfill bounced addresses still on the lead
+- Bounce webhook (Aug 4–7) set `delivery_status=bounced` and reverted CRM to
+  New, but strip-on-bounce landed later. Handler only ran on the *transition*
+  into bounced, so rows like **Academia Albert** kept `info@academiaalbert.es`
+  on `lead.emails` and `outreach.to_email`. Outreach also prefers `toEmail`,
+  so even leads with `emails: []` still looked like they had an address.
+- Migration **0032** strips the bounced recipient and clears leftover
+  `to_email`. Handler is now idempotent; Outreach ignores bounced `toEmail`.
+
 ### 2026-08-19 — Strip legacy “Contact registered” notes
 - Empty-channel journal fallback wrote `Contact registered` (optionally
   ` — {name}`). Three prod leads still had it. Migration **0031** deletes

@@ -44,7 +44,10 @@ function isContacted(lead: LeadWithOutreach): boolean {
 }
 
 function leadEmail(lead: LeadWithOutreach): string | null {
-  const raw = lead.outreach?.toEmail ?? lead.emails[0] ?? null;
+  const fromLead = lead.emails.find((e) => e.trim())?.trim() ?? null;
+  // Bounced recipient is dead — don't treat leftover outreach.toEmail as live.
+  if (lead.outreach?.deliveryStatus === "bounced") return fromLead;
+  const raw = lead.outreach?.toEmail ?? fromLead;
   const t = raw?.trim();
   return t || null;
 }
