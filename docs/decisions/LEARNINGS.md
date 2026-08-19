@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Missed-call journal text matches other notes
+- Gray was only for the **Missed** tag (vs sky **Call**). The date + body
+  used `text-mist-500` / `text-mist-400`, so the line looked dimmer than
+  notes. Journal body now uses the same `text-mist-300` / `text-mist-100`
+  as other notes.
+
 ### 2026-08-19 — Missed call still shows the Pipeline phone icon
 - Missed call is journal-only and stays in New / Ready (no `contactMethods`
   phone, so Outreach does not treat it as Contacted). Pipeline hid method
@@ -46,7 +52,8 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ### 2026-08-19 — Journal tag column; Add Note amber; Missed gray; overdue square
 - Notes journal tags share a fixed width so date/body lines up under Follow up.
-- **Add Note** header is amber; **Missed** tag + line (and header) are mist gray.
+- **Add Note** header is amber; **Missed** tag (and header) are mist gray.
+  Journal date/body use the same mist-100 / mist-300 as other notes.
 - Overdue days use a rose selected-day square; calendar icons stay violet.
 
 ### 2026-08-19 — Follow up tag in drawer; overdue calendar days

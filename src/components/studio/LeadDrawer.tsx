@@ -1012,14 +1012,10 @@ export function LeadDrawer(props: DrawerProps) {
                             : kind === "follow_up"
                               ? "Follow up"
                               : "Note";
-                      const lineClass = missed
-                        ? "text-mist-500"
-                        : isFollow && fu.done
+                      const lineClass =
+                        isFollow && fu.done
                           ? "text-mist-500 line-through"
                           : "text-mist-300";
-                      const dateClass = missed
-                        ? "text-mist-400"
-                        : "text-mist-100";
                       return (
                         <li key={fu.id} className="flex items-start gap-2">
                           <span
@@ -1063,7 +1059,7 @@ export function LeadDrawer(props: DrawerProps) {
                             <p
                               className={`min-w-0 flex-1 text-sm leading-relaxed ${lineClass}`}
                             >
-                              <span className={`font-semibold ${dateClass}`}>
+                              <span className="font-semibold text-mist-100">
                                 {formatNoteDate(fu.date)}
                               </span>
                               {fu.note ? <> · {fu.note}</> : null}

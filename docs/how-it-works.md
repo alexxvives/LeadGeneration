@@ -137,7 +137,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     (**Add Note** for a log line; **Follow up** pre-fills “Follow up” one week
     out and shows on Calendar; **Missed call** writes the journal line
     immediately — no composer — as `Missed call by {name}`, no trailing colon). Journal lines are chronological (oldest first)
-    with a kind tag (purple **Follow up**, amber **Note**, gray **Missed**).
+    with a kind tag (purple **Follow up**, amber **Note**, gray **Missed** —
+    tag only; the date/body use the same ink as other notes).
     **Add Note** in the header matches the amber tag. Notes can be edited
     or deleted. Done-state for follow-ups is ticked on Calendar only.
     Toggling **Phone** opens a call log with the caret after
