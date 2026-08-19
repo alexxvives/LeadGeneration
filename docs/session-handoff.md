@@ -9,18 +9,17 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Journal flash on add)
+## ⏱️ Status — updated 2026-08-19 (Card info pencil)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Notes / follow-ups no longer flash away after add: in-flight lead GET and
-  slim board polls were overwriting the optimistic journal; merge by id keeps
-  the new row until the save catches up.
+- Removed the non-clickable pencil icons from lead-drawer contact/about
+  fields. Those rows are already editable via the input itself.
 
 ### Next
-1. Deploy Worker so the journal-merge fix is live.
+1. Deploy Worker so the journal-merge fix (and this UI tweak) is live.
 
 ---
 

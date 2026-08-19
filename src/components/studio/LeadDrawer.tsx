@@ -1473,7 +1473,6 @@ function EditableInfoRow({
           aria-label={label}
           className="min-w-0 flex-1 bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-500"
         />
-        <PencilIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" aria-hidden />
       </div>
     </div>
   );
@@ -1511,7 +1510,6 @@ function AutoGrowAbout({
         aria-label="About"
         className="min-h-[1.5rem] min-w-0 flex-1 resize-none overflow-hidden bg-transparent py-0.5 text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-500"
       />
-      <PencilIcon className="mt-1 h-3.5 w-3.5 shrink-0 text-mist-500" aria-hidden />
     </div>
   );
 }
