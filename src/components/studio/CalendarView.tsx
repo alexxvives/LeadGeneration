@@ -306,17 +306,10 @@ export function CalendarView({
           </div>
         </div>
 
-        <ul className="mt-3 flex shrink-0 flex-wrap items-center justify-center gap-4 text-[11px] text-mist-400">
+        <ul className="relative mt-3 flex shrink-0 flex-wrap items-center justify-center gap-4 pr-24 text-[11px] text-mist-400">
           <li className="inline-flex items-center gap-1.5">
             <CalendarIcon className="h-3.5 w-3.5 text-violet-300" aria-hidden />
             Follow up
-          </li>
-          <li className="inline-flex items-center gap-1.5">
-            <span
-              className="h-3.5 w-3.5 rounded-sm bg-rose-400/20 ring-1 ring-rose-400/50"
-              aria-hidden
-            />
-            Overdue
           </li>
           <li className="inline-flex items-center gap-1.5">
             <MailIcon className="h-3.5 w-3.5 text-aurora-400" aria-hidden />
@@ -325,6 +318,13 @@ export function CalendarView({
           <li className="inline-flex items-center gap-1.5">
             <PhoneIcon className="h-3.5 w-3.5 text-sky-400" aria-hidden />
             Phone call
+          </li>
+          <li className="absolute right-0 top-1/2 inline-flex -translate-y-1/2 items-center gap-1.5">
+            <span
+              className="h-3.5 w-3.5 rounded-sm bg-rose-400/20 ring-1 ring-rose-400/50"
+              aria-hidden
+            />
+            Overdue
           </li>
         </ul>
       </section>

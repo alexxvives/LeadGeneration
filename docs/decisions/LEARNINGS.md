@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Calendar overdue legend; pipeline cards drop website
+- Calendar legend keeps type icons centered; **Overdue** is pinned to the
+  bottom-right so it is not read as another event kind.
+- Pipeline kanban cards show company + status chips only — no website host.
+
 ### 2026-08-19 — Calendar strikethrough is follow-ups only
 - Calls/emails/notes are stored `done: true` so they are not open reminders.
   Calendar was applying `line-through` to any `done` event. Strike only

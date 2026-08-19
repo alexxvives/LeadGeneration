@@ -16,7 +16,6 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { MailIcon, PhoneIcon, FormIcon, InfoIcon, CalendarIcon } from "@/components/icons";
-import { displayWebsite } from "@/lib/website";
 import { isUserFollowUp, resolveFollowUpKind } from "@/lib/follow-ups";
 import { Bone, useStableDuringLoad } from "./skeletons";
 
@@ -67,11 +66,6 @@ const PARKED_COLUMNS: {
     color: "bg-rose-400",
   },
 ];
-
-/** Card subtitle: website host — not email or street address. */
-function cardSubtitle(lead: LeadWithOutreach): string | null {
-  return displayWebsite(lead.website) ?? null;
-}
 
 // ─── Pipeline (CRM kanban with drag-and-drop) ─────────────────────────────────
 
@@ -270,9 +264,6 @@ export function PipelineView({
           {activeLead ? (
             <div className="w-60 rotate-2 cursor-grabbing rounded-xl border border-aurora-400/40 bg-ink-800 px-3 py-3 shadow-2xl">
               <p className="truncate text-sm font-medium text-mist-100">{activeLead.company}</p>
-              <p className="mt-1 truncate text-xs text-mist-500">
-                {cardSubtitle(activeLead) ?? "No contact yet"}
-              </p>
             </div>
           ) : null}
         </DragOverlay>
@@ -386,7 +377,6 @@ function PipelineColumn({
                   className="rounded-xl border border-white/8 bg-ink-950/50 p-3"
                 >
                   <Bone className="h-4 w-3/4 max-w-[12rem]" />
-                  <Bone className="mt-2 h-3 w-1/2 max-w-[8rem]" />
                 </div>
               ))}
             </div>
@@ -435,7 +425,6 @@ function DraggablePipelineCard({
   const journalNotes =
     lead.followUps?.filter((f) => resolveFollowUpKind(f) === "note").length ?? 0;
   const noteCount = journalNotes > 0 ? journalNotes : lead.notes?.trim() ? 1 : 0;
-  const subtitle = cardSubtitle(lead);
   const replied = lead.outreach?.deliveryStatus === "replied";
   const bounced = lead.outreach?.deliveryStatus === "bounced";
   const methods = lead.contactMethods ?? [];
@@ -472,9 +461,6 @@ function DraggablePipelineCard({
             {lead.company}
           </p>
         </div>
-        {subtitle && (
-          <p className="mt-0.5 truncate text-xs leading-snug text-mist-500">{subtitle}</p>
-        )}
         <div className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden">
           {bounced ? (
             <span className="shrink-0 rounded-full bg-rose-400/20 px-1.5 py-0.5 text-[10px] font-medium text-rose-200">

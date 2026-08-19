@@ -9,13 +9,14 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Calendar strike follow-ups only)
+## ⏱️ Status — updated 2026-08-19 (Calendar legend + pipeline cards)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Calendar strikethrough only on ticked follow-ups, not calls/emails.
+- Calendar legend: Overdue sits bottom-right, apart from Follow up / Email / Phone.
+- Pipeline cards: website host line removed.
 
 ### Next
 1. Deploy after `tsc`/`lint` green.
