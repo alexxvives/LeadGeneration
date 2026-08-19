@@ -109,7 +109,9 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     row already has a draft, the button becomes **Re-draft all** (rewrites
     from the active profile). Closing the draft drawer
     without Approve does not advance. The sidebar Board picker activates that
-    board’s linked outreach profile. Send remains per-lead after approve
+    board’s linked outreach profile. Contacted **N sent today · ~Y/day suggest**
+    is that board’s mailbox (boards that share an outreach profile share the
+    cap) — not a workspace total. Send remains per-lead after approve
     (constitution Art. I.1).
 
   - **Calendar** (`?view=calendar`) — month view of the active board filter.

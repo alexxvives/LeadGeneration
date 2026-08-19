@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
-import { warmupStatus } from "@/lib/email/warmup";
+import { loadWarmupProfile, warmupStatus } from "@/lib/email/warmup";
 import { Spinner } from "@/components/ui";
 import {
   CheckIcon,
@@ -169,6 +169,7 @@ function contactedDayHint(sentToday: number, softCap: number): string {
 export function OutreachView({
   leads,
   sendsToday = 0,
+  warmupScopeId = null,
   canSendEmail,
   busyIds = [],
   backfilling = false,
@@ -185,8 +186,10 @@ export function OutreachView({
   onLogCall,
 }: {
   leads: LeadWithOutreach[];
-  /** Workspace DB count of emails sent since local midnight. */
+  /** Workspace DB count of emails sent from this board’s mailbox today. */
   sendsToday?: number;
+  /** Board outreach profile (or board id) — mailbox age / ~N/day suggest. */
+  warmupScopeId?: string | null;
   canSendEmail: boolean;
   /** Lead / outreach ids currently drafting or sending (concurrent OK). */
   busyIds?: readonly string[];
@@ -277,7 +280,7 @@ export function OutreachView({
     contacted: contactedRows,
   };
 
-  const softCap = warmupStatus().softCap;
+  const softCap = warmupStatus(loadWarmupProfile(warmupScopeId)).softCap;
   const overSoftCap = sendsToday >= softCap;
 
   const draftAllRemaining = useMemo(
@@ -344,7 +347,7 @@ export function OutreachView({
                     }`}
                     title={
                       key === "contacted"
-                        ? "Soft recommend from Settings → mailbox age. Warning only — not a hard block."
+                        ? "Soft recommend for this board’s inbox (Settings → mailbox age). Warning only — not a hard block."
                         : undefined
                     }
                   >

@@ -11,14 +11,22 @@ import {
 } from "@/lib/email/warmup";
 
 /**
- * Compact age-band dropdown for Sending identity — drives soft daily send caps.
+ * Compact age-band dropdown for Sending identity — drives soft daily send caps
+ * for this outreach profile’s inbox (not the whole workspace).
  */
-export function MailboxAgePicker({ disabled = false }: { disabled?: boolean }) {
+export function MailboxAgePicker({
+  disabled = false,
+  scopeId = null,
+}: {
+  disabled?: boolean;
+  /** Board outreach profile id (or board id). */
+  scopeId?: string | null;
+}) {
   const [profile, setProfile] = useState<WarmupProfile | null>(null);
 
   useEffect(() => {
-    setProfile(loadWarmupProfile());
-  }, []);
+    setProfile(loadWarmupProfile(scopeId));
+  }, [scopeId]);
 
   if (!profile) return null;
 
@@ -27,7 +35,7 @@ export function MailboxAgePicker({ disabled = false }: { disabled?: boolean }) {
 
   const onChange = (band: MailboxAgeBand) => {
     if (disabled) return;
-    setProfile(setMailboxAgeBand(band));
+    setProfile(setMailboxAgeBand(band, scopeId));
   };
 
   return (

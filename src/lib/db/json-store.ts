@@ -869,15 +869,44 @@ export class JsonStore implements LeadRepository {
     }).length;
   }
 
-  async countSentSince(sinceIso: string): Promise<number> {
+  async countSentSince(
+    sinceIso: string,
+    opts?: { boardId?: string | null },
+  ): Promise<number> {
     const data = await this.read();
-    return data.outreach.filter(
-      (o) =>
-        this.inScope(o) &&
-        o.status === "sent" &&
-        !!o.sentAt &&
-        o.sentAt >= sinceIso,
-    ).length;
+    const boardId = opts?.boardId?.trim() || null;
+    let boardIds: Set<string> | null = null;
+    if (boardId) {
+      const board = data.boards.find((b) => b.id === boardId && this.inScope(b));
+      const profileId = board?.outreachProfileId?.trim() || null;
+      boardIds = profileId
+        ? new Set(
+            data.boards
+              .filter(
+                (b) => this.inScope(b) && b.outreachProfileId === profileId,
+              )
+              .map((b) => b.id),
+          )
+        : new Set([boardId]);
+    }
+    const leadBoard = new Map(
+      data.leads
+        .filter((l) => this.inScope(l))
+        .map((l) => [l.id, l.boardId || ""]),
+    );
+    return data.outreach.filter((o) => {
+      if (
+        !this.inScope(o) ||
+        o.status !== "sent" ||
+        !o.sentAt ||
+        o.sentAt < sinceIso
+      ) {
+        return false;
+      }
+      if (!boardIds) return true;
+      const leadBoardId = leadBoard.get(o.leadId);
+      return Boolean(leadBoardId && boardIds.has(leadBoardId));
+    }).length;
   }
 
   clearWorkspaceData(): Promise<void> {

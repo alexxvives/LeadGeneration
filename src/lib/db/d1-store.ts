@@ -1661,16 +1661,64 @@ export class D1Store implements LeadRepository {
     return Number(row?.n ?? 0);
   }
 
-  async countSentSince(sinceIso: string): Promise<number> {
+  async countSentSince(
+    sinceIso: string,
+    opts?: { boardId?: string | null },
+  ): Promise<number> {
+    const boardId = opts?.boardId?.trim() || null;
+    if (!boardId) {
+      const row = await this.db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM outreach
+           WHERE workspace_id = ?
+             AND status = 'sent'
+             AND sent_at IS NOT NULL
+             AND sent_at >= ?`,
+        )
+        .bind(this.workspaceId, sinceIso)
+        .first<{ n: number }>();
+      return Number(row?.n ?? 0);
+    }
+
+    const board = await this.db
+      .prepare(
+        `SELECT outreach_profile_id FROM boards WHERE id = ? AND workspace_id = ?`,
+      )
+      .bind(boardId, this.workspaceId)
+      .first<{ outreach_profile_id: string | null }>();
+    const profileId = board?.outreach_profile_id?.trim() || null;
+
+    if (profileId) {
+      const row = await this.db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM outreach o
+           INNER JOIN leads l
+             ON l.id = o.lead_id AND l.workspace_id = o.workspace_id
+           INNER JOIN boards b
+             ON b.id = l.board_id AND b.workspace_id = o.workspace_id
+           WHERE o.workspace_id = ?
+             AND o.status = 'sent'
+             AND o.sent_at IS NOT NULL
+             AND o.sent_at >= ?
+             AND b.outreach_profile_id = ?`,
+        )
+        .bind(this.workspaceId, sinceIso, profileId)
+        .first<{ n: number }>();
+      return Number(row?.n ?? 0);
+    }
+
     const row = await this.db
       .prepare(
-        `SELECT COUNT(*) AS n FROM outreach
-         WHERE workspace_id = ?
-           AND status = 'sent'
-           AND sent_at IS NOT NULL
-           AND sent_at >= ?`,
+        `SELECT COUNT(*) AS n FROM outreach o
+         INNER JOIN leads l
+           ON l.id = o.lead_id AND l.workspace_id = o.workspace_id
+         WHERE o.workspace_id = ?
+           AND o.status = 'sent'
+           AND o.sent_at IS NOT NULL
+           AND o.sent_at >= ?
+           AND l.board_id = ?`,
       )
-      .bind(this.workspaceId, sinceIso)
+      .bind(this.workspaceId, sinceIso, boardId)
       .first<{ n: number }>();
     return Number(row?.n ?? 0);
   }

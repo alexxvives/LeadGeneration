@@ -1358,7 +1358,12 @@ export function Studio() {
   ): Promise<boolean> => {
     try {
       const result = await api.send(outreachId, opts);
-      recordWarmupSend();
+      const cur = boardRef.current;
+      const warmupScope =
+        cur?.boards.find((b) => b.id === cur.activeBoardId)?.outreachProfileId ??
+        cur?.activeBoardId ??
+        null;
+      recordWarmupSend(warmupScope);
       // Patch in place — a full refresh on a large board reloads page 1 only
       // and can hide the just-sent lead from Outreach → Contacted.
       if (result.outreach) {
@@ -2651,6 +2656,10 @@ export function Studio() {
               key={filterBoardId ?? "all"}
               leads={outreachFilteredLeads}
               sendsToday={board.workspace.sendsToday ?? 0}
+              warmupScopeId={
+                board.boards.find((b) => b.id === board.activeBoardId)
+                  ?.outreachProfileId ?? board.activeBoardId
+              }
               canSendEmail={!!board.capabilities.canSendEmail}
               busyIds={outreachBusyIds}
               backfilling={leadsBackfilling}

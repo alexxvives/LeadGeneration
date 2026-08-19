@@ -207,10 +207,15 @@ export interface LeadRepository {
   countRecentSendActivity(sinceIso: string, excludeId?: string): Promise<number>;
 
   /**
-   * Workspace outreach with status `sent` and `sent_at >= sinceIso`.
+   * Outreach with status `sent` and `sent_at >= sinceIso`.
    * Used for the Contacted “sent today” counter (client passes local midnight).
+   * Pass `boardId` to count that board’s mailbox (boards sharing the same
+   * outreach profile share the cap). Omit for the whole workspace.
    */
-  countSentSince(sinceIso: string): Promise<number>;
+  countSentSince(
+    sinceIso: string,
+    opts?: { boardId?: string | null },
+  ): Promise<number>;
 
   /** Wipe runs/leads/outreach/boards for this workspace (keeps the workspace row). */
   clearWorkspaceData(): Promise<void>;

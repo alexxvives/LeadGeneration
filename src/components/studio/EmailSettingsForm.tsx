@@ -389,7 +389,7 @@ export function EmailSettingsForm({
             className={inputCls}
           />
         </Field>
-        <MailboxAgePicker disabled={!canEdit} />
+        <MailboxAgePicker disabled={!canEdit} scopeId={profileId ?? null} />
       </div>
 
       <div data-tour="resend-key" className="space-y-4">

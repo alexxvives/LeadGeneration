@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Sent today / ~N/day was workspace-wide, not per inbox
+- Contacted counted every send in the workspace and used one mailbox-age
+  blob, so LUMIA’s 25 sends showed on Akademo. Count now follows the
+  active board’s outreach profile (ADR 0027). Age is per profile too;
+  new domains start at ~20/day until Settings → mailbox age is set.
+
 ### 2026-08-19 — After Draft all, the same control becomes Re-draft all
 - Hiding the button once every Contact Draft had a draft removed the
   profile-change bulk rewrite. Keep **Draft all** for remaining first

@@ -62,7 +62,9 @@ export async function GET(req: Request) {
           d.setUTCHours(0, 0, 0, 0);
           return d.toISOString();
         })();
-  const sendsToday = await ctx.db.countSentSince(dayStart);
+  const sendsToday = await ctx.db.countSentSince(dayStart, {
+    boardId: board.activeBoardId,
+  });
   const ws = await ctx.db.getWorkspace(ctx.workspaceId);
   const caps = getCapabilities();
   // Easy path only (Resend / Maileroo / SMTP / platform). Connected mailbox is

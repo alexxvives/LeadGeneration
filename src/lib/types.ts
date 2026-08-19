@@ -493,7 +493,9 @@ export interface WorkspaceSummary {
   sendsLimit: number;
   /**
    * Outreach emails with status sent since the client's local midnight
-   * (`dayStart` on GET /api/board). Workspace-wide — not board-paged.
+   * (`dayStart` on GET /api/board). Scoped to the active board’s mailbox
+   * (boards sharing an outreach profile share the count). Workspace-wide
+   * when no board is selected.
    */
   sendsToday?: number;
   /** Insider / BYO sender — no platform send quota. */

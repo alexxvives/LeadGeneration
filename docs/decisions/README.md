@@ -65,5 +65,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0024 — Remove Zeruh / Maileroo Verify — MyEmailVerifier only](0024-remove-zeruh-verify.md) _(amends 0016; zeruh route alias removed 2026-08-08)_
 - [0025 — Per-board email verify toggle](0025-per-board-email-verify.md) _(amends 0016)_
 - [0026 — Remove Pro Gmail mailbox send path](0026-remove-pro-gmail-mailbox.md) _(supersedes 0010; Easy Resend/Maileroo/SMTP only)_
+- [0027 — Daily send suggest is per board mailbox](0027-per-board-mailbox-warmup.md) _(amends 0021 + 0022)_
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

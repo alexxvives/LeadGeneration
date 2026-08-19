@@ -9,19 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Re-draft all)
+## ⏱️ Status — updated 2026-08-19 (Per-board sent-today)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Contact Draft **Draft all** still only writes remaining first drafts.
-  When every row already has a draft, the same control becomes
-  **Re-draft all**.
+- Contacted **N sent today · ~Y/day suggest** is per board mailbox
+  (outreach profile), not the whole workspace. New domains start at
+  ~20/day until Settings → mailbox age is set (ADR 0027).
 
 ### Next
-1. Deploy Worker so lastWriteAt/writePending merge + Re-draft all +
-   sign-off editor are live.
+1. Deploy Worker so per-board sent-today + Re-draft all + lastWriteAt
+   merge are live.
 
 ---
 
