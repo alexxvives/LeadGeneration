@@ -1,11 +1,19 @@
-import type { FollowUp, LeadWithOutreach, Outreach } from "@/lib/types";
+import type { ContactMethod, FollowUp, Lead, LeadWithOutreach, Outreach } from "@/lib/types";
 import { mergeFollowUpLists } from "@/lib/follow-ups";
+import { mergeContactMethods } from "@/lib/contact-methods";
 
 export function droppedFollowUpIdSet(
   lead: Pick<LeadWithOutreach, "droppedFollowUpIds">,
 ): Set<string> | undefined {
   const ids = lead.droppedFollowUpIds;
   return ids?.length ? new Set(ids) : undefined;
+}
+
+export function droppedContactMethodSet(
+  lead: Pick<LeadWithOutreach, "droppedContactMethods">,
+): Set<ContactMethod> | undefined {
+  const methods = lead.droppedContactMethods;
+  return methods?.length ? new Set(methods) : undefined;
 }
 
 export function rememberDroppedFollowUps(
@@ -31,32 +39,23 @@ export type SlimMergeOpts = {
   writeAt?: number;
 };
 
-/** True when `incoming` was fetched or saved before the latest local write. */
+/**
+ * True when `incoming` was fetched before the latest local write, or while a
+ * PATCH is still in flight (poll started *after* the click, returned before save).
+ */
 export function isStaleSnapshot(
-  prev: Pick<LeadWithOutreach, "lastWriteAt">,
+  prev: Pick<LeadWithOutreach, "lastWriteAt" | "writePending">,
   opts?: SlimMergeOpts,
 ): boolean {
   const local = prev.lastWriteAt;
+  if (opts?.writeAt != null) {
+    // Older PATCH response vs a newer optimistic write.
+    return local != null && local > opts.writeAt;
+  }
+  if (prev.writePending) return true;
   if (local == null) return false;
   if (opts?.fetchStartedAt != null && local > opts.fetchStartedAt) return true;
-  if (opts?.writeAt != null && local > opts.writeAt) return true;
   return false;
-}
-
-/**
- * Prefer a cached list over a stale/slim snapshot.
- * Empty incoming is a wipe on slim rows (`[]` is truthy for `??`) — keep
- * cached extras unless this row had a local write (user cleared the list).
- */
-export function pickUserList<T>(
-  cached: T[],
-  incoming: T[],
-  opts: { stale: boolean; hadLocalWrite: boolean },
-): T[] {
-  if (opts.stale) return cached;
-  if (incoming.length > 0) return incoming;
-  if (!opts.hadLocalWrite && cached.length > 0) return cached;
-  return incoming;
 }
 
 function mergeOutreach(
@@ -69,12 +68,15 @@ function mergeOutreach(
   if (!incoming) return prev;
   if (!prev) return incoming;
   if (stale) {
+    const prevNewer = prev.updatedAt >= incoming.updatedAt;
+    const newer = prevNewer ? prev : incoming;
+    const older = prevNewer ? incoming : prev;
     return {
-      ...incoming,
+      ...newer,
       status: prev.status,
       toEmail: prev.toEmail || incoming.toEmail,
-      body: prev.body || incoming.body,
-      subject: prev.subject || incoming.subject,
+      body: prev.body || incoming.body || older.body,
+      subject: prev.subject || incoming.subject || older.subject,
     };
   }
   if (incomingSlim) {
@@ -84,11 +86,26 @@ function mergeOutreach(
       subject: prev.subject || incoming.subject,
     };
   }
+  const incomingNewer = incoming.updatedAt >= prev.updatedAt;
+  const newer = incomingNewer ? incoming : prev;
+  const older = incomingNewer ? prev : incoming;
   return {
-    ...incoming,
-    body: incoming.body || prev.body,
-    subject: incoming.subject || prev.subject,
+    ...newer,
+    body: newer.body || older.body,
+    subject: newer.subject || older.subject,
   };
+}
+
+function pendingAfterMerge(
+  prev: LeadWithOutreach,
+  opts: SlimMergeOpts | undefined,
+  stale: boolean,
+): boolean | undefined {
+  if (opts?.writeAt != null) {
+    return (prev.lastWriteAt ?? 0) > opts.writeAt ? true : undefined;
+  }
+  if (stale) return prev.writePending;
+  return undefined;
 }
 
 /**
@@ -102,31 +119,32 @@ export function mergeSlimIntoCached(
   opts?: SlimMergeOpts,
 ): LeadWithOutreach {
   const stale = isStaleSnapshot(prev, opts);
-  const hadLocalWrite = prev.lastWriteAt != null;
   const incomingSlim = incoming.detailLoaded === false;
-  const listOpts = { stale, hadLocalWrite };
 
-  const dropped = droppedFollowUpIdSet(prev);
   const followUps = mergeFollowUpLists(
     prev.followUps ?? [],
     incoming.followUps ?? [],
-    dropped,
+    droppedFollowUpIdSet(prev),
   );
-
-  const contactMethods = pickUserList(
+  const contactMethods = mergeContactMethods(
     prev.contactMethods ?? [],
     incoming.contactMethods ?? [],
-    listOpts,
+    droppedContactMethodSet(prev),
   );
-  const emails = pickUserList(prev.emails ?? [], incoming.emails ?? [], listOpts);
-  const phones = pickUserList(prev.phones ?? [], incoming.phones ?? [], listOpts);
+
+  // Slim rows include emails/phones (only about/notes/body are nulled). Empty
+  // is authoritative when the snapshot is not stale (bounce strip).
+  const emails = stale ? prev.emails : (incoming.emails ?? prev.emails);
+  const phones = stale ? prev.phones : (incoming.phones ?? prev.phones);
 
   const crmStage = stale ? prev.crmStage : (incoming.crmStage ?? prev.crmStage);
   const company = stale ? prev.company : incoming.company;
   const website = stale ? prev.website : incoming.website;
   const location = stale ? prev.location : incoming.location;
   const companyType = stale ? prev.companyType : incoming.companyType;
-  const customFields = stale ? prev.customFields : incoming.customFields;
+  const customFields = stale
+    ? prev.customFields
+    : (incoming.customFields ?? prev.customFields);
   const status = stale ? prev.status : incoming.status;
   const contactedByName = stale
     ? (prev.contactedByName ?? incoming.contactedByName)
@@ -146,6 +164,8 @@ export function mergeSlimIntoCached(
       ? (incoming.notes ?? prev.notes)
       : incoming.notes;
 
+  const writePending = pendingAfterMerge(prev, opts, stale);
+
   return {
     ...incoming,
     crmStage,
@@ -164,7 +184,9 @@ export function mergeSlimIntoCached(
     notes,
     followUps,
     droppedFollowUpIds: prev.droppedFollowUpIds,
+    droppedContactMethods: prev.droppedContactMethods,
     lastWriteAt: prev.lastWriteAt,
+    writePending,
     outreach: mergeOutreach(
       prev.outreach,
       incoming.outreach,
@@ -176,4 +198,38 @@ export function mergeSlimIntoCached(
         ? true
         : incoming.detailLoaded,
   };
+}
+
+/**
+ * Apply a PATCH response without copying unpatched fields from a stale
+ * full-lead snapshot (heal followUps must not clobber an in-flight Phone chip).
+ */
+export function mergeMutationIntoCached(
+  prev: LeadWithOutreach,
+  serverLead: Lead,
+  patch: Record<string, unknown>,
+  writeAt?: number,
+): LeadWithOutreach {
+  const incoming: LeadWithOutreach = {
+    ...prev,
+    outreach: prev.outreach,
+    detailLoaded: true,
+  };
+  for (const key of Object.keys(patch)) {
+    if (key in serverLead) {
+      (incoming as unknown as Record<string, unknown>)[key] =
+        (serverLead as unknown as Record<string, unknown>)[key];
+    }
+  }
+  incoming.contactedByName = serverLead.contactedByName;
+  incoming.contactedByUserId = serverLead.contactedByUserId;
+  incoming.fitScore = serverLead.fitScore;
+  incoming.fitReasons = serverLead.fitReasons;
+  if (patch.contactMethods !== undefined && patch.crmStage === undefined) {
+    incoming.crmStage = serverLead.crmStage;
+  }
+  if (serverLead.followUps) {
+    incoming.followUps = serverLead.followUps;
+  }
+  return mergeSlimIntoCached(prev, incoming, { writeAt });
 }

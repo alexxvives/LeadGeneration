@@ -57,6 +57,54 @@ export function toggleContactMethod(
     : [...current, method];
 }
 
+const METHOD_ORDER: readonly ContactMethod[] = [
+  "email",
+  "phone",
+  "contact_form",
+];
+
+/**
+ * Reconcile cached methods with a GET/poll snapshot. Keep optimistic extras,
+ * skip `dropped` so a stale row cannot resurrect a toggle-off.
+ */
+export function mergeContactMethods(
+  cached: ContactMethod[],
+  incoming: ContactMethod[],
+  dropped?: ReadonlySet<ContactMethod> | null,
+): ContactMethod[] {
+  const set = new Set<ContactMethod>();
+  for (const m of cached) {
+    if (dropped?.has(m)) continue;
+    set.add(m);
+  }
+  for (const m of incoming) {
+    if (dropped?.has(m)) continue;
+    set.add(m);
+  }
+  return METHOD_ORDER.filter((m) => set.has(m));
+}
+
+export function rememberDroppedContactMethods(
+  prior:
+    | Pick<
+        { contactMethods: ContactMethod[]; droppedContactMethods?: ContactMethod[] },
+        "contactMethods" | "droppedContactMethods"
+      >
+    | undefined,
+  nextMethods: ContactMethod[] | undefined,
+): ContactMethod[] | undefined {
+  const prevDropped = prior?.droppedContactMethods ?? [];
+  if (!nextMethods) {
+    return prevDropped.length ? prevDropped : undefined;
+  }
+  const nextSet = new Set(nextMethods);
+  const extra = (prior?.contactMethods ?? []).filter((m) => !nextSet.has(m));
+  const dropped = [...new Set([...prevDropped, ...extra])].filter(
+    (m) => !nextSet.has(m),
+  );
+  return dropped.length ? dropped : undefined;
+}
+
 export function contactMethodsEqual(
   a: ContactMethod[] | null | undefined,
   b: ContactMethod[] | null | undefined,

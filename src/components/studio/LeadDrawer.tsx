@@ -38,7 +38,11 @@ import {
 } from "@/lib/follow-ups";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
-import { toggleContactMethod, contactMethodsEqual } from "@/lib/contact-methods";
+import {
+  toggleContactMethod,
+  contactMethodsEqual,
+  mergeContactMethods,
+} from "@/lib/contact-methods";
 
 function sameDraft(
   a: { subject: string; body: string; toEmail: string },
@@ -191,7 +195,13 @@ export function LeadDrawer(props: DrawerProps) {
   useEffect(() => {
     const leadChanged = followUpsLeadIdRef.current !== lead.id;
     const nextStage = lead.crmStage ?? "new";
-    const nextMethods = lead.contactMethods ?? [];
+    const incomingMethods = lead.contactMethods ?? [];
+    const droppedMethods = lead.droppedContactMethods?.length
+      ? new Set(lead.droppedContactMethods)
+      : undefined;
+    const nextMethods = leadChanged
+      ? incomingMethods
+      : mergeContactMethods(contactMethods, incomingMethods, droppedMethods);
     if (leadChanged || crmStage !== nextStage) setCrmStage(nextStage);
     if (leadChanged || !contactMethodsEqual(contactMethods, nextMethods)) {
       setContactMethods(nextMethods);

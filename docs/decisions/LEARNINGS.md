@@ -26,10 +26,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
   fields, and returned slim rows wholesale when `detailLoaded` was false.
   Drawer `useEffect` copied those props into local stage/chips, so Phone /
   stage / drag jumped back until PATCH or the next poll.
-- Stamp `lastWriteAt` on optimistic writes. Ignore GET/poll snapshots (and
-  older PATCH responses) that started before that time. Never assign
-  `incoming` wholesale. Heal PATCHes wait for full detail and must not send
-  a shorter journal than the local list.
+- Stamp `lastWriteAt` + `writePending` on optimistic CRM writes. Ignore GET/
+  poll snapshots while a save is in flight — including polls that *start*
+  after the click (the previous `fetchStartedAt < lastWriteAt` check missed
+  those). Older PATCH responses (`writeAt` behind `lastWriteAt`) are ignored
+  the same way. Contact methods union by value (`mergeContactMethods`) and
+  remember dropped channels so a slim `[]` cannot resurrect a toggle-off.
+  `applyServerLead` only overlays patched + derived fields. CRM PATCHes are
+  queued per lead and rebased from the latest cache so a heal cannot
+  last-write-win over a note the user just added.
 
 ### 2026-08-19 — Deleted leads stayed until the next poll
 - Optimistic delete already filtered `board.leads`, but an in-flight

@@ -274,15 +274,16 @@ lead drawer fetches full detail via `GET /api/leads/:id`. That GET (and
 Pipeline’s 15s slim poll) is merged into the cached row via
 `mergeSlimIntoCached` (`src/lib/lead-cache.ts`). Journal follow-ups are
 unioned by id so a note added while the fetch is in flight does not
-vanish. CRM stage, contact methods, emails/phones, and other drawer
-fields keep the cached value when the snapshot started before the latest
-optimistic write (`lastWriteAt`) — the same flash class as the journal
-bug. Slim list rows still omit body/about/notes (`detailLoaded: false`);
-empty arrays are not treated as “server said clear” unless the user
-just wrote that clear. Deleted leads are removed from the cache
-immediately; stale polls are not allowed to push those ids back.
-Pipeline and Outreach stay mounted after first visit so switching back
-is instant.
+vanish. Contact methods are unioned the same way (dropped channels are
+remembered so a toggle-off cannot come back). CRM stage, emails/phones,
+and other drawer fields keep the cached value while a local write is
+pending (`writePending`) or when the snapshot started before
+`lastWriteAt` — the same flash class as the journal bug. Slim list rows
+still omit body/about/notes (`detailLoaded: false`); empty email/phone
+arrays on a non-stale snapshot are authoritative (bounce strip). Deleted
+leads are removed from the cache immediately; stale polls are not
+allowed to push those ids back. Pipeline and Outreach stay mounted after
+first visit so switching back is instant.
 
 ## 6. Guardrails baked into the flow
 

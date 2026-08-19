@@ -463,10 +463,20 @@ export interface LeadWithOutreach extends Lead {
    */
   droppedFollowUpIds?: string[];
   /**
+   * Client-only: contact methods removed this session. Stale GET/poll
+   * snapshots must not resurrect them (mergeContactMethods).
+   */
+  droppedContactMethods?: ContactMethod[];
+  /**
    * Client-only: `performance.now()` of the latest optimistic write.
    * GET/poll snapshots that started before this must not overwrite user fields.
    */
   lastWriteAt?: number;
+  /**
+   * Client-only: a PATCH is still in flight. Polls that start *after* the
+   * optimistic write but return before the save must not overwrite either.
+   */
+  writePending?: boolean;
 }
 
 /**

@@ -12,8 +12,10 @@ import {
 } from "@/lib/client-api";
 import type { ContactMethod, CrmStage, Lead, LeadWithOutreach, PlanId } from "@/lib/types";
 import { mergeFollowUpLists } from "@/lib/follow-ups";
+import { rememberDroppedContactMethods } from "@/lib/contact-methods";
 import {
   droppedFollowUpIdSet,
+  mergeMutationIntoCached,
   mergeSlimIntoCached,
   rememberDroppedFollowUps,
 } from "@/lib/lead-cache";
@@ -265,6 +267,8 @@ export function Studio() {
   const leadsGenRef = useRef(0);
   /** Ids removed this session — stale polls must not push them back onto the board. */
   const droppedLeadIdsRef = useRef(new Set<string>());
+  /** Serialize CRM PATCHes per lead so a heal cannot last-write-win over a newer journal. */
+  const leadWriteTailRef = useRef(new Map<string, Promise<void>>());
   /** Lead ids already toasted as bounced this session (null = not seeded yet). */
   const seenBouncedIdsRef = useRef<Set<string> | null>(null);
 
@@ -1157,14 +1161,39 @@ export function Studio() {
     }
   };
 
-  const patchLeadLocal = (leadId: string, next: Partial<LeadWithOutreach>) => {
+  const enqueueLeadWrite = (leadId: string, fn: () => Promise<void>) => {
+    const tail = leadWriteTailRef.current;
+    const prev = tail.get(leadId) ?? Promise.resolve();
+    const next = prev.then(fn, fn);
+    tail.set(
+      leadId,
+      next.then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+    return next;
+  };
+
+  const patchLeadLocal = (
+    leadId: string,
+    next: Partial<LeadWithOutreach>,
+    opts?: { pending?: boolean },
+  ) => {
     const lastWriteAt = performance.now();
     setBoard((b) =>
       b
         ? {
             ...b,
             leads: b.leads.map((l) =>
-              l.id === leadId ? { ...l, ...next, lastWriteAt } : l,
+              l.id === leadId
+                ? {
+                    ...l,
+                    ...next,
+                    lastWriteAt,
+                    writePending: opts?.pending ? true : l.writePending,
+                  }
+                : l,
             ),
           }
         : b,
@@ -1172,10 +1201,11 @@ export function Studio() {
     return lastWriteAt;
   };
 
-  /** Apply a PATCH lead without dropping optimistic journal rows. */
+  /** Apply a PATCH lead without dropping optimistic journal / chip rows. */
   const applyServerLead = (
     leadId: string,
     lead: Lead,
+    patch: Record<string, unknown>,
     writeAt?: number,
   ) => {
     setBoard((b) => {
@@ -1184,16 +1214,7 @@ export function Studio() {
         ...b,
         leads: b.leads.map((l) =>
           l.id === leadId
-            ? mergeSlimIntoCached(
-                l,
-                {
-                  ...l,
-                  ...lead,
-                  outreach: l.outreach,
-                  detailLoaded: true,
-                },
-                writeAt != null ? { writeAt } : undefined,
-              )
+            ? mergeMutationIntoCached(l, lead, patch, writeAt)
             : l,
         ),
       };
@@ -1375,6 +1396,7 @@ export function Studio() {
                 contactMethods: methods,
                 outreach: sent,
                 lastWriteAt,
+                writePending: undefined,
                 ...(followUps
                   ? {
                       followUps: mergeFollowUpLists(
@@ -1592,10 +1614,32 @@ export function Studio() {
       patch.contactMethods = [];
     }
     // Optimistic update first for instant feel.
-    const writeAt = patchLeadLocal(leadId, patch);
+    const droppedContactMethods = rememberDroppedContactMethods(
+      boardRef.current?.leads.find((l) => l.id === leadId),
+      patch.contactMethods,
+    );
+    const writeAt = patchLeadLocal(
+      leadId,
+      {
+        ...patch,
+        ...(droppedContactMethods ? { droppedContactMethods } : {}),
+      },
+      { pending: true },
+    );
     try {
-      const { lead } = await api.updateLead(leadId, patch);
-      applyServerLead(leadId, lead, writeAt);
+      await enqueueLeadWrite(leadId, async () => {
+        const latest = boardRef.current?.leads.find((l) => l.id === leadId);
+        const body = latest
+          ? {
+              crmStage: latest.crmStage,
+              ...(patch.contactMethods !== undefined
+                ? { contactMethods: latest.contactMethods }
+                : {}),
+            }
+          : patch;
+        const { lead } = await api.updateLead(leadId, body);
+        applyServerLead(leadId, lead, body, writeAt);
+      });
     } catch (e) {
       // Revert on failure by refreshing.
       await refresh();
@@ -1659,16 +1703,48 @@ export function Studio() {
       prior,
       patch.followUps,
     );
-    const writeAt = patchLeadLocal(leadId, {
-      ...(patch as Partial<LeadWithOutreach>),
-      ...(droppedFollowUpIds ? { droppedFollowUpIds } : {}),
-    });
+    const droppedContactMethods = rememberDroppedContactMethods(
+      prior,
+      patch.contactMethods,
+    );
+    const writeAt = patchLeadLocal(
+      leadId,
+      {
+        ...(patch as Partial<LeadWithOutreach>),
+        ...(droppedFollowUpIds ? { droppedFollowUpIds } : {}),
+        ...(droppedContactMethods ? { droppedContactMethods } : {}),
+      },
+      { pending: true },
+    );
     try {
-      const { lead } = await api.updateLead(leadId, patch);
-      applyServerLead(leadId, lead, writeAt);
+      await enqueueLeadWrite(leadId, async () => {
+        const latest = boardRef.current?.leads.find((l) => l.id === leadId);
+        const body: typeof patch = { ...patch };
+        if (latest) {
+          for (const key of Object.keys(patch) as (keyof typeof patch)[]) {
+            if (key === "followUps") body.followUps = latest.followUps;
+            else if (key === "contactMethods") {
+              body.contactMethods = latest.contactMethods;
+            } else if (key === "crmStage") body.crmStage = latest.crmStage;
+            else if (key === "emails") body.emails = latest.emails;
+            else if (key === "phones") body.phones = latest.phones;
+            else if (key === "company") body.company = latest.company;
+            else if (key === "website") body.website = latest.website;
+            else if (key === "location") body.location = latest.location;
+            else if (key === "aboutBlurb") body.aboutBlurb = latest.aboutBlurb;
+            else if (key === "notes") body.notes = latest.notes;
+            else if (key === "companyType") {
+              body.companyType = latest.companyType;
+            } else if (key === "customFields") {
+              body.customFields = latest.customFields;
+            }
+          }
+        }
+        const { lead } = await api.updateLead(leadId, body);
+        applyServerLead(leadId, lead, body, writeAt);
+      });
     } catch (e) {
-      if (prior) patchLeadLocal(leadId, prior);
-      else await refresh();
+      await refresh();
       toast("err", (e as Error).message);
     }
   };

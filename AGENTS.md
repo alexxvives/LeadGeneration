@@ -114,7 +114,7 @@ src/app/             Routes. Pages + thin API handlers (api/*/route.ts).
 src/components/      UI. studio/* is the app; BrandMark / icons / ui are primitives.
 src/lib/
   types.ts           Domain models (Workspace/Board/Run/Lead/Outreach) — source of truth.
-  lead-cache.ts      Client merge of slim poll/GET into cached leads (lastWriteAt).
+  lead-cache.ts      Client merge of slim poll/GET into cached leads (lastWriteAt / writePending).
   service.ts         Coordination layer + plan/quota enforcement (Ctx-based).
   request-context.ts getCtx(): D1 binding + session → workspace-scoped repo.
   config.ts          Env + capability detection (incl. authRequired).

@@ -9,18 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Sign-off editor)
+## ⏱️ Status — updated 2026-08-19 (Stale-overwrite audit)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Email sign-off template is editable again (was wrapped in a `<label>`, so
-  clicks hit Bold). `&amp;` no longer appears for `&` in one-line sign-offs.
+- Audited optimistic UI vs GET / 15s slim poll. Journal merge-by-id was not
+  enough: CRM stage, contact chips, and drawer fields could still flash.
+- `mergeSlimIntoCached` keeps cached user fields while `writePending` (PATCH
+  in flight) or when the snapshot is older than `lastWriteAt`. Contact
+  methods union like the journal; CRM PATCHes queue + rebase per lead.
 
 ### Next
-1. Deploy Worker so lastWriteAt merge + Draft-all hide + sign-off editor
-   are live.
+1. Deploy Worker so lastWriteAt/writePending merge + Draft-all hide +
+   sign-off editor are live.
 
 ---
 
