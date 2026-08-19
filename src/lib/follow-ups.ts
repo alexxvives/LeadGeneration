@@ -55,6 +55,11 @@ export function isBounceNote(note: string): boolean {
   return /^email bounced\b/i.test(note.trim());
 }
 
+/** Legacy empty-channel fallback (removed 2026-08-18). Also “ — {name}”. */
+export function isContactRegisteredNote(note: string): boolean {
+  return /^contact registered(?:\s*[—–-].*)?$/i.test(note.trim());
+}
+
 export function callNoteActor(name?: string | null): string {
   const t = name?.trim();
   return t || "you";

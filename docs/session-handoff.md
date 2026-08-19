@@ -9,17 +9,17 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Lead info card width)
+## ⏱️ Status — updated 2026-08-19 (Strip Contact registered notes)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0030** remote applied.
+**Migrations:** 0021–**0031** remote applied.
 
 ### This pass
-- Lead info card is 10% wider (`61rem` → `67.1rem`).
-- Info / notes split is 50/50 (was ~57/43).
+- Deleted leftover **Contact registered** journal lines (3 prod leads).
+- Migration 0031 + parse/heal filters so they cannot come back.
 
 ### Next
-1. Deploy after `tsc`/`lint` green.
+1. Deploy Worker so parse-time strip is live (D1 data is already cleaned).
 
 ---
 

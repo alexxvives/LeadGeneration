@@ -18,6 +18,7 @@ import {
   serializeContactMethods,
 } from "@/lib/contact-methods";
 import { hydrateLaneSql } from "@/lib/lead-lanes";
+import { isContactRegisteredNote } from "@/lib/follow-ups";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -273,7 +274,15 @@ function rowToRun(r: RunRow): Run {
 }
 
 const parseFollowUps = (s: string | null | undefined): FollowUp[] => {
-  try { return JSON.parse(s ?? "[]"); } catch { return []; }
+  try {
+    const raw = JSON.parse(s ?? "[]") as unknown;
+    if (!Array.isArray(raw)) return [];
+    return (raw as FollowUp[]).filter(
+      (f) => !isContactRegisteredNote(f?.note ?? ""),
+    );
+  } catch {
+    return [];
+  }
 };
 
 const parseCustomFields = (s: string | null | undefined): Record<string, string> => {

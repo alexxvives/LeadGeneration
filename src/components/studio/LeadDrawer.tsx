@@ -25,6 +25,7 @@ import {
   formatNoteDate,
   inferFollowUpKind,
   isBounceNote,
+  isContactRegisteredNote,
   isMissedCallNote,
   missedCallNotePrefix,
   phoneCallNotePrefix,
@@ -187,7 +188,7 @@ export function LeadDrawer(props: DrawerProps) {
     setContactMethods(lead.contactMethods ?? []);
     const raw = lead.followUps ?? [];
     const collapsed = collapseEmailSentFollowUps(raw, lead.contactedByName)
-      .filter((f) => !isBounceNote(f.note))
+      .filter((f) => !isBounceNote(f.note) && !isContactRegisteredNote(f.note))
       .map((f) => {
         const kind = resolveFollowUpKind(f);
         if (kind === f.kind) return f;

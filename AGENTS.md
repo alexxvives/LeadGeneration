@@ -129,7 +129,7 @@ src/lib/
   billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.
-migrations/          D1 SQL 0001–0030 (init … board email_verify_enabled).
+migrations/          D1 SQL 0001–**0031** (init … strip Contact registered notes).
 wrangler.jsonc, open-next.config.ts   Cloudflare Workers deploy config.
 data/                Local JSON DB (git-ignored).
 ```

@@ -14,6 +14,7 @@ import {
   type Workspace,
 } from "@/lib/types";
 import { parseContactMethods } from "@/lib/contact-methods";
+import { isContactRegisteredNote } from "@/lib/follow-ups";
 import { leadHydrateLane } from "@/lib/lead-lanes";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
@@ -93,7 +94,9 @@ function normalizeLead(l: Lead): Lead {
     contactedByName:
       typeof raw.contactedByName === "string" ? raw.contactedByName : null,
     notes: (raw.notes as Lead["notes"] | undefined) ?? null,
-    followUps: (raw.followUps as Lead["followUps"] | undefined) ?? [],
+    followUps: ((raw.followUps as Lead["followUps"] | undefined) ?? []).filter(
+      (f) => !isContactRegisteredNote(f?.note ?? ""),
+    ),
     customFields:
       raw.customFields && typeof raw.customFields === "object"
         ? (raw.customFields as Record<string, string>)

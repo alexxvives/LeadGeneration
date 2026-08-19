@@ -75,7 +75,7 @@ import {
   contactMethodsEqual,
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, isBounceNote, isEmailSentNote, resolveFollowUpKind } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, isEmailSentNote, resolveFollowUpKind } from "@/lib/follow-ups";
 import { LEAD_HYDRATE_LANES } from "@/lib/lead-lanes";
 import {
   companyGuessFromEmail,
@@ -2452,7 +2452,7 @@ export async function updateLeadCrm(
   const fus = next.followUps ?? patch.followUps;
   if (fus) {
     next.followUps = collapseEmailSentFollowUps(fus, actorName)
-      .filter((f) => !isBounceNote(f.note))
+      .filter((f) => !isBounceNote(f.note) && !isContactRegisteredNote(f.note))
       .map((f) => {
         const kind = resolveFollowUpKind(f);
         if (kind === f.kind) return f;
