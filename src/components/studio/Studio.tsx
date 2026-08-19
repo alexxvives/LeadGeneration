@@ -10,8 +10,13 @@ import {
   RateLimitedError,
   type BoardResponse,
 } from "@/lib/client-api";
-import type { ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId } from "@/lib/types";
+import type { ContactMethod, CrmStage, Lead, LeadWithOutreach, PlanId } from "@/lib/types";
 import { mergeFollowUpLists } from "@/lib/follow-ups";
+import {
+  droppedFollowUpIdSet,
+  mergeSlimIntoCached,
+  rememberDroppedFollowUps,
+} from "@/lib/lead-cache";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
 import { LeadTable } from "./LeadTable";
@@ -104,91 +109,6 @@ function appendUnseenLeads(
   const have = new Set(existing.map((l) => l.id));
   const added = incoming.filter((l) => !have.has(l.id) && !dropped.has(l.id));
   return added.length === 0 ? existing : [...existing, ...added];
-}
-
-function droppedFollowUpIdSet(
-  lead: Pick<LeadWithOutreach, "droppedFollowUpIds">,
-): Set<string> | undefined {
-  const ids = lead.droppedFollowUpIds;
-  return ids?.length ? new Set(ids) : undefined;
-}
-
-function rememberDroppedFollowUps(
-  prior: LeadWithOutreach | undefined,
-  nextFollowUps: FollowUp[] | undefined,
-): string[] | undefined {
-  const prevDropped = prior?.droppedFollowUpIds ?? [];
-  if (!nextFollowUps || !prior?.followUps?.length) {
-    return prevDropped.length ? prevDropped : undefined;
-  }
-  const nextIds = new Set(nextFollowUps.map((f) => f.id));
-  const extra = prior.followUps
-    .filter((f) => !nextIds.has(f.id))
-    .map((f) => f.id);
-  if (extra.length === 0) return prevDropped.length ? prevDropped : undefined;
-  return [...new Set([...prevDropped, ...extra])];
-}
-
-/** Merge a slim board-list row into a cached lead without wiping drawer detail. */
-function mergeSlimIntoCached(
-  prev: LeadWithOutreach,
-  incoming: LeadWithOutreach,
-): LeadWithOutreach {
-  const keepDetail =
-    prev.detailLoaded === true ||
-    Boolean(prev.outreach?.body) ||
-    Boolean(prev.aboutBlurb) ||
-    Boolean(prev.notes);
-
-  const dropped = droppedFollowUpIdSet(prev);
-  const followUps = mergeFollowUpLists(
-    prev.followUps ?? [],
-    incoming.followUps ?? [],
-    dropped,
-  );
-  const droppedFollowUpIds = prev.droppedFollowUpIds;
-
-  // `??` treats [] as present — a slim/stale empty list was wiping methods and
-  // flashing “How contacted? — open to register” on every Contacted row.
-  const prevMethods = prev.contactMethods ?? [];
-  const incMethods = incoming.contactMethods ?? [];
-  const contactMethods =
-    incMethods.length > 0
-      ? incMethods
-      : prevMethods.length > 0
-        ? prevMethods
-        : incMethods;
-
-  if (!keepDetail) {
-    return {
-      ...incoming,
-      contactMethods,
-      followUps,
-      droppedFollowUpIds,
-    };
-  }
-
-  // Prefer server for CRM / delivery / emails; keep local body/subject/notes.
-  return {
-    ...incoming,
-    crmStage: incoming.crmStage ?? prev.crmStage,
-    contactMethods,
-    emails: incoming.emails?.length ? incoming.emails : prev.emails,
-    aboutBlurb: incoming.aboutBlurb || prev.aboutBlurb,
-    notes: incoming.notes ?? prev.notes,
-    followUps,
-    droppedFollowUpIds,
-    outreach:
-      incoming.outreach && prev.outreach
-        ? {
-            ...incoming.outreach,
-            // Server delivery/status wins; keep richer local composer body.
-            body: prev.outreach.body || incoming.outreach.body,
-            subject: prev.outreach.subject || incoming.outreach.subject,
-          }
-        : (incoming.outreach ?? prev.outreach),
-    detailLoaded: true,
-  };
 }
 
 function viewFromParams(view: string | null): StudioView {
@@ -448,6 +368,7 @@ export function Studio() {
     // Always page — never pull all ~3k fat/slim rows in one soft-refresh.
     const pageOpts = { perLane: LEAD_PAGE_PER_LANE, laneOffset: 0 };
 
+    const fetchStartedAt = performance.now();
     const data = await api.board(boardKey, pageOpts);
     if (leadsGenRef.current !== gen) return data;
 
@@ -526,10 +447,17 @@ export function Studio() {
     if (pinned && pinned !== data.run?.id) {
       try {
         const { run, leads } = await api.runWithLeads(pinned);
+        const incoming = omitDroppedLeadIds(leads, droppedLeadIdsRef.current);
+        const prevById = new Map((prev?.leads ?? []).map((l) => [l.id, l]));
         const merged = {
           ...data,
           run,
-          leads: omitDroppedLeadIds(leads, droppedLeadIdsRef.current),
+          leads: incoming.map((l) => {
+            const old = prevById.get(l.id);
+            return old
+              ? mergeSlimIntoCached(old, l, { fetchStartedAt })
+              : l;
+          }),
           leadsHasMore: false,
         };
         setBoard(merged);
@@ -562,7 +490,9 @@ export function Studio() {
       const patch = new Map(incomingLeads.map((l) => [l.id, l]));
       const merged = omitDroppedLeadIds(prev.leads, dropped).map((l) => {
         const incoming = patch.get(l.id);
-        return incoming ? mergeSlimIntoCached(l, incoming) : l;
+        return incoming
+          ? mergeSlimIntoCached(l, incoming, { fetchStartedAt })
+          : l;
       });
       const seen = new Set(merged.map((l) => l.id));
       for (const l of incomingLeads) {
@@ -645,7 +575,9 @@ export function Studio() {
                 .filter((l) => ids.has(l.id))
                 .map((l) => {
                   const incoming = byId.get(l.id);
-                  return incoming ? mergeSlimIntoCached(l, incoming) : l;
+                  return incoming
+                    ? mergeSlimIntoCached(l, incoming, { fetchStartedAt })
+                    : l;
                 });
               for (const [id, l] of byId) {
                 if (droppedLeadIdsRef.current.has(id)) continue;
@@ -674,7 +606,9 @@ export function Studio() {
         ...data,
         leads: incomingLeads.map((l) => {
           const old = prevById.get(l.id);
-          return old ? mergeSlimIntoCached(old, l) : l;
+          return old
+            ? mergeSlimIntoCached(old, l, { fetchStartedAt })
+            : l;
         }),
         leadsTotal: serverTotal,
         leadsHasMore: !!data.leadsHasMore,
@@ -1224,25 +1158,42 @@ export function Studio() {
   };
 
   const patchLeadLocal = (leadId: string, next: Partial<LeadWithOutreach>) => {
+    const lastWriteAt = performance.now();
     setBoard((b) =>
-      b ? { ...b, leads: b.leads.map((l) => (l.id === leadId ? { ...l, ...next } : l)) } : b,
+      b
+        ? {
+            ...b,
+            leads: b.leads.map((l) =>
+              l.id === leadId ? { ...l, ...next, lastWriteAt } : l,
+            ),
+          }
+        : b,
     );
+    return lastWriteAt;
   };
 
   /** Apply a PATCH lead without dropping optimistic journal rows. */
-  const applyServerLead = (leadId: string, lead: Lead) => {
+  const applyServerLead = (
+    leadId: string,
+    lead: Lead,
+    writeAt?: number,
+  ) => {
     setBoard((b) => {
       if (!b) return b;
       return {
         ...b,
         leads: b.leads.map((l) =>
           l.id === leadId
-            ? mergeSlimIntoCached(l, {
-                ...l,
-                ...lead,
-                outreach: l.outreach,
-                detailLoaded: true,
-              })
+            ? mergeSlimIntoCached(
+                l,
+                {
+                  ...l,
+                  ...lead,
+                  outreach: l.outreach,
+                  detailLoaded: true,
+                },
+                writeAt != null ? { writeAt } : undefined,
+              )
             : l,
         ),
       };
@@ -1388,6 +1339,7 @@ export function Studio() {
       if (result.outreach) {
         const sent = result.outreach;
         const followUps = result.followUps;
+        const lastWriteAt = performance.now();
         setBoard((b) => {
           if (!b) return b;
           const prevToday = b.workspace.sendsToday ?? 0;
@@ -1422,6 +1374,7 @@ export function Studio() {
                 crmStage: l.crmStage === "new" ? "contacted" : l.crmStage,
                 contactMethods: methods,
                 outreach: sent,
+                lastWriteAt,
                 ...(followUps
                   ? {
                       followUps: mergeFollowUpLists(
@@ -1639,10 +1592,10 @@ export function Studio() {
       patch.contactMethods = [];
     }
     // Optimistic update first for instant feel.
-    patchLeadLocal(leadId, patch);
+    const writeAt = patchLeadLocal(leadId, patch);
     try {
       const { lead } = await api.updateLead(leadId, patch);
-      applyServerLead(leadId, lead);
+      applyServerLead(leadId, lead, writeAt);
     } catch (e) {
       // Revert on failure by refreshing.
       await refresh();
@@ -1706,13 +1659,13 @@ export function Studio() {
       prior,
       patch.followUps,
     );
-    patchLeadLocal(leadId, {
+    const writeAt = patchLeadLocal(leadId, {
       ...(patch as Partial<LeadWithOutreach>),
       ...(droppedFollowUpIds ? { droppedFollowUpIds } : {}),
     });
     try {
       const { lead } = await api.updateLead(leadId, patch);
-      applyServerLead(leadId, lead);
+      applyServerLead(leadId, lead, writeAt);
     } catch (e) {
       if (prior) patchLeadLocal(leadId, prior);
       else await refresh();
@@ -1799,6 +1752,7 @@ export function Studio() {
     async (id: string) => {
       const cur = boardRef.current?.leads.find((l) => l.id === id);
       if (!cur || cur.detailLoaded !== false) return;
+      const fetchStartedAt = performance.now();
       try {
         const { lead } = await api.getLead(id);
         setBoard((b) => {
@@ -1807,7 +1761,11 @@ export function Studio() {
             ...b,
             leads: b.leads.map((l) =>
               l.id === id
-                ? mergeSlimIntoCached(l, { ...lead, detailLoaded: true })
+                ? mergeSlimIntoCached(
+                    l,
+                    { ...lead, detailLoaded: true },
+                    { fetchStartedAt },
+                  )
                 : l,
             ),
           };

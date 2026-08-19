@@ -462,6 +462,11 @@ export interface LeadWithOutreach extends Lead {
    * must not resurrect them (mergeFollowUpLists).
    */
   droppedFollowUpIds?: string[];
+  /**
+   * Client-only: `performance.now()` of the latest optimistic write.
+   * GET/poll snapshots that started before this must not overwrite user fields.
+   */
+  lastWriteAt?: number;
 }
 
 /**

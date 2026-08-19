@@ -38,7 +38,7 @@ import {
 } from "@/lib/follow-ups";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
-import { toggleContactMethod } from "@/lib/contact-methods";
+import { toggleContactMethod, contactMethodsEqual } from "@/lib/contact-methods";
 
 function sameDraft(
   a: { subject: string; body: string; toEmail: string },
@@ -189,8 +189,13 @@ export function LeadDrawer(props: DrawerProps) {
   }, [lead.id, outreach?.id, outreach?.subject, outreach?.body, outreach?.toEmail]);
 
   useEffect(() => {
-    setCrmStage(lead.crmStage ?? "new");
-    setContactMethods(lead.contactMethods ?? []);
+    const leadChanged = followUpsLeadIdRef.current !== lead.id;
+    const nextStage = lead.crmStage ?? "new";
+    const nextMethods = lead.contactMethods ?? [];
+    if (leadChanged || crmStage !== nextStage) setCrmStage(nextStage);
+    if (leadChanged || !contactMethodsEqual(contactMethods, nextMethods)) {
+      setContactMethods(nextMethods);
+    }
     const raw = lead.followUps ?? [];
     const collapsed = collapseEmailSentFollowUps(raw, lead.contactedByName)
       .filter((f) => !isBounceNote(f.note) && !isContactRegisteredNote(f.note))
@@ -208,7 +213,6 @@ export function LeadDrawer(props: DrawerProps) {
               : f.done,
         };
       });
-    const leadChanged = followUpsLeadIdRef.current !== lead.id;
     followUpsLeadIdRef.current = lead.id;
     const dropped = lead.droppedFollowUpIds?.length
       ? new Set(lead.droppedFollowUpIds)
@@ -238,12 +242,18 @@ export function LeadDrawer(props: DrawerProps) {
           f.note !== raw[i]?.note,
       );
     // Heal kinds on the merged list — never PATCH a stale subset that would
-    // delete a note the user just added.
-    if (changed && next.length >= raw.length) {
+    // delete a note the user just added, and wait for full detail so we don't
+    // race the in-flight GET with a slim payload.
+    if (
+      changed &&
+      lead.detailLoaded !== false &&
+      next.length >= raw.length &&
+      next.length >= followUps.length
+    ) {
       void props.onUpdateCrm(lead.id, { followUps: next });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- heal journal kinds; keep local extras across stale props
-  }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, lead.contactedByName]);
+  }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, lead.contactedByName, lead.detailLoaded]);
 
   useEffect(() => {
     if (promptNote) {
@@ -269,8 +279,9 @@ export function LeadDrawer(props: DrawerProps) {
   // bare "Email sent" next to an existing "Email sent by …" line.
   useEffect(() => {
     if (outreach?.status !== "sent" || !outreach.sentAt) return;
+    if (lead.detailLoaded === false) return;
     const sentDay = outreach.sentAt.slice(0, 10);
-    const existing = lead.followUps ?? [];
+    const existing = followUps.length ? followUps : (lead.followUps ?? []);
     const collapsed = collapseEmailSentFollowUps(
       existing,
       lead.contactedByName,
@@ -304,7 +315,7 @@ export function LeadDrawer(props: DrawerProps) {
     setFollowUps(updated);
     void props.onUpdateCrm(lead.id, { followUps: updated });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot heal per lead/sentAt
-  }, [lead.id, outreach?.status, outreach?.sentAt]);
+  }, [lead.id, outreach?.status, outreach?.sentAt, lead.detailLoaded]);
 
   useEffect(() => {
     if (!showAddNote) return;
@@ -624,9 +635,9 @@ export function LeadDrawer(props: DrawerProps) {
                 Loading full details…
               </p>
             ) : null}
-            {mode === "info" && lead.crmStage && lead.crmStage !== "new" ? (
+            {mode === "info" && crmStage && crmStage !== "new" ? (
               <div className="flex items-center gap-2">
-                <CrmStagePill stage={lead.crmStage} />
+                <CrmStagePill stage={crmStage} />
               </div>
             ) : null}
             {mode === "draft" ? (
@@ -642,7 +653,7 @@ export function LeadDrawer(props: DrawerProps) {
             ) : (
               <div
                 className={`min-w-0 ${
-                  mode === "info" && lead.crmStage && lead.crmStage !== "new"
+                  mode === "info" && crmStage && crmStage !== "new"
                     ? "mt-3"
                     : ""
                 }`}

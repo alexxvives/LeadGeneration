@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Stale GET/poll overwrote optimistic CRM (same class as journal flash)
+- Journal merge-by-id was not enough. `mergeSlimIntoCached` still preferred
+  incoming `crmStage` / non-empty `contactMethods` / `...incoming` company
+  fields, and returned slim rows wholesale when `detailLoaded` was false.
+  Drawer `useEffect` copied those props into local stage/chips, so Phone /
+  stage / drag jumped back until PATCH or the next poll.
+- Stamp `lastWriteAt` on optimistic writes. Ignore GET/poll snapshots (and
+  older PATCH responses) that started before that time. Never assign
+  `incoming` wholesale. Heal PATCHes wait for full detail and must not send
+  a shorter journal than the local list.
+
 ### 2026-08-19 — Deleted leads stayed until the next poll
 - Optimistic delete already filtered `board.leads`, but an in-flight
   `refresh()` captured the old list and, on return, merged the still-present

@@ -9,17 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Delete vanishes immediately)
+## ⏱️ Status — updated 2026-08-19 (Stale-overwrite audit)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Deleting a lead removes it from the board immediately. In-flight polls
-  can no longer merge the old row back for a few seconds.
+- Audited optimistic UI vs GET / 15s slim poll. Journal merge-by-id was not
+  enough: CRM stage, contact chips, and drawer fields could still flash.
+- `mergeSlimIntoCached` now lives in `src/lib/lead-cache.ts` and keeps cached
+  user fields when the snapshot started before `lastWriteAt`.
 
 ### Next
-1. Deploy Worker so journal-merge + immediate-delete are live.
+1. Deploy Worker so journal-merge + immediate-delete + lastWriteAt merge are live.
 
 ---
 
