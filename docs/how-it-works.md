@@ -115,9 +115,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     mail / phone icons on the day cell. An open follow-up whose date is at
     least one day past fills that day square in **red** (same selected-day
     treatment, rose instead of aurora) — the calendar icon stays violet.
-    Tick the checkbox on Calendar to mark it done (the lead drawer shows a
-    purple **Follow up** tag, no checkbox). Plain notes stay on the lead
-    only and never count as follow-ups. Click an item to open the lead.
+    Tick the checkbox on Calendar to mark a follow-up done (strikethrough
+    is follow-ups only — calls and emails stay unstruck). The lead drawer
+    shows a purple **Follow up** tag, no checkbox. Plain notes stay on the
+    lead only and never count as follow-ups. Click an item to open the lead.
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.

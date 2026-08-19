@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Calendar strikethrough is follow-ups only
+- Calls/emails/notes are stored `done: true` so they are not open reminders.
+  Calendar was applying `line-through` to any `done` event. Strike only
+  ticked follow-ups.
+
 ### 2026-08-19 — Journal tag column; Add Note amber; Missed gray; overdue square
 - Notes journal tags share a fixed width so date/body lines up under Follow up.
 - **Add Note** header is amber; **Missed** tag + line (and header) are mist gray.

@@ -436,7 +436,9 @@ function DayGroup({
                 <p className="flex min-w-0 items-baseline gap-1.5">
                   <span
                     className={`truncate text-sm font-medium ${
-                      ev.done ? "text-mist-400 line-through" : "text-mist-100"
+                      ev.kind === "follow_up" && ev.done
+                        ? "text-mist-400 line-through"
+                        : "text-mist-100"
                     }`}
                   >
                     {ev.company}

@@ -9,14 +9,13 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Journal align + overdue square)
+## ⏱️ Status — updated 2026-08-19 (Calendar strike follow-ups only)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Notes tags same width so text lines up; Add Note amber; Missed gray.
-- Overdue = red day square (selected-day style); calendar icon stays violet.
+- Calendar strikethrough only on ticked follow-ups, not calls/emails.
 
 ### Next
 1. Deploy after `tsc`/`lint` green.
