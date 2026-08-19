@@ -90,6 +90,13 @@ export function needsOutreachDraft(lead: LeadWithOutreach): boolean {
   return !s || s === "rejected";
 }
 
+/** Email lead in Contact Draft that already has a draft to rewrite. */
+export function canRedraftOutreach(lead: LeadWithOutreach): boolean {
+  if (!leadEmail(lead)) return false;
+  if (isContacted(lead)) return false;
+  return lead.outreach?.status === "draft";
+}
+
 /** Company A–Z (stable). */
 function byCompany(a: LeadWithOutreach, b: LeadWithOutreach): number {
   return a.company.localeCompare(b.company, undefined, { sensitivity: "base" });
@@ -194,7 +201,7 @@ export function OutreachView({
   /** Contact Draft: approve + send without visiting Ready. */
   onApproveAndSend: (leadId: string) => Promise<void>;
   onSend: (outreachId: string) => void | Promise<void>;
-  onDraftAll: () => Promise<void>;
+  onDraftAll: (opts?: { redraft?: boolean }) => Promise<void>;
   onMarkContacted: (
     leadId: string,
     method: ContactMethod,
@@ -273,9 +280,13 @@ export function OutreachView({
   const softCap = warmupStatus().softCap;
   const overSoftCap = sendsToday >= softCap;
 
-  const draftAllAvailable = useMemo(
+  const draftAllRemaining = useMemo(
     () => leads.some(needsOutreachDraft),
     [leads],
+  );
+  const redraftAllAvailable = useMemo(
+    () => !draftAllRemaining && leads.some(canRedraftOutreach),
+    [draftAllRemaining, leads],
   );
 
   const columns: OutreachBucket[] = ["review", "ready", "contacted"];
@@ -374,20 +385,30 @@ export function OutreachView({
                       })}
                     </div>
                   ) : null}
-                  {key === "review" && draftAllAvailable ? (
+                  {key === "review" && (draftAllRemaining || redraftAllAvailable) ? (
                     <button
                       type="button"
-                      onClick={() => void onDraftAll()}
+                      onClick={() =>
+                        void onDraftAll(
+                          redraftAllAvailable ? { redraft: true } : undefined,
+                        )
+                      }
                       disabled={busySet.has("draft-all")}
-                      title="Draft remaining email leads — they stay in Contact Draft until Approve"
+                      title={
+                        redraftAllAvailable
+                          ? "Rewrite every Contact Draft from the active profile"
+                          : "Draft remaining email leads — they stay in Contact Draft until Approve"
+                      }
                       className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
                     >
                       {busySet.has("draft-all") ? (
                         <Spinner className="h-3 w-3" />
+                      ) : redraftAllAvailable ? (
+                        <PencilIcon className="h-3 w-3" />
                       ) : (
                         <CheckIcon className="h-3 w-3" />
                       )}
-                      Draft all
+                      {redraftAllAvailable ? "Re-draft all" : "Draft all"}
                     </button>
                   ) : null}
                 </div>

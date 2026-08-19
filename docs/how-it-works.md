@@ -105,9 +105,9 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     stays in Ready.
     The same miss path exists from the lead’s **Notes**.
     **Draft all** writes drafts for email leads that still need one and
-    leaves them in Contact Draft until Approve. The button hides once every
-    Contact Draft row already has a draft (redraft from the lead drawer).
-    Closing the draft drawer
+    leaves them in Contact Draft until Approve. Once every Contact Draft
+    row already has a draft, the button becomes **Re-draft all** (rewrites
+    from the active profile). Closing the draft drawer
     without Approve does not advance. The sidebar Board picker activates that
     board’s linked outreach profile. Send remains per-lead after approve
     (constitution Art. I.1).

@@ -31,7 +31,11 @@ import { crmStageLabel, Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
 import { PipelineView } from "./PipelineView";
-import { OutreachView, needsOutreachDraft } from "./OutreachView";
+import {
+  OutreachView,
+  canRedraftOutreach,
+  needsOutreachDraft,
+} from "./OutreachView";
 import { CalendarView } from "./CalendarView";
 import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
@@ -1753,11 +1757,12 @@ export function Studio() {
     draftAbortRef.current?.abort();
   }, []);
 
-  const onDraftAllOutreach = async () => {
+  const onDraftAllOutreach = async (opts?: { redraft?: boolean }) => {
     if (!board) return;
-    // Only leads that still need a first draft (or a rewrite after reject).
-    // Existing drafts stay put — redraft from the lead drawer if the profile changed.
-    const targets = board.leads.filter(needsOutreachDraft);
+    const redraft = Boolean(opts?.redraft);
+    const targets = board.leads.filter(
+      redraft ? canRedraftOutreach : needsOutreachDraft,
+    );
     if (targets.length === 0) return;
 
     const ac = new AbortController();
@@ -1795,22 +1800,21 @@ export function Studio() {
           worker(),
         ),
       );
+      const unit = `draft${ok === 1 ? "" : "s"}`;
+      const verb = redraft ? "rewritten" : "ready for approval";
       if (ac.signal.aborted) {
         toast(
           "ok",
-          `Stopped — ${ok} draft${ok === 1 ? "" : "s"} ready for approval${
+          `Stopped — ${ok} ${unit} ${verb}${
             failed ? ` (${failed} failed)` : ""
           }.`,
         );
       } else if (failed === 0) {
-        toast(
-          "ok",
-          `${ok} draft${ok === 1 ? "" : "s"} ready for approval.`,
-        );
+        toast("ok", `${ok} ${unit} ${verb}.`);
       } else {
         toast(
           "err",
-          `${ok} of ${targets.length} drafted — ${failed} failed.`,
+          `${ok} of ${targets.length} ${redraft ? "rewritten" : "drafted"} — ${failed} failed.`,
         );
       }
     } finally {

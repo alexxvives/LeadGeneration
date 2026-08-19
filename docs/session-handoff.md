@@ -9,20 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Stale-overwrite audit)
+## ⏱️ Status — updated 2026-08-19 (Re-draft all)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Audited optimistic UI vs GET / 15s slim poll. Journal merge-by-id was not
-  enough: CRM stage, contact chips, and drawer fields could still flash.
-- `mergeSlimIntoCached` keeps cached user fields while `writePending` (PATCH
-  in flight) or when the snapshot is older than `lastWriteAt`. Contact
-  methods union like the journal; CRM PATCHes queue + rebase per lead.
+- Contact Draft **Draft all** still only writes remaining first drafts.
+  When every row already has a draft, the same control becomes
+  **Re-draft all**.
 
 ### Next
-1. Deploy Worker so lastWriteAt/writePending merge + Draft-all hide +
+1. Deploy Worker so lastWriteAt/writePending merge + Re-draft all +
    sign-off editor are live.
 
 ---

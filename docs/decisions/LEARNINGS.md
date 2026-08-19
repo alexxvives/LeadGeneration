@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — After Draft all, the same control becomes Re-draft all
+- Hiding the button once every Contact Draft had a draft removed the
+  profile-change bulk rewrite. Keep **Draft all** for remaining first
+  writes; when none remain, swap the label to **Re-draft all**.
+
 ### 2026-08-19 — Sign-off editor: clicks hit Bold; `&amp;` on screen
 - Settings wrapped **Email sign-off template** in a `<label>`. A label’s
   first labelable descendant is the Bold toolbar button, so clicks never
