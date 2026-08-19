@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Click Email again logs another send today
+- Email chip was a toggle: second click turned the method off. It now stays
+  on and opens a journal composer prefilled `Email sent by {name}:` (same
+  pattern as Phone). Save / Skip details writes a new dated Email line —
+  multiple named sends on the same day are kept. Collapse only drops a
+  bare `Email sent` when a named line already exists that day.
+
 ### 2026-08-19 — Missed-call journal text matches other notes
 - Gray was only for the **Missed** tag (vs sky **Call**). The date + body
   used `text-mist-500` / `text-mist-400`, so the line looked dimmer than

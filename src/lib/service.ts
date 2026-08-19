@@ -75,7 +75,7 @@ import {
   contactMethodsEqual,
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, isEmailSentNote, resolveFollowUpKind } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind } from "@/lib/follow-ups";
 import { LEAD_HYDRATE_LANES } from "@/lib/lead-lanes";
 import {
   companyGuessFromEmail,
@@ -1578,24 +1578,18 @@ export async function sendApprovedOutreach(
       const emailSentNote = actor
         ? `Email sent by ${actor}`
         : "Email sent";
-      const hasEmailSentNote = existing.some(
-        (f) =>
-          f.note.trim().toLowerCase().startsWith("email sent") &&
-          f.date === today,
-      );
-      let followUps = existing;
-      if (!hasEmailSentNote) {
-        followUps = [
-          {
-            id: newId("fu"),
-            date: today,
-            note: emailSentNote,
-            done: true,
-            kind: "email",
-          },
-          ...followUps,
-        ];
-      }
+      // App send always journals its own line — chip logs can add more the
+      // same day; collapse only drops a bare "Email sent" duplicate.
+      const followUps = [
+        {
+          id: newId("fu"),
+          date: today,
+          note: emailSentNote,
+          done: true,
+          kind: "email" as const,
+        },
+        ...existing,
+      ];
       crmPatch.followUps = collapseEmailSentFollowUps(followUps, actor);
     }
     await db.updateLead(outreach.leadId, crmPatch);
@@ -2403,9 +2397,8 @@ export async function updateLeadCrm(
     ctx.userEmail?.trim() ||
     null;
 
-  // Journal only channels that were just added. Phone logs are written in the
-  // drawer as "Phone call by …" / "Missed call by …" so we don't invent a
-  // combined "Contacted via email, phone" line here.
+  // Journal only channels that were just added. Phone/email logs are written
+  // in the drawer so we don't invent a "Contacted via …" line here.
   if (
     patch.contactMethods &&
     !contactMethodsEqual(patch.contactMethods, lead.contactMethods)
@@ -2417,10 +2410,7 @@ export async function updateLeadCrm(
     );
     let followUps = existing;
     for (const method of added) {
-      if (method === "phone") continue;
-      if (method === "email" && followUps.some((f) => isEmailSentNote(f.note))) {
-        continue;
-      }
+      if (method === "phone" || method === "email") continue;
       const entry = contactMethodAddedNote(method, actorName);
       const already = followUps.some(
         (f) =>

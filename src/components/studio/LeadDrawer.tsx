@@ -24,10 +24,12 @@ import {
   collapseEmailSentFollowUps,
   formatNoteDate,
   inferFollowUpKind,
+  emailSentNotePrefix,
   isBounceNote,
   isContactRegisteredNote,
   isMissedCallNote,
   missedCallNotePrefix,
+  normalizeEmailSentNote,
   normalizeMissedCallNote,
   phoneCallNotePrefix,
   resolveFollowUpKind,
@@ -55,7 +57,7 @@ interface DrawerProps {
   mode?: "info" | "draft";
   /** Open the dated-note composer for a call log (connected or missed). */
   promptNote?: false | "call" | "missed";
-  /** Display name of the signed-in user — used in "Phone call by …" prefixes. */
+  /** Display name of the signed-in user — used in "Phone call by …" / "Email sent by …" prefixes. */
   actorName?: string | null;
   /** Undo a mistaken Ready→Contacted mark (phone / form log). */
   onUndoMarkContacted?: () => Promise<void>;
@@ -154,10 +156,10 @@ export function LeadDrawer(props: DrawerProps) {
         ? phoneCallNotePrefix(actorName)
         : "",
   );
-  /** Local call composer when Phone is toggled in the drawer (not from Ready). */
-  const [callPrompt, setCallPrompt] = useState<false | "call" | "missed">(
-    promptNote,
-  );
+  /** Local composer when Phone/Email is toggled in the drawer (not from Ready). */
+  const [callPrompt, setCallPrompt] = useState<
+    false | "call" | "missed" | "email"
+  >(promptNote);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -191,7 +193,7 @@ export function LeadDrawer(props: DrawerProps) {
     const collapsed = collapseEmailSentFollowUps(raw, lead.contactedByName)
       .filter((f) => !isBounceNote(f.note) && !isContactRegisteredNote(f.note))
       .map((f) => {
-        const note = normalizeMissedCallNote(f.note);
+        const note = normalizeEmailSentNote(normalizeMissedCallNote(f.note));
         const kind = resolveFollowUpKind({ ...f, note });
         if (kind === f.kind && note === f.note) return f;
         return {
@@ -387,8 +389,21 @@ export function LeadDrawer(props: DrawerProps) {
     });
   };
 
-  /** Toggle a contact method (multi-select). Adding phone opens a call log. */
+  /** Toggle a contact method (multi-select). Phone/email open a journal composer. */
   const toggleMethod = async (method: ContactMethod) => {
+    if (method === "email") {
+      if (!contactMethods.includes("email")) {
+        const next: ContactMethod[] = [...contactMethods, "email"];
+        const stage = crmStage === "new" ? "contacted" : crmStage;
+        await commitStage(stage, next);
+      }
+      setCallPrompt("email");
+      setShowAddNote(true);
+      setComposerKind("note");
+      setNewNoteDate(todayIsoDate());
+      setNewNoteText(emailSentNotePrefix(actorName));
+      return;
+    }
     const addedPhone = method === "phone" && !contactMethods.includes("phone");
     const next = toggleContactMethod(contactMethods, method);
     const stage =
@@ -413,7 +428,13 @@ export function LeadDrawer(props: DrawerProps) {
   /** Pipeline/CRM contacted — log methods/notes, don't push email approve/send. */
   const registerOnly = isPastNew && !outreachSent;
 
-  const promptingCall = Boolean(promptNote) || Boolean(callPrompt);
+  const promptingCall =
+    callPrompt === "call" ||
+    callPrompt === "missed" ||
+    promptNote === "call" ||
+    promptNote === "missed";
+  const promptingEmail = callPrompt === "email";
+  const promptingChannel = promptingCall || promptingEmail;
 
   const openComposer = (kind: "note" | "follow_up") => {
     setShowAddNote(true);
@@ -429,30 +450,34 @@ export function LeadDrawer(props: DrawerProps) {
   };
 
   // ── Dated notes (journal) ──
-  const addNote = async (variant?: "call" | "missed") => {
+  const addNote = async (variant?: "call" | "missed" | "email") => {
     const callMode = variant ?? (callPrompt || (promptNote ? promptNote : false));
     let text = newNoteText.trim();
     if (callMode === "missed") {
       text = missedCallNotePrefix(actorName).trim();
     } else if (callMode === "call" && !text) {
       text = phoneCallNotePrefix(actorName).trim();
+    } else if (callMode === "email" && !text) {
+      text = emailSentNotePrefix(actorName).trim();
     }
+    if (callMode === "email") text = normalizeEmailSentNote(text);
     if (!newNoteDate || !text) return;
     const inferred = inferFollowUpKind(text);
     const isCall =
       inferred === "phone" || callMode === "call" || callMode === "missed";
+    const isEmailLog = inferred === "email" || callMode === "email";
     const kind: FollowUpKind = isCall
       ? "phone"
-      : composerKind === "follow_up"
-        ? "follow_up"
-        : inferred === "email"
-          ? "email"
+      : isEmailLog
+        ? "email"
+        : composerKind === "follow_up"
+          ? "follow_up"
           : "note";
     const fu: FollowUp = {
       id: newId("fu"),
       date: newNoteDate,
       note: text,
-      done: isCall || kind === "note",
+      done: isCall || isEmailLog || kind === "note",
       kind,
     };
     const updated = [...followUps, fu];
@@ -495,6 +520,18 @@ export function LeadDrawer(props: DrawerProps) {
       };
       setCrmStage(stage);
       setContactMethods(methods);
+    } else if (callMode === "email") {
+      const methods: ContactMethod[] = contactMethods.includes("email")
+        ? contactMethods
+        : [...contactMethods, "email"];
+      const stage = crmStage === "new" ? "contacted" : crmStage;
+      crmPatch = {
+        ...crmPatch,
+        crmStage: stage,
+        contactMethods: methods,
+      };
+      setCrmStage(stage);
+      setContactMethods(methods);
     }
     await props.onUpdateCrm(lead.id, crmPatch);
     if (promptNote) props.onPromptNoteDone?.();
@@ -516,7 +553,15 @@ export function LeadDrawer(props: DrawerProps) {
   const saveEditFollowUp = async () => {
     if (!editingId || !editDate || !editText.trim()) return;
     const updated = followUps.map((f) =>
-      f.id === editingId ? { ...f, date: editDate, note: editText.trim() } : f,
+      f.id === editingId
+        ? {
+            ...f,
+            date: editDate,
+            note: normalizeEmailSentNote(
+              normalizeMissedCallNote(editText.trim()),
+            ),
+          }
+        : f,
     );
     setFollowUps(updated);
     setEditingId(null);
@@ -897,9 +942,11 @@ export function LeadDrawer(props: DrawerProps) {
                     <span className="mb-1 block text-[11px] uppercase tracking-wider text-mist-500">
                       {promptingCall
                         ? "Call date"
-                        : composerKind === "follow_up"
-                          ? "Follow up on"
-                          : "Date"}
+                        : promptingEmail
+                          ? "Email date"
+                          : composerKind === "follow_up"
+                            ? "Follow up on"
+                            : "Date"}
                     </span>
                     <input
                       type="date"
@@ -916,9 +963,11 @@ export function LeadDrawer(props: DrawerProps) {
                     placeholder={
                       promptingCall
                         ? "how the conversation went…"
-                        : composerKind === "follow_up"
-                          ? "Follow up"
-                          : "What happened…"
+                        : promptingEmail
+                          ? "what you sent…"
+                          : composerKind === "follow_up"
+                            ? "Follow up"
+                            : "What happened…"
                     }
                     className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60"
                   />
@@ -948,6 +997,10 @@ export function LeadDrawer(props: DrawerProps) {
                           void addNote("call");
                           return;
                         }
+                        if (promptingEmail) {
+                          void addNote("email");
+                          return;
+                        }
                         setShowAddNote(false);
                         setCallPrompt(false);
                         setComposerKind("note");
@@ -956,7 +1009,7 @@ export function LeadDrawer(props: DrawerProps) {
                       }}
                       className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
                     >
-                      {promptingCall ? "Skip details" : "Cancel"}
+                      {promptingChannel ? "Skip details" : "Cancel"}
                     </button>
                     {promptNote && props.onUndoMarkContacted ? (
                       <button

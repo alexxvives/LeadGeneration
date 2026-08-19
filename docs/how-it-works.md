@@ -142,7 +142,10 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     **Add Note** in the header matches the amber tag. Notes can be edited
     or deleted. Done-state for follow-ups is ticked on Calendar only.
     Toggling **Phone** opens a call log with the caret after
-    `Phone call by {name}:`.
+    `Phone call by {name}:`. Clicking **Email** (again, even when it is
+    already on) logs another send dated today and opens a note with
+    `Email sent by {name}:` so you can add details — it does not turn the
+    chip off.
     A bounce deletes that address and returns the lead to New — it is not a
     follow-up. The outreach composer (draft → edit → approve → send) is on
     the draft pane.

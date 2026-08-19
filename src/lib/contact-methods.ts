@@ -73,7 +73,7 @@ export function contactMethodLabel(method: ContactMethod): string {
   return "contact form";
 }
 
-/** Note for a newly added channel. Phone is omitted — the drawer writes the call log. */
+/** Note for a newly added channel. Phone/email are omitted — the drawer writes those logs. */
 export function contactMethodAddedNote(
   method: Exclude<ContactMethod, "phone">,
   byName?: string | null,

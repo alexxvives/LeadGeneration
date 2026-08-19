@@ -79,9 +79,19 @@ export function missedCallNotePrefix(name?: string | null): string {
   return `Missed call by ${callNoteActor(name)}`;
 }
 
+export function emailSentNotePrefix(name?: string | null): string {
+  return `Email sent by ${callNoteActor(name)}: `;
+}
+
 /** Drop a trailing colon when the missed-call line has no extra body. */
 export function normalizeMissedCallNote(note: string): string {
   if (!isMissedCallNote(note)) return note;
+  return note.trim().replace(/:\s*$/, "");
+}
+
+/** Drop a trailing colon when the email-sent line has no extra body. */
+export function normalizeEmailSentNote(note: string): string {
+  if (!isEmailSentNote(note)) return note;
   return note.trim().replace(/:\s*$/, "");
 }
 
@@ -180,33 +190,32 @@ export function calendarEventsFromLeads(
 }
 
 /**
- * One journal line per day for sends. Named "Email sent by …" wins over a
- * bare "Email sent" (the drawer heal used to add a second row).
+ * Drop a bare "Email sent" when a named "Email sent by …" already exists
+ * that day (drawer heal used to add a second row). Keep multiple named
+ * sends on the same day — clicking Email again logs another one.
  */
 export function collapseEmailSentFollowUps(
   followUps: FollowUp[],
   actorName?: string | null,
 ): FollowUp[] {
   const name = actorName?.trim() || null;
-  const winnerIdByDate = new Map<string, string>();
+  const namedDates = new Set<string>();
   for (const f of followUps) {
-    if (!isEmailSentNote(f.note)) continue;
-    const existingId = winnerIdByDate.get(f.date);
-    if (!existingId) {
-      winnerIdByDate.set(f.date, f.id);
-      continue;
-    }
-    const named = /^email sent by\b/i.test(f.note.trim());
-    if (!named) continue;
-    const prev = followUps.find((x) => x.id === existingId);
-    const prevNamed = prev ? /^email sent by\b/i.test(prev.note.trim()) : false;
-    if (!prevNamed) winnerIdByDate.set(f.date, f.id);
+    if (/^email sent by\b/i.test(f.note.trim())) namedDates.add(f.date);
   }
+  const seenBareDates = new Set<string>();
   return followUps.flatMap((f) => {
     if (!isEmailSentNote(f.note)) return [f];
-    if (winnerIdByDate.get(f.date) !== f.id) return [];
-    if (/^email sent$/i.test(f.note.trim()) && name) {
-      return [{ ...f, note: `Email sent by ${name}`, kind: "email" }];
+    const trimmed = f.note.trim();
+    const isBare = /^email sent$/i.test(trimmed);
+    if (isBare) {
+      if (namedDates.has(f.date)) return [];
+      if (seenBareDates.has(f.date)) return [];
+      seenBareDates.add(f.date);
+      if (name) {
+        return [{ ...f, note: `Email sent by ${name}`, kind: "email" }];
+      }
+      return [{ ...f, kind: f.kind ?? "email" }];
     }
     return [{ ...f, kind: f.kind ?? "email" }];
   });

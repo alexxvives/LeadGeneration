@@ -9,19 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Missed-call note text matches others)
+## ⏱️ Status — updated 2026-08-19 (Email chip logs another send)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Missed-call journal lines were dim gray (`mist-500` / `mist-400`). Date +
-  body now use the same `mist-100` / `mist-300` as other notes. The **Missed**
-  tag stays gray so it still reads apart from sky **Call**.
+- Clicking **Email** on lead info (including when it is already on) logs
+  another send for today and opens `Email sent by {name}:` so you can add
+  details. The chip stays selected; it no longer toggles off.
 
 ### Next
-1. Deploy Worker so missed-call note color + pipeline icon + bounce/colon
-   fixes are live.
+1. Deploy Worker so the Email-again journal + missed-call color/icon fixes
+   are live.
 
 ---
 
