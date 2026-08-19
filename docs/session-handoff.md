@@ -9,14 +9,14 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Follow up tag + overdue days)
+## ⏱️ Status — updated 2026-08-19 (Journal align + overdue square)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0030** remote applied.
 
 ### This pass
-- Drawer notes: purple Follow up tag (no checkbox), chronological.
-- Calendar: checkbox stays; overdue open follow-ups paint the day red.
+- Notes tags same width so text lines up; Add Note amber; Missed gray.
+- Overdue = red day square (selected-day style); calendar icon stays violet.
 
 ### Next
 1. Deploy after `tsc`/`lint` green.

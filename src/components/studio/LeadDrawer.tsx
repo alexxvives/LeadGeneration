@@ -826,7 +826,7 @@ export function LeadDrawer(props: DrawerProps) {
                 <button
                   type="button"
                   onClick={() => openComposer("note")}
-                  className="text-[11px] text-aurora-400 hover:underline"
+                  className="text-[11px] text-amber-300 hover:underline"
                 >
                   Add Note
                 </button>
@@ -840,7 +840,7 @@ export function LeadDrawer(props: DrawerProps) {
                 <button
                   type="button"
                   onClick={() => void addNote("missed")}
-                  className="text-[11px] text-amber-200 hover:underline"
+                  className="text-[11px] text-mist-400 hover:underline"
                 >
                   Missed call
                 </button>
@@ -929,7 +929,7 @@ export function LeadDrawer(props: DrawerProps) {
                         type="button"
                         onClick={() => void addNote("missed")}
                         disabled={!newNoteDate}
-                        className="rounded-full border border-amber-400/30 px-3 py-1 text-xs font-medium text-amber-200 hover:bg-amber-400/10 disabled:opacity-40"
+                        className="rounded-full border border-white/15 px-3 py-1 text-xs font-medium text-mist-400 hover:bg-white/5 disabled:opacity-40"
                       >
                         Missed call
                       </button>
@@ -990,7 +990,7 @@ export function LeadDrawer(props: DrawerProps) {
                           ? "bg-aurora-400/15 text-aurora-200"
                           : kind === "phone"
                             ? missed
-                              ? "bg-amber-400/15 text-amber-200"
+                              ? "bg-white/10 text-mist-400"
                               : "bg-sky-400/15 text-sky-200"
                             : kind === "follow_up"
                               ? "bg-violet-400/15 text-violet-200"
@@ -1005,10 +1005,18 @@ export function LeadDrawer(props: DrawerProps) {
                             : kind === "follow_up"
                               ? "Follow up"
                               : "Note";
+                      const lineClass = missed
+                        ? "text-mist-500"
+                        : isFollow && fu.done
+                          ? "text-mist-500 line-through"
+                          : "text-mist-300";
+                      const dateClass = missed
+                        ? "text-mist-400"
+                        : "text-mist-100";
                       return (
                         <li key={fu.id} className="flex items-start gap-2">
                           <span
-                            className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tagClass}`}
+                            className={`mt-0.5 inline-flex w-[5.25rem] shrink-0 justify-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tagClass}`}
                           >
                             {tagText}
                           </span>
@@ -1046,13 +1054,9 @@ export function LeadDrawer(props: DrawerProps) {
                             </div>
                           ) : (
                             <p
-                              className={`min-w-0 flex-1 text-sm leading-relaxed ${
-                                isFollow && fu.done
-                                  ? "text-mist-500 line-through"
-                                  : "text-mist-300"
-                              }`}
+                              className={`min-w-0 flex-1 text-sm leading-relaxed ${lineClass}`}
                             >
-                              <span className="font-semibold text-mist-100">
+                              <span className={`font-semibold ${dateClass}`}>
                                 {formatNoteDate(fu.date)}
                               </span>
                               {fu.note ? <> · {fu.note}</> : null}

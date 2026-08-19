@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Journal tag column; Add Note amber; Missed gray; overdue square
+- Notes journal tags share a fixed width so date/body lines up under Follow up.
+- **Add Note** header is amber; **Missed** tag + line (and header) are mist gray.
+- Overdue days use a rose selected-day square; calendar icons stay violet.
+
 ### 2026-08-19 — Follow up tag in drawer; overdue calendar days
 - Lead drawer journal: every line gets a kind tag (purple **Follow up**, not a
   checkbox). Sort is chronological (oldest first). Tick done only on Calendar.

@@ -67,13 +67,7 @@ function KindMark({ kind }: { kind: FollowUpKind }) {
   );
 }
 
-function DayKindMark({
-  kind,
-  overdue = false,
-}: {
-  kind: FollowUpKind;
-  overdue?: boolean;
-}) {
+function DayKindMark({ kind }: { kind: FollowUpKind }) {
   if (kind === "email") {
     return (
       <MailIcon className="h-3.5 w-3.5 text-aurora-400 drop-shadow-[0_0_4px_rgba(52,211,153,0.45)]" aria-hidden />
@@ -86,14 +80,7 @@ function DayKindMark({
   }
   if (kind === "follow_up") {
     return (
-      <CalendarIcon
-        className={`h-3.5 w-3.5 ${
-          overdue
-            ? "text-rose-400 drop-shadow-[0_0_4px_rgba(251,113,133,0.55)]"
-            : "text-violet-300 drop-shadow-[0_0_4px_rgba(167,139,250,0.55)]"
-        }`}
-        aria-hidden
-      />
+      <CalendarIcon className="h-3.5 w-3.5 text-violet-300 drop-shadow-[0_0_4px_rgba(167,139,250,0.55)]" aria-hidden />
     );
   }
   return (
@@ -283,10 +270,10 @@ export function CalendarView({
                   className={`flex h-full min-h-0 flex-col items-start rounded-xl px-1.5 py-1.5 text-left transition-colors ${
                     isSelected
                       ? overdue
-                        ? "bg-rose-400/15 ring-1 ring-rose-400/55"
+                        ? "bg-rose-400/20 ring-1 ring-rose-400/60"
                         : "bg-aurora-400/15 ring-1 ring-aurora-400/50"
                       : overdue
-                        ? "bg-rose-400/10 ring-1 ring-rose-400/45"
+                        ? "bg-rose-400/15 ring-1 ring-rose-400/50"
                         : isToday
                           ? "bg-white/[0.04] ring-1 ring-white/15"
                           : "hover:bg-white/[0.04]"
@@ -294,11 +281,9 @@ export function CalendarView({
                 >
                   <span
                     className={`text-xs tabular-nums ${
-                      overdue
-                        ? "font-semibold text-rose-300"
-                        : isToday
-                          ? "font-semibold text-aurora-300"
-                          : "text-mist-200"
+                      isToday && !overdue
+                        ? "font-semibold text-aurora-300"
+                        : "text-mist-200"
                     }`}
                   >
                     {cell.day}
@@ -306,11 +291,7 @@ export function CalendarView({
                   {kinds.length > 0 ? (
                     <span className="mt-auto flex flex-wrap items-center gap-1 pt-1">
                       {kinds.map((k) => (
-                        <DayKindMark
-                          key={k}
-                          kind={k}
-                          overdue={overdue && k === "follow_up"}
-                        />
+                        <DayKindMark key={k} kind={k} />
                       ))}
                       {pending > 0 ? (
                         <span className="sr-only">
@@ -331,7 +312,10 @@ export function CalendarView({
             Follow up
           </li>
           <li className="inline-flex items-center gap-1.5">
-            <CalendarIcon className="h-3.5 w-3.5 text-rose-400" aria-hidden />
+            <span
+              className="h-3.5 w-3.5 rounded-sm bg-rose-400/20 ring-1 ring-rose-400/50"
+              aria-hidden
+            />
             Overdue
           </li>
           <li className="inline-flex items-center gap-1.5">
@@ -437,7 +421,7 @@ function DayGroup({
               ) : (
                 <span
                   className={`mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
-                    missed ? "bg-amber-400/15 text-amber-200" : KIND_CHIP[ev.kind]
+                    missed ? "bg-white/10 text-mist-400" : KIND_CHIP[ev.kind]
                   }`}
                   title={missed ? "Missed call" : followUpKindLabel(ev.kind)}
                 >
@@ -458,7 +442,7 @@ function DayGroup({
                     {ev.company}
                   </span>
                   {missed ? (
-                    <span className="shrink-0 text-[10px] font-medium text-amber-200">
+                    <span className="shrink-0 text-[10px] font-medium text-mist-400">
                       Missed
                     </span>
                   ) : null}

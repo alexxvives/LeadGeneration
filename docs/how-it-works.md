@@ -113,10 +113,11 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     Each day lists **follow-ups** (dated reminders from **Follow up**),
     **emails sent**, and **phone calls** logged that day — shown as calendar /
     mail / phone icons on the day cell. An open follow-up whose date is at
-    least one day past paints that day **red**. Tick the checkbox on Calendar
-    to mark it done (the lead drawer shows a purple **Follow up** tag, no
-    checkbox). Plain notes stay on the lead only and never count as
-    follow-ups. Click an item to open the lead.
+    least one day past fills that day square in **red** (same selected-day
+    treatment, rose instead of aurora) — the calendar icon stays violet.
+    Tick the checkbox on Calendar to mark it done (the lead drawer shows a
+    purple **Follow up** tag, no checkbox). Plain notes stay on the lead
+    only and never count as follow-ups. Click an item to open the lead.
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.
@@ -133,7 +134,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     (**Add Note** for a log line; **Follow up** pre-fills “Follow up” one week
     out and shows on Calendar; **Missed call** writes the journal line
     immediately — no composer). Journal lines are chronological (oldest first)
-    with a kind tag (purple **Follow up**, amber Note, …). Notes can be edited
+    with a kind tag (purple **Follow up**, amber **Note**, gray **Missed**).
+    **Add Note** in the header matches the amber tag. Notes can be edited
     or deleted. Done-state for follow-ups is ticked on Calendar only.
     Toggling **Phone** opens a call log with the caret after
     `Phone call by {name}:`.
