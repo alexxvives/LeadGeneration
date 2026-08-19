@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Deleted leads stayed until the next poll
+- Optimistic delete already filtered `board.leads`, but an in-flight
+  `refresh()` captured the old list and, on return, merged the still-present
+  server row back in. Soft merge also *appends* unseen ids, so the card
+  reappeared until `leadsTotal` shrank a few seconds later.
+- Remember dropped lead ids for the session, cancel in-flight backfill,
+  merge from the post-await cache, and never append a dropped id.
+
 ### 2026-08-19 — Notes/follow-ups flash then reappear
 - Adding a journal row updated local drawer state immediately, then
   `ensureLeadDetail` (in-flight `GET /api/leads/:id`) or a slim board poll

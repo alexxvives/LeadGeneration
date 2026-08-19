@@ -9,17 +9,17 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Card info pencil)
+## ⏱️ Status — updated 2026-08-19 (Delete vanishes immediately)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Removed the non-clickable pencil icons from lead-drawer contact/about
-  fields. Those rows are already editable via the input itself.
+- Deleting a lead removes it from the board immediately. In-flight polls
+  can no longer merge the old row back for a few seconds.
 
 ### Next
-1. Deploy Worker so the journal-merge fix (and this UI tweak) is live.
+1. Deploy Worker so journal-merge + immediate-delete are live.
 
 ---
 

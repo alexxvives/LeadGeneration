@@ -272,7 +272,9 @@ email bodies / about blurbs (`detailLoaded: false`). Opening a
 lead drawer fetches full detail via `GET /api/leads/:id`. That GET (and
 Pipeline’s 15s slim poll) is merged into the cached row — journal
 follow-ups are unioned by id so a note added while the fetch is in
-flight does not vanish, then pop back when the save returns. Pipeline and Outreach
+flight does not vanish, then pop back when the save returns. Deleted
+leads are removed from the cache immediately; stale polls are not
+allowed to push those ids back. Pipeline and Outreach
 stay mounted after first visit so switching back is instant.
 
 ## 6. Guardrails baked into the flow

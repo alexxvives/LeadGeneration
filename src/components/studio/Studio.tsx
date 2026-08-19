@@ -88,6 +88,24 @@ type StudioView =
 /** Views kept mounted after first visit so filters / sort / scroll survive. */
 type StickyView = "pipeline" | "outreach" | "leads";
 
+function omitDroppedLeadIds<T extends { id: string }>(
+  leads: T[],
+  dropped: ReadonlySet<string>,
+): T[] {
+  if (dropped.size === 0) return leads;
+  return leads.filter((l) => !dropped.has(l.id));
+}
+
+function appendUnseenLeads(
+  existing: LeadWithOutreach[],
+  incoming: LeadWithOutreach[],
+  dropped: ReadonlySet<string>,
+): LeadWithOutreach[] {
+  const have = new Set(existing.map((l) => l.id));
+  const added = incoming.filter((l) => !have.has(l.id) && !dropped.has(l.id));
+  return added.length === 0 ? existing : [...existing, ...added];
+}
+
 function droppedFollowUpIdSet(
   lead: Pick<LeadWithOutreach, "droppedFollowUpIds">,
 ): Set<string> | undefined {
@@ -325,6 +343,8 @@ export function Studio() {
   const boardLiteRef = useRef(false);
   const boardRef = useRef<BoardResponse | null>(null);
   const leadsGenRef = useRef(0);
+  /** Ids removed this session — stale polls must not push them back onto the board. */
+  const droppedLeadIdsRef = useRef(new Set<string>());
   /** Lead ids already toasted as bounced this session (null = not seeded yet). */
   const seenBouncedIdsRef = useRef<Set<string> | null>(null);
 
@@ -404,7 +424,7 @@ export function Studio() {
           boardLiteRef.current = !complete;
           return {
             ...data,
-            leads: prev.leads,
+            leads: omitDroppedLeadIds(prev.leads, droppedLeadIdsRef.current),
             leadsTotal: prev.leadsTotal ?? prev.leads.length,
             leadsHasMore: prev.leadsHasMore ?? false,
           };
@@ -412,7 +432,10 @@ export function Studio() {
         boardLiteRef.current = true;
         return {
           ...data,
-          leads: sameBoard ? (prev?.leads ?? data.leads) : data.leads,
+          leads: omitDroppedLeadIds(
+            sameBoard ? (prev?.leads ?? data.leads) : data.leads,
+            droppedLeadIdsRef.current,
+          ),
           leadsTotal: data.leadsTotal ?? 0,
           leadsHasMore: false,
         };
@@ -421,6 +444,15 @@ export function Studio() {
     }
 
     const gen = ++leadsGenRef.current;
+
+    // Always page — never pull all ~3k fat/slim rows in one soft-refresh.
+    const pageOpts = { perLane: LEAD_PAGE_PER_LANE, laneOffset: 0 };
+
+    const data = await api.board(boardKey, pageOpts);
+    if (leadsGenRef.current !== gen) return data;
+
+    // Read cache AFTER the await so an optimistic delete during the fetch
+    // is not overwritten by the snapshot from the start of this refresh.
     const prev = boardRef.current;
     const sameBoard = (prev?.activeBoardId ?? null) === (boardKey ?? null);
     const haveComplete =
@@ -428,12 +460,8 @@ export function Studio() {
       sameBoard &&
       prev.leadsHasMore === false &&
       prev.leads.length > 0;
-
-    // Always page — never pull all ~3k fat/slim rows in one soft-refresh.
-    const pageOpts = { perLane: LEAD_PAGE_PER_LANE, laneOffset: 0 };
-
-    const data = await api.board(boardKey, pageOpts);
-    if (leadsGenRef.current !== gen) return data;
+    const dropped = droppedLeadIdsRef.current;
+    const incomingLeads = omitDroppedLeadIds(data.leads, dropped);
 
     boardLiteRef.current = false;
     setBoards(data.boards ?? []);
@@ -450,7 +478,7 @@ export function Studio() {
       }
       setBoard({
         ...data,
-        leads: data.leads,
+        leads: incomingLeads,
         leadsTotal: data.leadsTotal ?? data.leads.length,
         leadsHasMore: !!data.leadsHasMore,
       });
@@ -468,11 +496,13 @@ export function Studio() {
               if (leadsGenRef.current !== gen) return;
               setBoard((b) => {
                 if (!b) return b;
-                const seen = new Set(b.leads.map((l) => l.id));
-                const added = chunk.leads.filter((l) => !seen.has(l.id));
                 return {
                   ...b,
-                  leads: [...b.leads, ...added],
+                  leads: appendUnseenLeads(
+                    b.leads,
+                    chunk.leads,
+                    droppedLeadIdsRef.current,
+                  ),
                   leadsTotal: chunk.leadsTotal,
                   leadsHasMore: chunk.leadsHasMore,
                 };
@@ -496,7 +526,12 @@ export function Studio() {
     if (pinned && pinned !== data.run?.id) {
       try {
         const { run, leads } = await api.runWithLeads(pinned);
-        const merged = { ...data, run, leads, leadsHasMore: false };
+        const merged = {
+          ...data,
+          run,
+          leads: omitDroppedLeadIds(leads, droppedLeadIdsRef.current),
+          leadsHasMore: false,
+        };
         setBoard(merged);
         return merged;
       } catch {
@@ -524,13 +559,13 @@ export function Studio() {
       !totalShrunk &&
       !singlePageComplete
     ) {
-      const patch = new Map(data.leads.map((l) => [l.id, l]));
-      const merged = prev.leads.map((l) => {
+      const patch = new Map(incomingLeads.map((l) => [l.id, l]));
+      const merged = omitDroppedLeadIds(prev.leads, dropped).map((l) => {
         const incoming = patch.get(l.id);
         return incoming ? mergeSlimIntoCached(l, incoming) : l;
       });
       const seen = new Set(merged.map((l) => l.id));
-      for (const l of data.leads) {
+      for (const l of incomingLeads) {
         if (!seen.has(l.id)) merged.push(l);
       }
       const total = serverTotal;
@@ -557,11 +592,13 @@ export function Studio() {
               if (leadsGenRef.current !== gen) return;
               setBoard((b) => {
                 if (!b) return b;
-                const have = new Set(b.leads.map((l) => l.id));
-                const added = chunk.leads.filter((l) => !have.has(l.id));
                 return {
                   ...b,
-                  leads: [...b.leads, ...added],
+                  leads: appendUnseenLeads(
+                    b.leads,
+                    chunk.leads,
+                    droppedLeadIdsRef.current,
+                  ),
                   leadsTotal: chunk.leadsTotal,
                   leadsHasMore: chunk.leadsHasMore,
                 };
@@ -595,6 +632,7 @@ export function Studio() {
               });
               if (leadsGenRef.current !== gen) return;
               for (const l of chunk.leads) {
+                if (droppedLeadIdsRef.current.has(l.id)) continue;
                 ids.add(l.id);
                 byId.set(l.id, l);
               }
@@ -603,13 +641,14 @@ export function Studio() {
             }
             setBoard((b) => {
               if (!b || leadsGenRef.current !== gen) return b;
-              const next = b.leads
+              const next = omitDroppedLeadIds(b.leads, droppedLeadIdsRef.current)
                 .filter((l) => ids.has(l.id))
                 .map((l) => {
                   const incoming = byId.get(l.id);
                   return incoming ? mergeSlimIntoCached(l, incoming) : l;
                 });
               for (const [id, l] of byId) {
+                if (droppedLeadIdsRef.current.has(id)) continue;
                 if (!next.some((x) => x.id === id)) next.push(l);
               }
               return {
@@ -633,7 +672,7 @@ export function Studio() {
       const prevById = new Map(prev.leads.map((l) => [l.id, l]));
       setBoard({
         ...data,
-        leads: data.leads.map((l) => {
+        leads: incomingLeads.map((l) => {
           const old = prevById.get(l.id);
           return old ? mergeSlimIntoCached(old, l) : l;
         }),
@@ -656,11 +695,13 @@ export function Studio() {
               if (leadsGenRef.current !== gen) return;
               setBoard((b) => {
                 if (!b) return b;
-                const have = new Set(b.leads.map((l) => l.id));
-                const added = chunk.leads.filter((l) => !have.has(l.id));
                 return {
                   ...b,
-                  leads: [...b.leads, ...added],
+                  leads: appendUnseenLeads(
+                    b.leads,
+                    chunk.leads,
+                    droppedLeadIdsRef.current,
+                  ),
                   leadsTotal: chunk.leadsTotal,
                   leadsHasMore: chunk.leadsHasMore,
                 };
@@ -680,7 +721,10 @@ export function Studio() {
       return data;
     }
 
-    setBoard(data);
+    setBoard({
+      ...data,
+      leads: incomingLeads,
+    });
 
     // Progressive: show first page, keep loading the rest without blocking UI.
     if (data.leadsHasMore) {
@@ -698,11 +742,13 @@ export function Studio() {
             if (leadsGenRef.current !== gen) return;
             setBoard((b) => {
               if (!b) return b;
-              const seen = new Set(b.leads.map((l) => l.id));
-              const added = chunk.leads.filter((l) => !seen.has(l.id));
               return {
                 ...b,
-                leads: [...b.leads, ...added],
+                leads: appendUnseenLeads(
+                  b.leads,
+                  chunk.leads,
+                  droppedLeadIdsRef.current,
+                ),
                 leadsTotal: chunk.leadsTotal,
                 leadsHasMore: chunk.leadsHasMore,
               };
@@ -1995,17 +2041,44 @@ export function Studio() {
     return <StudioViewSkeleton view={view} />;
   }
 
+  const dropLeadsLocally = (ids: string[]) => {
+    const idSet = new Set(ids);
+    for (const id of ids) droppedLeadIdsRef.current.add(id);
+    // Cancel in-flight board fetch/backfill so it cannot re-apply the old list.
+    leadsGenRef.current += 1;
+    setLeadsBackfilling(false);
+    setSelectedId((cur) => (cur && idSet.has(cur) ? null : cur));
+    setBoard((b) => {
+      if (!b) return b;
+      const removing = b.leads.filter((l) => idSet.has(l.id));
+      const counts = b.crmStageCounts ? { ...b.crmStageCounts } : undefined;
+      if (counts) {
+        for (const l of removing) {
+          const stage = l.crmStage ?? "new";
+          counts[stage] = Math.max(0, (counts[stage] ?? 0) - 1);
+        }
+      }
+      return {
+        ...b,
+        leads: b.leads.filter((l) => !idSet.has(l.id)),
+        leadsTotal: Math.max(
+          0,
+          (b.leadsTotal ?? b.leads.length) - removing.length,
+        ),
+        ...(counts ? { crmStageCounts: counts } : {}),
+      };
+    });
+  };
+
   const onDeleteLead = async (leadId: string) => {
     // Stop any in-flight CSV import so rows don’t reappear after delete.
     importAbortRef.current?.abort();
-    setSelectedId((cur) => (cur === leadId ? null : cur));
-    setBoard((b) =>
-      b ? { ...b, leads: b.leads.filter((l) => l.id !== leadId) } : b,
-    );
+    dropLeadsLocally([leadId]);
     try {
       await api.deleteLead(leadId);
       toast("ok", "Lead deleted.");
     } catch (e) {
+      droppedLeadIdsRef.current.delete(leadId);
       await refresh();
       toast("err", (e as Error).message);
     }
@@ -2024,18 +2097,7 @@ export function Studio() {
     importAbortRef.current?.abort();
     setDeletingLeads(true);
     setDeleteProgress({ done: 0, total: leadIds.length });
-    // Optimistic — hide rows immediately so large deletes don’t feel stuck.
-    setBoard((b) =>
-      b
-        ? {
-            ...b,
-            leads: clearingBoard
-              ? []
-              : b.leads.filter((l) => !idSet.has(l.id)),
-          }
-        : b,
-    );
-    setSelectedId((cur) => (cur && idSet.has(cur) ? null : cur));
+    dropLeadsLocally(leadIds);
     try {
       const { deleted } = await api.deleteLeads(leadIds, {
         boardId: filterBoardId,
@@ -2046,9 +2108,9 @@ export function Studio() {
         "ok",
         `Deleted ${deleted} lead${deleted === 1 ? "" : "s"}.`,
       );
-      // Confirm server state (also clears any race from a cancelled import).
       await refresh();
     } catch (e) {
+      for (const id of leadIds) droppedLeadIdsRef.current.delete(id);
       await refresh();
       toast("err", (e as Error).message);
     } finally {
