@@ -134,7 +134,7 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     (incl. full address), about blurb, CRM stage, dated notes journal
     (**Add Note** for a log line; **Follow up** pre-fills “Follow up” one week
     out and shows on Calendar; **Missed call** writes the journal line
-    immediately — no composer). Journal lines are chronological (oldest first)
+    immediately — no composer — as `Missed call by {name}`, no trailing colon). Journal lines are chronological (oldest first)
     with a kind tag (purple **Follow up**, amber **Note**, gray **Missed**).
     **Add Note** in the header matches the amber tag. Notes can be edited
     or deleted. Done-state for follow-ups is ticked on Calendar only.
@@ -210,7 +210,7 @@ the local JSON-store path is always unmetered/demo.
   (a serialized read-modify-write JSON file store, the zero-key default) and
   `D1Store` (Cloudflare D1 / SQLite, the production backend). `getDb(binding?)`
   selects D1Store when a D1Database binding is passed (Workers runtime), else
-  JsonStore. Schema lives in `migrations/` (`0001`–`0032`, Wrangler format).
+  JsonStore. Schema lives in `migrations/` (`0001`–`0033`, Wrangler format).
 - **`src/lib/search/`** — `runSearch()` uses Firecrawl (demo when no key / Load demo),
   scrapes/enriches to leads, and **falls back to demo data** on missing key or
   error. `enrich.ts` extracts emails/phones/blurb; `fit-score.ts` scores.

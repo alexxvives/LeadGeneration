@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-19 — Missed call note has no trailing colon
+- One-click missed call reused the connected-call prefix (`…by {name}: `),
+  so the journal showed `Missed call by alexxvives:`. Write
+  `Missed call by {name}` when there is no extra body. Migration **0033**
+  plus parse/heal strip a leftover trailing colon.
+
 ### 2026-08-19 — Backfill bounced addresses still on the lead
 - Bounce webhook (Aug 4–7) set `delivery_status=bounced` and reverted CRM to
   New, but strip-on-bounce landed later. Handler only ran on the *transition*

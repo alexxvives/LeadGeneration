@@ -129,7 +129,7 @@ src/lib/
   billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.
-migrations/          D1 SQL 0001–**0032** (init … strip bounced leftover emails).
+migrations/          D1 SQL 0001–**0033** (init … missed-call notes drop trailing colon).
 wrangler.jsonc, open-next.config.ts   Cloudflare Workers deploy config.
 data/                Local JSON DB (git-ignored).
 ```

@@ -70,14 +70,20 @@ export function phoneCallNotePrefix(name?: string | null): string {
 }
 
 export function missedCallNotePrefix(name?: string | null): string {
-  return `Missed call by ${callNoteActor(name)}: `;
+  return `Missed call by ${callNoteActor(name)}`;
+}
+
+/** Drop a trailing colon when the missed-call line has no extra body. */
+export function normalizeMissedCallNote(note: string): string {
+  if (!isMissedCallNote(note)) return note;
+  return note.trim().replace(/:\s*$/, "");
 }
 
 /** Strip a connected/missed call prefix so we can switch Connected ↔ Missed. */
 export function stripCallNotePrefix(note: string): string {
   return note
     .replace(/^phone call by [^:]+:\s*/i, "")
-    .replace(/^missed call by [^:]+:\s*/i, "");
+    .replace(/^missed call by [^:]+(?::\s*)?/i, "");
 }
 
 export function inferFollowUpKind(note: string): FollowUpKind {

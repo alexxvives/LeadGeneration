@@ -9,21 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Backfill bounced leftover emails)
+## ⏱️ Status — updated 2026-08-19 (Missed call note without colon)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0032** remote applied.
+**Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Bounced leads from before strip-on-bounce still had the dead address
-  (Academia Albert, Opos Madrid, Ie Preparadores, Opolengua, plus leftover
-  `to_email` on Codice / APROSAS / Quafurg / Ritual Thai).
-- Migration **0032** strips those; bounce handler is idempotent; Outreach no
-  longer treats bounced `toEmail` as a live address.
+- Missed-call journal wrote `Missed call by {name}:` (prefix leftover).
+  New lines are `Missed call by {name}`. Migration **0033** + parse/heal
+  strip a trailing colon when there is no extra body.
 
 ### Next
-1. Deploy Worker so idempotent bounce strip + Outreach `toEmail` ignore is live
-   (D1 data is already cleaned once 0032 is applied).
+1. Deploy Worker so new missed-call copy and parse-time normalize are live
+   (D1 data is already cleaned once 0033 is applied).
 
 ---
 

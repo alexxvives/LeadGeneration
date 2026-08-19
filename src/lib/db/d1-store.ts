@@ -18,7 +18,7 @@ import {
   serializeContactMethods,
 } from "@/lib/contact-methods";
 import { hydrateLaneSql } from "@/lib/lead-lanes";
-import { isContactRegisteredNote } from "@/lib/follow-ups";
+import { isContactRegisteredNote, normalizeMissedCallNote } from "@/lib/follow-ups";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -277,9 +277,9 @@ const parseFollowUps = (s: string | null | undefined): FollowUp[] => {
   try {
     const raw = JSON.parse(s ?? "[]") as unknown;
     if (!Array.isArray(raw)) return [];
-    return (raw as FollowUp[]).filter(
-      (f) => !isContactRegisteredNote(f?.note ?? ""),
-    );
+    return (raw as FollowUp[])
+      .filter((f) => !isContactRegisteredNote(f?.note ?? ""))
+      .map((f) => ({ ...f, note: normalizeMissedCallNote(f?.note ?? "") }));
   } catch {
     return [];
   }

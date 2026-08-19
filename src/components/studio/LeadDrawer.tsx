@@ -28,6 +28,7 @@ import {
   isContactRegisteredNote,
   isMissedCallNote,
   missedCallNotePrefix,
+  normalizeMissedCallNote,
   phoneCallNotePrefix,
   resolveFollowUpKind,
   todayIsoDate,
@@ -190,10 +191,12 @@ export function LeadDrawer(props: DrawerProps) {
     const collapsed = collapseEmailSentFollowUps(raw, lead.contactedByName)
       .filter((f) => !isBounceNote(f.note) && !isContactRegisteredNote(f.note))
       .map((f) => {
-        const kind = resolveFollowUpKind(f);
-        if (kind === f.kind) return f;
+        const note = normalizeMissedCallNote(f.note);
+        const kind = resolveFollowUpKind({ ...f, note });
+        if (kind === f.kind && note === f.note) return f;
         return {
           ...f,
+          note,
           kind,
           done:
             kind === "phone" || kind === "email" || kind === "note"
@@ -206,7 +209,10 @@ export function LeadDrawer(props: DrawerProps) {
     const changed =
       collapsed.length !== raw.length ||
       collapsed.some(
-        (f, i) => f.kind !== raw[i]?.kind || f.done !== raw[i]?.done,
+        (f, i) =>
+          f.kind !== raw[i]?.kind ||
+          f.done !== raw[i]?.done ||
+          f.note !== raw[i]?.note,
       );
     if (changed) {
       void props.onUpdateCrm(lead.id, { followUps: collapsed });
