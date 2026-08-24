@@ -67,5 +67,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0026 — Remove Pro Gmail mailbox send path](0026-remove-pro-gmail-mailbox.md) _(supersedes 0010; Easy Resend/Maileroo/SMTP only)_
 - [0027 — Daily send suggest is per board mailbox](0027-per-board-mailbox-warmup.md) _(amends 0021 + 0022)_
 - [0028 — Board invites never expire](0028-board-invites-never-expire.md) _(amends 0015)_
+- [0029 — Draft is Ready to Contact — no Approve step](0029-draft-is-ready-no-approve.md) _(amends constitution Art. I.1)_
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

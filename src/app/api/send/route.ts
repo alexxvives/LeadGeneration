@@ -32,11 +32,11 @@ export async function POST(req: Request) {
       skipVerify: parsed.data.skipVerify === true,
     });
     if (!result.ok) {
-      const status = result.rateLimited
-        ? 429
-        : result.error?.includes("approved")
-          ? 409
-          : 400;
+      const conflict =
+        result.error?.includes("already") ||
+        result.error?.includes("in progress") ||
+        result.error?.includes("not ready");
+      const status = result.rateLimited ? 429 : conflict ? 409 : 400;
       return NextResponse.json(
         {
           ...result,

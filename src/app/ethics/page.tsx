@@ -3,13 +3,13 @@ import { CheckIcon } from "@/components/icons";
 
 export const metadata = {
   title: "Ethics — HERMES mail",
-  description: "Human approval, rate limits, and clear from-identity.",
+  description: "Per-lead send, rate limits, and clear from-identity.",
 };
 
 const POINTS: [string, string][] = [
   [
-    "Per-lead approval",
-    "No message is ever auto-blasted. Every send needs an explicit approve.",
+    "Per-lead send",
+    "No message is ever auto-blasted. Every send needs an explicit Send click.",
   ],
   [
     "Rate limited",

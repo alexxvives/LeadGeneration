@@ -9,19 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-24 (Invites never expire)
+## ⏱️ Status — updated 2026-08-24 (Draft = Ready, no Approve)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Board invites no longer expire (ADR 0028). LUMIA pending invite to
-  `onaparadell@gmail.com` restored in prod D1 (`expires_at` far future)
-  so she can Accept on Boards with that Google account.
+- Outreach: **Contact Draft** = no draft yet; **Ready to Contact** = has
+  draft (or phone-only). Approve UI removed. Send is the per-lead gate
+  (ADR 0029). Re-draft all rewrites Ready drafts too.
 
 ### Next
-1. Deploy Worker so invite TTL removal is live (D1 already unblocks the
-   current Worker).
+1. Deploy Worker (invite TTL removal + this Outreach change).
 2. Ona: sign in as `onaparadell@gmail.com` → Boards → **Accept invite**.
 
 ---

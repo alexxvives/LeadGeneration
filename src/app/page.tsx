@@ -35,8 +35,8 @@ const FLOW = [
   },
   {
     n: "04",
-    title: "Approve",
-    body: "You say yes per lead — then it sends.",
+    title: "Send",
+    body: "You click Send per lead — then it goes out.",
     icon: CheckIcon,
   },
 ];
@@ -58,8 +58,8 @@ const CAPABILITIES = [
     icon: SparkIcon,
   },
   {
-    title: "Approve before send",
-    body: "Drafts per lead from your profile. Nothing leaves until you approve that outreach.",
+    title: "Send one at a time",
+    body: "Drafts per lead from your profile. Nothing leaves until you click Send on that outreach.",
     icon: MailIcon,
   },
   {
@@ -78,7 +78,7 @@ export default function LandingPage() {
   const required = authRequired();
 
   return (
-    <MarketingShell glow="lg" footerTagline="You approve every send.">
+    <MarketingShell glow="lg" footerTagline="You send every message.">
       {/* Hero — brand + one promise + CTA + product plane */}
       <section className="mx-auto flex min-h-[calc(100vh-5.5rem)] max-w-7xl items-center px-5 pb-16 pt-6 sm:px-8 sm:pb-20">
         <div className="grid w-full items-center gap-12 lg:grid-cols-2 lg:gap-14 xl:gap-16">
@@ -88,7 +88,7 @@ export default function LandingPage() {
               <br />
               Draft outreach.
               <br />
-              <span className="text-aurora-300">You approve every send.</span>
+              <span className="text-aurora-300">You send every message.</span>
             </h1>
             <p
               className="animate-float-up mt-6 text-lg leading-relaxed text-mist-200 sm:text-xl"
@@ -228,8 +228,8 @@ export default function LandingPage() {
           <ul className="space-y-6">
             {[
               {
-                title: "Per-lead approval",
-                body: "Status must be approved before send. There is no “blast all.”",
+                title: "Per-lead send",
+                body: "You click Send on that lead. There is no “blast all.”",
               },
               {
                 title: "Demo-safe by design",

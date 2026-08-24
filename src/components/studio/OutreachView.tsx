@@ -16,6 +16,7 @@ import {
   SendIcon,
 } from "@/components/icons";
 import { useStableDuringLoad } from "./skeletons";
+import { leadHydrateLane } from "@/lib/lead-lanes";
 
 type OutreachBucket = "review" | "ready" | "contacted";
 /** Ready-column contact-channel filter. */
@@ -67,19 +68,9 @@ function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   // No email and no phone → hide from Outreach queue.
   if (!email) return null;
 
-  // Email leads only in Contact Draft / Ready send path.
-  const o = lead.outreach;
-  if (
-    o?.status === "approved" ||
-    o?.status === "sending" ||
-    o?.status === "failed"
-  ) {
-    return "ready";
-  }
-  if (!o || o.status === "draft" || o.status === "rejected") {
-    return "review";
-  }
-  return null;
+  // Email leads: no draft → Contact Draft; saved draft → Ready (ADR 0029).
+  if (leadHydrateLane(lead, lead.outreach) === "ready") return "ready";
+  return "review";
 }
 
 /** Email lead in Contact Draft that still needs a first write (or after reject). */
@@ -90,11 +81,12 @@ export function needsOutreachDraft(lead: LeadWithOutreach): boolean {
   return !s || s === "rejected";
 }
 
-/** Email lead in Contact Draft that already has a draft to rewrite. */
+/** Email lead with a draft that Re-draft all can rewrite (includes Ready). */
 export function canRedraftOutreach(lead: LeadWithOutreach): boolean {
   if (!leadEmail(lead)) return false;
   if (isContacted(lead)) return false;
-  return lead.outreach?.status === "draft";
+  const s = lead.outreach?.status;
+  return s === "draft" || s === "approved" || s === "failed";
 }
 
 /** Company A–Z (stable). */
@@ -116,13 +108,13 @@ const BUCKET_META: Record<
 > = {
   review: {
     title: "Contact Draft",
-    hint: "Create or review a draft",
-    empty: "No email drafts waiting — approve moves them to Ready.",
+    hint: "Email leads that still need a draft",
+    empty: "Every email lead has a draft — they're in Ready to Contact.",
   },
   ready: {
     title: "Ready to Contact",
-    hint: "Approved emails & phone-only leads",
-    empty: "Approve a draft, or add a phone-only lead, to fill this column.",
+    hint: "Drafted emails & phone-only leads",
+    empty: "Draft an email in Contact Draft, or add a phone-only lead.",
   },
   contacted: {
     title: "Contacted",
@@ -143,7 +135,7 @@ function emptyCopy(
     return "No phone-only leads in Ready. Switch to All or Email.";
   }
   if (bucket === "ready" && channel === "email") {
-    return "No email-ready leads. Approve a draft in Contact Draft.";
+    return "No email-ready leads. Draft remaining emails in Contact Draft.";
   }
   if (bucket === "review") {
     const hasEmail = leads.some((l) => Boolean(leadEmail(l)));
@@ -162,9 +154,9 @@ function contactedDayHint(sentToday: number, softCap: number): string {
 }
 
 /**
- * Compact 3-column send queue: Review → Ready → Contacted.
+ * Compact 3-column send queue: Contact Draft → Ready → Contacted.
  * Phone-only leads land in Ready (no email draft required).
- * Draft/Ready: fit desc, then company A–Z. Contacted: newest send first.
+ * A saved draft is Ready; Send is the per-lead human gate (ADR 0029).
  */
 export function OutreachView({
   leads,
@@ -178,8 +170,6 @@ export function OutreachView({
   onOpenInfo,
   onOpenDraft,
   onCreateDraft,
-  onApprove,
-  onApproveAndSend,
   onSend,
   onDraftAll,
   onMarkContacted,
@@ -200,9 +190,6 @@ export function OutreachView({
   onOpenInfo: (id: string) => void;
   onOpenDraft: (id: string) => void;
   onCreateDraft: (id: string) => Promise<void>;
-  onApprove: (leadId: string) => Promise<void>;
-  /** Contact Draft: approve + send without visiting Ready. */
-  onApproveAndSend: (leadId: string) => Promise<void>;
   onSend: (outreachId: string) => void | Promise<void>;
   onDraftAll: (opts?: { redraft?: boolean }) => Promise<void>;
   onMarkContacted: (
@@ -288,8 +275,8 @@ export function OutreachView({
     [leads],
   );
   const redraftAllAvailable = useMemo(
-    () => !draftAllRemaining && leads.some(canRedraftOutreach),
-    [draftAllRemaining, leads],
+    () => leads.some(canRedraftOutreach),
+    [leads],
   );
 
   const columns: OutreachBucket[] = ["review", "ready", "contacted"];
@@ -388,30 +375,36 @@ export function OutreachView({
                       })}
                     </div>
                   ) : null}
-                  {key === "review" && (draftAllRemaining || redraftAllAvailable) ? (
+                  {key === "ready" && redraftAllAvailable ? (
                     <button
                       type="button"
-                      onClick={() =>
-                        void onDraftAll(
-                          redraftAllAvailable ? { redraft: true } : undefined,
-                        )
-                      }
+                      onClick={() => void onDraftAll({ redraft: true })}
                       disabled={busySet.has("draft-all")}
-                      title={
-                        redraftAllAvailable
-                          ? "Rewrite every Contact Draft from the active profile"
-                          : "Draft remaining email leads — they stay in Contact Draft until Approve"
-                      }
+                      title="Rewrite every drafted email from the active profile"
                       className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
                     >
                       {busySet.has("draft-all") ? (
                         <Spinner className="h-3 w-3" />
-                      ) : redraftAllAvailable ? (
+                      ) : (
                         <PencilIcon className="h-3 w-3" />
+                      )}
+                      Re-draft all
+                    </button>
+                  ) : null}
+                  {key === "review" && draftAllRemaining ? (
+                    <button
+                      type="button"
+                      onClick={() => void onDraftAll()}
+                      disabled={busySet.has("draft-all")}
+                      title="Draft remaining email leads — they move to Ready to Contact"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
+                    >
+                      {busySet.has("draft-all") ? (
+                        <Spinner className="h-3 w-3" />
                       ) : (
                         <CheckIcon className="h-3 w-3" />
                       )}
-                      {redraftAllAvailable ? "Re-draft all" : "Draft all"}
+                      Draft all
                     </button>
                   ) : null}
                 </div>
@@ -439,8 +432,6 @@ export function OutreachView({
                       onOpenInfo={() => onOpenInfo(lead.id)}
                       onOpenDraft={() => onOpenDraft(lead.id)}
                       onCreateDraft={() => onCreateDraft(lead.id)}
-                      onApprove={() => onApprove(lead.id)}
-                      onApproveAndSend={() => onApproveAndSend(lead.id)}
                       onSend={() =>
                         lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
                       }
@@ -476,8 +467,6 @@ function OutreachRow({
   onOpenInfo,
   onOpenDraft,
   onCreateDraft,
-  onApprove,
-  onApproveAndSend,
   onSend,
   onMarkContacted,
   onLogCall,
@@ -490,8 +479,6 @@ function OutreachRow({
   onOpenInfo: () => void;
   onOpenDraft: () => void;
   onCreateDraft: () => Promise<void>;
-  onApprove: () => Promise<void>;
-  onApproveAndSend: () => Promise<void>;
   onSend: () => void | Promise<void>;
   onMarkContacted: (
     method: ContactMethod,
@@ -601,9 +588,9 @@ function OutreachRow({
               aria-label={hasDraft ? "Review draft" : "Create draft"}
               title={
                 hasDraft
-                  ? "Open draft — Approve & send in the drawer"
+                  ? "Open draft"
                   : email
-                    ? "Create draft from active profile"
+                    ? "Create draft from active profile — moves to Ready"
                     : "Create draft (add email in the composer if needed)"
               }
               className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
@@ -615,40 +602,6 @@ function OutreachRow({
               ) : (
                 <PlusIcon className="h-2.5 w-2.5" />
               )}
-            </button>
-            <button
-              type="button"
-              disabled={busy || (!hasDraft && !email)}
-              onClick={() => void onApprove()}
-              aria-label="Approve draft — move to Ready"
-              title={
-                hasDraft
-                  ? "Approve only — move to Ready to contact"
-                  : email
-                    ? "Create & approve — move to Ready"
-                    : "Needs an email to draft"
-              }
-              className={`${ACTION_ICON_BTN} bg-amber-400 text-on-accent disabled:opacity-50`}
-            >
-              {busy ? <Spinner className="h-2.5 w-2.5" /> : <CheckIcon className="h-2.5 w-2.5" />}
-            </button>
-            <button
-              type="button"
-              disabled={busy || (!hasDraft && !email) || phoneOnly}
-              onClick={() => void onApproveAndSend()}
-              aria-label={
-                canSendEmail ? "Approve and send email" : "Approve and send (simulate)"
-              }
-              title={
-                phoneOnly
-                  ? "Phone-only — use Ready to log a call"
-                  : canSendEmail
-                    ? "Approve & send now"
-                    : "Approve & send (simulate)"
-              }
-              className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
-            >
-              {busy ? <Spinner className="h-2.5 w-2.5" /> : <SendIcon className="h-2.5 w-2.5" />}
             </button>
           </div>
         )}

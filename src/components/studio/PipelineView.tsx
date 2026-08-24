@@ -40,7 +40,7 @@ const MAIN_COLUMNS: {
   {
     stage: "contacted",
     title: "Contacted",
-    empty: "Send an approved email or drag a card here.",
+    empty: "Send an email or drag a card here.",
     color: "bg-amber-400",
   },
   {

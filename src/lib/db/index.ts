@@ -172,8 +172,8 @@ export interface LeadRepository {
   upsertOutreach(outreach: Outreach): Promise<Outreach>;
   updateOutreach(id: string, patch: Partial<Outreach>): Promise<Outreach | null>;
   /**
-   * Atomic send claim: `approved` → `sending` (or reclaim stuck `sending`).
-   * Returns null if another sender already claimed it.
+   * Atomic send claim: `draft`/`approved`/`failed` → `sending`
+   * (or reclaim stuck `sending`). Returns null if another sender already claimed it.
    */
   claimOutreachForSend(id: string): Promise<Outreach | null>;
   getOutreach(id: string): Promise<Outreach | null>;

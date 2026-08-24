@@ -42,7 +42,7 @@ is the implicit single-tenant used in demo/dev mode — always free and unmetere
 ### Phase 2 — Plans + usage metering ✅ done
 `src/lib/plans.ts` is the single source of truth for quotas and Stripe price-env
 names. `createAndRunSearch` checks lead credits; `sendApprovedOutreach` checks
-send quota *after* the approval gate. Over-limit throws `QuotaError` → 402, which
+send quota after the send claim. Over-limit throws `QuotaError` → 402, which
 the UI turns into an upgrade modal. Metering is gated on the D1 binding
 (`metered = !!binding`), so the local JSON-store path is always unmetered.
 
@@ -83,7 +83,7 @@ current status.
 
 These are non-negotiable (constitution Article I):
 
-- No email sends without **explicit per-lead human approval** (`outreach.status === "approved"`).
+- No email sends without an **explicit per-lead Send** (no blast; ADR 0029).
 - The app must remain **fully usable with zero API keys** (demo mode). Never
   remove the JsonStore fallback or the demo-data path.
 - **Compliance footer** (from-identity, physical address, unsubscribe placeholder)

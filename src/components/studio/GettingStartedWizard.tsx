@@ -105,7 +105,7 @@ function buildSteps(): TourStep[] {
       path: "/app",
       target: null,
       title: "Welcome to HERMES mail",
-      body: "Search a niche, review leads on the pipeline, then approve every email before it goes out. Nothing sends without you.",
+      body: "Search a niche, review leads on the pipeline, then send every email yourself. Nothing sends without you.",
     },
     {
       id: "search",
@@ -139,7 +139,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="outreach-queue"]',
       prefer: "right",
       title: "Send from Outreach",
-      body: "Draft → approve → send lives here. Call a phone-only lead or set a follow-up from the drawer — follow-ups show on Calendar.",
+      body: "Draft → Ready → Send lives here. Call a phone-only lead or set a follow-up from the drawer — follow-ups show on Calendar.",
       scrollBlock: "start",
     },
     {
@@ -166,7 +166,7 @@ function buildSteps(): TourStep[] {
       path: "/app",
       target: null,
       title: "You’re ready",
-      body: "Search a niche, approve outreach one lead at a time, and set follow-ups so Calendar reminds you.",
+      body: "Search a niche, send outreach one lead at a time, and set follow-ups so Calendar reminds you.",
     },
   ];
 }

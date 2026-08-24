@@ -13,7 +13,7 @@ import {
 export const metadata = {
   title: "How it works — HERMES mail",
   description:
-    "Search, enrich, draft, approve, send — human-in-the-loop lead generation.",
+    "Search, enrich, draft, send — human-in-the-loop lead generation.",
 };
 
 const STEPS = [
@@ -37,8 +37,8 @@ const STEPS = [
   },
   {
     n: "04",
-    title: "Approve & send",
-    body: "Nothing leaves without you. Review, edit, approve per lead, then send — rate-limited and compliant.",
+    title: "Send",
+    body: "Nothing leaves without you. Review, edit, then send per lead — rate-limited and compliant.",
     icon: CheckIcon,
   },
 ];
@@ -55,7 +55,7 @@ export default function HowItWorksPage() {
           Four steps, one steady hand
         </h1>
         <p className="mt-5 text-lg leading-relaxed text-mist-200 sm:text-xl">
-          Search → Enrich → Draft → Approve → Send. Hermes Mail does the
+          Search → Enrich → Draft → Send. Hermes Mail does the
           busywork; you stay in control of every message that leaves.
         </p>
 

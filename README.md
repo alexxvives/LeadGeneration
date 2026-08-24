@@ -3,8 +3,8 @@
 **Navigate to your next customer.** A human-in-the-loop lead generation studio.
 Describe an ideal customer in plain English → Hermes Mail searches the web,
 enriches each prospect, drafts a personalized outreach email, and
-puts every message in an approval queue. **Nothing is sent without your explicit
-per-lead approval.**
+lets you send one lead at a time. **Nothing is sent without your explicit
+per-lead Send.**
 
 Built with Next.js (App Router) + TypeScript + Tailwind. Runs fully offline in
 demo mode — no API keys required to explore the whole flow.
@@ -29,7 +29,7 @@ Open <http://localhost:3000> for the landing page, or go straight to
 
 ## The flow
 
-**Search → Enrich → Draft → Approve → Send**
+**Search → Enrich → Draft → Send**
 
 1. **Search** — Enter a niche/ICP (e.g. "dentist clinics") and optional location
    on the studio **Search** view.
@@ -37,13 +37,11 @@ Open <http://localhost:3000> for the landing page, or go straight to
    blurb.
 3. **Draft** — A personalized first email is **auto-generated for every lead** as
    part of the run. Open any lead to edit or **Regenerate** the draft.
-4. **Approve** — Review in the drawer, then **Approve** or **Reject** per lead.
-   Use **Pipeline** for CRM stages and bulk draft/approve/send.
-5. **Send** — Approved emails send via your provider, rate-limited, with a
-   compliance footer. Status: `queued → approved → sent / failed`.
+4. **Send** — Review in the drawer or Outreach **Ready to Contact**, then **Send**
+   per lead. Status: `draft → sending → sent / failed`.
 
 After a search, Hermes Mail opens **Pipeline** (kanban + leads table/cards/map).
-Nothing is sent without per-lead approval.
+Nothing is sent without a per-lead Send.
 
 ---
 

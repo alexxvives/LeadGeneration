@@ -73,7 +73,7 @@ export const PLANS: Record<PlanId, Plan> = {
     sendsPerMonth: 20,
     verifiesPerDay: 5,
     features: [
-      "Live search, draft, approve & send",
+      "Live search, draft & send",
       "50 enriched leads / month",
       "20 sends / month (bring your own sender)",
       "5 email verifies / day",

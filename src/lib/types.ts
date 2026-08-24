@@ -17,8 +17,8 @@ export type RunStatus = "pending" | "running" | "complete" | "failed";
 
 export type LeadStatus =
   | "new" // freshly discovered — CRM New = needs human review
-  | "queued" // outreach drafted (batch-approve helper); not shown as "In review"
-  | "approved" // human approved the draft, ready to send
+  | "queued" // outreach drafted; Ready to Contact until send
+  | "approved" // send-claim / post-send-attempt; not a separate UI step
   | "sent" // email dispatched
   | "rejected" // verify cleanup / undeliverable (no UI "reject draft" action)
   | "failed"; // transport error after a send attempt
@@ -73,13 +73,13 @@ export interface FollowUp {
 }
 
 export type OutreachStatus =
-  | "draft"
-  | "approved"
+  | "draft" // has copy — Ready to Contact (ADR 0029)
+  | "approved" // claimed or retried send; same Ready lane as draft
   /** Atomic send claim — in flight; heals back to approved if stuck. */
   | "sending"
   | "rejected" // verify undeliverable cleanup (not a human "reject draft")
   | "sent"
-  | "failed"; // transport error — retry via Send (re-approves)
+  | "failed"; // transport error — retry via Send
 
 /**
  * Post-send delivery outcome. Manual stub today; Resend/SMTP webhooks can write

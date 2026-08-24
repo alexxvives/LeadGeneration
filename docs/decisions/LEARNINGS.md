@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-24 — Contact Draft = no draft; Ready = has draft (no Approve)
+- A `draft` status stayed in Contact Draft until Approve, so drafted copy
+  never showed in Ready. Re-draft all only targeted Contact Draft `draft`
+  rows, so Ready emails were skipped.
+- Lanes now treat `draft|approved|sending|failed` as Ready. Send claims
+  those statuses (ADR 0029). Draft all still fills missing copy; Re-draft
+  all sits on Ready and rewrites existing drafts.
+
 ### 2026-08-24 — Board invites hid after 14 days while still pending
 - `listPendingInvitesForEmail` filtered `expires_at > now`, and accept
   revoked expired rows. Owner Boards still listed them (no expiry

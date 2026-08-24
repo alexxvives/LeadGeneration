@@ -6,7 +6,6 @@ import type { Capabilities } from "@/lib/config";
 import { CrmStagePill, Spinner } from "@/components/ui";
 import {
   ArrowIcon,
-  CheckIcon,
   BuildingIcon,
   GlobeIcon,
   MailIcon,
@@ -75,7 +74,6 @@ interface DrawerProps {
     patch: { subject: string; body: string; toEmail: string | null },
     opts?: { silent?: boolean },
   ) => Promise<void>;
-  onDecide: (outreachId: string, decision: "approved" | "rejected") => Promise<void>;
   /** Returns true when the email was actually sent (drawer should close). */
   onSend: (outreachId: string) => Promise<boolean | void>;
   onSetDelivery: (outreachId: string, deliveryStatus: DeliveryStatus) => Promise<void>;
@@ -401,7 +399,7 @@ export function LeadDrawer(props: DrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/lead only
   }, [lead.id]);
 
-  /** Persist composer fields before approve/send so edits aren't lost. */
+  /** Persist composer fields before send so edits aren't lost. */
   const persistIfDirty = async () => {
     if (!outreach || !dirty) return;
     await props.onSaveDraft(
@@ -612,7 +610,7 @@ export function LeadDrawer(props: DrawerProps) {
     await props.onUpdateCrm(lead.id, { followUps: updated });
   };
 
-  /** Recipient required; draft→approved is handled inside onSend. */
+  /** Recipient required; Send is the per-lead human gate. */
   const canSend = Boolean(toEmail.trim());
   const sent = outreach?.status === "sent";
 
@@ -1370,8 +1368,8 @@ export function LeadDrawer(props: DrawerProps) {
                 {!sent && registerOnly ? (
                   <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-mist-400">
                     Pipeline already marks this lead as contacted — use the
-                    channels above to register how you reached them. Approve /
-                    send stay available only for New → Ready email flow.
+                    channels above to register how you reached them. Send stays
+                    available only for New → Ready email flow.
                   </p>
                 ) : null}
 
@@ -1395,31 +1393,11 @@ export function LeadDrawer(props: DrawerProps) {
                       {busy === "save" ? <Spinner className="h-3.5 w-3.5" /> : null}
                       Save draft
                     </button>
-                    {outreach.status !== "approved" ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          run("approve", async () => {
-                            await persistIfDirty();
-                            await props.onDecide(outreach.id, "approved");
-                          })
-                        }
-                        disabled={busy === "approve" || busy === "send"}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-105 disabled:opacity-50"
-                      >
-                        {busy === "approve" ? (
-                          <Spinner className="h-3.5 w-3.5" />
-                        ) : (
-                          <CheckIcon className="h-4 w-4" />
-                        )}
-                        Approve
-                      </button>
-                    ) : null}
                     <button
                       type="button"
                       onClick={() =>
                         void (async () => {
-                          if (busy === "send" || busy === "approve") return;
+                          if (busy === "send") return;
                           try {
                             await persistIfDirty();
                           } catch {
@@ -1430,18 +1408,12 @@ export function LeadDrawer(props: DrawerProps) {
                           void props.onSend(outreach.id);
                         })()
                       }
-                      disabled={!canSend || busy === "send" || busy === "approve"}
+                      disabled={!canSend || busy === "send"}
                       title={!toEmail ? "Add a recipient email first" : undefined}
                       className="inline-flex items-center gap-1.5 rounded-full bg-aurora-400 px-5 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-105 disabled:opacity-50"
                     >
                       <ArrowIcon className="h-4 w-4" />
-                      {outreach.status === "approved"
-                        ? capabilities.canSendEmail
-                          ? "Send email"
-                          : "Send (simulate)"
-                        : capabilities.canSendEmail
-                          ? "Approve & send"
-                          : "Approve & send (simulate)"}
+                      {capabilities.canSendEmail ? "Send email" : "Send (simulate)"}
                     </button>
                   </div>
                 )}

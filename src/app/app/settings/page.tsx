@@ -266,7 +266,7 @@ export default async function SettingsPage() {
             <HelpIcon className="h-5 w-5 shrink-0 text-mist-500" />
             <div className="min-w-0 flex-1">
               <p className="font-medium">How it works</p>
-              <p className="text-sm text-mist-500">Search, enrich, approve, send — the full walkthrough.</p>
+              <p className="text-sm text-mist-500">Search, enrich, draft, send — the full walkthrough.</p>
             </div>
             <span className="text-mist-500">→</span>
           </Link>

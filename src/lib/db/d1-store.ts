@@ -1506,7 +1506,7 @@ export class D1Store implements LeadRepository {
          SET status = 'sending', error = NULL, updated_at = ?
          WHERE id = ? AND workspace_id = ?
            AND (
-             status = 'approved'
+             status IN ('draft', 'approved', 'failed')
              OR (status = 'sending' AND updated_at < ?)
            )`,
       )

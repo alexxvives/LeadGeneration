@@ -16,7 +16,7 @@ const COMPANY = [
  * Shared marketing footer — brand + link columns + short tagline.
  */
 export function SiteFooter({
-  tagline = "You approve every send.",
+  tagline = "You send every message.",
 }: {
   tagline?: string;
 }) {

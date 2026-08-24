@@ -787,7 +787,9 @@ export class JsonStore implements LeadRepository {
       const stuckBefore = Date.now() - 2 * 60_000;
       const updatedMs = Date.parse(o.updatedAt || "") || 0;
       const canClaim =
+        o.status === "draft" ||
         o.status === "approved" ||
+        o.status === "failed" ||
         (o.status === "sending" && updatedMs < stuckBefore);
       if (!canClaim) return { data, result: null };
       const now = new Date().toISOString();

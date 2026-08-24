@@ -41,7 +41,7 @@ export function EmptyState({
       <SparkIcon className="mx-auto h-7 w-7 text-aurora-300" />
       <h2 className="mt-3 font-display text-xl font-semibold text-mist-100">Your board is clear</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-mist-300">
-        Search a niche, import a list, or add a lead by hand — then approve and send one at a time.
+        Search a niche, import a list, or add a lead by hand — then send one at a time.
       </p>
       <Link
         href={actionHref}

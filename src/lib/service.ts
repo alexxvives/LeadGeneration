@@ -1317,13 +1317,13 @@ export interface SendOutcome {
 }
 
 /**
- * Send a single APPROVED outreach. Enforces (in order):
- *  - atomic claim approved→sending (prevents double-send)
+ * Send a single drafted outreach. Enforces (in order):
+ *  - atomic claim draft|approved|failed → sending (prevents double-send)
  *  - a valid recipient
  *  - email verify (optional) — soft-block on Invalid, strip only hard junk
  *  - monthly send quota (metered workspaces only) — throws QuotaError → 402
  *  - rate limiting
- * Studio Send may auto-approve a draft first (per-lead human gate = Send click).
+ * Human gate is the per-lead Send click (ADR 0029) — no separate Approve step.
  */
 export async function sendApprovedOutreach(
   ctx: Ctx,
@@ -1341,7 +1341,7 @@ export async function sendApprovedOutreach(
     if (existing.status === "sending") {
       return { ok: false, error: "Send already in progress", outreach: existing };
     }
-    return { ok: false, error: "Outreach must be approved before sending" };
+    return { ok: false, error: "Outreach is not ready to send" };
   }
 
   const releaseClaim = async (error?: string | null) => {
@@ -1596,7 +1596,7 @@ export async function sendApprovedOutreach(
     };
   }
 
-  // Transport error — mark failed so Email Status is honest; Send retries via approve.
+  // Transport error — mark failed so Email Status is honest; Send retries.
   const updated = await db.updateOutreach(outreachId, {
     status: "failed",
     error: result.error ?? "Unknown send error",

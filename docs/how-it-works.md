@@ -10,12 +10,12 @@ instructions see [`../README.md`](../README.md); for principles see
 
 You describe an ideal customer; Hermes Mail finds matching businesses on the web,
 enriches each with contact info, writes a personalized first email
-for each, and lets you review, approve, and send — one lead at a time.
+for each, and lets you review and send — one lead at a time.
 
-## 2. The five-step flow
+## 2. The four-step flow
 
 ```
-Search  →  Enrich  →  Draft  →  Approve  →  Send
+Search  →  Enrich  →  Draft  →  Send
 ```
 
 1. **Search** — On the studio **Search** view you enter a **niche/ICP** (e.g.
@@ -32,21 +32,17 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
    name** (Settings), passed via the API — the server never reads browser storage.
    Sign-off / from-identity come from Settings (and env defaults). Bodies stay
    natural — no STOP / mailing-address auto-footer (ADR 0012).
-4. **Approve** — Open a lead (pipeline card, table row, or map pin) to see the
-   detail drawer. Edit subject/body/recipient, then **Approve**. There is no
-   Reject-draft control — only clear junk (disposable / no-reply) is stripped
-   at verify; soft “Invalid” keeps the address and offers **Send anyway**.
-   Nothing sends on approval alone. **Outreach → Draft all** writes drafts
-   into Contact Draft (still needs Approve); **send stays per-lead** (Art. I.1).
-5. **Send** — From the drawer, Approve then Send. From the Outreach queue,
-   Send may auto-approve the draft first (the click is the per-lead human
-   gate). Soft verify blocks show a confirm modal; hard junk removes the
-   address. Status flows `draft → approved → sending → sent` (or `failed`).
-   Successful send advances CRM stage to **Contacted**.
+4. **Send** — From Ready to Contact or the drawer, **Send** on that lead. Soft
+   verify blocks show a confirm modal; hard junk removes the address. Status
+   flows `draft → sending → sent` (or `failed`; retry Send). Successful send
+   advances CRM stage to **Contacted**. Nothing sends without that click.
+   **Outreach → Draft all** writes missing drafts into Ready; **Re-draft all**
+   rewrites Ready copy from the active profile. **Send stays per-lead**
+   (Art. I.1 / ADR 0029).
 
 ## 3. Screens
 
-- **`/` Landing** — full-bleed aurora hero, the five steps, and the ethics/
+- **`/` Landing** — full-bleed aurora hero, the four steps, and the ethics/
   compliance section. Brand-first marketing view. Public.
 - **`/pricing`** — the four plans (Free / Starter / Pro / Agency) with Stripe
   Checkout CTAs. Public.
@@ -85,7 +81,7 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
   - **Pipeline** (`?view=pipeline`) — CRM kanban for the active board filter
     (**All** = every board) across four active stages (*New · Contacted · In
     Conversation · Closed*) plus *Not Interested*. Drag cards between columns.
-    Bulk draft lives on **Outreach** (Approve stays per-lead).
+    Bulk draft lives on **Outreach** (Send stays per-lead).
     CRM **New** = needs human review (there is no separate “In review” tag).
     A **Missed call** stays in New but still shows the phone method icon
     (it does not count as Contacted).
@@ -97,22 +93,19 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     when available (or a Google search plan-B when no website). Map pins
     accumulate as the board hydrates; zoom/pan stay put until you change board.
 
-  - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (icon
-    actions: create/review, approve, send; unapproved drafts stay here) →
-    **Ready** (after Approve; send or call as icons) → **Contacted**.
+  - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (email
+    leads with no draft yet; **Draft all** writes them) → **Ready** (has a
+    draft, or phone-only; send or call as icons; **Re-draft all** rewrites
+    email copy) → **Contacted**.
     Phone-only Ready rows open a call log without leaving Ready. **Save** or
     **Skip details** marks Contacted; **Missed call** journals the miss and
     stays in Ready.
     The same miss path exists from the lead’s **Notes**.
-    **Draft all** writes drafts for email leads that still need one and
-    leaves them in Contact Draft until Approve. Once every Contact Draft
-    row already has a draft, the button becomes **Re-draft all** (rewrites
-    from the active profile). Closing the draft drawer
-    without Approve does not advance. The sidebar Board picker activates that
+    Closing the draft drawer does not send. The sidebar Board picker activates that
     board’s linked outreach profile. Contacted **N sent today · ~Y/day suggest**
     is that board’s mailbox (boards that share an outreach profile share the
-    cap) — not a workspace total. Send remains per-lead after approve
-    (constitution Art. I.1).
+    cap) — not a workspace total. Send remains per-lead
+    (constitution Art. I.1 / ADR 0029).
 
   - **Calendar** (`?view=calendar`) — month view of the active board filter.
     Each day lists **follow-ups** (dated reminders from **Follow up**),
@@ -290,7 +283,9 @@ first visit so switching back is instant.
 
 ## 6. Guardrails baked into the flow
 
-- `sendApprovedOutreach` refuses anything not `approved` (returns 409 via the API).
+- `sendApprovedOutreach` claims `draft`/`approved`/`failed` (returns 409 if
+  already sent, in flight, or not ready). There is no separate Approve
+  step — the Send click is the gate (ADR 0029).
 - Rate limiter blocks bursts (429) and protects deliverability.
 - Contact-form automation (`/api/contact-form`) is a stub: 403 unless the
   off-by-default flag is set, and even then it only *simulates*.

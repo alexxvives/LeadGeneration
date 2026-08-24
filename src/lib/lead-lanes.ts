@@ -19,6 +19,18 @@ export type LeadHydrateLane = (typeof LEAD_HYDRATE_LANES)[number];
 /** First + later pages: this many rows from each lane. */
 export const LEAD_PAGE_PER_LANE = 50;
 
+/** CRM New + a saved draft (or phone-only) → Outreach Ready to Contact. */
+export function isOutreachReadyStatus(
+  status: Outreach["status"] | undefined,
+): boolean {
+  return (
+    status === "draft" ||
+    status === "approved" ||
+    status === "sending" ||
+    status === "failed"
+  );
+}
+
 export function leadHydrateLane(
   lead: Pick<Lead, "crmStage" | "emails" | "phones">,
   outreach?: Pick<Outreach, "status" | "toEmail"> | null,
@@ -27,8 +39,7 @@ export function leadHydrateLane(
   if (stage !== "new") return stage;
   const email = (outreach?.toEmail ?? lead.emails[0] ?? "").trim();
   const phone = (lead.phones[0] ?? "").trim();
-  const st = outreach?.status;
-  if (st === "approved" || st === "sending" || st === "failed") return "ready";
+  if (isOutreachReadyStatus(outreach?.status)) return "ready";
   if (!email && phone) return "ready";
   return "draft";
 }
@@ -38,7 +49,7 @@ export function hydrateLaneSql(lane: LeadHydrateLane): string {
   const stage = `COALESCE(NULLIF(l.crm_stage, ''), 'new')`;
   const hasEmail = `(TRIM(COALESCE(o.to_email, '')) != '' OR (l.emails IS NOT NULL AND l.emails NOT IN ('', '[]', 'null')))`;
   const hasPhone = `(l.phones IS NOT NULL AND l.phones NOT IN ('', '[]', 'null'))`;
-  const isReady = `(o.status IN ('approved', 'sending', 'failed') OR (NOT ${hasEmail} AND ${hasPhone}))`;
+  const isReady = `(o.status IN ('draft', 'approved', 'sending', 'failed') OR (NOT ${hasEmail} AND ${hasPhone}))`;
   if (lane === "draft") return `${stage} = 'new' AND NOT ${isReady}`;
   if (lane === "ready") return `${stage} = 'new' AND ${isReady}`;
   const crm: CrmStage = lane;

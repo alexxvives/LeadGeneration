@@ -21,7 +21,7 @@ this repository. Read it first. It is intentionally short: the details live in
 ## What this project is
 
 **HERMES mail** — a human-in-the-loop lead-generation studio. Search a niche →
-enrich prospects → auto-draft outreach → human approves per lead → send.
+enrich prospects → auto-draft outreach → human sends per lead.
 Next.js (App Router) + TypeScript + Tailwind, local JSON file DB behind a
 repository interface, provider-agnostic search (Firecrawl) and email
 (Resend/SMTP), all with a zero-key demo mode.
@@ -54,9 +54,9 @@ Also see [`README.md`](README.md) for setup/run instructions.
 2. **Keep the layering intact.** UI → API routes → `src/lib/service.ts` →
    repository/providers. Never let UI or routes talk to the DB or providers
    directly. See the constitution for the dependency rule.
-3. **Never break the two hard invariants:** (a) email only sends from an
-   explicitly **approved** outreach, and (b) the app must fully work with **no
-   API keys** (demo mode). Add tests/guards, don't remove them.
+3. **Never break the two hard invariants:** (a) email only sends when a human
+   clicks **Send** on that lead (no blast; ADR 0029), and (b) the app must fully
+   work with **no API keys** (demo mode). Add tests/guards, don't remove them.
 4. **Types first.** Update `src/lib/types.ts` and let types flow outward.
 5. **Verify before you finish:** `npx tsc --noEmit`, `npm run lint`, and — if a
    dev server is up — `npm run smoke`.

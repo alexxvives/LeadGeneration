@@ -10,9 +10,11 @@ it, or amend this constitution first (with reasoning recorded in
 
 ## Article I — Product invariants (never break these)
 
-1. **Human in the loop, always.** No email is ever sent without an explicit,
-   per-lead human approval. There is no "auto-blast", no "approve all + send"
-   that skips the approval state. Sending requires `outreach.status === "approved"`.
+1. **Human in the loop, always.** No email is ever sent without an explicit
+   per-lead **Send**. There is no "auto-blast" or "send all". A saved draft
+   is Ready to Contact; sending still requires a human click on that lead.
+   There is no separate Approve step (ADR 0029). The send claim accepts
+   `draft`, `approved`, or `failed`.
 2. **Works with zero API keys.** The entire app must remain fully usable in
    **demo mode** with no external services. Every integration degrades
    gracefully to a local fallback (sample leads, simulated sends). Never make a

@@ -1,6 +1,6 @@
 // Headless smoke test of the core HERMES mail flow against a running dev server.
 // Usage: start `npm run dev` in one terminal, then `npm run smoke` in another.
-// Exercises: create run → draft → approve → send, plus key guardrails.
+// Exercises: create run → draft → send, plus key guardrails.
 
 const BASE = process.env.SMOKE_BASE_URL || "http://localhost:3000";
 // When auth is enforced (production-like), the smoke test authenticates via a
@@ -66,28 +66,21 @@ async function main() {
   check("draft created", draft.status === 201 && draft.body.outreach?.status === "draft");
   const outreachId = draft.body.outreach.id;
 
-  console.log("4. Guardrail: cannot send before approval");
-  const early = await json("/api/send", {
-    method: "POST",
-    body: JSON.stringify({ outreachId }),
-  });
-  check("send blocked pre-approval (409)", early.status === 409, `got ${early.status}`);
-
-  console.log("5. Approve");
-  const approve = await json(`/api/outreach/${outreachId}`, {
-    method: "PATCH",
-    body: JSON.stringify({ decision: "approved" }),
-  });
-  check("approved", approve.body.outreach?.status === "approved");
-
-  console.log("6. Send approved");
+  console.log("4. Send from draft");
   const send = await json("/api/send", {
     method: "POST",
-    body: JSON.stringify({ outreachId }),
+    body: JSON.stringify({ outreachId, skipVerify: true }),
   });
   check("send ok", send.body.ok === true, JSON.stringify(send.body));
 
-  console.log("7. Guardrail: contact-form automation off by default");
+  console.log("5. Guardrail: cannot send twice");
+  const again = await json("/api/send", {
+    method: "POST",
+    body: JSON.stringify({ outreachId, skipVerify: true }),
+  });
+  check("second send blocked (409)", again.status === 409, `got ${again.status}`);
+
+  console.log("6. Guardrail: contact-form automation off by default");
   const cf = await json("/api/contact-form", {
     method: "POST",
     body: JSON.stringify({ url: "https://example.com", message: "hi" }),

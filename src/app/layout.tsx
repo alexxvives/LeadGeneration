@@ -27,7 +27,7 @@ const syne = Syne({
 export const metadata: Metadata = {
   title: "HERMES mail — Find, draft, deliver",
   description:
-    "A human-in-the-loop lead studio. Search a niche, enrich prospects, draft outreach, approve, and send — on your terms.",
+    "A human-in-the-loop lead studio. Search a niche, enrich prospects, draft outreach, and send — on your terms.",
 };
 
 /** Prevent theme flash before React hydrates. Light only on /app (studio). */

@@ -1330,23 +1330,6 @@ export function Studio() {
     }
   };
 
-  /** Yellow arrow: approve (create draft first if missing) → Ready. */
-  const approveContactDraft = async (leadId: string) => {
-    markOutreachBusy(leadId);
-    try {
-      const lead = board?.leads.find((l) => l.id === leadId);
-      let outreachId = lead?.outreach?.id ?? null;
-      if (!outreachId) {
-        outreachId = await onDraft(leadId);
-        if (!outreachId) return;
-      }
-      await onDecide(outreachId, "approved", { silent: true });
-      toast("ok", "Approved — moved to Ready to contact.");
-    } finally {
-      clearOutreachBusy(leadId);
-    }
-  };
-
   const closeLeadDrawer = useCallback(() => {
     setDrawerPromptNote(false);
     setSelectedId(null);
@@ -1476,8 +1459,8 @@ export function Studio() {
       }
       if (err.undeliverableRemoved || /isn.?t real|can.?t receive mail|undeliverable/i.test(msg)) {
         toast("err", msg);
-      } else if (/must be approved/i.test(msg)) {
-        toast("err", "Approve the draft first, then send. (If a prior send failed, re-approve and retry.)");
+      } else if (/not ready to send/i.test(msg)) {
+        toast("err", "Draft this lead first, then send.");
       } else if (/domain|verified|from/i.test(msg)) {
         toast(
           "err",
@@ -1524,11 +1507,11 @@ export function Studio() {
 
   /** Real delivery needs a provider; otherwise confirm simulate-or-settings. */
   const requestSend = async (outreachId: string): Promise<boolean> => {
-    // Send click is the per-lead human gate — promote draft → approved first.
+    // Per-lead Send click is the human gate (ADR 0029).
     const lead = findLeadByOutreach(outreachId);
     const st = lead?.outreach?.status;
     if (st === "sending") return false; // claim already in flight
-    if (st === "draft" || st === "rejected" || st === "failed") {
+    if (st === "rejected") {
       await onDecide(outreachId, "approved", { silent: true });
     }
     if (!board?.capabilities.canSendEmail) {
@@ -1547,23 +1530,6 @@ export function Studio() {
     // Soft daily warmup recommend is non-blocking (Outreach Contacted column
     // hint only) — never interrupt Send with a modal.
     return runSend(outreachId);
-  };
-
-  /** Contact Draft aurora: create draft if needed, approve, send in one step. */
-  const approveAndSendContactDraft = async (leadId: string) => {
-    markOutreachBusy(leadId);
-    try {
-      const lead = board?.leads.find((l) => l.id === leadId);
-      let outreachId = lead?.outreach?.id ?? null;
-      if (!outreachId) {
-        outreachId = await onDraft(leadId);
-        if (!outreachId) return;
-      }
-      // Fire send without holding the whole queue — verify/send toasts update in background.
-      void requestSend(outreachId);
-    } finally {
-      clearOutreachBusy(leadId);
-    }
   };
 
   const confirmSimulateSend = async () => {
@@ -1806,7 +1772,7 @@ export function Studio() {
         ),
       );
       const unit = `draft${ok === 1 ? "" : "s"}`;
-      const verb = redraft ? "rewritten" : "ready for approval";
+      const verb = redraft ? "rewritten" : "moved to Ready to Contact";
       if (ac.signal.aborted) {
         toast(
           "ok",
@@ -2205,7 +2171,7 @@ export function Studio() {
                   : view === "leads"
                     ? "All prospects on this board — filter, edit, and export."
                     : view === "outreach"
-                      ? "Draft, approve, and send outreach one lead at a time."
+                      ? "Draft and send outreach one lead at a time."
                       : view === "calendar"
                         ? "Follow-ups, emails sent, and phone calls — day by day."
                       : view === "runs"
@@ -2668,8 +2634,6 @@ export function Studio() {
               onOpenInfo={openInfo}
               onOpenDraft={openDraft}
               onCreateDraft={createAndOpenDraft}
-              onApprove={approveContactDraft}
-              onApproveAndSend={approveAndSendContactDraft}
               onSend={(outreachId) => {
                 // Non-blocking: verify/send continue while user works other leads.
                 void requestSend(outreachId);
@@ -2740,7 +2704,6 @@ export function Studio() {
           onPromptNoteDone={() => setDrawerPromptNote(false)}
           onDraft={onDraft}
           onSaveDraft={onSaveDraft}
-          onDecide={onDecide}
           onSend={requestSend}
           onSetDelivery={onSetDelivery}
           onUpdateCrm={onUpdateLeadCrm}

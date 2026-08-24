@@ -92,7 +92,7 @@ async function sendWithResendKey(
 }
 
 /**
- * Send a single already-approved email.
+ * Send a single drafted email.
  *
  * Easy path: workspace Resend / Maileroo / SMTP (selected provider; no
  * cross-fallback). Then (no workspace Easy key): platform Resend → SMTP → demo.
