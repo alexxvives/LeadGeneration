@@ -325,6 +325,17 @@ export function StudioShell({
     }[];
   }[] = [
     {
+      label: "Overview",
+      items: [
+        {
+          href: "/app?view=dashboard",
+          label: "Dashboard",
+          icon: DashboardIcon,
+          active: onApp && displayView === "dashboard",
+        },
+      ],
+    },
+    {
       label: "Find",
       items: [
         {
@@ -378,12 +389,6 @@ export function StudioShell({
           label: "Runs",
           icon: HistoryIcon,
           active: onApp && displayView === "runs",
-        },
-        {
-          href: "/app?view=dashboard",
-          label: "Dashboard",
-          icon: DashboardIcon,
-          active: onApp && displayView === "dashboard",
         },
       ],
     },
@@ -461,7 +466,7 @@ export function StudioShell({
           {navSections.map((section) => (
             <div key={section.label} className="flex flex-col gap-1">
               <p
-                className={`mb-0.5 px-3 text-xs uppercase tracking-wider text-mist-500 ${
+                className={`mb-0.5 px-3 text-[0.9rem] uppercase tracking-wider text-mist-500 ${
                   wide ? "hidden sm:block" : "hidden"
                 }`}
               >
@@ -480,7 +485,7 @@ export function StudioShell({
                     href={boardHref(item.href)}
                     onClick={() => setPendingNavView(viewKey)}
                     title={item.label}
-                    className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
+                    className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[1.05rem] font-medium transition-colors ${
                       wide ? "justify-center sm:justify-start" : "justify-center"
                     } ${
                       item.active
@@ -543,10 +548,10 @@ export function StudioShell({
                   {signedIn ? (displayName?.[0] ?? userEmail?.[0] ?? "U").toUpperCase() : "G"}
                 </div>
                 <div className="min-w-0 flex-1 leading-tight">
-                  <p className="truncate text-[13px] font-medium text-mist-100">
+                  <p className="truncate text-[16px] font-medium text-mist-100">
                     {signedIn ? (displayName ?? userEmail ?? "Account") : "Guest"}
                   </p>
-                  <p className="truncate text-[11px] text-mist-500">
+                  <p className="truncate text-[13px] text-mist-500">
                     {signedIn && userEmail && displayName
                       ? userEmail
                       : "Settings"}

@@ -236,6 +236,12 @@ export const api = {
       method: "POST",
     }),
 
+  takeoverBoardLock: (boardId: string) =>
+    jsonFetch<{ lock: BoardLock }>(`/api/boards/${boardId}/lock`, {
+      method: "POST",
+      body: JSON.stringify({ takeover: true }),
+    }),
+
   releaseBoardLock: (boardId: string) =>
     jsonFetch<{ ok: boolean }>(`/api/boards/${boardId}/lock`, {
       method: "DELETE",

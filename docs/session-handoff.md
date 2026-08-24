@@ -9,18 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-24 (Draft = Ready, no Approve)
+## ⏱️ Status — updated 2026-08-24 (studio chrome)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Outreach: **Contact Draft** = no draft yet; **Ready to Contact** = has
-  draft (or phone-only). Approve UI removed. Send is the per-lead gate
-  (ADR 0029). Re-draft all rewrites Ready drafts too.
+- Board lock: compact **Live** chip + **Take control** (ADR 0030).
+- Note delete: Undo in the notes panel + toast (~8s).
+- Header meters: Sends removed; Insider Leads hidden when Firecrawl credits
+  cannot be read (no more “Credits unavailable” in the top bar).
+- Sidebar: Dashboard first; nav type ~20% larger.
 
 ### Next
-1. Deploy Worker (invite TTL removal + this Outreach change).
+1. Deploy Worker so production matches this chrome.
 2. Ona: sign in as `onaparadell@gmail.com` → Boards → **Accept invite**.
 
 ---

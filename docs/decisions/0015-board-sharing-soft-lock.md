@@ -12,8 +12,9 @@ coordination.
 - Boards stay owned by the creator’s workspace (quotas stay on the owner).
 - `board_members` + `board_invites` (in-app accept by matching email; platform
   Resend/SMTP also sends a best-effort invite email when configured).
-- Soft lock: `board_locks` with ~45s heartbeat / ~2.5m TTL. Another user’s edits
-  return 423; view remains allowed. UI shows who holds the board.
+- Soft lock: `board_locks` with ~20s heartbeat / ~2.5m TTL. Another user’s edits
+  return 423; view remains allowed. UI shows a Live chip; **Take control**
+  steals the lock (ADR 0030).
 - Shared boards appear in the invitee’s board list; lead reads/writes re-scope
   the repository to the owner workspace via `Ctx.scopeToWorkspace`.
 

@@ -1837,3 +1837,16 @@ live product preview (map + pipeline) ? dropped missing hero image dependency.
   button; Off keeps the form and disables submit.
 - `PasswordField` forced `autoComplete="new-password"` after props spread, so
   sign-in never got `current-password` / email autocomplete.
+
+### 2026-08-24 — Studio chrome: lock chip, credits, notes undo
+- Insider “Credits unavailable” in the center meter is Firecrawl’s credit-usage
+  API returning null (no key, 4xx, or unparsed body) — not “you’re out.” Header
+  hides the Leads meter when remaining is null instead of showing that copy.
+  Fetch now tries `/v2/team/credit-usage` then v1.
+- Exclusive board lock stays; UI is a Live chip + **Take control** (ADR 0030).
+  `rememberDroppedFollowUps` must drop ids that reappear so note-delete Undo
+  is not wiped by the next poll.
+- Note-delete Undo must live on **Studio**, not LeadDrawer local state. After
+  PATCH the drawer can remount (lead snapshot / journal heal); drawer-only
+  undo vanished and the overlay hid sibling toasts (`main` is overflow-hidden).
+  Parent banner + body-portaled toast with Undo.

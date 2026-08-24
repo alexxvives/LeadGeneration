@@ -53,7 +53,7 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0012 — Natural email bodies — no STOP footer](0012-natural-email-bodies-no-stop-footer.md) _(amends constitution Art. I.3)_
 - [0013 — Pitch AI: no heuristic fallback](0013-pitch-ai-no-heuristic-fallback.md)
 - [0014 — First-class Boards for lead collections](0014-boards.md) _(amended by [0023](0023-no-auto-default-board.md) — no auto Default)_
-- [0015 — Board sharing with soft presence lock](0015-board-sharing-soft-lock.md) _(invite TTL removed by [0028](0028-board-invites-never-expire.md))_
+- [0015 — Board sharing with soft presence lock](0015-board-sharing-soft-lock.md) _(invite TTL removed by [0028](0028-board-invites-never-expire.md); take-control UI in [0030](0030-board-lock-take-control.md))_
 - [0016 — MyEmailVerifier is the primary email verify provider](0016-myemailverifier-primary-verify.md) _(amends 0009 verify path; **Zeruh removed by [0024](0024-remove-zeruh-verify.md)**)_
 - [0017 — Hidden Insider plan with shared free-credit pool](0017-insider-shared-free-pool.md) _(credit display amended by [0018](0018-insider-raw-firecrawl-credits.md))_
 - [0018 — Insider shows raw Firecrawl remaining credits](0018-insider-raw-firecrawl-credits.md)
@@ -68,5 +68,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0027 — Daily send suggest is per board mailbox](0027-per-board-mailbox-warmup.md) _(amends 0021 + 0022)_
 - [0028 — Board invites never expire](0028-board-invites-never-expire.md) _(amends 0015)_
 - [0029 — Draft is Ready to Contact — no Approve step](0029-draft-is-ready-no-approve.md) _(amends constitution Art. I.1)_
+- [0030 — Board lock: Live chip + take control](0030-board-lock-take-control.md) _(amends 0015)_
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

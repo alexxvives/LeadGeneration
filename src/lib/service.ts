@@ -551,6 +551,30 @@ export async function heartbeatBoardLock(
   return ctx.db.upsertBoardLock(lock);
 }
 
+/**
+ * Steal the soft lock. The previous holder loses edit rights on their next
+ * heartbeat (ADR 0030). Used when a collaborator clicks Take control.
+ */
+export async function takeoverBoardLock(
+  ctx: Ctx,
+  boardId: string,
+): Promise<BoardLock> {
+  if (!ctx.userId) throw new Error("Sign in required");
+  const access = await resolveBoardAccess(ctx, boardId);
+  if (!access) throw new NotFoundError("Board not found");
+
+  await ctx.db.clearBoardLock(boardId);
+  const now = nowIso();
+  const lock: BoardLock = {
+    boardId,
+    userId: ctx.userId,
+    userName: ctx.userName,
+    lockedAt: now,
+    expiresAt: new Date(Date.now() + LOCK_TTL_MS).toISOString(),
+  };
+  return ctx.db.upsertBoardLock(lock);
+}
+
 export async function releaseBoardLock(
   ctx: Ctx,
   boardId: string,

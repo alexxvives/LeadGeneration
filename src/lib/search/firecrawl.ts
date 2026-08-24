@@ -14,7 +14,11 @@ import type { PageResult, SearchProvider } from "./providers";
 
 const FIRECRAWL_SEARCH = "https://api.firecrawl.dev/v1/search";
 const FIRECRAWL_SCRAPE = "https://api.firecrawl.dev/v1/scrape";
-const FIRECRAWL_CREDITS = "https://api.firecrawl.dev/v1/team/credit-usage";
+/** v2 first (camelCase remainingCredits); v1 snake_case remaining_credits. */
+const FIRECRAWL_CREDIT_URLS = [
+  "https://api.firecrawl.dev/v2/team/credit-usage",
+  "https://api.firecrawl.dev/v1/team/credit-usage",
+] as const;
 
 /** Contact path scrapes before falling back to the landing page. */
 const MAX_CONTACT_PATH_SCRAPES = 2;
@@ -55,38 +59,47 @@ export function parseFirecrawlCredits(raw: unknown): number | null {
   return null;
 }
 
+type FirecrawlCreditPayload = {
+  data?: {
+    remaining_credits?: unknown;
+    remainingCredits?: unknown;
+  };
+  remaining_credits?: unknown;
+  remainingCredits?: unknown;
+};
+
+function remainingFromCreditPayload(json: FirecrawlCreditPayload): number | null {
+  return (
+    parseFirecrawlCredits(json.data?.remaining_credits) ??
+    parseFirecrawlCredits(json.data?.remainingCredits) ??
+    parseFirecrawlCredits(json.remaining_credits) ??
+    parseFirecrawlCredits(json.remainingCredits)
+  );
+}
+
 /** Remaining Firecrawl credits for the API key team (null if unavailable). */
 export async function getFirecrawlRemainingCredits(): Promise<number | null> {
   const key = env.firecrawlKey();
   if (!key) return null;
-  try {
-    const res = await fetch(FIRECRAWL_CREDITS, {
-      headers: {
-        Authorization: `Bearer ${key}`,
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(10_000),
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    // API returns snake_case (`remaining_credits`); accept camelCase / strings.
-    const json = (await res.json()) as {
-      data?: {
-        remaining_credits?: unknown;
-        remainingCredits?: unknown;
-      };
-      remaining_credits?: unknown;
-      remainingCredits?: unknown;
-    };
-    return (
-      parseFirecrawlCredits(json.data?.remaining_credits) ??
-      parseFirecrawlCredits(json.data?.remainingCredits) ??
-      parseFirecrawlCredits(json.remaining_credits) ??
-      parseFirecrawlCredits(json.remainingCredits)
-    );
-  } catch {
-    return null;
+  for (const url of FIRECRAWL_CREDIT_URLS) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${key}`,
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(10_000),
+        cache: "no-store",
+      });
+      if (!res.ok) continue;
+      const json = (await res.json()) as FirecrawlCreditPayload;
+      const remaining = remainingFromCreditPayload(json);
+      if (remaining != null) return remaining;
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 /**

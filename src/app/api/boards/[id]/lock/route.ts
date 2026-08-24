@@ -4,6 +4,7 @@ import {
   getBoardLockStatus,
   heartbeatBoardLock,
   releaseBoardLock,
+  takeoverBoardLock,
 } from "@/lib/service";
 import { isBoardLockedError, isNotFoundError } from "@/lib/errors";
 
@@ -20,15 +21,27 @@ export async function GET(
   return NextResponse.json({ lock });
 }
 
-/** Heartbeat — claim or refresh soft lock. */
+/** Heartbeat — claim or refresh soft lock. `{ takeover: true }` steals it. */
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  let takeover = false;
+  try {
+    const text = await req.text();
+    if (text.trim()) {
+      const body = JSON.parse(text) as { takeover?: boolean };
+      takeover = body.takeover === true;
+    }
+  } catch {
+    takeover = false;
+  }
   try {
     const ctx = await getCtx();
-    const lock = await heartbeatBoardLock(ctx, id);
+    const lock = takeover
+      ? await takeoverBoardLock(ctx, id)
+      : await heartbeatBoardLock(ctx, id);
     return NextResponse.json({ lock });
   } catch (err) {
     if (isBoardLockedError(err)) {

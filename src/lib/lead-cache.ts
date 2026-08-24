@@ -21,15 +21,17 @@ export function rememberDroppedFollowUps(
   nextFollowUps: FollowUp[] | undefined,
 ): string[] | undefined {
   const prevDropped = prior?.droppedFollowUpIds ?? [];
-  if (!nextFollowUps || !prior?.followUps?.length) {
-    return prevDropped.length ? prevDropped : undefined;
+  const nextIds = new Set((nextFollowUps ?? []).map((f) => f.id));
+  // Drop ids that are present again (undo restore) so polls cannot re-delete.
+  const stillDropped = prevDropped.filter((id) => !nextIds.has(id));
+  if (!nextFollowUps) {
+    return stillDropped.length ? stillDropped : undefined;
   }
-  const nextIds = new Set(nextFollowUps.map((f) => f.id));
-  const extra = prior.followUps
+  const extra = (prior?.followUps ?? [])
     .filter((f) => !nextIds.has(f.id))
     .map((f) => f.id);
-  if (extra.length === 0) return prevDropped.length ? prevDropped : undefined;
-  return [...new Set([...prevDropped, ...extra])];
+  const merged = [...new Set([...stillDropped, ...extra])];
+  return merged.length ? merged : undefined;
 }
 
 export type SlimMergeOpts = {

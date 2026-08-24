@@ -54,7 +54,7 @@ Search  →  Enrich  →  Draft  →  Send
   when set). `/login` only redirects here (Auth.js `pages.signIn`). Unauth
   `/app` → `/?signin=1&callbackUrl=/app`.
 - **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar
-  nav: **Search · Leads · Pipeline · Outreach · Calendar · Boards · Runs · Dashboard**.
+  nav: **Dashboard · Search · Leads · Pipeline · Outreach · Calendar · Boards · Runs**.
   Board filter (the active board) sits above the account card. Settings
   opens from the **account card** at the bottom of the sidebar (not a Workspace
   nav item). **Platform admins** get a slim ops nav (**Dashboard · Users**) and
@@ -123,8 +123,8 @@ Search  →  Enrich  →  Draft  →  Send
 
   - **Boards** (`?view=boards`) — create / rename / delete named lead
     collections; invite collaborators by email (in-app accept, no expiry —
-    ADR 0028). Soft lock when
-    someone else is editing. Boards are created at search/import (no auto
+    ADR 0028). Soft lock when someone else is editing: Live chip + **Take
+    control** (ADR 0030). Boards are created at search/import (no auto
     **Default** — ADR 0023). Creating a board also creates a matching empty
     outreach profile (edit pitch / From in Settings). Also linked from
     Settings → Boards.
@@ -137,7 +137,7 @@ Search  →  Enrich  →  Draft  →  Send
     with a kind tag (purple **Follow up**, amber **Note**, gray **Missed** —
     tag only; the date/body use the same ink as other notes).
     **Add Note** in the header matches the amber tag. Notes can be edited
-    or deleted. Done-state for follow-ups is ticked on Calendar only.
+    or deleted; delete offers **Undo** for a few seconds. Done-state for follow-ups is ticked on Calendar only.
     Toggling **Phone** opens a call log with the caret after
     `Phone call by {name}:`. Clicking **Email** (again, even when it is
     already on) logs another send dated today and opens a note with

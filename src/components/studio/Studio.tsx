@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
@@ -10,7 +11,7 @@ import {
   RateLimitedError,
   type BoardResponse,
 } from "@/lib/client-api";
-import type { ContactMethod, CrmStage, Lead, LeadWithOutreach, PlanId } from "@/lib/types";
+import type { ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId } from "@/lib/types";
 import { mergeFollowUpLists } from "@/lib/follow-ups";
 import { rememberDroppedContactMethods } from "@/lib/contact-methods";
 import {
@@ -83,7 +84,13 @@ const CRM_STAGE_FILTERS: CrmStage[] = [
   "not_interested",
 ];
 
-type Toast = { id: string; kind: "ok" | "err"; text: string };
+type Toast = {
+  id: string;
+  kind: "ok" | "err";
+  text: string;
+  actionLabel?: string;
+  onAction?: () => void;
+};
 type UpgradePrompt = { kind: "leads" | "sends"; planId: PlanId };
 type StudioView =
   | "board"
@@ -212,7 +219,15 @@ export function Studio() {
   const [leadsBackfilling, setLeadsBackfilling] = useState(false);
   const [editLocked, setEditLocked] = useState(false);
   const [lockHolder, setLockHolder] = useState<string | null>(null);
+  const [takingOver, setTakingOver] = useState(false);
+  const takeoverRef = useRef(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [noteUndo, setNoteUndo] = useState<{
+    leadId: string;
+    note: FollowUp;
+  } | null>(null);
+  const noteUndoTimerRef = useRef<number | null>(null);
+  const [toastHost, setToastHost] = useState<HTMLElement | null>(null);
   const [upgrade, setUpgrade] = useState<UpgradePrompt | null>(null);
   const [verifyLimitPlan, setVerifyLimitPlan] = useState<PlanId | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -287,11 +302,26 @@ export function Studio() {
 
   const toastTimers = useRef(new Map<string, number>());
   const toast = useCallback(
-    (kind: Toast["kind"], text: string, ms = 4200, key?: string) => {
+    (
+      kind: Toast["kind"],
+      text: string,
+      ms = 4200,
+      key?: string,
+      action?: { label: string; onClick: () => void },
+    ) => {
       const id = key ?? `t-${Date.now()}-${Math.random()}`;
       const prev = toastTimers.current.get(id);
       if (prev) window.clearTimeout(prev);
-      setToasts((t) => [...t.filter((x) => x.id !== id), { id, kind, text }]);
+      setToasts((t) => [
+        ...t.filter((x) => x.id !== id),
+        {
+          id,
+          kind,
+          text,
+          actionLabel: action?.label,
+          onAction: action?.onClick,
+        },
+      ]);
       const timer = window.setTimeout(() => {
         toastTimers.current.delete(id);
         setToasts((t) => t.filter((x) => x.id !== id));
@@ -307,6 +337,19 @@ export function Studio() {
     toastTimers.current.delete(key);
     setToasts((t) => t.filter((x) => x.id !== key));
   }, []);
+
+  useEffect(() => {
+    setToastHost(document.body);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (noteUndoTimerRef.current != null) {
+        window.clearTimeout(noteUndoTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const handleError = useCallback(
     (e: unknown) => {
@@ -896,25 +939,31 @@ export function Studio() {
           (e as Error & { locked?: boolean }).locked ||
           /working on this board|paused/i.test(msg);
         if (locked) {
+          takeoverRef.current = false;
           setEditLocked(true);
           setLockHolder(
             msg.split(" is working")[0] ||
-              board?.boardLock?.userName ||
+              boardRef.current?.boardLock?.userName ||
               "Someone else",
           );
         }
       }
     };
     void beat();
-    const id = window.setInterval(() => void beat(), 45_000);
+    const id = window.setInterval(() => void beat(), 20_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
       void api.releaseBoardLock(bid).catch(() => undefined);
     };
-  }, [filterBoardId, boards, board?.boardLock, router, view]);
+  }, [filterBoardId, boards, router, view]);
 
   useEffect(() => {
+    takeoverRef.current = false;
+  }, [filterBoardId]);
+
+  useEffect(() => {
+    if (takeoverRef.current) return;
     const lock = board?.boardLock;
     if (lock) {
       setEditLocked(true);
@@ -1724,6 +1773,38 @@ export function Studio() {
     }
   };
 
+  const clearNoteUndoTimer = () => {
+    if (noteUndoTimerRef.current != null) {
+      window.clearTimeout(noteUndoTimerRef.current);
+      noteUndoTimerRef.current = null;
+    }
+  };
+
+  const restoreDeletedNote = async (leadId: string, note: FollowUp) => {
+    clearNoteUndoTimer();
+    setNoteUndo(null);
+    dismissToast(`undo-note-${note.id}`);
+    const current =
+      boardRef.current?.leads.find((l) => l.id === leadId)?.followUps ?? [];
+    const updated = current.some((f) => f.id === note.id)
+      ? current
+      : [...current, note];
+    await onUpdateLeadCrm(leadId, { followUps: updated });
+  };
+
+  const offerNoteUndo = (leadId: string, note: FollowUp) => {
+    clearNoteUndoTimer();
+    setNoteUndo({ leadId, note });
+    toast("ok", "Note deleted.", 8000, `undo-note-${note.id}`, {
+      label: "Undo",
+      onClick: () => void restoreDeletedNote(leadId, note),
+    });
+    noteUndoTimerRef.current = window.setTimeout(() => {
+      setNoteUndo(null);
+      noteUndoTimerRef.current = null;
+    }, 8000);
+  };
+
   const cancelDraftAll = useCallback(() => {
     draftAbortRef.current?.abort();
   }, []);
@@ -2089,6 +2170,23 @@ export function Studio() {
     }
   };
 
+  const onTakeControl = async () => {
+    if (!filterBoardId || takingOver) return;
+    setTakingOver(true);
+    try {
+      await api.takeoverBoardLock(filterBoardId);
+      takeoverRef.current = true;
+      setEditLocked(false);
+      setLockHolder(null);
+      toast("ok", "You have control of this board.");
+    } catch (e) {
+      takeoverRef.current = false;
+      toast("err", (e as Error).message);
+    } finally {
+      setTakingOver(false);
+    }
+  };
+
   const onDeleteLeads = async (leadIds: string[]) => {
     const idSet = new Set(leadIds);
     const boardLeads = board?.leads ?? [];
@@ -2123,6 +2221,17 @@ export function Studio() {
       setDeleteProgress(null);
     }
   };
+
+  const showVerifyMeter = Boolean(
+    board?.capabilities.emailVerify &&
+      board.workspace.emailVerifyEnabled !== false,
+  );
+  const showLeadsMeter = Boolean(
+    board?.workspace &&
+      (board.workspace.planId !== "insider" ||
+        board.workspace.firecrawlCreditsRemaining != null),
+  );
+  const meterCount = (showLeadsMeter ? 1 : 0) + (showVerifyMeter ? 1 : 0);
 
   return (
     <main className="mx-auto flex h-dvh max-w-[90rem] flex-col overflow-hidden px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-3 sm:pt-8">
@@ -2160,12 +2269,33 @@ export function Studio() {
               </button>
             ) : null}
             {view === "leads" && hasLeads ? <ExportButton /> : null}
+            {editLocked && filterBoardId ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-aurora-400/25 bg-aurora-400/10 py-1 pl-2.5 pr-1 text-xs text-mist-200">
+                <span
+                  className="pulse-ring h-1.5 w-1.5 shrink-0 rounded-full bg-aurora-400"
+                  aria-hidden
+                />
+                <span className="font-medium text-aurora-200">Live</span>
+                <span className="max-w-[9rem] truncate text-mist-400">
+                  {lockHolder ?? "Someone else"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void onTakeControl()}
+                  disabled={takingOver}
+                  aria-label={`Take control of this board from ${lockHolder ?? "the other editor"}`}
+                  className="rounded-full bg-aurora-400/20 px-2.5 py-1 font-medium text-aurora-100 transition-colors hover:bg-aurora-400/30 disabled:opacity-50"
+                >
+                  {takingOver ? "Taking…" : "Take control"}
+                </button>
+              </span>
+            ) : null}
           </div>
           <p className="mt-0.5 text-sm text-mist-500">
             {view === "dashboard"
               ? "Overview of leads and activity across your boards."
               : view === "boards"
-                ? "Named lists for campaigns or niches. Invite collaborators; only one person edits at a time."
+                ? "Named lists for campaigns or niches. Invite collaborators; take control if someone else is live."
                 : view === "pipeline"
                   ? "Drag leads between stages as conversations progress."
                   : view === "leads"
@@ -2182,54 +2312,36 @@ export function Studio() {
                             ? "Plan, usage, and send setup across workspaces."
                             : "Find prospects by niche and location."}
           </p>
-          {editLocked && filterBoardId ? (
-            <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200">
-              {lockHolder ?? "Someone else"} is editing this board — view only until they leave.
-            </p>
-          ) : null}
         </div>
 
         {view !== "dashboard" &&
         view !== "boards" &&
         view !== "admin" &&
         view !== "admin-users" &&
-        board?.workspace ? (
+        board?.workspace &&
+        meterCount > 0 ? (
           <div className="flex min-w-0 max-w-md flex-col gap-1 justify-self-stretch sm:min-w-[16rem] sm:justify-self-center sm:min-w-[22rem]">
             <div
               className={`grid gap-4 ${
-                board.capabilities.emailVerify &&
-                board.workspace.emailVerifyEnabled !== false
-                  ? "grid-cols-3"
-                  : "grid-cols-2"
+                meterCount > 1 ? "grid-cols-2" : "grid-cols-1"
               }`}
             >
-              {board.workspace.planId === "insider" ? (
+              {showLeadsMeter && board.workspace.planId === "insider" ? (
                 <UsageBar
                   label="Leads"
                   title="Firecrawl credits"
-                  unavailable={
-                    board.workspace.firecrawlCreditsRemaining == null
-                  }
                   remaining={
                     board.workspace.firecrawlCreditsRemaining ?? undefined
                   }
                 />
-              ) : (
+              ) : showLeadsMeter ? (
                 <UsageBar
                   label="Leads"
                   used={board.workspace.leadsUsed}
                   limit={board.workspace.leadsLimit}
                 />
-              )}
-              <UsageBar
-                label="Sends"
-                used={board.workspace.unlimitedSends ? 0 : board.workspace.sendsUsed}
-                limit={
-                  board.workspace.unlimitedSends ? 0 : board.workspace.sendsLimit
-                }
-              />
-              {board.capabilities.emailVerify &&
-              board.workspace.emailVerifyEnabled !== false ? (
+              ) : null}
+              {showVerifyMeter ? (
                 <UsageBar
                   label="Verifies"
                   used={board.workspace.verifiesUsed}
@@ -2707,6 +2819,14 @@ export function Studio() {
           onSend={requestSend}
           onSetDelivery={onSetDelivery}
           onUpdateCrm={onUpdateLeadCrm}
+          deletedNote={
+            noteUndo && selected.id === noteUndo.leadId ? noteUndo.note : null
+          }
+          onNoteDeleted={(note) => offerNoteUndo(selected.id, note)}
+          onUndoDeletedNote={() => {
+            if (!noteUndo) return;
+            void restoreDeletedNote(noteUndo.leadId, noteUndo.note);
+          }}
           onDeleteLead={
             editLocked
               ? undefined
@@ -2975,26 +3095,47 @@ export function Studio() {
         }}
       />
 
-      {/* Toasts */}
-      <div
-        className="pointer-events-none fixed bottom-6 right-6 z-[60] flex flex-col gap-2"
-        role="status"
-        aria-live="polite"
-      >
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`animate-float-up pointer-events-auto flex items-center gap-2 rounded-xl px-4 py-3 text-sm shadow-xl ring-1 ${
-              t.kind === "ok"
-                ? "bg-ink-800 text-aurora-200 ring-aurora-400/25"
-                : "bg-ink-800 text-rose-200 ring-rose-400/30"
-            }`}
-          >
-            {t.kind === "ok" ? <CheckIcon className="h-4 w-4" /> : <span>⚠</span>}
-            {t.text}
-          </div>
-        ))}
-      </div>
+      {/* Toasts — portaled so overflow-hidden main / drawer overlay cannot hide Undo */}
+      {toastHost
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed bottom-6 left-6 z-[2000] flex flex-col gap-2"
+              role="status"
+              aria-live="polite"
+            >
+              {toasts.map((t) => (
+                <div
+                  key={t.id}
+                  className={`animate-float-up pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-3 text-sm shadow-xl ring-1 ${
+                    t.kind === "ok"
+                      ? "bg-ink-800 text-aurora-200 ring-aurora-400/25"
+                      : "bg-ink-800 text-rose-200 ring-rose-400/30"
+                  }`}
+                >
+                  {t.kind === "ok" ? (
+                    <CheckIcon className="h-4 w-4 shrink-0" />
+                  ) : (
+                    <span>⚠</span>
+                  )}
+                  <span className="min-w-0">{t.text}</span>
+                  {t.actionLabel && t.onAction ? (
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-full bg-aurora-400/20 px-2.5 py-1 text-xs font-medium text-aurora-100 hover:bg-aurora-400/30"
+                      onClick={() => {
+                        t.onAction?.();
+                        dismissToast(t.id);
+                      }}
+                    >
+                      {t.actionLabel}
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>,
+            toastHost,
+          )
+        : null}
     </main>
   );
 }

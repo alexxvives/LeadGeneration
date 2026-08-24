@@ -36,41 +36,54 @@ export async function GET() {
   }
 
   try {
-    // Prefer v1 (widely documented); fall back quietly if shape differs.
-    const res = await fetch("https://api.firecrawl.dev/v1/team/credit-usage", {
-      headers: {
-        Authorization: `Bearer ${env.firecrawlKey()}`,
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(10_000),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return NextResponse.json(
-        {
-          available: false,
-          provider: "firecrawl" as const,
-          remainingCredits: null,
-          planCredits: null,
-          error: `Firecrawl usage unavailable (${res.status}): ${text.slice(0, 120)}`,
+    const key = env.firecrawlKey();
+    const urls = [
+      "https://api.firecrawl.dev/v2/team/credit-usage",
+      "https://api.firecrawl.dev/v1/team/credit-usage",
+    ] as const;
+    let lastError = "";
+    for (const url of urls) {
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${key}`,
+          Accept: "application/json",
         },
-        { status: 200 },
-      );
+        signal: AbortSignal.timeout(10_000),
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        lastError = `Firecrawl usage unavailable (${res.status}): ${text.slice(0, 120)}`;
+        continue;
+      }
+      const json = (await res.json()) as FirecrawlUsagePayload;
+      const remaining =
+        parseFirecrawlCredits(json.data?.remaining_credits) ??
+        parseFirecrawlCredits(json.data?.remainingCredits);
+      const plan =
+        parseFirecrawlCredits(json.data?.plan_credits) ??
+        parseFirecrawlCredits(json.data?.planCredits);
+      if (remaining == null) {
+        lastError = "Firecrawl usage payload had no remaining credits";
+        continue;
+      }
+      return NextResponse.json({
+        available: true,
+        provider: "firecrawl" as const,
+        remainingCredits: remaining,
+        planCredits: plan,
+      });
     }
-    const json = (await res.json()) as FirecrawlUsagePayload;
-    const remaining =
-      parseFirecrawlCredits(json.data?.remaining_credits) ??
-      parseFirecrawlCredits(json.data?.remainingCredits);
-    const plan =
-      parseFirecrawlCredits(json.data?.plan_credits) ??
-      parseFirecrawlCredits(json.data?.planCredits);
-    return NextResponse.json({
-      available: remaining != null,
-      provider: "firecrawl" as const,
-      remainingCredits: remaining,
-      planCredits: plan,
-    });
+    return NextResponse.json(
+      {
+        available: false,
+        provider: "firecrawl" as const,
+        remainingCredits: null,
+        planCredits: null,
+        error: lastError || "Firecrawl usage unavailable",
+      },
+      { status: 200 },
+    );
   } catch (e) {
     return NextResponse.json({
       available: false,

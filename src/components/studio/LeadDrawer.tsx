@@ -93,6 +93,10 @@ interface DrawerProps {
       followUps?: FollowUp[];
     },
   ) => Promise<void>;
+  /** Parent-owned note-delete undo (survives drawer remounts). */
+  deletedNote?: FollowUp | null;
+  onNoteDeleted?: (note: FollowUp) => void;
+  onUndoDeletedNote?: () => void;
   /** Delete this lead (info + draft drawers). Omit when the board is view-only. */
   onDeleteLead?: (leadId: string) => Promise<void> | void;
 }
@@ -169,6 +173,7 @@ export function LeadDrawer(props: DrawerProps) {
   const [editDate, setEditDate] = useState("");
   const [editText, setEditText] = useState("");
   const followUpsLeadIdRef = useRef(lead.id);
+  const deletedNote = props.deletedNote ?? null;
 
   const dirty = useMemo(
     () => !sameDraft({ subject, body, toEmail }, savedDraft),
@@ -222,12 +227,11 @@ export function LeadDrawer(props: DrawerProps) {
         };
       });
     followUpsLeadIdRef.current = lead.id;
-    const dropped = lead.droppedFollowUpIds?.length
-      ? new Set(lead.droppedFollowUpIds)
-      : undefined;
+    const dropped = new Set(lead.droppedFollowUpIds ?? []);
+    if (deletedNote) dropped.add(deletedNote.id);
     const next = leadChanged
-      ? collapsed
-      : mergeFollowUpLists(followUps, collapsed, dropped);
+      ? collapsed.filter((f) => !dropped.has(f.id))
+      : mergeFollowUpLists(followUps, collapsed, dropped.size ? dropped : undefined);
     const journalSame =
       !leadChanged &&
       next.length === followUps.length &&
@@ -254,6 +258,7 @@ export function LeadDrawer(props: DrawerProps) {
     // race the in-flight GET with a slim payload.
     if (
       changed &&
+      !deletedNote &&
       lead.detailLoaded !== false &&
       next.length >= raw.length &&
       next.length >= followUps.length
@@ -261,7 +266,7 @@ export function LeadDrawer(props: DrawerProps) {
       void props.onUpdateCrm(lead.id, { followUps: next });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- heal journal kinds; keep local extras across stale props
-  }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, lead.contactedByName, lead.detailLoaded]);
+  }, [lead.id, lead.crmStage, lead.contactMethods, lead.followUps, lead.contactedByName, lead.detailLoaded, deletedNote?.id]);
 
   useEffect(() => {
     if (promptNote) {
@@ -580,10 +585,18 @@ export function LeadDrawer(props: DrawerProps) {
   };
 
   const deleteFollowUp = async (fuId: string) => {
+    const removed = followUps.find((f) => f.id === fuId);
+    if (!removed) return;
+    const previous = followUps;
     const updated = followUps.filter((f) => f.id !== fuId);
     setFollowUps(updated);
     if (editingId === fuId) setEditingId(null);
-    await props.onUpdateCrm(lead.id, { followUps: updated });
+    props.onNoteDeleted?.(removed);
+    try {
+      await props.onUpdateCrm(lead.id, { followUps: updated });
+    } catch {
+      setFollowUps(previous);
+    }
   };
 
   const startEditFollowUp = (fu: FollowUp) => {
@@ -1071,10 +1084,28 @@ export function LeadDrawer(props: DrawerProps) {
                 </div>
               )}
 
+              {deletedNote ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-100"
+                >
+                  <span>Note deleted.</span>
+                  <button
+                    type="button"
+                    onClick={() => props.onUndoDeletedNote?.()}
+                    className="rounded-full bg-amber-400/20 px-2.5 py-1 font-medium text-amber-50 hover:bg-amber-400/30"
+                  >
+                    Undo
+                  </button>
+                </div>
+              ) : null}
               {followUps.length === 0 && !showAddNote ? (
+                deletedNote ? null : (
                 <p className="text-xs text-mist-600">
                   No notes yet.
                 </p>
+                )
               ) : (
                 <ul className="space-y-2">
                   {[...followUps]
