@@ -129,7 +129,8 @@ Search  →  Enrich  →  Draft  →  Approve  →  Send
     mode, lead count, status). Click a run to open its leads on **Leads**.
 
   - **Boards** (`?view=boards`) — create / rename / delete named lead
-    collections; invite collaborators by email (in-app accept). Soft lock when
+    collections; invite collaborators by email (in-app accept, no expiry —
+    ADR 0028). Soft lock when
     someone else is editing. Boards are created at search/import (no auto
     **Default** — ADR 0023). Creating a board also creates a matching empty
     outreach profile (edit pitch / From in Settings). Also linked from

@@ -434,12 +434,8 @@ export class JsonStore implements LeadRepository {
   async listPendingInvitesForEmail(email: string): Promise<BoardInvite[]> {
     const data = await this.read();
     const key = email.trim().toLowerCase();
-    const now = new Date().toISOString();
     return data.boardInvites.filter(
-      (i) =>
-        i.status === "pending" &&
-        i.email.toLowerCase() === key &&
-        i.expiresAt > now,
+      (i) => i.status === "pending" && i.email.toLowerCase() === key,
     );
   }
 

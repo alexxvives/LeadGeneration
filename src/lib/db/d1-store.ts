@@ -117,6 +117,16 @@ type BoardRow = {
   updated_at: string;
 };
 
+type BoardInviteRow = {
+  id: string;
+  board_id: string;
+  email: string;
+  role: string;
+  invited_by_user_id: string;
+  status: string;
+  created_at: string;
+};
+
 type RunRow = {
   id: string;
   workspace_id: string;
@@ -177,6 +187,9 @@ type OutreachRow = {
   created_at: string;
   updated_at: string;
 };
+
+/** Leftover NOT NULL column from the old 14-day TTL; unused (ADR 0028). */
+const BOARD_INVITE_EXPIRES_AT_UNUSED = "9999-12-31T23:59:59.000Z";
 
 const str = (arr: string[]): string => JSON.stringify(arr);
 const arr = (s: string | null | undefined): string[] => {
@@ -251,6 +264,19 @@ function rowToBoard(r: BoardRow): Board {
     emailVerifyEnabled: !isSqliteOff(r.email_verify_enabled),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+  };
+}
+
+function rowToBoardInvite(r: BoardInviteRow, boardName: string): BoardInvite {
+  return {
+    id: r.id,
+    boardId: r.board_id,
+    boardName,
+    email: r.email,
+    role: r.role as BoardMemberRole,
+    invitedByUserId: r.invited_by_user_id,
+    status: r.status as BoardInvite["status"],
+    createdAt: r.created_at,
   };
 }
 
@@ -749,7 +775,7 @@ export class D1Store implements LeadRepository {
         invite.invitedByUserId,
         invite.status,
         invite.createdAt,
-        invite.expiresAt,
+        BOARD_INVITE_EXPIRES_AT_UNUSED,
       )
       .run();
     return invite;
@@ -762,7 +788,6 @@ export class D1Store implements LeadRepository {
     const row: Record<string, unknown> = {};
     if ("status" in patch) row.status = patch.status;
     if ("role" in patch) row.role = patch.role;
-    if ("expiresAt" in patch) row.expires_at = patch.expiresAt;
     if (Object.keys(row).length === 0) return this.getBoardInvite(id);
     const { clause, values } = buildSet(row);
     await this.db
@@ -776,64 +801,25 @@ export class D1Store implements LeadRepository {
     const r = await this.db
       .prepare(`SELECT * FROM board_invites WHERE id = ?`)
       .bind(id)
-      .first<{
-        id: string;
-        board_id: string;
-        email: string;
-        role: string;
-        invited_by_user_id: string;
-        status: string;
-        created_at: string;
-        expires_at: string;
-      }>();
+      .first<BoardInviteRow>();
     if (!r) return null;
     const board = await this.getBoardAnywhere(r.board_id);
-    return {
-      id: r.id,
-      boardId: r.board_id,
-      boardName: board?.name ?? "Board",
-      email: r.email,
-      role: r.role as BoardMemberRole,
-      invitedByUserId: r.invited_by_user_id,
-      status: r.status as BoardInvite["status"],
-      createdAt: r.created_at,
-      expiresAt: r.expires_at,
-    };
+    return rowToBoardInvite(r, board?.name ?? "Board");
   }
 
   async listPendingInvitesForEmail(email: string): Promise<BoardInvite[]> {
     const key = email.trim().toLowerCase();
-    const now = new Date().toISOString();
     const { results } = await this.db
       .prepare(
         `SELECT * FROM board_invites
-         WHERE lower(email) = ? AND status = 'pending' AND expires_at > ?`,
+         WHERE lower(email) = ? AND status = 'pending'`,
       )
-      .bind(key, now)
-      .all<{
-        id: string;
-        board_id: string;
-        email: string;
-        role: string;
-        invited_by_user_id: string;
-        status: string;
-        created_at: string;
-        expires_at: string;
-      }>();
+      .bind(key)
+      .all<BoardInviteRow>();
     const out: BoardInvite[] = [];
     for (const r of results ?? []) {
       const board = await this.getBoardAnywhere(r.board_id);
-      out.push({
-        id: r.id,
-        boardId: r.board_id,
-        boardName: board?.name ?? "Board",
-        email: r.email,
-        role: r.role as BoardMemberRole,
-        invitedByUserId: r.invited_by_user_id,
-        status: r.status as BoardInvite["status"],
-        createdAt: r.created_at,
-        expiresAt: r.expires_at,
-      });
+      out.push(rowToBoardInvite(r, board?.name ?? "Board"));
     }
     return out;
   }
@@ -844,28 +830,11 @@ export class D1Store implements LeadRepository {
         `SELECT * FROM board_invites WHERE board_id = ? AND status = 'pending'`,
       )
       .bind(boardId)
-      .all<{
-        id: string;
-        board_id: string;
-        email: string;
-        role: string;
-        invited_by_user_id: string;
-        status: string;
-        created_at: string;
-        expires_at: string;
-      }>();
+      .all<BoardInviteRow>();
     const board = await this.getBoardAnywhere(boardId);
-    return (results ?? []).map((r) => ({
-      id: r.id,
-      boardId: r.board_id,
-      boardName: board?.name ?? "Board",
-      email: r.email,
-      role: r.role as BoardMemberRole,
-      invitedByUserId: r.invited_by_user_id,
-      status: r.status as BoardInvite["status"],
-      createdAt: r.created_at,
-      expiresAt: r.expires_at,
-    }));
+    return (results ?? []).map((r) =>
+      rowToBoardInvite(r, board?.name ?? "Board"),
+    );
   }
 
   async getBoardLock(boardId: string): Promise<BoardLock | null> {

@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-24 — Board invites hid after 14 days while still pending
+- `listPendingInvitesForEmail` filtered `expires_at > now`, and accept
+  revoked expired rows. Owner Boards still listed them (no expiry
+  filter). LUMIA invite to `onaparadell@gmail.com` (created 2026-07-21,
+  expired 2026-08-04) stayed pending but was invisible to Ona.
+- Invites no longer expire (ADR 0028). Live D1 pending `expires_at`
+  bumped so the current Worker shows the card before deploy.
+
 ### 2026-08-19 — Sent today / ~N/day was workspace-wide, not per inbox
 - Contacted counted every send in the workspace and used one mailbox-age
   blob, so LUMIA’s 25 sends showed on Akademo. Count now follows the

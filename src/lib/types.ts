@@ -258,6 +258,7 @@ export interface BoardLock {
   expiresAt: string;
 }
 
+/** Pending until accepted or revoked — no TTL (ADR 0028). */
 export interface BoardInvite {
   id: string;
   boardId: string;
@@ -267,7 +268,6 @@ export interface BoardInvite {
   invitedByUserId: string;
   status: "pending" | "accepted" | "revoked";
   createdAt: string;
-  expiresAt: string;
 }
 
 export interface BoardMember {

@@ -452,7 +452,6 @@ export async function inviteToBoard(
   if (dup) return { invite: dup, emailSent: false };
 
   const now = nowIso();
-  const expires = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
   const invite = await ctx.db.createBoardInvite({
     id: newId("binv"),
     boardId,
@@ -462,7 +461,6 @@ export async function inviteToBoard(
     invitedByUserId: ctx.userId,
     status: "pending",
     createdAt: now,
-    expiresAt: expires,
   });
   // Best-effort email — invite is valid in-app even if mail fails.
   let emailSent = false;
@@ -495,10 +493,6 @@ export async function acceptBoardInvite(
   const invite = await ctx.db.getBoardInvite(inviteId);
   if (!invite || invite.status !== "pending") {
     throw new NotFoundError("Invite not found");
-  }
-  if (invite.expiresAt <= nowIso()) {
-    await ctx.db.updateBoardInvite(inviteId, { status: "revoked" });
-    throw new Error("Invite expired");
   }
   if (invite.email.toLowerCase() !== ctx.userEmail.toLowerCase()) {
     throw new Error("This invite was sent to a different email");

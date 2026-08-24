@@ -9,19 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-19 (Per-board sent-today)
+## ⏱️ Status — updated 2026-08-24 (Invites never expire)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Contacted **N sent today · ~Y/day suggest** is per board mailbox
-  (outreach profile), not the whole workspace. New domains start at
-  ~20/day until Settings → mailbox age is set (ADR 0027).
+- Board invites no longer expire (ADR 0028). LUMIA pending invite to
+  `onaparadell@gmail.com` restored in prod D1 (`expires_at` far future)
+  so she can Accept on Boards with that Google account.
 
 ### Next
-1. Deploy Worker so per-board sent-today + Re-draft all + lastWriteAt
-   merge are live.
+1. Deploy Worker so invite TTL removal is live (D1 already unblocks the
+   current Worker).
+2. Ona: sign in as `onaparadell@gmail.com` → Boards → **Accept invite**.
 
 ---
 
