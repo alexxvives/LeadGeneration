@@ -11,6 +11,8 @@ waiting for the other session to expire.
 
 ## Decision
 - Keep the exclusive soft lock (heartbeat ~20s, TTL ~2.5m, writes 423).
+  The heartbeat poll itself is HTTP 200 + `{ acquired: false }` so Chrome does
+  not log a failed resource and the collaborator can still load leads.
 - When someone else holds it, show a compact **Live** chip beside the page
   title with their name and **Take control**.
 - Take control force-steals the lock (`POST …/lock { takeover: true }`). The

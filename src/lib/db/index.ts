@@ -150,6 +150,11 @@ export interface LeadRepository {
   /** Fast count for import progress (avoids loading every lead row). */
   countLeads(filter?: LeadListFilter): Promise<number>;
   /**
+   * Attach leads/runs with empty boardId to `boardId`. Cheap no-op when none
+   * exist — must not SELECT * the whole workspace (Worker isolates re-run this).
+   */
+  reassignOrphansToBoard(boardId: string): Promise<void>;
+  /**
    * Aggregate CRM/status/fit for dashboard — avoids loading every lead body.
    */
   summarizeLeads(filter?: LeadListFilter): Promise<{

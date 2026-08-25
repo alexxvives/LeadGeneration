@@ -9,21 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-25 (card-list load)
+## ⏱️ Status — updated 2026-08-25 (lock 423 / empty list)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0033** remote applied.
 
 ### This pass
-- Board list is card-sized: D1 skips about/notes/tags/fit/source; JSON omits
-  bodies, subjects, blurbs, journal text. Drawer GET loads the rest.
-- 100 leads/lane (was 50). Pipeline / Outreach / Leads cards window the DOM.
-- Delete + hydrate: polls cannot resurrect a deleted row; paging gen stays
-  put while backfill runs.
+- Collaborator heartbeat is HTTP 200 `{ acquired: false }`, not 423 — view
+  still loads leads; edits stay locked. Lock effect no longer restarts on
+  every board poll. Shared-board GET resolves owner leads by id. Orphan
+  heal no longer `SELECT *` the workspace on each Worker isolate.
 
 ### Next
-1. Deploy Worker so production matches this hydrate speedup.
+1. Deploy Worker so production matches this lock/hydrate fix.
 2. Ona: sign in as `onaparadell@gmail.com` → Boards → **Accept invite**.
+3. Two-browser check: second user should see leads + Live chip, no 423.
 
 ---
 

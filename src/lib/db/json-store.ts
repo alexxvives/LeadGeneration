@@ -746,6 +746,26 @@ export class JsonStore implements LeadRepository {
     });
   }
 
+  async reassignOrphansToBoard(boardId: string): Promise<void> {
+    if (!boardId) return;
+    const snapshot = await this.read();
+    const hasOrphan =
+      snapshot.leads.some((l) => this.inScope(l) && !l.boardId) ||
+      snapshot.runs.some((r) => this.inScope(r) && !r.boardId);
+    if (!hasOrphan) return;
+    await this.mutate((data) => {
+      for (const lead of data.leads) {
+        if (!this.inScope(lead)) continue;
+        if (!lead.boardId) lead.boardId = boardId;
+      }
+      for (const run of data.runs) {
+        if (!this.inScope(run)) continue;
+        if (!run.boardId) run.boardId = boardId;
+      }
+      return { data, result: undefined };
+    });
+  }
+
   deleteLeadsByBoard(boardId: string): Promise<number> {
     if (!boardId) return Promise.resolve(0);
     return this.mutate((data) => {

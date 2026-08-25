@@ -232,9 +232,10 @@ export const api = {
     }),
 
   heartbeatBoardLock: (boardId: string) =>
-    jsonFetch<{ lock: BoardLock }>(`/api/boards/${boardId}/lock`, {
-      method: "POST",
-    }),
+    jsonFetch<{ lock: BoardLock; acquired: boolean }>(
+      `/api/boards/${boardId}/lock`,
+      { method: "POST" },
+    ),
 
   takeoverBoardLock: (boardId: string) =>
     jsonFetch<{ lock: BoardLock }>(`/api/boards/${boardId}/lock`, {

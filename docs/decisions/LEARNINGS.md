@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-25 — 423 lock poll showed no leads for the other user
+- Heartbeat `POST /api/boards/:id/lock` returned 423 when someone else was
+  live. Chrome logs that as “Failed to load resource”. The effect depended on
+  the `boards` array, so every Pipeline poll released+reclaimed the lock.
+  If summaries omitted the shared board, refresh replaced the list with the
+  viewer’s empty workspace.
+- Heartbeat is now 200 `{ lock, acquired }`. Effect deps are “boards ready /
+  id known”, not array identity. Board GET resolves shared access by id
+  before listing leads. Orphan heal is LIMIT 1 + UPDATE, not `SELECT *`
+  of the whole workspace (that made two-user loads extra slow).
+
 ### 2026-08-25 — 2400-lead boards were loading drawer data on every card
 - Board hydrate used `SELECT l.*` then nulled about/notes in JS, so D1 still
   read blurbs, fit reasons, tags, source, and full journal text for every

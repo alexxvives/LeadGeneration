@@ -220,14 +220,8 @@ export async function ensureDefaultBoard(ctx: Ctx): Promise<Board | null> {
   }
 
   if (def && !defaultBoardOrphansChecked.has(ctx.workspaceId)) {
-    const [leads, runs] = await Promise.all([db.listLeads(), db.listRuns()]);
-    const orphanLeads = leads.filter((l) => !l.boardId);
-    const orphanRuns = runs.filter((r) => !r.boardId);
-    await Promise.all([
-      ...orphanLeads.map((l) => db.updateLead(l.id, { boardId: def!.id })),
-      ...orphanRuns.map((r) => db.updateRun(r.id, { boardId: def!.id })),
-    ]);
     defaultBoardOrphansChecked.add(ctx.workspaceId);
+    await db.reassignOrphansToBoard(def.id);
   }
   return def;
 }
@@ -539,18 +533,23 @@ export async function listBoardMembersForUi(
   return ctx.db.listBoardMembers(boardId);
 }
 
-/** Heartbeat: claim or refresh soft lock. Fails if another user holds it. */
+/**
+ * Heartbeat: claim or refresh the soft lock.
+ * When someone else holds it, return their lock with `acquired: false`
+ * (HTTP 200) so the viewer can still load leads — do not 423 a poll.
+ * Edits still 423 via `assertBoardEditable`.
+ */
 export async function heartbeatBoardLock(
   ctx: Ctx,
   boardId: string,
-): Promise<BoardLock> {
+): Promise<{ lock: BoardLock; acquired: boolean }> {
   if (!ctx.userId) throw new Error("Sign in required");
   const access = await resolveBoardAccess(ctx, boardId);
   if (!access) throw new NotFoundError("Board not found");
 
   const existing = await ctx.db.getBoardLock(boardId);
   if (existing && existing.userId !== ctx.userId) {
-    throw new BoardLockedError(existing.userId, existing.userName);
+    return { lock: existing, acquired: false };
   }
   const now = nowIso();
   const lock: BoardLock = {
@@ -560,7 +559,7 @@ export async function heartbeatBoardLock(
     lockedAt: existing?.lockedAt ?? now,
     expiresAt: new Date(Date.now() + LOCK_TTL_MS).toISOString(),
   };
-  return ctx.db.upsertBoardLock(lock);
+  return { lock: await ctx.db.upsertBoardLock(lock), acquired: true };
 }
 
 /**
@@ -949,7 +948,7 @@ export async function getLatestBoard(
     /** Round-robin hydrate: N rows from each Pipeline/Outreach lane. */
     leadPerLane?: number;
     leadLaneOffset?: number;
-    /** Background pages: skip run/summaries/name-clean so paging stays cheap. */
+    /** Background pages: skip run/summaries so paging stays cheap. */
     leadsOnly?: boolean;
   },
 ): Promise<{
@@ -1055,16 +1054,20 @@ export async function getLatestBoard(
 
   await ensureDefaultBoard(ctx);
   const boards = await listBoardSummaries(ctx);
-  const active =
-    boardId && boardId !== "all" && boards.some((b) => b.id === boardId)
-      ? boardId
-      : null;
 
+  // Resolve by id so a collaborator never lists their empty workspace when
+  // someone else holds the lock (summaries must not gate the lead query).
   let leadDb = ctx.db;
   let boardLock: BoardLock | null = null;
+  let active: string | null = null;
+  if (boardId && boardId !== "all") {
+    const access = await resolveBoardAccess(ctx, boardId);
+    if (access) {
+      active = boardId;
+      leadDb = access.db;
+    }
+  }
   if (active) {
-    const access = await resolveBoardAccess(ctx, active);
-    if (access) leadDb = access.db;
     boardLock = await getBoardLockStatus(ctx, active);
   }
 

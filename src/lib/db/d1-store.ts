@@ -1266,6 +1266,44 @@ export class D1Store implements LeadRepository {
     return deleted;
   }
 
+  async reassignOrphansToBoard(boardId: string): Promise<void> {
+    if (!boardId) return;
+    const orphanLead = await this.db
+      .prepare(
+        `SELECT id FROM leads
+         WHERE workspace_id = ? AND (board_id IS NULL OR board_id = '')
+         LIMIT 1`,
+      )
+      .bind(this.workspaceId)
+      .first<{ id: string }>();
+    if (orphanLead) {
+      await this.db
+        .prepare(
+          `UPDATE leads SET board_id = ?
+           WHERE workspace_id = ? AND (board_id IS NULL OR board_id = '')`,
+        )
+        .bind(boardId, this.workspaceId)
+        .run();
+    }
+    const orphanRun = await this.db
+      .prepare(
+        `SELECT id FROM runs
+         WHERE workspace_id = ? AND (board_id IS NULL OR board_id = '')
+         LIMIT 1`,
+      )
+      .bind(this.workspaceId)
+      .first<{ id: string }>();
+    if (orphanRun) {
+      await this.db
+        .prepare(
+          `UPDATE runs SET board_id = ?
+           WHERE workspace_id = ? AND (board_id IS NULL OR board_id = '')`,
+        )
+        .bind(boardId, this.workspaceId)
+        .run();
+    }
+  }
+
   async deleteLeadsByBoard(boardId: string): Promise<number> {
     if (!boardId) return 0;
     // Prefer set-based deletes so we never ship thousands of ids over the wire.

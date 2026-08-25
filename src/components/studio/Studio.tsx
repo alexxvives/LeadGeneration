@@ -486,8 +486,11 @@ export function Studio() {
       setBoards(data.boards ?? []);
 
       // Requested board gone (deleted) — drop sticky filter + hard-replace leads.
+      // Don't treat "summaries omitted the id" as deleted when the GET still
+      // resolved that board (shared board + someone else live).
       if (
         boardKey &&
+        data.activeBoardId !== boardKey &&
         !(data.boards ?? []).some((b) => b.id === boardKey)
       ) {
         storeBoardFilter("");
@@ -762,6 +765,10 @@ export function Studio() {
   }, [view, refresh]);
 
   // Soft lock heartbeat when a specific board is selected.
+  const boardsReady = boards.length > 0;
+  const knownBoard = Boolean(
+    filterBoardId && boards.some((b) => b.id === filterBoardId),
+  );
   useEffect(() => {
     const bid = filterBoardId;
     if (!bid) {
@@ -770,21 +777,25 @@ export function Studio() {
       return;
     }
     // Wait for board list so we don't heartbeat a stale id from another session.
-    if (boards.length === 0) return;
-    if (!boards.some((b) => b.id === bid)) {
-      storeBoardFilter("");
-      setEditLocked(false);
-      setLockHolder(null);
-      router.replace(`/app${queryForView(view, null)}`, { scroll: false });
-      return;
-    }
+    if (!boardsReady) return;
+    if (!knownBoard) return;
     let cancelled = false;
     const beat = async () => {
       try {
-        await api.heartbeatBoardLock(bid);
+        const { lock, acquired } = await api.heartbeatBoardLock(bid);
         if (!cancelled) {
-          setEditLocked(false);
-          setLockHolder(null);
+          if (acquired !== false) {
+            setEditLocked(false);
+            setLockHolder(null);
+          } else {
+            takeoverRef.current = false;
+            setEditLocked(true);
+            setLockHolder(
+              lock.userName ||
+                boardRef.current?.boardLock?.userName ||
+                "Someone else",
+            );
+          }
         }
       } catch (e) {
         if (cancelled) return;
@@ -818,7 +829,7 @@ export function Studio() {
       window.clearInterval(id);
       void api.releaseBoardLock(bid).catch(() => undefined);
     };
-  }, [filterBoardId, boards, router, view]);
+  }, [filterBoardId, boardsReady, knownBoard, router, view]);
 
   useEffect(() => {
     takeoverRef.current = false;

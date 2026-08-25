@@ -21,7 +21,7 @@ export async function GET(
   return NextResponse.json({ lock });
 }
 
-/** Heartbeat — claim or refresh soft lock. `{ takeover: true }` steals it. */
+/** Heartbeat — claim/refresh. 200 `{ acquired: false }` if someone else holds it. `{ takeover: true }` steals. */
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -39,10 +39,12 @@ export async function POST(
   }
   try {
     const ctx = await getCtx();
-    const lock = takeover
-      ? await takeoverBoardLock(ctx, id)
-      : await heartbeatBoardLock(ctx, id);
-    return NextResponse.json({ lock });
+    if (takeover) {
+      const lock = await takeoverBoardLock(ctx, id);
+      return NextResponse.json({ lock, acquired: true });
+    }
+    const result = await heartbeatBoardLock(ctx, id);
+    return NextResponse.json(result);
   } catch (err) {
     if (isBoardLockedError(err)) {
       return NextResponse.json(
@@ -52,6 +54,7 @@ export async function POST(
             userId: err.holderUserId,
             userName: err.holderName,
           },
+          acquired: false,
         },
         { status: 423 },
       );

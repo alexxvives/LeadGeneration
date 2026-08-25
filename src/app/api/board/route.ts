@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCtx, getWorkspaceSummary } from "@/lib/request-context";
-import { clearBoard, getLatestBoard } from "@/lib/service";
+import { clearBoard, getLatestBoard, resolveBoardAccess } from "@/lib/service";
 import { getCapabilities } from "@/lib/config";
 
 export const runtime = "nodejs";
@@ -63,7 +63,12 @@ export async function GET(req: Request) {
           d.setUTCHours(0, 0, 0, 0);
           return d.toISOString();
         })();
-  const sendsToday = await ctx.db.countSentSince(dayStart, {
+  let sendDb = ctx.db;
+  if (board.activeBoardId) {
+    const access = await resolveBoardAccess(ctx, board.activeBoardId);
+    if (access) sendDb = access.db;
+  }
+  const sendsToday = await sendDb.countSentSince(dayStart, {
     boardId: board.activeBoardId,
   });
   const ws = await ctx.db.getWorkspace(ctx.workspaceId);
