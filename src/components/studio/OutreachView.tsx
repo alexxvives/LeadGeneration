@@ -82,7 +82,7 @@ export function needsOutreachDraft(lead: LeadWithOutreach): boolean {
   return !s || s === "rejected";
 }
 
-/** Email lead with a draft that Re-draft all can rewrite (includes Ready). */
+/** Email lead with a draft that Re-draft all rewrites (Ready column). */
 export function canRedraftOutreach(lead: LeadWithOutreach): boolean {
   if (!leadEmail(lead)) return false;
   if (isContacted(lead)) return false;
@@ -376,12 +376,12 @@ export function OutreachView({
                       })}
                     </div>
                   ) : null}
-                  {key === "ready" && redraftAllAvailable ? (
+                  {key === "review" && redraftAllAvailable ? (
                     <button
                       type="button"
                       onClick={() => void onDraftAll({ redraft: true })}
                       disabled={busySet.has("draft-all")}
-                      title="Rewrite every drafted email from the active profile"
+                      title="Rewrite Ready emails and draft remaining Contact Draft leads"
                       className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
                     >
                       {busySet.has("draft-all") ? (

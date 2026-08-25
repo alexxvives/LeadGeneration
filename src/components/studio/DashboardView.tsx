@@ -214,11 +214,6 @@ function DashboardLoaded({
                   <div className="flex items-center justify-between text-sm">
                     <span className="truncate font-medium text-mist-100">
                       {b.name}
-                      {b.isDefault ? (
-                        <span className="ml-1.5 text-[10px] uppercase text-mist-500">
-                          Default
-                        </span>
-                      ) : null}
                     </span>
                     <span className="text-mist-400">
                       {b.leadCount} · {b.sentCount} sent

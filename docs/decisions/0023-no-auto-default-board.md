@@ -12,15 +12,16 @@ encouraged duplicate empty outreach profiles.
 
 ## Decision
 
-1. **Do not auto-create** a Default board. `ensureDefaultBoard` only heals
-   duplicate-default collapse and orphan lead/run backfill onto an *existing*
-   board.
+1. **Do not auto-create** a Default board. `ensureDefaultBoard` clears leftover
+   `isDefault` flags, deletes empty boards named "Default", and back-fills
+   orphan leads/runs onto an existing board.
 2. **Search / import / manual lead** require an explicit `boardId` or
    `newBoardName` — no silent fallback.
-3. **Delete** may remove any board (including legacy `isDefault`). Leads move
-   to another remaining board; deleting the last board with leads is blocked.
-4. Legacy `isDefault` rows may remain until users delete them; new boards are
-   never flagged default.
+3. **Delete** may remove any board. Leads move to another remaining board;
+   deleting the last board with leads is blocked.
+4. New workspaces start with **zero boards**. The getting-started tour creates
+   a named board (e.g. "Austin dental clinics"), never "Default". Empty
+   leftover Default boards are removed by migration `0034` and the heal path.
 
 ## Alternatives considered
 
@@ -28,11 +29,11 @@ encouraged duplicate empty outreach profiles.
 | --- | --- |
 | Keep Default as catch-all | Users ignore it; orphans rare after migrate |
 | Soft-hide Default in UI only | Still created on every new workspace |
-| Auto-delete empty Default | Racey; better to stop creating |
+| Auto-delete Default boards that still have leads | Would hide real user data |
 
 ## Consequences
 
 - `BoardAssignModal` opens in create mode when the workspace has zero boards.
 - Boards UI no longer blocks delete on `isDefault`.
-- Demo `scripts/seed.ts` may still ship a local Default for zero-key demo data.
+- Demo `scripts/seed.ts` uses a named board ("Austin dental clinics"), not Default.
 - ADR 0014's "exactly one Default" rule is superseded for new workspaces.

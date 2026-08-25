@@ -36,8 +36,9 @@ Search  →  Enrich  →  Draft  →  Send
    verify blocks show a confirm modal; hard junk removes the address. Status
    flows `draft → sending → sent` (or `failed`; retry Send). Successful send
    advances CRM stage to **Contacted**. Nothing sends without that click.
-   **Outreach → Draft all** writes missing drafts into Ready; **Re-draft all**
-   rewrites Ready copy from the active profile. **Send stays per-lead**
+   **Outreach → Contact Draft → Draft all** writes missing drafts into Ready;
+   **Re-draft all** (same column) rewrites Ready copy and drafts remaining
+   Contact Draft leads. **Send stays per-lead**
    (Art. I.1 / ADR 0029).
 
 ## 3. Screens
@@ -94,9 +95,9 @@ Search  →  Enrich  →  Draft  →  Send
     accumulate as the board hydrates; zoom/pan stay put until you change board.
 
   - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (email
-    leads with no draft yet; **Draft all** writes them) → **Ready** (has a
-    draft, or phone-only; send or call as icons; **Re-draft all** rewrites
-    email copy) → **Contacted**.
+    leads with no draft yet; **Draft all** writes them; **Re-draft all** rewrites
+    Ready emails *and* drafts remaining Contact Draft leads) → **Ready** (has a
+    draft, or phone-only; send or call as icons) → **Contacted**.
     Phone-only Ready rows open a call log without leaving Ready. **Save** or
     **Skip details** marks Contacted; **Missed call** journals the miss and
     stays in Ready.
@@ -110,7 +111,9 @@ Search  →  Enrich  →  Draft  →  Send
   - **Calendar** (`?view=calendar`) — month view of the active board filter.
     Each day lists **follow-ups** (dated reminders from **Follow up**),
     **emails sent**, and **phone calls** logged that day — shown as calendar /
-    mail / phone icons on the day cell. An open follow-up whose date is at
+    mail / phone icons **with counts** on the day cell. Sidebar group titles
+    (Follow-ups / Emails sent / Phone calls) show the same totals. The
+    studio search bar filters calendar events by lead. An open follow-up whose date is at
     least one day past fills that day square in **red** (same selected-day
     treatment, rose instead of aurora) — the calendar icon stays violet.
     Tick the checkbox on Calendar to mark a follow-up done (strikethrough
@@ -135,7 +138,9 @@ Search  →  Enrich  →  Draft  →  Send
     out and shows on Calendar; **Missed call** writes the journal line
     immediately — no composer — as `Missed call by {name}`, no trailing colon). Journal lines are chronological (oldest first)
     with a kind tag (purple **Follow up**, amber **Note**, gray **Missed** —
-    tag only; the date/body use the same ink as other notes).
+    tag only; the date/body use the same ink as other notes). Calendar cards
+    do not repeat a “Missed” chip next to the company name — the journal line
+    already says it.
     **Add Note** in the header matches the amber tag. Notes can be edited
     or deleted; delete offers **Undo** for a few seconds. Done-state for follow-ups is ticked on Calendar only.
     Toggling **Phone** opens a call log with the caret after

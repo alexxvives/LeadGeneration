@@ -9,22 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-25 (drawer skeleton / pipeline search)
+## ⏱️ Status — updated 2026-08-25 (outreach / calendar / Default boards)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0033** remote applied.
+**Migrations:** 0021–**0034** remote — apply `0034` on deploy (drop empty Default boards).
 
 ### This pass
-- Lead drawer shows About / notes / email skeletons until GET hydrates.
-- Pipeline search misses no longer keep empty columns in a loading
-  skeleton (that used unfiltered stage totals).
-- Rebuilt OpenNext then deployed (`f09c99e3-a0f1-4ab2-affa-3642f2bf1585`)
-  so client chunks actually updated.
+- Re-draft all moved to Contact Draft; also drafts remaining leads there.
+- Lucide-animated nav / calendar chrome / theme toggle (parent-hover).
+- Empty Default boards deleted; tour/seed never create one.
+- Follow-up save works on date-only edits.
+- Calendar: no “Missed” chip by name, search bar, counts on cells + titles.
 
 ### Next
-1. Hard-refresh Pipeline: search with no hits → empty copy, not skeletons.
-   Open a lead card → shimmer in About/notes until details land.
-2. Ona: sign in as `onaparadell@gmail.com` → Boards → **Accept invite**.
+1. Apply `0034` remotely (`npm run cf:migrate`) then deploy.
+2. Hard-refresh Outreach + Calendar after deploy.
 
 ---
 

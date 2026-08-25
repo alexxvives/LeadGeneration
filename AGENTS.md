@@ -130,7 +130,7 @@ src/lib/
   billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.
-migrations/          D1 SQL 0001–**0033** (init … missed-call notes drop trailing colon).
+migrations/          D1 SQL 0001–**0034** (init … drop empty Default boards).
 wrangler.jsonc, open-next.config.ts   Cloudflare Workers deploy config.
 data/                Local JSON DB (git-ignored).
 ```

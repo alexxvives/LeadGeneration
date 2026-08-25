@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  type ComponentType,
+  type MouseEvent,
+  type Ref,
   useCallback,
   useEffect,
   useRef,
   useState,
-  type ComponentType,
-  type SVGProps,
 } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { BrandMark } from "@/components/BrandMark";
@@ -32,25 +33,102 @@ import {
   setActiveOutreachProfile,
 } from "@/lib/sender-profile";
 import type { BoardSummary } from "@/lib/types";
+import { LayoutGridIcon } from "@/components/lucide-animated/layout-grid";
+import { SearchIcon } from "@/components/lucide-animated/search";
+import { UsersIcon } from "@/components/lucide-animated/users";
+import { FolderKanbanIcon } from "@/components/lucide-animated/folder-kanban";
+import { MailboxIcon } from "@/components/lucide-animated/mailbox";
+import { CalendarDaysIcon } from "@/components/lucide-animated/calendar-days";
+import { LayersIcon } from "@/components/lucide-animated/layers";
+import { HistoryIcon } from "@/components/lucide-animated/history";
+import { ShieldCheckIcon } from "@/components/lucide-animated/shield-check";
+import { SettingsIcon } from "@/components/lucide-animated/settings";
+import { LogoutIcon } from "@/components/lucide-animated/logout";
+import { ChevronLeftIcon } from "@/components/lucide-animated/chevron-left";
+import { ChevronRightIcon } from "@/components/lucide-animated/chevron-right";
 import {
-  SearchIcon,
-  SettingsIcon,
-  PipelineIcon,
-  HistoryIcon,
-  LogoutIcon,
-  MailIcon,
-  UsersIcon,
-  DashboardIcon,
-  BoardsIcon,
-  CalendarIcon,
-  ShieldIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "@/components/icons";
+  useIconMotion,
+  type IconMotionHandle,
+} from "@/components/lucide-animated/hover";
 
 const SIDEBAR_COLLAPSED_KEY = "hermes_sidebar_collapsed";
 
-type Icon = ComponentType<SVGProps<SVGSVGElement>>;
+type AnimatedIcon = ComponentType<{
+  size?: number;
+  className?: string;
+  ref?: Ref<IconMotionHandle>;
+}>;
+
+function StudioNavLink({
+  href,
+  label,
+  icon: Icon,
+  active,
+  wide,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  icon: AnimatedIcon;
+  active: boolean;
+  wide: boolean;
+  onNavigate: () => void;
+}) {
+  const { ref, bind } = useIconMotion();
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      title={label}
+      {...bind}
+      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[1.05rem] font-medium transition-colors ${
+        wide ? "justify-center sm:justify-start" : "justify-center"
+      } ${
+        active
+          ? "bg-aurora-400/10 text-aurora-300"
+          : "text-mist-300 hover:bg-white/5 hover:text-mist-100"
+      }`}
+    >
+      <Icon
+        ref={ref}
+        size={20}
+        className={`flex shrink-0 ${
+          active ? "text-aurora-300" : "text-mist-500 group-hover:text-aurora-300"
+        }`}
+        aria-hidden
+      />
+      <span className={wide ? "hidden sm:inline" : "hidden"}>{label}</span>
+    </Link>
+  );
+}
+
+function MotionIconControl({
+  label,
+  icon: Icon,
+  onClick,
+  className,
+  size = 16,
+}: {
+  label: string;
+  icon: AnimatedIcon;
+  onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
+  className?: string;
+  size?: number;
+}) {
+  const { ref, bind } = useIconMotion();
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={className}
+      {...bind}
+    >
+      <Icon ref={ref} size={size} className="flex" aria-hidden />
+    </button>
+  );
+}
 
 const GUEST_KEY = "hermes_guest";
 const GUEST_LEGACY = ["leadify_guest", "lodestar_guest"];
@@ -320,7 +398,7 @@ export function StudioShell({
     items: {
       href: string;
       label: string;
-      icon: Icon;
+      icon: AnimatedIcon;
       active: boolean;
     }[];
   }[] = [
@@ -330,7 +408,7 @@ export function StudioShell({
         {
           href: "/app?view=dashboard",
           label: "Dashboard",
-          icon: DashboardIcon,
+          icon: LayoutGridIcon,
           active: onApp && displayView === "dashboard",
         },
       ],
@@ -358,19 +436,19 @@ export function StudioShell({
         {
           href: "/app?view=pipeline",
           label: "Pipeline",
-          icon: PipelineIcon,
+          icon: FolderKanbanIcon,
           active: onApp && displayView === "pipeline",
         },
         {
           href: "/app?view=outreach",
           label: "Outreach",
-          icon: MailIcon,
+          icon: MailboxIcon,
           active: onApp && displayView === "outreach",
         },
         {
           href: "/app?view=calendar",
           label: "Calendar",
-          icon: CalendarIcon,
+          icon: CalendarDaysIcon,
           active: onApp && displayView === "calendar",
         },
       ],
@@ -381,7 +459,7 @@ export function StudioShell({
         {
           href: "/app?view=boards",
           label: "Boards",
-          icon: BoardsIcon,
+          icon: LayersIcon,
           active: onApp && displayView === "boards",
         },
         {
@@ -400,7 +478,7 @@ export function StudioShell({
               {
                 href: "/app?view=admin",
                 label: "Platform",
-                icon: ShieldIcon,
+                icon: ShieldCheckIcon,
                 active: onApp && displayView === "admin",
               },
               {
@@ -427,25 +505,19 @@ export function StudioShell({
         }`}
       >
         {wide ? (
-          <button
-            type="button"
+          <MotionIconControl
+            label="Collapse sidebar"
+            icon={ChevronLeftIcon}
             onClick={toggleSidebarCollapsed}
             className="absolute right-2 top-3 z-10 hidden rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100 sm:inline-flex"
-            aria-label="Collapse sidebar"
-            title="Collapse menu"
-          >
-            <ChevronLeftIcon className="h-4 w-4" />
-          </button>
+          />
         ) : (
-          <button
-            type="button"
+          <MotionIconControl
+            label="Expand sidebar"
+            icon={ChevronRightIcon}
             onClick={toggleSidebarCollapsed}
             className="mb-3 hidden items-center justify-center self-center rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100 sm:inline-flex"
-            aria-label="Expand sidebar"
-            title="Expand menu"
-          >
-            <ChevronRightIcon className="h-4 w-4" />
-          </button>
+          />
         )}
 
         <Link
@@ -473,35 +545,21 @@ export function StudioShell({
                 {section.label}
               </p>
               {section.items.map((item) => {
-                const Icon = item.icon;
                 const viewKey = (() => {
                   const q = item.href.indexOf("?");
                   if (q < 0) return "";
                   return new URLSearchParams(item.href.slice(q + 1)).get("view") ?? "";
                 })();
                 return (
-                  <Link
+                  <StudioNavLink
                     key={item.href}
                     href={boardHref(item.href)}
-                    onClick={() => setPendingNavView(viewKey)}
-                    title={item.label}
-                    className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[1.05rem] font-medium transition-colors ${
-                      wide ? "justify-center sm:justify-start" : "justify-center"
-                    } ${
-                      item.active
-                        ? "bg-aurora-400/10 text-aurora-300"
-                        : "text-mist-300 hover:bg-white/5 hover:text-mist-100"
-                    }`}
-                  >
-                    <Icon
-                      className={`h-5 w-5 shrink-0 transition-transform duration-300 ease-out group-hover:scale-125 group-hover:-translate-y-0.5 group-hover:rotate-[-6deg] ${
-                        item.active ? "text-aurora-300" : "text-mist-500 group-hover:text-aurora-300"
-                      }`}
-                    />
-                    <span className={wide ? "hidden sm:inline" : "hidden"}>
-                      {item.label}
-                    </span>
-                  </Link>
+                    label={item.label}
+                    icon={item.icon}
+                    active={item.active}
+                    wide={wide}
+                    onNavigate={() => setPendingNavView(viewKey)}
+                  />
                 );
               })}
             </div>
@@ -558,18 +616,16 @@ export function StudioShell({
                   </p>
                 </div>
                 {signedIn ? (
-                  <button
-                    type="button"
+                  <MotionIconControl
+                    label="Sign out"
+                    icon={LogoutIcon}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       void signOut({ callbackUrl: "/" });
                     }}
-                    title="Sign out"
                     className="rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200"
-                  >
-                    <LogoutIcon className="h-4 w-4" />
-                  </button>
+                  />
                 ) : (
                   <button
                     type="button"
@@ -601,26 +657,24 @@ export function StudioShell({
                   : "text-mist-500 hover:bg-white/5 hover:text-aurora-300"
               }`}
             >
-              <SettingsIcon className="h-5 w-5" />
+              <SettingsIcon size={20} className="flex" aria-hidden />
             </Link>
             {signedIn ? (
-              <button
-                type="button"
-                onClick={() => signOut({ callbackUrl: "/" })}
-                title="Sign out"
+              <MotionIconControl
+                label="Sign out"
+                icon={LogoutIcon}
+                size={20}
+                onClick={() => void signOut({ callbackUrl: "/" })}
                 className="rounded-xl p-2.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200"
-              >
-                <LogoutIcon className="h-5 w-5" />
-              </button>
+              />
             ) : (
-              <button
-                type="button"
+              <MotionIconControl
+                label="Sign in"
+                icon={MailboxIcon}
+                size={20}
                 onClick={() => setAuthOpen(true)}
-                title="Sign in"
                 className="rounded-xl p-2.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-aurora-300"
-              >
-                <MailIcon className="h-5 w-5" />
-              </button>
+              />
             )}
           </div>
         </div>

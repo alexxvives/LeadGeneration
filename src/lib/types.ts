@@ -224,13 +224,13 @@ export interface Workspace {
 /**
  * Named collection of leads within a workspace (ADR 0014, amended by 0023).
  * Boards are created at search/import time — no auto "Default" board.
- * Legacy `isDefault` may still exist on older rows until cleaned up.
+ * Legacy `isDefault` is unused; leftover Default boards are deleted when empty.
  */
 export interface Board {
   id: string;
   workspaceId: string;
   name: string;
-  /** Legacy flag; new boards are never default (ADR 0023). */
+  /** Unused. New boards are never default; leftover flags are cleared (ADR 0023). */
   isDefault: boolean;
   /**
    * Outreach profile (pitch + Easy From/keys) for this board (ADR 0022).
@@ -557,6 +557,6 @@ export interface CreateRunInput {
    * (constitution Art. I.2: zero-key mode still works via the Load demo button).
    */
   demo?: boolean;
-  /** Board to assign new leads to. Defaults to the workspace default board. */
+  /** Board to assign new leads to. Required — no silent Default board. */
   boardId?: string | null;
 }

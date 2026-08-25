@@ -170,11 +170,6 @@ export function BoardAssignModal({
                 >
                   <span className="truncate text-sm font-medium">
                     {b.name}
-                    {b.isDefault ? (
-                      <span className="ml-2 text-[10px] uppercase tracking-wider text-mist-500">
-                        Default
-                      </span>
-                    ) : null}
                   </span>
                   <span className="shrink-0 text-xs text-mist-500">
                     {b.leadCount} lead{b.leadCount === 1 ? "" : "s"}

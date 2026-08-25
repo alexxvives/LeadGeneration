@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-25 — Re-draft all, calendar counts, no Default board
+- **Re-draft all** lives on Contact Draft. It rewrites Ready emails and also
+  drafts remaining Contact Draft leads (Draft all stays for remaining-only).
+- Follow-up Save needs a date only — empty note + date change must persist.
+- Calendar: search bar, per-kind counts on day cells and sidebar titles,
+  no extra “Missed” chip next to the company name.
+- Empty boards named Default are deleted (migration 0034 + `ensureDefaultBoard`
+  heal). New workspaces and the tour never create one.
+- Studio nav uses lucide-animated icons; parent hover (`useIconMotion`) so the
+  whole row animates, not only the glyph. Dense lists stay on `icons.tsx`.
+
 ### 2026-08-25 — Pipeline search kept empty columns spinning
 - Column empty state used unfiltered CRM `stageCounts`. A search with no
   hits still had count > 0, so those lanes showed card skeletons forever.

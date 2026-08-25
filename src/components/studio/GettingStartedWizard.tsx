@@ -404,8 +404,12 @@ export function GettingStartedWizard({
       try {
         const data = await api.board(null);
         if (cancelled || (data.leads?.length ?? 0) > 0) return;
-        const def =
-          data.boards?.find((b) => b.isDefault)?.id ?? data.boards?.[0]?.id;
+        const existing = data.boards?.[0]?.id ?? null;
+        let boardId = existing;
+        if (!boardId) {
+          const { board } = await api.createBoard("Austin dental clinics");
+          boardId = board.id;
+        }
         const { run } = await api.createRun({
           niche: "boutique dental clinics",
           location: "Austin, TX",
@@ -414,7 +418,7 @@ export function GettingStartedWizard({
           demo: true,
           autoDraft: true,
           maxLeads: 6,
-          boardId: def,
+          boardId,
         });
         if (cancelled) return;
         const { leads } = await api.runWithLeads(run.id);

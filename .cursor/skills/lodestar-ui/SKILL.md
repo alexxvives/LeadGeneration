@@ -112,10 +112,12 @@ token becomes the page color in light mode).
 ```
 
 ## Icons
-All icons live in `src/components/icons.tsx` — inline SVG, no dependency.
-Available: `SearchIcon ArrowIcon MailIcon SendIcon PlusIcon CheckIcon XIcon GlobeIcon PhoneIcon
-SparkIcon StarIcon ShieldIcon SettingsIcon EyeIcon EyeOffIcon CalendarIcon`.
-Add new icons there (same pattern: `SVGProps<SVGSVGElement>`, `currentColor`).
+Dense UI (pipeline cards, drawer chips) uses inline SVGs in `src/components/icons.tsx`.
+Studio nav, calendar chrome, theme toggle, and the Find-leads compact CTA use
+[lucide-animated](https://lucide-animated.com/) in `src/components/lucide-animated/`
+(Motion, hover-only). Drive animation from the parent hover target (`useIconMotion`)
+so the label, not just the 20px glyph, retriggers the motion. Do not animate every
+tiny icon in a list.
 
 ## Architecture rules (never break)
 - `"use client"` only on components that need browser APIs/hooks.
@@ -128,4 +130,5 @@ Add new icons there (same pattern: `SVGProps<SVGSVGElement>`, `currentColor`).
 - No inline `style={}` for colors — use the token classes.
 - No magic numbers for spacing/radius — use Tailwind scale + `rounded-xl2`.
 - No `any` TypeScript without a comment explaining why.
-- No heavy animation libraries (Framer Motion variants etc.) — use CSS keyframes.
+- No heavy animation libraries (Framer Motion variants etc.) on dense lists —
+  lucide-animated is allowed for nav / calendar chrome / theme toggle only.

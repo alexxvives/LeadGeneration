@@ -98,8 +98,8 @@ const db = {
     {
       id: boardId,
       workspaceId: WORKSPACE_ID,
-      name: "Default",
-      isDefault: true,
+      name: "Austin dental clinics",
+      isDefault: false,
       createdAt: now,
       updatedAt: now,
     },

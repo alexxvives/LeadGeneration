@@ -189,27 +189,6 @@ export function BoardsView({
       ) : null}
 
       <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Default first, then pending invites to its right, then other boards. */}
-        {boards
-          .filter((b) => b.isDefault)
-          .map((b) => (
-            <BoardCard
-              key={b.id}
-              board={b}
-              editingId={editingId}
-              editName={editName}
-              onSelect={() => onSelectBoard?.(b.id)}
-              onStartEdit={() => {
-                setEditingId(b.id);
-                setEditName(b.name);
-              }}
-              onEditName={setEditName}
-              onSaveEdit={() => void handleRename(b.id)}
-              onCancelEdit={() => setEditingId(null)}
-              onDelete={() => void handleDelete(b.id)}
-              onInvite={() => setInviteBoard(b)}
-            />
-          ))}
         {invites.map((inv) => (
           <li key={inv.id}>
             <div className="flex h-full flex-col rounded-xl2 border-2 border-dashed border-amber-400/45 bg-amber-400/[0.06] p-5">
@@ -239,9 +218,7 @@ export function BoardsView({
             </div>
           </li>
         ))}
-        {boards
-          .filter((b) => !b.isDefault)
-          .map((b) => (
+        {boards.map((b) => (
             <BoardCard
               key={b.id}
               board={b}

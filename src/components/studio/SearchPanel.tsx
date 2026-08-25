@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { SearchIcon } from "@/components/icons";
+import { SearchIcon } from "@/components/lucide-animated/search";
 import { Spinner } from "@/components/ui";
 import type { PlanId, SearchStrategy } from "@/lib/types";
 import { getPlan, LEAD_COUNT_OPTIONS } from "@/lib/plans";
@@ -390,7 +390,7 @@ export function SearchPanel({
         onClick={() => setOpen(true)}
         className="glass inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-mist-100 transition-transform hover:scale-[1.02]"
       >
-        <SearchIcon className="h-4 w-4 text-aurora-300" />
+        <SearchIcon size={16} className="flex text-aurora-300" aria-hidden />
         New search
       </button>
     );

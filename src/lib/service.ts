@@ -178,46 +178,46 @@ const defaultBoardOrphansChecked = new Set<string>();
 
 /**
  * Heal board invariants without auto-creating a "Default" board.
- * - Collapse duplicate `isDefault` boards onto the oldest.
+ * - Clear leftover `isDefault` flags (ADR 0023).
+ * - Delete empty boards named "Default".
  * - Back-fill orphan leads/runs (empty boardId) onto an existing board once
  *   per workspace per isolate.
- * Returns a fallback board (default flag, else oldest) or null when empty.
+ * Returns a fallback board (oldest remaining) or null when empty.
  * Users create boards at search/import time (ADR 0023).
  */
 export async function ensureDefaultBoard(ctx: Ctx): Promise<Board | null> {
   const { db } = ctx;
-  const boards = await db.listBoards();
-  const defaults = boards
-    .filter((b) => b.isDefault)
-    .sort(
-      (a, b) =>
-        a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
-    );
-  let def = defaults[0] ?? null;
+  let boards = await db.listBoards();
 
-  if (defaults.length > 1 && def) {
-    for (const extra of defaults.slice(1)) {
-      const [extraLeads, extraRuns] = await Promise.all([
-        db.listLeads({ boardId: extra.id }),
-        db.listRuns(),
-      ]);
-      await Promise.all([
-        ...extraLeads.map((l) => db.updateLead(l.id, { boardId: def!.id })),
-        ...extraRuns
-          .filter((r) => r.boardId === extra.id)
-          .map((r) => db.updateRun(r.id, { boardId: def!.id })),
-      ]);
-      await db.updateBoard(extra.id, { isDefault: false, updatedAt: nowIso() });
-      await db.deleteBoard(extra.id);
-    }
+  for (const b of boards.filter((row) => row.isDefault)) {
+    await db.updateBoard(b.id, { isDefault: false, updatedAt: nowIso() });
   }
 
-  if (!def && boards.length > 0) {
-    def = [...boards].sort(
+  const counts = await db.countLeadsByBoard();
+  const runBoardIds = new Set(
+    (await db.listRuns()).map((r) => r.boardId).filter(Boolean),
+  );
+  const emptyDefaults = boards.filter((b) => {
+    if (b.name.trim().toLowerCase() !== "default") return false;
+    const leads = counts[b.id]?.total ?? 0;
+    return leads === 0 && !runBoardIds.has(b.id);
+  });
+  for (const extra of emptyDefaults) {
+    await db.deleteBoard(extra.id);
+  }
+  if (emptyDefaults.length > 0) {
+    boards = await db.listBoards();
+  } else {
+    boards = boards
+      .filter((b) => !emptyDefaults.some((d) => d.id === b.id))
+      .map((b) => (b.isDefault ? { ...b, isDefault: false } : b));
+  }
+
+  const def =
+    [...boards].sort(
       (a, b) =>
         a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
-    )[0]!;
-  }
+    )[0] ?? null;
 
   if (def && !defaultBoardOrphansChecked.has(ctx.workspaceId)) {
     defaultBoardOrphansChecked.add(ctx.workspaceId);
@@ -323,7 +323,6 @@ export async function listBoardSummaries(ctx: Ctx): Promise<BoardSummary[]> {
 
   return summaries.sort((a, b) => {
     if (a.shared !== b.shared) return a.shared ? 1 : -1;
-    if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
 }

@@ -1685,8 +1685,10 @@ export function Studio() {
   const onDraftAllOutreach = async (opts?: { redraft?: boolean }) => {
     if (!board) return;
     const redraft = Boolean(opts?.redraft);
-    const targets = board.leads.filter(
-      redraft ? canRedraftOutreach : needsOutreachDraft,
+    const targets = board.leads.filter((lead) =>
+      redraft
+        ? canRedraftOutreach(lead) || needsOutreachDraft(lead)
+        : needsOutreachDraft(lead),
     );
     if (targets.length === 0) return;
 
@@ -1726,7 +1728,9 @@ export function Studio() {
         ),
       );
       const unit = `draft${ok === 1 ? "" : "s"}`;
-      const verb = redraft ? "rewritten" : "moved to Ready to Contact";
+      const verb = redraft
+        ? "rewritten or moved to Ready to Contact"
+        : "moved to Ready to Contact";
       if (ac.signal.aborted) {
         toast(
           "ok",
@@ -1978,7 +1982,10 @@ export function Studio() {
     view === "calendar";
   const showLeadSearch =
     hasLeads &&
-    (view === "leads" || view === "pipeline" || view === "outreach");
+    (view === "leads" ||
+      view === "pipeline" ||
+      view === "outreach" ||
+      view === "calendar");
 
   // Skeleton for hydrate / first body / first visit to a layout tab only.
   const layoutPaneReady = visitedLayouts.has(layoutTab);
@@ -2643,7 +2650,7 @@ export function Studio() {
             <EmptyState actionHref={searchHref} actionLabel="Find leads to follow up" />
           ) : (
             <CalendarView
-              leads={board.leads}
+              leads={searchFilteredLeads}
               onOpenLead={openInfo}
               onToggleFollowUp={(leadId, fuId, done) => {
                 const lead = board.leads.find((l) => l.id === leadId);

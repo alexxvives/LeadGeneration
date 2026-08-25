@@ -607,7 +607,7 @@ export function LeadDrawer(props: DrawerProps) {
   };
 
   const saveEditFollowUp = async () => {
-    if (!editingId || !editDate || !editText.trim()) return;
+    if (!editingId || !editDate) return;
     const updated = followUps.map((f) =>
       f.id === editingId
         ? {
@@ -1179,7 +1179,7 @@ export function LeadDrawer(props: DrawerProps) {
                                 <button
                                   type="button"
                                   onClick={() => void saveEditFollowUp()}
-                                  disabled={!editDate || !editText.trim()}
+                                  disabled={!editDate}
                                   className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent disabled:opacity-40"
                                 >
                                   Save
