@@ -18,6 +18,7 @@ import {
 import { useStableDuringLoad } from "./skeletons";
 import { leadHydrateLane } from "@/lib/lead-lanes";
 import { VirtualColumnList } from "./virtual-list";
+import { Lockable, useBoardLockUi } from "./board-lock";
 
 type OutreachBucket = "review" | "ready" | "contacted";
 /** Ready-column contact-channel filter. */
@@ -201,6 +202,7 @@ export function OutreachView({
   /** Ready phone-only: open the call log without moving to Contacted yet. */
   onLogCall?: (leadId: string) => void;
 }) {
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const busySet = useMemo(() => new Set(busyIds), [busyIds]);
   const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
   const skipReadyChannelPersist = useRef(true);
@@ -377,36 +379,48 @@ export function OutreachView({
                     </div>
                   ) : null}
                   {key === "review" && redraftAllAvailable ? (
-                    <button
-                      type="button"
-                      onClick={() => void onDraftAll({ redraft: true })}
-                      disabled={busySet.has("draft-all")}
-                      title="Rewrite Ready emails and draft remaining Contact Draft leads"
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                    >
+                    <Lockable>
+                      <button
+                        type="button"
+                        onClick={() => void onDraftAll({ redraft: true })}
+                        disabled={editLocked || busySet.has("draft-all")}
+                        title={
+                          editLocked
+                            ? lockHint
+                            : "Rewrite Ready emails and draft remaining Contact Draft leads"
+                        }
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
+                      >
                       {busySet.has("draft-all") ? (
                         <Spinner className="h-3 w-3" />
                       ) : (
                         <PencilIcon className="h-3 w-3" />
                       )}
-                      Re-draft all
-                    </button>
+                        Re-draft all
+                      </button>
+                    </Lockable>
                   ) : null}
                   {key === "review" && draftAllRemaining ? (
-                    <button
-                      type="button"
-                      onClick={() => void onDraftAll()}
-                      disabled={busySet.has("draft-all")}
-                      title="Draft remaining email leads — they move to Ready to Contact"
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                    >
+                    <Lockable>
+                      <button
+                        type="button"
+                        onClick={() => void onDraftAll()}
+                        disabled={editLocked || busySet.has("draft-all")}
+                        title={
+                          editLocked
+                            ? lockHint
+                            : "Draft remaining email leads — they move to Ready to Contact"
+                        }
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
+                      >
                       {busySet.has("draft-all") ? (
                         <Spinner className="h-3 w-3" />
                       ) : (
                         <CheckIcon className="h-3 w-3" />
                       )}
-                      Draft all
-                    </button>
+                        Draft all
+                      </button>
+                    </Lockable>
                   ) : null}
                 </div>
               </div>
@@ -491,6 +505,7 @@ function OutreachRow({
   ) => Promise<void>;
   onLogCall?: () => void;
 }) {
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const email = leadEmail(lead);
   const phone = leadPhone(lead);
   const phoneOnly = !email && Boolean(phone);
@@ -515,6 +530,7 @@ function OutreachRow({
     }
     if (bucket === "review") {
       if (hasDraft) onOpenDraft();
+      else if (editLocked) onOpenInfo();
       else void onCreateDraft();
       return;
     }
@@ -583,31 +599,45 @@ function OutreachRow({
       <div className="flex shrink-0 flex-col items-end gap-1">
         {bucket === "review" && (
           <div className="flex items-center justify-end gap-1">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                if (hasDraft) onOpenDraft();
-                else void onCreateDraft();
-              }}
-              aria-label={hasDraft ? "Review draft" : "Create draft"}
-              title={
-                hasDraft
-                  ? "Open draft"
-                  : email
-                    ? "Create draft from active profile — moves to Ready"
-                    : "Create draft (add email in the composer if needed)"
-              }
-              className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
-            >
-              {busy ? (
-                <Spinner className="h-2.5 w-2.5" />
-              ) : hasDraft ? (
-                <EyeIcon className="h-2.5 w-2.5" />
-              ) : (
-                <PlusIcon className="h-2.5 w-2.5" />
-              )}
-            </button>
+            {hasDraft ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onOpenDraft}
+                aria-label="Review draft"
+                title="Open draft"
+                className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
+              >
+                {busy ? (
+                  <Spinner className="h-2.5 w-2.5" />
+                ) : (
+                  <EyeIcon className="h-2.5 w-2.5" />
+                )}
+              </button>
+            ) : (
+              <Lockable>
+                <button
+                  type="button"
+                  disabled={busy || editLocked}
+                  onClick={() => void onCreateDraft()}
+                  aria-label={editLocked ? lockHint : "Create draft"}
+                  title={
+                    editLocked
+                      ? lockHint
+                      : email
+                        ? "Create draft from active profile — moves to Ready"
+                        : "Create draft (add email in the composer if needed)"
+                  }
+                  className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
+                >
+                  {busy ? (
+                    <Spinner className="h-2.5 w-2.5" />
+                  ) : (
+                    <PlusIcon className="h-2.5 w-2.5" />
+                  )}
+                </button>
+              </Lockable>
+            )}
           </div>
         )}
         {bucket === "ready" && (
@@ -625,39 +655,66 @@ function OutreachRow({
                 </button>
               ) : null}
               {email ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void onSend()}
-                  aria-label={canSendEmail ? "Send" : "Send (simulate)"}
-                  title={canSendEmail ? "Send" : "Send (simulate)"}
-                  className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
-                >
-                  {busy ? <Spinner className="h-2.5 w-2.5" /> : <SendIcon className="h-2.5 w-2.5" />}
-                </button>
+                <Lockable>
+                  <button
+                    type="button"
+                    disabled={busy || editLocked}
+                    onClick={() => void onSend()}
+                    aria-label={
+                      editLocked
+                        ? lockHint
+                        : canSendEmail
+                          ? "Send"
+                          : "Send (simulate)"
+                    }
+                    title={
+                      editLocked
+                        ? lockHint
+                        : canSendEmail
+                          ? "Send"
+                          : "Send (simulate)"
+                    }
+                    className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
+                  >
+                    {busy ? <Spinner className="h-2.5 w-2.5" /> : <SendIcon className="h-2.5 w-2.5" />}
+                  </button>
+                </Lockable>
               ) : phoneOnly ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => {
-                    if (onLogCall) onLogCall();
-                    else void onMarkContacted("phone", { promptNote: true });
-                  }}
-                  aria-label="Log a call — stays in Ready until you save as connected"
-                  title="Log the call. Missed stays in Ready; connected moves to Contacted."
-                  className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
-                >
-                  {busy ? <Spinner className="h-2.5 w-2.5" /> : <PhoneIcon className="h-2.5 w-2.5" />}
-                </button>
+                <Lockable>
+                  <button
+                    type="button"
+                    disabled={busy || editLocked}
+                    onClick={() => {
+                      if (onLogCall) onLogCall();
+                      else void onMarkContacted("phone", { promptNote: true });
+                    }}
+                    aria-label={
+                      editLocked
+                        ? lockHint
+                        : "Log a call — stays in Ready until you save as connected"
+                    }
+                    title={
+                      editLocked
+                        ? lockHint
+                        : "Log the call. Missed stays in Ready; connected moves to Contacted."
+                    }
+                    className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
+                  >
+                    {busy ? <Spinner className="h-2.5 w-2.5" /> : <PhoneIcon className="h-2.5 w-2.5" />}
+                  </button>
+                </Lockable>
               ) : (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setPickingMethod((v) => !v)}
-                  className={`${ACTION_TEXT_BTN} border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 disabled:opacity-50`}
-                >
-                  Log contact
-                </button>
+                <Lockable>
+                  <button
+                    type="button"
+                    disabled={busy || editLocked}
+                    onClick={() => setPickingMethod((v) => !v)}
+                    title={editLocked ? lockHint : undefined}
+                    className={`${ACTION_TEXT_BTN} border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 disabled:opacity-50`}
+                  >
+                    Log contact
+                  </button>
+                </Lockable>
               )}
             </div>
             {pickingMethod && !email && !phoneOnly ? (
@@ -671,7 +728,7 @@ function OutreachRow({
                   <button
                     key={`${method}-${label}`}
                     type="button"
-                    disabled={busy}
+                    disabled={busy || editLocked}
                     onClick={() => {
                       setPickingMethod(false);
                       void onMarkContacted(method, {

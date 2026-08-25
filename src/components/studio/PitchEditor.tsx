@@ -65,6 +65,7 @@ export function PitchEditor({
   onBlur,
   placeholder,
   compact,
+  disabled = false,
 }: {
   value: string;
   onChange: (html: string) => void;
@@ -73,6 +74,7 @@ export function PitchEditor({
   placeholder?: string;
   /** Shorter editor (e.g. sign-off). */
   compact?: boolean;
+  disabled?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const lastExternal = useRef<string>("");
@@ -92,6 +94,7 @@ export function PitchEditor({
   }, [value]);
 
   const emit = (opts?: { rehighlight?: boolean }) => {
+    if (disabled) return;
     const el = ref.current;
     if (!el) return;
     const html = sanitizePitchHtml(el.innerHTML);
@@ -112,6 +115,10 @@ export function PitchEditor({
   };
 
   const onPaste = (e: ClipboardEvent<HTMLDivElement>) => {
+    if (disabled) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     const html = e.clipboardData.getData("text/html");
     const text = e.clipboardData.getData("text/plain");
@@ -128,12 +135,18 @@ export function PitchEditor({
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-white/10 bg-ink-900/60 focus-within:border-aurora-400/60">
+    <div
+      className={`overflow-hidden rounded-lg border border-white/10 bg-ink-900/60 focus-within:border-aurora-400/60 ${
+        disabled ? "opacity-70" : ""
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-1 border-b border-white/5 px-2 py-1.5">
         <ToolbarBtn
           label="Bold"
+          disabled={disabled}
           onMouseDown={(e) => {
             e.preventDefault();
+            if (disabled) return;
             cmd("bold");
           }}
         >
@@ -141,8 +154,10 @@ export function PitchEditor({
         </ToolbarBtn>
         <ToolbarBtn
           label="Italic"
+          disabled={disabled}
           onMouseDown={(e) => {
             e.preventDefault();
+            if (disabled) return;
             cmd("italic");
           }}
         >
@@ -150,8 +165,10 @@ export function PitchEditor({
         </ToolbarBtn>
         <ToolbarBtn
           label="Underline"
+          disabled={disabled}
           onMouseDown={(e) => {
             e.preventDefault();
+            if (disabled) return;
             cmd("underline");
           }}
         >
@@ -159,8 +176,10 @@ export function PitchEditor({
         </ToolbarBtn>
         <ToolbarBtn
           label="Bullet list"
+          disabled={disabled}
           onMouseDown={(e) => {
             e.preventDefault();
+            if (disabled) return;
             cmd("insertUnorderedList");
           }}
         >
@@ -169,8 +188,10 @@ export function PitchEditor({
         <span className="mx-0.5 h-4 w-px bg-white/10" aria-hidden />
         <ToolbarBtn
           label="Clear formatting"
+          disabled={disabled}
           onMouseDown={(e) => {
             e.preventDefault();
+            if (disabled) return;
             const el = ref.current;
             if (!el) return;
             el.focus();
@@ -190,7 +211,8 @@ export function PitchEditor({
         role="textbox"
         aria-multiline
         aria-label={placeholder ?? "Email body template"}
-        contentEditable={true}
+        aria-disabled={disabled || undefined}
+        contentEditable={!disabled}
         suppressContentEditableWarning
         data-placeholder={placeholder}
         onFocus={() => {
@@ -214,9 +236,9 @@ export function PitchEditor({
           }
           onBlur?.();
         }}
-        className={`pitch-editor cursor-text px-4 py-3 text-sm leading-relaxed text-mist-100 outline-none empty:before:pointer-events-none empty:before:text-mist-500 empty:before:content-[attr(data-placeholder)] [&_*]:!bg-transparent [&_:not([data-ph])]:!text-inherit [&_[data-ph]]:!text-aurora-300 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 ${
+        className={`pitch-editor px-4 py-3 text-sm leading-relaxed text-mist-100 outline-none empty:before:pointer-events-none empty:before:text-mist-500 empty:before:content-[attr(data-placeholder)] [&_*]:!bg-transparent [&_:not([data-ph])]:!text-inherit [&_[data-ph]]:!text-aurora-300 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 ${
           compact ? "min-h-[4.5rem]" : "min-h-[5.5rem]"
-        }`}
+        } ${disabled ? "cursor-not-allowed" : "cursor-text"}`}
       />
     </div>
   );
@@ -226,18 +248,21 @@ function ToolbarBtn({
   label,
   children,
   onMouseDown,
+  disabled = false,
 }: {
   label: string;
   children: ReactNode;
   onMouseDown: (e: MouseEvent) => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       title={label}
       aria-label={label}
+      disabled={disabled}
       onMouseDown={onMouseDown}
-      className="inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-md px-2 text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100"
+      className="inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-md px-2 text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100 disabled:opacity-40"
     >
       {children}
     </button>

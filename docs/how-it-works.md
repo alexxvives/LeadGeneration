@@ -117,7 +117,10 @@ Search  →  Enrich  →  Draft  →  Send
     least one day past fills that day square in **red** (same selected-day
     treatment, rose instead of aurora) — the calendar icon stays violet.
     Tick the checkbox on Calendar to mark a follow-up done (strikethrough
-    is follow-ups only — calls and emails stay unstruck). The lead drawer
+    is follow-ups only — calls and emails stay unstruck). If another collaborator
+    holds the board, the tick stays on screen but is disabled; hover explains they
+    must **Take control**. Calendar also notes that the other user is active.
+    The lead drawer
     shows a purple **Follow up** tag, no checkbox. Plain notes stay on the
     lead only and never count as follow-ups. Click an item to open the lead.
 
@@ -127,7 +130,8 @@ Search  →  Enrich  →  Draft  →  Send
   - **Boards** (`?view=boards`) — create / rename / delete named lead
     collections; invite collaborators by email (in-app accept, no expiry —
     ADR 0028). Soft lock when someone else is editing: Live chip + **Take
-    control** (ADR 0030). Boards are created at search/import (no auto
+    control** (ADR 0030). Write buttons stay visible and disabled (hover: take
+    control) instead of disappearing. Boards are created at search/import (no auto
     **Default** — ADR 0023). Creating a board also creates a matching empty
     outreach profile (edit pitch / From in Settings). Also linked from
     Settings → Boards.

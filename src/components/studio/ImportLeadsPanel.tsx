@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Spinner } from "@/components/ui";
+import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 import { api } from "@/lib/client-api";
 import type { ImportLeadRow } from "@/lib/types";
 import { parseImportCrmStage } from "@/lib/import-crm-stage";
@@ -380,6 +381,7 @@ export function ImportLeadsPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
 
   async function handleFile(file: File | null) {
     if (!file) return;
@@ -409,15 +411,18 @@ export function ImportLeadsPanel({
             you choose which board they go to.
           </p>
         </div>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => inputRef.current?.click()}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
-        >
-          {busy ? <Spinner className="h-4 w-4" /> : null}
-          {busy ? "Reading…" : "Import CSV / Excel"}
-        </button>
+        <Lockable>
+          <button
+            type="button"
+            disabled={busy || editLocked}
+            onClick={() => inputRef.current?.click()}
+            title={editLocked ? lockHint : undefined}
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
+          >
+            {busy ? <Spinner className="h-4 w-4" /> : null}
+            {busy ? "Reading…" : "Import CSV / Excel"}
+          </button>
+        </Lockable>
         <input
           ref={inputRef}
           type="file"

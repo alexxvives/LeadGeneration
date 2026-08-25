@@ -20,6 +20,7 @@ import {
   mergeSlimIntoCached,
   rememberDroppedFollowUps,
 } from "@/lib/lead-cache";
+import { BoardLockUiProvider, Lockable } from "./board-lock";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
 import { VirtualCardGrid } from "./virtual-list";
@@ -220,6 +221,8 @@ export function Studio() {
   const [leadsBackfilling, setLeadsBackfilling] = useState(false);
   const [editLocked, setEditLocked] = useState(false);
   const [lockHolder, setLockHolder] = useState<string | null>(null);
+  const editLockedRef = useRef(false);
+  editLockedRef.current = editLocked;
   const [takingOver, setTakingOver] = useState(false);
   const takeoverRef = useRef(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -908,6 +911,7 @@ export function Studio() {
   };
 
   const requestSearch = (v: SearchValues) => {
+    if (editLockedRef.current) return;
     const list = boards.length ? boards : board?.boards ?? [];
     const preferred =
       (filterBoardId && list.some((b) => b.id === filterBoardId)
@@ -946,6 +950,7 @@ export function Studio() {
   };
 
   const executeImport = async (leads: ImportLeadRow[], dest: BoardDestination) => {
+    if (editLockedRef.current) return;
     // Larger chunks are fine now that import is spreadsheet-only (no HTTP enrich).
     const CHUNK = 250;
     const total = leads.length;
@@ -1151,6 +1156,7 @@ export function Studio() {
     leadId: string,
     opts?: { silent?: boolean },
   ): Promise<string | null> => {
+    if (editLockedRef.current) return null;
     try {
       const profile = loadSenderProfile();
       const lead = board?.leads.find((l) => l.id === leadId);
@@ -1261,6 +1267,7 @@ export function Studio() {
     outreachId: string,
     opts?: { skipVerify?: boolean },
   ): Promise<boolean> => {
+    if (editLockedRef.current) return false;
     try {
       const result = await api.send(outreachId, opts);
       const cur = boardRef.current;
@@ -1497,6 +1504,7 @@ export function Studio() {
     stage: CrmStage,
     contactMethods?: ContactMethod[] | null,
   ) => {
+    if (editLockedRef.current) return;
     const patch: {
       crmStage: CrmStage;
       contactMethods?: ContactMethod[];
@@ -1549,6 +1557,7 @@ export function Studio() {
     method: ContactMethod,
     opts?: { promptNote?: boolean; missed?: boolean },
   ) => {
+    if (editLockedRef.current) return;
     markOutreachBusy(leadId);
     try {
       const existing =
@@ -1595,6 +1604,7 @@ export function Studio() {
     leadId: string,
     patch: Parameters<typeof api.updateLead>[1],
   ) => {
+    if (editLockedRef.current) return;
     const prior = boardRef.current?.leads.find((l) => l.id === leadId);
     const droppedFollowUpIds = rememberDroppedFollowUps(
       prior,
@@ -1683,7 +1693,7 @@ export function Studio() {
   }, []);
 
   const onDraftAllOutreach = async (opts?: { redraft?: boolean }) => {
-    if (!board) return;
+    if (editLockedRef.current || !board) return;
     const redraft = Boolean(opts?.redraft);
     const targets = board.leads.filter((lead) =>
       redraft
@@ -2037,6 +2047,7 @@ export function Studio() {
   };
 
   const onDeleteLead = async (leadId: string) => {
+    if (editLockedRef.current) return;
     // Stop any in-flight CSV import so rows don’t reappear after delete.
     importAbortRef.current?.abort();
     dropLeadsLocally([leadId]);
@@ -2068,6 +2079,7 @@ export function Studio() {
   };
 
   const onDeleteLeads = async (leadIds: string[]) => {
+    if (editLockedRef.current) return;
     const idSet = new Set(leadIds);
     const boardLeads = board?.leads ?? [];
     // Full wipe of the filtered board view → one set-based API call (avoids
@@ -2113,6 +2125,7 @@ export function Studio() {
   const meterCount = (showLeadsMeter ? 1 : 0) + (showVerifyMeter ? 1 : 0);
 
   return (
+    <BoardLockUiProvider locked={editLocked} holder={lockHolder}>
     <main className="mx-auto flex h-dvh max-w-[90rem] flex-col overflow-hidden px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-3 sm:pt-8">
       <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         <div className="min-w-0">
@@ -2458,22 +2471,26 @@ export function Studio() {
                   </span>
                 ) : null}
               </p>
-              {board && !editLocked ? (
-                <button
-                  type="button"
-                  onClick={() => void onAddLead()}
-                  disabled={addingLead || loading || leadsHydrating}
-                  className="glass inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-mist-100 transition-transform hover:scale-[1.02] disabled:opacity-50"
-                >
-                  {addingLead ? (
-                    <Spinner className="h-3 w-3 text-aurora-300" />
-                  ) : (
-                    <span className="text-aurora-300" aria-hidden>
-                      +
-                    </span>
-                  )}
-                  Add lead
-                </button>
+              {board ? (
+                <Lockable>
+                  <button
+                    type="button"
+                    onClick={() => void onAddLead()}
+                    disabled={
+                      editLocked || addingLead || loading || leadsHydrating
+                    }
+                    className="glass inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-mist-100 transition-transform hover:scale-[1.02] disabled:opacity-50"
+                  >
+                    {addingLead ? (
+                      <Spinner className="h-3 w-3 text-aurora-300" />
+                    ) : (
+                      <span className="text-aurora-300" aria-hidden>
+                        +
+                      </span>
+                    )}
+                    Add lead
+                  </button>
+                </Lockable>
               ) : null}
             </div>
             <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
@@ -2574,11 +2591,10 @@ export function Studio() {
                       statusFilter={pipelineFilter}
                       onStatusFilterChange={setPipelineFilter}
                       onOpen={openInfo}
-                      onMoveStage={editLocked ? undefined : onMoveStage}
-                      onUpdateLead={editLocked ? undefined : onUpdateLeadCrm}
-                      onDeleteLead={editLocked ? undefined : (id) => void onDeleteLead(id)}
-                      onDeleteLeads={editLocked ? undefined : onDeleteLeads}
-                      editLocked={editLocked}
+                      onMoveStage={onMoveStage}
+                      onUpdateLead={onUpdateLeadCrm}
+                      onDeleteLead={(id) => void onDeleteLead(id)}
+                      onDeleteLeads={onDeleteLeads}
                     />
                   </div>
                 ) : null}
@@ -2708,14 +2724,10 @@ export function Studio() {
             if (!noteUndo) return;
             void restoreDeletedNote(noteUndo.leadId, noteUndo.note);
           }}
-          onDeleteLead={
-            editLocked
-              ? undefined
-              : async (id) => {
-                  closeLeadDrawer();
-                  await onDeleteLead(id);
-                }
-          }
+          onDeleteLead={async (id) => {
+            closeLeadDrawer();
+            await onDeleteLead(id);
+          }}
         />
       )}
 
@@ -3018,5 +3030,6 @@ export function Studio() {
           )
         : null}
     </main>
+    </BoardLockUiProvider>
   );
 }

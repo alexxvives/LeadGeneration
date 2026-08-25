@@ -23,6 +23,7 @@ import {
 } from "@/lib/follow-ups";
 import { Bone, useStableDuringLoad } from "./skeletons";
 import { VirtualColumnList } from "./virtual-list";
+import { useBoardLockUi } from "./board-lock";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
 
@@ -187,6 +188,7 @@ export function PipelineView({
     contactMethods?: ContactMethod[] | null,
   ) => void;
 }) {
+  const { locked: editLocked, holder } = useBoardLockUi();
   const [activeId, setActiveId] = useState<string | null>(null);
   const dragStartedRef = useRef(false);
   const [parkedOpen, setParkedOpen] = useState<Record<string, boolean>>({
@@ -202,6 +204,7 @@ export function PipelineView({
   const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
 
   function handleDragStart(event: DragStartEvent) {
+    if (editLocked) return;
     dragStartedRef.current = true;
     setActiveId(String(event.active.id));
   }
@@ -212,6 +215,7 @@ export function PipelineView({
     window.setTimeout(() => {
       dragStartedRef.current = false;
     }, 0);
+    if (editLocked) return;
     const { active, over } = event;
     if (!over) return;
     const lead = leads.find((l) => l.id === active.id);
@@ -229,7 +233,10 @@ export function PipelineView({
     <div className="flex h-full min-h-0 flex-col gap-3">
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
-        {leads.length === 1 ? "" : "s"} · click for info · drag to move stage
+        {leads.length === 1 ? "" : "s"} · click for info
+        {editLocked
+          ? ` · ${holder ?? "Someone else"} is editing — take control to drag stages`
+          : " · drag to move stage"}
       </p>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -454,7 +461,11 @@ function DraggablePipelineCard({
   onOpen: (id: string) => void;
   isDragging: boolean;
 }) {
-  const { attributes, listeners, setNodeRef } = useDraggable({ id: lead.id });
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: lead.id,
+    disabled: editLocked,
+  });
   const pendingFollowUps =
     lead.followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
   const journalNotes =
@@ -474,9 +485,12 @@ function DraggablePipelineCard({
     <div
       ref={setNodeRef}
       {...attributes}
-      {...listeners}
+      {...(editLocked ? {} : listeners)}
       onClick={() => onOpen(lead.id)}
-      className={`group flex h-auto cursor-grab touch-pan-y items-start gap-1 rounded-xl px-3 py-2.5 transition-all active:cursor-grabbing ${
+      title={editLocked ? lockHint : undefined}
+      className={`group flex h-auto items-start gap-1 rounded-xl px-3 py-2.5 transition-all ${
+        editLocked ? "cursor-not-allowed" : "cursor-grab touch-pan-y active:cursor-grabbing"
+      } ${
         replied
           ? "border border-sky-400/50 bg-sky-400/10 shadow-[0_0_0_1px_rgba(56,189,248,0.25)] ring-1 ring-sky-400/30 hover:bg-sky-400/15"
           : needsMethod

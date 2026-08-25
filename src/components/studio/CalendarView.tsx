@@ -24,6 +24,7 @@ import { MailCheckIcon } from "@/components/lucide-animated/mail-check";
 import { PhoneIcon as AnimatedPhoneIcon } from "@/components/lucide-animated/phone";
 import { PhoneMissedIcon } from "@/components/lucide-animated/phone-missed";
 import { useIconMotion } from "@/components/lucide-animated/hover";
+import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 
 const KIND_ORDER: FollowUpKind[] = ["follow_up", "email", "phone"];
 
@@ -157,6 +158,7 @@ export function CalendarView({
   onOpenLead: (leadId: string) => void;
   onToggleFollowUp?: (leadId: string, followUpId: string, done: boolean) => void;
 }) {
+  const { locked: editLocked, holder } = useBoardLockUi();
   const today = todayIsoDate();
   const now = new Date();
   const [cursor, setCursor] = useState({
@@ -394,6 +396,12 @@ export function CalendarView({
             ? "Nothing logged"
             : `${dayEvents.length} on this day`}
         </h3>
+        {editLocked ? (
+          <p className="mt-2 rounded-lg border border-aurora-400/20 bg-aurora-400/5 px-3 py-2 text-xs text-aurora-100/90">
+            {holder ?? "Someone else"} is editing this board. Take control to
+            mark follow-ups done.
+          </p>
+        ) : null}
 
         <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto">
           {dayEvents.length === 0 ? (
@@ -484,6 +492,7 @@ function DayGroup({
   onOpenLead: (leadId: string) => void;
   onToggleFollowUp?: (leadId: string, followUpId: string, done: boolean) => void;
 }) {
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   if (events.length === 0) return null;
   const missed = missedCallCount(events);
   return (
@@ -504,21 +513,35 @@ function DayGroup({
               }`}
             >
               {onToggleFollowUp && ev.kind === "follow_up" ? (
-                <button
-                  type="button"
-                  onClick={() => onToggleFollowUp(ev.leadId, ev.id, !ev.done)}
-                  aria-pressed={ev.done}
-                  aria-label={
-                    ev.done ? "Mark follow-up not done" : "Mark follow-up done"
-                  }
-                  className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors ${
-                    ev.done
-                      ? "border-aurora-400/40 bg-aurora-400/20 text-aurora-200"
-                      : "border-violet-400/40 text-violet-300 hover:border-violet-400/70 hover:text-violet-200"
-                  }`}
-                >
-                  {ev.done ? <CheckIcon className="h-3 w-3" /> : null}
-                </button>
+                <Lockable>
+                  <button
+                    type="button"
+                    disabled={editLocked}
+                    onClick={() => onToggleFollowUp(ev.leadId, ev.id, !ev.done)}
+                    aria-pressed={ev.done}
+                    aria-label={
+                      editLocked
+                        ? lockHint
+                        : ev.done
+                          ? "Mark follow-up not done"
+                          : "Mark follow-up done"
+                    }
+                    title={
+                      editLocked
+                        ? lockHint
+                        : ev.done
+                          ? "Mark follow-up not done"
+                          : "Mark follow-up done"
+                    }
+                    className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors disabled:opacity-50 ${
+                      ev.done
+                        ? "border-aurora-400/40 bg-aurora-400/20 text-aurora-200"
+                        : "border-violet-400/40 text-violet-300 hover:border-violet-400/70 hover:text-violet-200"
+                    }`}
+                  >
+                    {ev.done ? <CheckIcon className="h-3 w-3" /> : null}
+                  </button>
+                </Lockable>
               ) : (
                 <span
                   className={`mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${

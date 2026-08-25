@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-25 — Locked board: disable buttons, don't hide them
+- When another user holds the board lock, write controls (Add lead, stage
+  picker, delete, Send, Draft all, calendar follow-up ticks) stay visible and
+  `disabled`. Hover (wrapper `title`, because native disabled skips pointer
+  events) explains they must **Take control**. Calendar sidebar also names
+  the live editor. Pipeline drag is off for the same reason.
+
 ### 2026-08-25 — Re-draft all, calendar counts, no Default board
 - **Re-draft all** lives on Contact Draft. It rewrites Ready emails and also
   drafts remaining Contact Draft leads (Draft all stays for remaining-only).

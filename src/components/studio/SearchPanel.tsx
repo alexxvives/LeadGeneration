@@ -21,6 +21,7 @@ import { deleteSavedIcp, loadSavedIcps, saveIcp } from "@/lib/saved-icps";
 import type { SavedIcp } from "@/lib/types";
 import { api } from "@/lib/client-api";
 import type { LocationSuggestion } from "@/app/api/geocode/route";
+import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 
 export interface SearchValues {
   niche: string;
@@ -268,6 +269,7 @@ export function SearchPanel({
   /** Fired when the Search profile picker changes the active profile. */
   onProfileChange?: () => void;
 }) {
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const [niche, setNiche] = useState("");
   const [location, setLocation] = useState("");
   const [locationConfirmed, setLocationConfirmed] = useState(true);
@@ -328,7 +330,7 @@ export function SearchPanel({
   // stay on the server (402) so a Firecrawl usage blip can't look like "Search
   // disabled" when the admin toggle is On.
   const canSubmit =
-    findLeadsEnabled && niche.trim().length > 0 && !running;
+    findLeadsEnabled && niche.trim().length > 0 && !running && !editLocked;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -596,11 +598,13 @@ export function SearchPanel({
         </div>
       </div>
       <div className="mt-5 flex items-center justify-center gap-4">
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className="btn-aurora-shine inline-flex items-center justify-center rounded-full px-8 py-3 font-semibold text-on-accent shadow-[0_0_24px_-6px_rgba(67,224,168,0.55)] transition-transform hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:[animation:none]"
-        >
+        <Lockable>
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            title={editLocked ? lockHint : undefined}
+            className="btn-aurora-shine inline-flex items-center justify-center rounded-full px-8 py-3 font-semibold text-on-accent shadow-[0_0_24px_-6px_rgba(67,224,168,0.55)] transition-transform hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:[animation:none]"
+          >
           {running ? (
             <>
               <Spinner className="mr-2 h-4 w-4" /> Charting…
@@ -609,6 +613,7 @@ export function SearchPanel({
             "Find leads"
           )}
         </button>
+        </Lockable>
       </div>
     </form>
   );

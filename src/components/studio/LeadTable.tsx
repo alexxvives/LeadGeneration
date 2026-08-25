@@ -9,6 +9,7 @@ import { CheckIcon, MailIcon, PhoneIcon, TrashIcon, XIcon } from "@/components/i
 import { displayWebsite } from "@/lib/website";
 import { shortLocation } from "@/lib/format-location";
 import { useLeadColumnState } from "@/components/studio/LeadColumnsMenu";
+import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 
 const STAGE_OPTIONS: CrmStage[] = [
   "new",
@@ -41,7 +42,6 @@ export function LeadTable({
   onUpdateLead,
   onDeleteLead,
   onDeleteLeads,
-  editLocked = false,
 }: {
   leads: LeadWithOutreach[];
   /** Already filtered by Studio; used for header filter menu sync. */
@@ -64,9 +64,8 @@ export function LeadTable({
   onDeleteLead?: (leadId: string) => void;
   /** Bulk delete — preferred when selecting multiple. */
   onDeleteLeads?: (leadIds: string[]) => void | Promise<void>;
-  /** Soft lock — view OK, edits disabled. */
-  editLocked?: boolean;
 }) {
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const [openId, setOpenId] = useState<string | null>(null);
   const [pipelineMenuOpen, setPipelineMenuOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -82,7 +81,7 @@ export function LeadTable({
   const { customCols, vis } = useLeadColumnState();
   const visibleCustom = customCols.filter((c) => !!vis.custom[c.id]);
   const showNotes = !!vis.notes;
-  const canDelete = Boolean(onDeleteLead || onDeleteLeads) && !editLocked;
+  const canDelete = Boolean(onDeleteLead || onDeleteLeads);
   const colCount =
     (canDelete ? 1 : 0) + 6 + (showNotes ? 1 : 0) + visibleCustom.length;
 
@@ -220,16 +219,25 @@ export function LeadTable({
             <tr className="border-b border-white/10 text-left text-xs uppercase tracking-widest text-mist-500">
               {canDelete ? (
                 <th className="w-10 px-3 py-3">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = someSelected;
-                    }}
-                    onChange={toggleAll}
-                    aria-label={allSelected ? "Deselect all leads" : "Select all leads"}
-                    className="rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40"
-                  />
+                  <Lockable>
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      disabled={editLocked}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someSelected;
+                      }}
+                      onChange={toggleAll}
+                      aria-label={
+                        editLocked
+                          ? lockHint
+                          : allSelected
+                            ? "Deselect all leads"
+                            : "Select all leads"
+                      }
+                      className="rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40 disabled:opacity-50"
+                    />
+                  </Lockable>
                 </th>
               ) : null}
               <th className="px-5 py-3 font-medium">
@@ -395,13 +403,18 @@ export function LeadTable({
                       className="px-3 py-3.5"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleOne(l.id)}
-                        aria-label={`Select ${l.company}`}
-                        className="rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40"
-                      />
+                      <Lockable>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={editLocked}
+                          onChange={() => toggleOne(l.id)}
+                          aria-label={
+                            editLocked ? lockHint : `Select ${l.company}`
+                          }
+                          className="rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40 disabled:opacity-50"
+                        />
+                      </Lockable>
                     </td>
                   ) : null}
                   <td className="max-w-[14rem] px-5 py-3.5">
@@ -473,52 +486,58 @@ export function LeadTable({
                     </div>
                   </td>
                   <td className="relative px-5 py-3.5 whitespace-nowrap">
-                    {onMoveStage && !editLocked ? (
-                      <div
-                        ref={openId === l.id ? menuRef : undefined}
-                        className="relative inline-block"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenId((id) => (id === l.id ? null : l.id))
-                          }
-                          className="rounded-full transition-transform hover:scale-[1.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora-400/50"
-                          aria-haspopup="listbox"
-                          aria-expanded={openId === l.id}
-                          title="Change stage"
+                    {onMoveStage ? (
+                      <Lockable>
+                        <div
+                          ref={openId === l.id ? menuRef : undefined}
+                          className="relative inline-block"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <CrmStagePill stage={stage} />
-                        </button>
-                        {openId === l.id ? (
-                          <ul
-                            role="listbox"
-                            className="absolute right-0 z-20 mt-1 min-w-[10rem] overflow-hidden rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
+                          <button
+                            type="button"
+                            disabled={editLocked}
+                            onClick={() =>
+                              setOpenId((id) => (id === l.id ? null : l.id))
+                            }
+                            className="rounded-full transition-transform hover:scale-[1.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-aurora-400/50 disabled:opacity-60"
+                            aria-haspopup="listbox"
+                            aria-expanded={openId === l.id}
+                            aria-label={
+                              editLocked ? lockHint : "Change stage"
+                            }
+                            title={editLocked ? lockHint : "Change stage"}
                           >
-                            {STAGE_OPTIONS.map((s) => (
-                              <li key={s}>
-                                <button
-                                  type="button"
-                                  role="option"
-                                  aria-selected={s === stage}
-                                  className={`block w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-white/5 ${
-                                    s === stage
-                                      ? "font-medium text-aurora-300"
-                                      : "text-mist-200"
-                                  }`}
-                                  onClick={() => {
-                                    setOpenId(null);
-                                    if (s !== stage) onMoveStage(l.id, s);
-                                  }}
-                                >
-                                  {crmStageLabel(s)}
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </div>
+                            <CrmStagePill stage={stage} />
+                          </button>
+                          {openId === l.id && !editLocked ? (
+                            <ul
+                              role="listbox"
+                              className="absolute right-0 z-20 mt-1 min-w-[10rem] overflow-hidden rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
+                            >
+                              {STAGE_OPTIONS.map((s) => (
+                                <li key={s}>
+                                  <button
+                                    type="button"
+                                    role="option"
+                                    aria-selected={s === stage}
+                                    className={`block w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-white/5 ${
+                                      s === stage
+                                        ? "font-medium text-aurora-300"
+                                        : "text-mist-200"
+                                    }`}
+                                    onClick={() => {
+                                      setOpenId(null);
+                                      if (s !== stage) onMoveStage(l.id, s);
+                                    }}
+                                  >
+                                    {crmStageLabel(s)}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      </Lockable>
                     ) : (
                       <CrmStagePill stage={stage} />
                     )}
@@ -534,9 +553,16 @@ export function LeadTable({
                       onClick={(e) => e.stopPropagation()}
                     >
                       {editLocked ? (
-                        <span className="truncate text-sm text-mist-300">
-                          {l.notes?.trim() || "—"}
-                        </span>
+                        <Lockable className="w-full">
+                          <input
+                            value={l.notes ?? ""}
+                            readOnly
+                            disabled
+                            placeholder="—"
+                            aria-label={lockHint}
+                            className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 opacity-70"
+                          />
+                        </Lockable>
                       ) : (
                         <input
                           defaultValue={l.notes ?? ""}
@@ -560,9 +586,33 @@ export function LeadTable({
                       onClick={(e) => e.stopPropagation()}
                     >
                       {editLocked ? (
-                        <span className="text-sm text-mist-300">
-                          {fields[c.id] || "—"}
-                        </span>
+                        <Lockable className="w-full">
+                          {c.type === "select" ? (
+                            <Select
+                              value={fields[c.id] ?? ""}
+                              disabled
+                              aria-label={lockHint}
+                              className="w-full min-w-[6rem] py-1 text-xs opacity-70"
+                            >
+                              <option value="">—</option>
+                              {(c.options ?? []).map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </Select>
+                          ) : (
+                            <input
+                              type={c.type === "number" ? "number" : "text"}
+                              value={fields[c.id] ?? ""}
+                              readOnly
+                              disabled
+                              placeholder="—"
+                              aria-label={lockHint}
+                              className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 opacity-70"
+                            />
+                          )}
+                        </Lockable>
                       ) : c.type === "select" ? (
                         <Select
                           value={fields[c.id] ?? ""}
@@ -625,7 +675,7 @@ export function LeadTable({
               </p>
               <button
                 type="button"
-                disabled={deleting}
+                disabled={deleting || editLocked}
                 onClick={() => void runBulkDelete()}
                 className="inline-flex items-center gap-1 rounded-full bg-rose-400 px-3 py-1.5 text-xs font-medium text-on-accent disabled:opacity-50"
               >
@@ -647,14 +697,18 @@ export function LeadTable({
                 <span className="font-semibold text-aurora-300">{selected.size}</span>{" "}
                 selected
               </p>
-              <button
-                type="button"
-                onClick={() => setConfirmBulk(true)}
-                className="inline-flex items-center gap-1 rounded-full bg-rose-400/90 px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-rose-400"
-              >
-                <TrashIcon className="h-3 w-3" />
-                Delete
-              </button>
+              <Lockable>
+                <button
+                  type="button"
+                  disabled={deleting || editLocked}
+                  onClick={() => setConfirmBulk(true)}
+                  aria-label={editLocked ? lockHint : "Delete selected leads"}
+                  className="inline-flex items-center gap-1 rounded-full bg-rose-400/90 px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-rose-400 disabled:opacity-50"
+                >
+                  <TrashIcon className="h-3 w-3" />
+                  Delete
+                </button>
+              </Lockable>
               <button
                 type="button"
                 onClick={() => {

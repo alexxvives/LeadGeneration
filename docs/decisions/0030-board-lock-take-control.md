@@ -15,6 +15,9 @@ waiting for the other session to expire.
   not log a failed resource and the collaborator can still load leads.
 - When someone else holds it, show a compact **Live** chip beside the page
   title with their name and **Take control**.
+- Write actions stay visible (Add lead, stage pickers, Send, follow-up ticks,
+  etc.) but **disabled**, with hover copy that the other person is editing and
+  they need **Take control** to act. Do not hide those buttons.
 - Take control force-steals the lock (`POST …/lock { takeover: true }`). The
   previous holder becomes view-only on their next heartbeat.
 - No request-and-wait: we have no realtime channel to ping the other person.
