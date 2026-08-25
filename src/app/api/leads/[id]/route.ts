@@ -7,7 +7,7 @@ import { isBoardLockedError } from "@/lib/errors";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Full lead + outreach (board list is slim — body/blurb loaded here). */
+/** Full lead + outreach (board list is card-sized — body/blurb/journal loaded here). */
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },

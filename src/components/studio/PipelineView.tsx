@@ -22,6 +22,7 @@ import {
   resolveFollowUpKind,
 } from "@/lib/follow-ups";
 import { Bone, useStableDuringLoad } from "./skeletons";
+import { VirtualColumnList } from "./virtual-list";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
 
@@ -320,22 +321,26 @@ function ParkedStage({
         <span className="text-xs text-mist-600">{open ? "▾" : "▸"}</span>
       </button>
       {open ? (
-        <div className="max-h-[28vh] overflow-y-auto overscroll-contain p-3">
+        <div className="max-h-[28vh] min-h-0">
           {leads.length === 0 ? (
             <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
               {col.empty}
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              {leads.map((l) => (
-                  <DraggablePipelineCard
-                    key={l.id}
-                    lead={l}
-                    onOpen={onOpen}
-                    isDragging={l.id === activeId}
-                  />
-                ))}
-            </div>
+            <VirtualColumnList
+              items={leads}
+              estimateSize={72}
+              padding={12}
+              gap={8}
+              className="max-h-[28vh]"
+              renderItem={(l) => (
+                <DraggablePipelineCard
+                  lead={l}
+                  onOpen={onOpen}
+                  isDragging={l.id === activeId}
+                />
+              )}
+            />
           )}
         </div>
       ) : null}
@@ -371,10 +376,9 @@ function PipelineColumn({
           {count}
         </span>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3">
-        {leads.length === 0 ? (
+      {leads.length === 0 ? (
           count > 0 ? (
-            <div className="flex flex-col gap-2" aria-hidden>
+            <div className="flex flex-col gap-2 p-3" aria-hidden>
               {Array.from({ length: Math.min(3, count) }, (_, i) => (
                 <div
                   key={i}
@@ -390,16 +394,20 @@ function PipelineColumn({
             </p>
           )
         ) : (
-          leads.map((l) => (
-            <DraggablePipelineCard
-              key={l.id}
-              lead={l}
-              onOpen={onOpen}
-              isDragging={l.id === activeId}
-            />
-          ))
+          <VirtualColumnList
+            items={leads}
+            estimateSize={64}
+            padding={12}
+            gap={8}
+            renderItem={(l) => (
+              <DraggablePipelineCard
+                lead={l}
+                onOpen={onOpen}
+                isDragging={l.id === activeId}
+              />
+            )}
+          />
         )}
-      </div>
     </div>
   );
 }

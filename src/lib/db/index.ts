@@ -44,6 +44,11 @@ export interface LeadListFilter {
   offset?: number;
   /** Pipeline / Outreach hydrate lane (with `limit`/`offset` per lane). */
   lane?: LeadHydrateLane;
+  /**
+   * `card` skips about/notes/tags/fit/source so board pages stay small.
+   * Default `full` for import dedupe / board-move (needs every column).
+   */
+  columns?: "card" | "full";
 }
 
 export interface LeadRepository {

@@ -261,15 +261,20 @@ to reset); in production on Cloudflare Workers, `getDb()` receives a D1 binding
 and uses `D1Store` instead. Pipeline/Leads respect the sidebar board filter
 (**All** by default). Boards are user-created (ADR 0014 / 0023).
 
-Board hydrate is **progressive + slim**: **50 leads per Pipeline /
+Board hydrate is **progressive + card-sized**: **100 leads per Pipeline /
 Outreach lane** (New split into Contact Draft vs Ready, then Contacted /
-In Conversation / Closed / Not Interested), then the same 50-per-lane
-again in the background until the board is complete. Background pages are
+In Conversation / Closed / Not Interested), then the same 100-per-lane
+again in the background until the board is complete. D1 `SELECT`s only
+card columns (no about/notes/tags/fit/source). Rows on the wire omit
+email bodies and subjects, blurbs, notes, tags, fit, source URL, and
+journal note text (`detailLoaded: false`) — Calendar still gets
+id/date/kind/done for dots. Opening a
+lead drawer fetches full detail via `GET /api/leads/:id`. Pipeline,
+Outreach, and Leads cards **window** the DOM (only on-screen rows mount).
+Background pages are
 a **leads-only** request (no run/summaries/lock) so paging stays cheap
 with two people on the board. Pipeline’s 15s slim poll **does not cancel
-or restart** that backfill — it only patches already-loaded rows. Rows
-are slim — no email bodies / about blurbs (`detailLoaded: false`). Opening a
-lead drawer fetches full detail via `GET /api/leads/:id`. That GET (and
+or restart** that backfill — it only patches already-loaded rows. That GET (and
 Pipeline’s 15s slim poll) is merged into the cached row via
 `mergeSlimIntoCached` (`src/lib/lead-cache.ts`). Journal follow-ups are
 unioned by id so a note added while the fetch is in flight does not
@@ -277,9 +282,10 @@ vanish. Contact methods are unioned the same way (dropped channels are
 remembered so a toggle-off cannot come back). CRM stage, emails/phones,
 and other drawer fields keep the cached value while a local write is
 pending (`writePending`) or when the snapshot started before
-`lastWriteAt` — the same flash class as the journal bug. Slim list rows
-still omit body/about/notes (`detailLoaded: false`); empty email/phone
-arrays on a non-stale snapshot are authoritative (bounce strip). Deleted
+`lastWriteAt` — the same flash class as the journal bug. Card-list rows
+omit body/subject/about/notes/journal text (`detailLoaded: false`); a
+full GET prefers incoming journal notes so those bodies return. Empty
+email/phone arrays on a non-stale snapshot are authoritative (bounce strip). Deleted
 leads are removed from the cache immediately; later polls merge with
 functional `setBoard` so they cannot resurrect a dropped id. Pipeline and
 Outreach stay mounted after first visit so switching back is instant.

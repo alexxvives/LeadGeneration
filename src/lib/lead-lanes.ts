@@ -17,7 +17,7 @@ export const LEAD_HYDRATE_LANES = [
 export type LeadHydrateLane = (typeof LEAD_HYDRATE_LANES)[number];
 
 /** First + later pages: this many rows from each lane. */
-export const LEAD_PAGE_PER_LANE = 50;
+export const LEAD_PAGE_PER_LANE = 100;
 
 /** CRM New + a saved draft (or phone-only) → Outreach Ready to Contact. */
 export function isOutreachReadyStatus(

@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-25 — 2400-lead boards were loading drawer data on every card
+- Board hydrate used `SELECT l.*` then nulled about/notes in JS, so D1 still
+  read blurbs, fit reasons, tags, source, and full journal text for every
+  page. Draft subjects travelled with each outreach row. Pipeline/Outreach/
+  Leads cards then mounted every row in the DOM.
+- List queries now `columns: "card"` (skip about/notes/tags/fit/source).
+  Wire payload drops body/subject, blurbs, and journal note text (keep
+  id/date/kind/done + missed-call prefix). Drawer GET restores bodies.
+  Full GET prefers incoming journal notes so empty slim notes cannot stick.
+  100/lane (was 50). Pipeline, Outreach, and Leads cards virtualize.
+
 ### 2026-08-25 — Delete stayed; hydrate never left page 1
 - Optimistic delete filtered `board.leads`, but Pipeline’s 15s `refresh()`
   incremented the paging gen, cancelled backfill, and merged from a stale

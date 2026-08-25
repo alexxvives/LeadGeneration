@@ -127,6 +127,7 @@ export function mergeSlimIntoCached(
     prev.followUps ?? [],
     incoming.followUps ?? [],
     droppedFollowUpIdSet(prev),
+    { preferIncoming: !incomingSlim && !stale },
   );
   const contactMethods = mergeContactMethods(
     prev.contactMethods ?? [],
@@ -134,8 +135,8 @@ export function mergeSlimIntoCached(
     droppedContactMethodSet(prev),
   );
 
-  // Slim rows include emails/phones (only about/notes/body are nulled). Empty
-  // is authoritative when the snapshot is not stale (bounce strip).
+  // Slim rows include emails/phones (bodies/blurbs stay on the drawer GET).
+  // Empty is authoritative when the snapshot is not stale (bounce strip).
   const emails = stale ? prev.emails : (incoming.emails ?? prev.emails);
   const phones = stale ? prev.phones : (incoming.phones ?? prev.phones);
 

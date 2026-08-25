@@ -155,22 +155,28 @@ type LeadRow = {
   phones: string;
   contact_name: string | null;
   location: string | null;
-  about_blurb: string | null;
+  about_blurb?: string | null;
   company_type: string | null;
-  tags: string;
-  fit_score: number;
-  fit_reasons: string;
-  source_url: string;
+  tags?: string;
+  fit_score?: number;
+  fit_reasons?: string;
+  source_url?: string;
   status: Lead["status"];
   crm_stage: string | null;
   contact_method: string | null;
   contacted_by_user_id: string | null;
   contacted_by_name: string | null;
-  notes: string | null;
+  notes?: string | null;
   follow_ups: string | null; // JSON-encoded FollowUp[]
   custom_fields: string | null; // JSON-encoded Record<string, string>
   created_at: string;
 };
+
+/** Card/list hydrate — skip about/notes/tags/fit/source (drawer GET loads them). */
+const CARD_LEAD_SELECT = `l.id, l.workspace_id, l.run_id, l.board_id, l.company, l.website,
+         l.emails, l.phones, l.contact_name, l.location, l.company_type,
+         l.status, l.crm_stage, l.contact_method, l.contacted_by_user_id,
+         l.contacted_by_name, l.created_at, l.custom_fields, l.follow_ups`;
 
 type OutreachRow = {
   id: string;
@@ -338,12 +344,12 @@ function rowToLead(r: LeadRow): Lead {
     phones: arr(r.phones),
     contactName: r.contact_name,
     location: r.location,
-    aboutBlurb: r.about_blurb,
+    aboutBlurb: r.about_blurb ?? null,
     companyType: r.company_type ?? null,
     tags: arr(r.tags),
-    fitScore: r.fit_score,
+    fitScore: r.fit_score ?? 0,
     fitReasons: arr(r.fit_reasons),
-    sourceUrl: r.source_url,
+    sourceUrl: r.source_url ?? "",
     status: r.status,
     crmStage: normalizeCrmStage(r.crm_stage),
     contactMethods: parseContactMethods(r.contact_method),
@@ -1301,9 +1307,10 @@ export class D1Store implements LeadRepository {
     if (filter?.lane) {
       where += ` AND (${hydrateLaneSql(filter.lane)})`;
     }
+    const cols = filter?.columns === "card" ? CARD_LEAD_SELECT : "l.*";
     const { results } = await this.db
       .prepare(
-        `SELECT l.* FROM leads l
+        `SELECT ${cols} FROM leads l
          LEFT JOIN outreach o ON o.lead_id = l.id
          ${where}
          ${orderSql}${pageSql}`,
@@ -1552,8 +1559,10 @@ export class D1Store implements LeadRepository {
     const CHUNK = 50;
     // List path skips body — largest column and unused until drawer open.
     const cols = opts?.omitBody
-      ? `id, workspace_id, lead_id, run_id, to_email, subject, '' AS body,
-         status, delivery_status, sent_at, error, created_at, updated_at`
+      ? `id, workspace_id, lead_id, run_id, to_email, '' AS subject, '' AS body,
+         status, delivery_status, sent_at,
+         CASE WHEN status = 'failed' THEN error ELSE NULL END AS error,
+         created_at, updated_at`
       : "*";
     for (let i = 0; i < ids.length; i += CHUNK) {
       const chunk = ids.slice(i, i + CHUNK);

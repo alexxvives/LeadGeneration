@@ -17,6 +17,7 @@ import {
 } from "@/components/icons";
 import { useStableDuringLoad } from "./skeletons";
 import { leadHydrateLane } from "@/lib/lead-lanes";
+import { VirtualColumnList } from "./virtual-list";
 
 type OutreachBucket = "review" | "ready" | "contacted";
 /** Ready-column contact-channel filter. */
@@ -410,17 +411,21 @@ export function OutreachView({
                 </div>
               </div>
 
-              <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                {rows.length === 0 ? (
-                  <li className="px-3 py-6 text-center text-[11px] text-mist-600">
-                    {backfilling && key === "contacted"
-                      ? "Loading contacted leads…"
-                      : emptyCopy(key, leads, readyChannel)}
-                  </li>
-                ) : (
-                  rows.map((lead, i) => (
+              {rows.length === 0 ? (
+                <div className="px-3 py-6 text-center text-[11px] text-mist-600">
+                  {backfilling && key === "contacted"
+                    ? "Loading contacted leads…"
+                    : emptyCopy(key, leads, readyChannel)}
+                </div>
+              ) : (
+                <VirtualColumnList
+                  items={rows}
+                  estimateSize={52}
+                  padding={0}
+                  gap={0}
+                  itemClassName=""
+                  renderItem={(lead, i) => (
                     <OutreachRow
-                      key={lead.id}
                       lead={lead}
                       bucket={key}
                       busy={
@@ -442,9 +447,9 @@ export function OutreachView({
                         onLogCall ? () => onLogCall(lead.id) : undefined
                       }
                     />
-                  ))
-                )}
-              </ul>
+                  )}
+                />
+              )}
             </section>
           );
         })}
@@ -517,7 +522,7 @@ function OutreachRow({
   };
 
   return (
-    <li
+    <div
       className={`flex items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03] ${
         showDivider ? "border-t border-white/10" : ""
       } ${needsMethod ? "bg-amber-400/[0.06]" : ""}`}
@@ -724,6 +729,6 @@ function OutreachRow({
           )
         ) : null}
       </div>
-    </li>
+    </div>
   );
 }

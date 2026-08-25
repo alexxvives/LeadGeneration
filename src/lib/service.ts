@@ -75,7 +75,7 @@ import {
   contactMethodsEqual,
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList } from "@/lib/follow-ups";
 import { LEAD_HYDRATE_LANES } from "@/lib/lead-lanes";
 import {
   companyGuessFromEmail,
@@ -928,9 +928,9 @@ export async function getRunWithLeads(
   if (!run) return null;
   const leads = await persistCleanedLeadNames(
     ctx.db,
-    await ctx.db.listLeads({ runId }),
+    await ctx.db.listLeads({ runId, columns: "card" }),
   );
-  const withOutreach = await attachOutreach(ctx.db, leads);
+  const withOutreach = await attachOutreach(ctx.db, leads, { slim: true });
   return { run, leads: withOutreach };
 }
 
@@ -1003,6 +1003,7 @@ export async function getLatestBoard(
               lane,
               limit: perLane,
               offset: laneOffset,
+              columns: "card",
             }),
           ),
         ).then((pages) => ({
@@ -1012,6 +1013,7 @@ export async function getLatestBoard(
       : leadDb
           .listLeads({
             ...filter,
+            columns: "card",
             ...(limit != null ? { limit, offset } : {}),
           })
           .then((raw) => ({
@@ -1098,17 +1100,16 @@ export async function getLatestBoard(
     leadDb.summarizeLeads(filter),
     listPagedLeads(leadDb, filter),
   ]);
-  const leads = await persistCleanedLeadNames(leadDb, listed.raw);
   const leadsHasMore =
     perLane != null
       ? listed.hasMore
       : limit != null
-        ? offset + leads.length < leadsTotal
+        ? offset + listed.raw.length < leadsTotal
         : false;
   return {
     run,
-    // Slim list: no email bodies / blurbs — drawer fetches full detail on open.
-    leads: await attachOutreach(leadDb, leads, { slim: true }),
+    // Card list: no blurb/notes/body/subject/journal text — drawer GET on open.
+    leads: await attachOutreach(leadDb, listed.raw, { slim: true }),
     leadsTotal,
     leadsHasMore,
     crmStageCounts: toStageCounts(summary.byCrmStage),
@@ -1176,13 +1177,23 @@ async function attachOutreach(
     if (!opts?.slim) {
       return { ...l, outreach, detailLoaded: true };
     }
-    // List rows: drop blurb/notes/body so 3k boards stay fast over the wire.
+    // Card rows: drop everything the list/kanban/map/calendar dots don't paint.
     return {
       ...l,
       aboutBlurb: null,
       notes: null,
+      tags: [],
+      fitScore: 0,
+      fitReasons: [],
+      sourceUrl: "",
+      followUps: slimFollowUpsForList(l.followUps ?? []),
       outreach: outreach
-        ? { ...outreach, body: "" }
+        ? {
+            ...outreach,
+            subject: "",
+            body: "",
+            error: outreach.status === "failed" ? outreach.error : null,
+          }
         : null,
       detailLoaded: false,
     };

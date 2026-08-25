@@ -22,6 +22,7 @@ import {
 } from "@/lib/lead-cache";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
+import { VirtualCardGrid } from "./virtual-list";
 import { LeadTable } from "./LeadTable";
 import { LeadMap } from "./LeadMap";
 import { prefetchLeadGeocodes } from "@/lib/geocode-client";
@@ -418,7 +419,7 @@ export function Studio() {
     }
 
     // Soft poll / mutation refresh must not cancel an in-flight first page or
-    // restart paging from offset 50 — that left Pipeline spinning forever
+    // restart paging from offset 100 — that left Pipeline spinning forever
     // (especially with two users sharing D1).
     if (!replace && (loadInFlightRef.current || leadsBackfillingRef.current)) {
       const cached = boardRef.current;
@@ -2516,7 +2517,7 @@ export function Studio() {
                   <div
                     className={
                       layout === "cards"
-                        ? "absolute inset-0 overflow-y-auto overscroll-contain"
+                        ? "absolute inset-0 overflow-hidden"
                         : "pointer-events-none invisible absolute inset-0 -z-10 overflow-hidden"
                     }
                     aria-hidden={layout !== "cards"}
@@ -2526,16 +2527,17 @@ export function Studio() {
                         No leads match this filter.
                       </p>
                     ) : (
-                      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                        {cardsLeads.map((lead, i) => (
+                      <VirtualCardGrid
+                        items={cardsLeads}
+                        renderItem={(lead, i) => (
                           <LeadCard
                             key={lead.id}
                             lead={lead}
                             index={i}
                             onOpen={() => openInfo(lead.id)}
                           />
-                        ))}
-                      </div>
+                        )}
+                      />
                     )}
                   </div>
                 ) : null}

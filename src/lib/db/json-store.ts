@@ -833,7 +833,14 @@ export class JsonStore implements LeadRepository {
       .filter((o) => this.inScope(o) && want.has(o.leadId))
       .map((o) => {
         const n = normalizeOutreach(o);
-        return opts?.omitBody ? { ...n, body: "" } : n;
+        return opts?.omitBody
+          ? {
+              ...n,
+              subject: "",
+              body: "",
+              error: n.status === "failed" ? n.error : null,
+            }
+          : n;
       });
   }
 

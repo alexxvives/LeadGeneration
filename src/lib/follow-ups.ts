@@ -118,6 +118,8 @@ function looksLikeFollowUpReminder(note: string): boolean {
 }
 
 export function resolveFollowUpKind(fu: FollowUp): FollowUpKind {
+  // Card-list rows strip note text; trust the kind we persisted at slim time.
+  if (!fu.note?.trim() && fu.kind) return fu.kind;
   const inferred = inferFollowUpKind(fu.note);
   // Call / send / bounce text wins over a stored kind — logging a phone
   // call via Follow up used to save kind: follow_up (the checkbox).
@@ -134,6 +136,25 @@ export function resolveFollowUpKind(fu: FollowUp): FollowUpKind {
     return "note";
   }
   return "note";
+}
+
+/**
+ * Card-list journal: keep id/date/done/kind (Pipeline chips + Calendar dots)
+ * and drop note bodies until the drawer GET. Missed-call prefix stays so
+ * `leadHasMissedCall` still works without the extra comment text.
+ */
+export function slimFollowUpsForList(followUps: FollowUp[]): FollowUp[] {
+  return followUps.map((f) => {
+    const kind = resolveFollowUpKind(f);
+    const missed = isMissedCallNote(f.note);
+    return {
+      id: f.id,
+      date: f.date,
+      done: f.done,
+      kind,
+      note: missed ? f.note.trim().replace(/:[\s\S]*$/, "") : "",
+    };
+  });
 }
 
 /** User-authored reminder — not a note, send, call, or bounce. */
@@ -231,6 +252,7 @@ export function mergeFollowUpLists(
   cached: FollowUp[],
   incoming: FollowUp[],
   droppedIds?: ReadonlySet<string> | null,
+  opts?: { preferIncoming?: boolean },
 ): FollowUp[] {
   if (cached.length === 0 && incoming.length === 0) return incoming;
   if (incoming.length === 0) {
@@ -242,6 +264,21 @@ export function mergeFollowUpLists(
     return droppedIds?.size
       ? incoming.filter((f) => !droppedIds.has(f.id))
       : incoming;
+  }
+  // Full drawer GET: restore note bodies. Keep cached-only ids (optimistic add).
+  if (opts?.preferIncoming) {
+    const incomingIds = new Set<string>();
+    const out: FollowUp[] = [];
+    for (const f of incoming) {
+      if (droppedIds?.has(f.id)) continue;
+      incomingIds.add(f.id);
+      out.push(f);
+    }
+    for (const f of cached) {
+      if (droppedIds?.has(f.id) || incomingIds.has(f.id)) continue;
+      out.push(f);
+    }
+    return out;
   }
   const seen = new Set<string>();
   const out: FollowUp[] = [];
