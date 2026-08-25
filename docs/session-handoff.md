@@ -19,11 +19,12 @@ first, and update the top block at the end of any session that changes state.**
   still loads leads; edits stay locked. Lock effect no longer restarts on
   every board poll. Shared-board GET resolves owner leads by id. Orphan
   heal no longer `SELECT *` the workspace on each Worker isolate.
+- Deployed to https://leadgeneration.alexxvives.workers.dev (version
+  `3ab87647-26d9-4597-ab12-9158afcadcfe`).
 
 ### Next
-1. Deploy Worker so production matches this lock/hydrate fix.
+1. Two-browser check on production: second user should see leads + Live chip, no 423 in the console.
 2. Ona: sign in as `onaparadell@gmail.com` → Boards → **Accept invite**.
-3. Two-browser check: second user should see leads + Live chip, no 423.
 
 ---
 
