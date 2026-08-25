@@ -108,6 +108,63 @@ export function Bone({ className = "" }: { className?: string }) {
   );
 }
 
+/** About / notes / email body placeholders while drawer GET hydrates. */
+export function LeadDrawerPendingSkeleton({
+  variant,
+  noteRows = 2,
+}: {
+  variant: "about" | "notes" | "email";
+  noteRows?: number;
+}) {
+  if (variant === "about") {
+    return (
+      <div
+        className="space-y-2 rounded-lg border border-white/8 bg-ink-950/30 p-3"
+        role="status"
+        aria-busy="true"
+        aria-label="Loading about"
+      >
+        <Bone className="h-3.5 w-full" />
+        <Bone className="h-3.5 w-11/12" />
+        <Bone className="h-3.5 w-4/5" />
+        <Bone className="h-3.5 w-2/3" />
+      </div>
+    );
+  }
+  if (variant === "email") {
+    return (
+      <div className="space-y-2 rounded-lg border border-white/8 bg-ink-950/30 p-3">
+        <Bone className="h-3.5 w-full" />
+        <Bone className="h-3.5 w-full" />
+        <Bone className="h-3.5 w-5/6" />
+        <Bone className="h-3.5 w-4/5" />
+        <Bone className="h-3.5 w-2/3" />
+        <Bone className="h-24 w-full" />
+      </div>
+    );
+  }
+  const n = Math.min(4, Math.max(1, noteRows));
+  return (
+    <div
+      className="space-y-3"
+      role="status"
+      aria-busy="true"
+      aria-label="Loading notes"
+    >
+      {Array.from({ length: n }, (_, i) => (
+        <div
+          key={i}
+          className="rounded-lg border border-white/8 bg-ink-950/30 p-3"
+        >
+          <Bone className="h-3 w-24" />
+          <Bone className="mt-2 h-3.5 w-full" />
+          <Bone className="mt-1.5 h-3.5 w-4/5" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function DashboardSkeleton() {
   return (
     <div className="animate-float-up space-y-6">

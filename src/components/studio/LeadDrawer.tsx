@@ -37,6 +37,7 @@ import {
 } from "@/lib/follow-ups";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
+import { Bone, LeadDrawerPendingSkeleton } from "@/components/studio/skeletons";
 import {
   toggleContactMethod,
   contactMethodsEqual,
@@ -640,6 +641,7 @@ export function LeadDrawer(props: DrawerProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="lead-drawer-title"
+        aria-busy={lead.detailLoaded === false}
         className={`animate-float-up relative flex w-full flex-col overflow-hidden border border-white/10 bg-ink-900 shadow-2xl ${
           mode === "info"
             ? "max-h-[min(90dvh,720px)] max-w-[67.1rem] rounded-xl2"
@@ -651,9 +653,8 @@ export function LeadDrawer(props: DrawerProps) {
         <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
           <div className="min-w-0 flex-1 pr-2">
             {lead.detailLoaded === false ? (
-              <p className="mb-2 flex items-center gap-1.5 text-[11px] text-mist-500">
-                <Spinner className="h-3 w-3" />
-                Loading full details…
+              <p className="sr-only" role="status">
+                Loading full details
               </p>
             ) : null}
             {mode === "info" && crmStage && crmStage !== "new" ? (
@@ -912,16 +913,20 @@ export function LeadDrawer(props: DrawerProps) {
 
           <section>
             <SectionLabel>About</SectionLabel>
-            <AutoGrowAbout
-              key={`${lead.id}-about-${lead.aboutBlurb ?? ""}`}
-              defaultValue={lead.aboutBlurb ?? ""}
-              onSave={(raw) => {
-                const next = raw.trim() || null;
-                if (next !== (lead.aboutBlurb ?? null)) {
-                  void props.onUpdateCrm(lead.id, { aboutBlurb: next });
-                }
-              }}
-            />
+            {lead.detailLoaded === false ? (
+              <LeadDrawerPendingSkeleton variant="about" />
+            ) : (
+              <AutoGrowAbout
+                key={`${lead.id}-about-${lead.aboutBlurb ?? ""}`}
+                defaultValue={lead.aboutBlurb ?? ""}
+                onSave={(raw) => {
+                  const next = raw.trim() || null;
+                  if (next !== (lead.aboutBlurb ?? null)) {
+                    void props.onUpdateCrm(lead.id, { aboutBlurb: next });
+                  }
+                }}
+              />
+            )}
           </section>
           </div>
 
@@ -954,6 +959,13 @@ export function LeadDrawer(props: DrawerProps) {
               </div>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+              {lead.detailLoaded === false ? (
+                <LeadDrawerPendingSkeleton
+                  variant="notes"
+                  noteRows={Math.max(2, followUps.length)}
+                />
+              ) : (
+                <>
               {lead.notes?.trim() && followUps.length === 0 && (
                 <p className="text-sm leading-relaxed text-mist-400">
                   <span className="font-semibold text-mist-200">Earlier note:</span>{" "}
@@ -1216,6 +1228,8 @@ export function LeadDrawer(props: DrawerProps) {
                     })}
                 </ul>
               )}
+                </>
+              )}
             </div>
           </aside>
             </>
@@ -1307,6 +1321,29 @@ export function LeadDrawer(props: DrawerProps) {
                   {busy === "draft" ? <Spinner className="h-4 w-4" /> : <SparkIcon className="h-4 w-4" />}
                   Draft outreach
                 </button>
+              </div>
+            ) : lead.detailLoaded === false ? (
+              <div
+                className="space-y-3"
+                role="status"
+                aria-busy="true"
+                aria-label="Loading email draft"
+              >
+                <FieldMini label="To">
+                  <input
+                    value={toEmail}
+                    onChange={(e) => setToEmail(e.target.value)}
+                    disabled
+                    placeholder="name@company.com"
+                    className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none disabled:opacity-60"
+                  />
+                </FieldMini>
+                <FieldMini label="Subject">
+                  <Bone className="h-10 w-full" />
+                </FieldMini>
+                <FieldMini label="Body">
+                  <LeadDrawerPendingSkeleton variant="email" />
+                </FieldMini>
               </div>
             ) : (
               <div className="space-y-3">

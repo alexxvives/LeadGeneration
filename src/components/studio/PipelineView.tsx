@@ -103,6 +103,7 @@ function MainStageColumn({
   allLeads,
   stageCount,
   backfilling,
+  filterActive,
   onOpen,
   activeId,
 }: {
@@ -110,6 +111,7 @@ function MainStageColumn({
   allLeads: LeadWithOutreach[];
   stageCount?: number;
   backfilling: boolean;
+  filterActive: boolean;
   onOpen: (id: string) => void;
   activeId: string | null;
 }) {
@@ -118,7 +120,9 @@ function MainStageColumn({
     <PipelineColumn
       col={col}
       leads={colLeads}
-      count={stageCount ?? colLeads.length}
+      count={filterActive ? colLeads.length : (stageCount ?? colLeads.length)}
+      backfilling={backfilling}
+      filterActive={filterActive}
       onOpen={onOpen}
       activeId={activeId}
     />
@@ -130,6 +134,7 @@ function ParkedStageColumn({
   allLeads,
   stageCount,
   backfilling,
+  filterActive,
   open,
   onToggle,
   onOpen,
@@ -139,6 +144,7 @@ function ParkedStageColumn({
   allLeads: LeadWithOutreach[];
   stageCount?: number;
   backfilling: boolean;
+  filterActive: boolean;
   open: boolean;
   onToggle: () => void;
   onOpen: (id: string) => void;
@@ -149,7 +155,8 @@ function ParkedStageColumn({
     <ParkedStage
       col={col}
       leads={colLeads}
-      count={stageCount ?? colLeads.length}
+      count={filterActive ? colLeads.length : (stageCount ?? colLeads.length)}
+      filterActive={filterActive}
       open={open}
       onToggle={onToggle}
       onOpen={onOpen}
@@ -162,6 +169,7 @@ export function PipelineView({
   leads,
   stageCounts,
   backfilling = false,
+  filterActive = false,
   onOpen,
   onMoveStage,
 }: {
@@ -170,6 +178,8 @@ export function PipelineView({
   stageCounts?: Record<CrmStage, number>;
   /** While true, new cards append at column bottoms (no top pop-in). */
   backfilling?: boolean;
+  /** Search is filtering — don't treat empty columns as still paging. */
+  filterActive?: boolean;
   onOpen: (id: string) => void;
   onMoveStage: (
     leadId: string,
@@ -237,6 +247,7 @@ export function PipelineView({
                 allLeads={leads}
                 stageCount={stageCounts?.[col.stage]}
                 backfilling={backfilling}
+                filterActive={filterActive}
                 onOpen={openIfClick}
                 activeId={activeId}
               />
@@ -251,6 +262,7 @@ export function PipelineView({
                 allLeads={leads}
                 stageCount={stageCounts?.[col.stage]}
                 backfilling={backfilling}
+                filterActive={filterActive}
                 open={parkedOpen[col.stage] ?? false}
                 onToggle={() =>
                   setParkedOpen((prev) => ({
@@ -281,6 +293,7 @@ function ParkedStage({
   col,
   leads,
   count,
+  filterActive,
   open,
   onToggle,
   onOpen,
@@ -289,6 +302,7 @@ function ParkedStage({
   col: (typeof PARKED_COLUMNS)[number];
   leads: LeadWithOutreach[];
   count: number;
+  filterActive: boolean;
   open: boolean;
   onToggle: () => void;
   onOpen: (id: string) => void;
@@ -324,7 +338,7 @@ function ParkedStage({
         <div className="max-h-[28vh] min-h-0">
           {leads.length === 0 ? (
             <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
-              {col.empty}
+              {filterActive ? "No matching leads." : col.empty}
             </p>
           ) : (
             <VirtualColumnList
@@ -352,12 +366,16 @@ function PipelineColumn({
   col,
   leads,
   count,
+  backfilling,
+  filterActive,
   onOpen,
   activeId,
 }: {
   col: (typeof MAIN_COLUMNS)[number] | (typeof PARKED_COLUMNS)[number];
   leads: LeadWithOutreach[];
   count: number;
+  backfilling: boolean;
+  filterActive: boolean;
   onOpen: (id: string) => void;
   activeId: string | null;
 }) {
@@ -377,8 +395,13 @@ function PipelineColumn({
         </span>
       </div>
       {leads.length === 0 ? (
-          count > 0 ? (
-            <div className="flex flex-col gap-2 p-3" aria-hidden>
+          backfilling && !filterActive && count > 0 ? (
+            <div
+              className="flex flex-col gap-2 p-3"
+              role="status"
+              aria-busy="true"
+              aria-label={`Loading ${col.title} leads`}
+            >
               {Array.from({ length: Math.min(3, count) }, (_, i) => (
                 <div
                   key={i}
@@ -390,7 +413,7 @@ function PipelineColumn({
             </div>
           ) : (
             <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
-              {col.empty}
+              {filterActive ? "No matching leads." : col.empty}
             </p>
           )
         ) : (

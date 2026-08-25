@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-25 — Pipeline search kept empty columns spinning
+- Column empty state used unfiltered CRM `stageCounts`. A search with no
+  hits still had count > 0, so those lanes showed card skeletons forever.
+- Skeleton only while backfilling with no search. Search misses show
+  “No matching leads.” and a 0 badge. Drawer GET now skeletons About,
+  notes, and email body instead of an empty “No notes yet” flash.
+
 ### 2026-08-25 — 423 lock poll showed no leads for the other user
 - Heartbeat `POST /api/boards/:id/lock` returned 423 when someone else was
   live. Chrome logs that as “Failed to load resource”. The effect depended on

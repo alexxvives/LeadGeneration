@@ -2394,6 +2394,7 @@ export function Studio() {
                 leads={searchFilteredLeads}
                 stageCounts={board.crmStageCounts}
                 backfilling={leadsBackfilling}
+                filterActive={Boolean(deferredLeadSearch.trim())}
                 onOpen={openInfo}
                 onMoveStage={onMoveStage}
               />
