@@ -286,6 +286,8 @@ export function Studio() {
   const leadsGenRef = useRef(0);
   /** Ids removed this session — stale polls must not push them back onto the board. */
   const droppedLeadIdsRef = useRef(new Set<string>());
+  const leadsBackfillingRef = useRef(false);
+  const loadInFlightRef = useRef(false);
   /** Serialize CRM PATCHes per lead so a heal cannot last-write-win over a newer journal. */
   const leadWriteTailRef = useRef(new Map<string, Promise<void>>());
   /** Lead ids already toasted as bounced this session (null = not seeded yet). */
@@ -372,7 +374,8 @@ export function Studio() {
     [toast],
   );
 
-  const refresh = useCallback(async (opts?: { forceFull?: boolean }) => {
+  const refresh = useCallback(async (opts?: { forceFull?: boolean; replace?: boolean }) => {
+    const replace = !!opts?.replace || !!opts?.forceFull;
     const v = viewRef.current;
     const lite =
       !opts?.forceFull &&
@@ -414,319 +417,39 @@ export function Studio() {
       return data;
     }
 
-    const gen = ++leadsGenRef.current;
-
-    // Always page — never pull all ~3k fat/slim rows in one soft-refresh.
-    const pageOpts = { perLane: LEAD_PAGE_PER_LANE, laneOffset: 0 };
-
-    const fetchStartedAt = performance.now();
-    const data = await api.board(boardKey, pageOpts);
-    if (leadsGenRef.current !== gen) return data;
-
-    // Read cache AFTER the await so an optimistic delete during the fetch
-    // is not overwritten by the snapshot from the start of this refresh.
-    const prev = boardRef.current;
-    const sameBoard = (prev?.activeBoardId ?? null) === (boardKey ?? null);
-    const haveComplete =
-      !!prev &&
-      sameBoard &&
-      prev.leadsHasMore === false &&
-      prev.leads.length > 0;
-    const dropped = droppedLeadIdsRef.current;
-    const incomingLeads = omitDroppedLeadIds(data.leads, dropped);
-
-    boardLiteRef.current = false;
-    setBoards(data.boards ?? []);
-
-    // Requested board gone (deleted) — drop sticky filter + hard-replace leads.
-    if (
-      boardKey &&
-      !(data.boards ?? []).some((b) => b.id === boardKey)
-    ) {
-      storeBoardFilter("");
-      if (typeof window !== "undefined") {
-        const next = `/app${queryForView(viewRef.current, null)}`;
-        window.history.replaceState({}, "", next);
-      }
-      setBoard({
-        ...data,
-        leads: incomingLeads,
-        leadsTotal: data.leadsTotal ?? data.leads.length,
-        leadsHasMore: !!data.leadsHasMore,
-      });
-      if (data.leadsHasMore) {
-        setLeadsBackfilling(true);
-        void (async () => {
-          let offset = LEAD_PAGE_PER_LANE;
-          try {
-            while (true) {
-              if (leadsGenRef.current !== gen) return;
-              const chunk = await api.boardLeadsChunk(null, {
-                perLane: LEAD_PAGE_PER_LANE,
-                laneOffset: offset,
-              });
-              if (leadsGenRef.current !== gen) return;
-              setBoard((b) => {
-                if (!b) return b;
-                return {
-                  ...b,
-                  leads: appendUnseenLeads(
-                    b.leads,
-                    chunk.leads,
-                    droppedLeadIdsRef.current,
-                  ),
-                  leadsTotal: chunk.leadsTotal,
-                  leadsHasMore: chunk.leadsHasMore,
-                };
-              });
-              offset += LEAD_PAGE_PER_LANE;
-              if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
-            }
-          } catch {
-            /* keep partial */
-          } finally {
-            if (leadsGenRef.current === gen) setLeadsBackfilling(false);
-          }
-        })();
-      } else {
-        setLeadsBackfilling(false);
-      }
-      return data;
+    // Soft poll / mutation refresh must not cancel an in-flight first page or
+    // restart paging from offset 50 — that left Pipeline spinning forever
+    // (especially with two users sharing D1).
+    if (!replace && (loadInFlightRef.current || leadsBackfillingRef.current)) {
+      const cached = boardRef.current;
+      if (cached) return cached;
     }
 
-    const pinned = activeRunIdRef.current;
-    if (pinned && pinned !== data.run?.id) {
-      try {
-        const { run, leads } = await api.runWithLeads(pinned);
-        const incoming = omitDroppedLeadIds(leads, droppedLeadIdsRef.current);
-        const prevById = new Map((prev?.leads ?? []).map((l) => [l.id, l]));
-        const merged = {
-          ...data,
-          run,
-          leads: incoming.map((l) => {
-            const old = prevById.get(l.id);
-            return old
-              ? mergeSlimIntoCached(old, l, { fetchStartedAt })
-              : l;
-          }),
-          leadsHasMore: false,
-        };
-        setBoard(merged);
-        return merged;
-      } catch {
-        activeRunIdRef.current = null;
-        setActiveRunId(null);
-      }
+    const gen = replace ? ++leadsGenRef.current : leadsGenRef.current;
+    if (replace) {
+      leadsBackfillingRef.current = false;
+      loadInFlightRef.current = true;
     }
 
-    const serverTotal = data.leadsTotal ?? prev?.leadsTotal ?? data.leads.length;
-    const totalShrunk =
-      !!prev &&
-      sameBoard &&
-      serverTotal < (prev.leadsTotal ?? prev.leads.length);
-    // Entire board fits in one page — replace (drops deleted ghosts).
-    const singlePageComplete =
-      !data.leadsHasMore && serverTotal <= data.leads.length;
-
-    // Soft refresh / pipeline poll: never replace a larger in-memory list with
-    // a smaller page — that made Pipeline Contacted drop from ~169 → a handful.
-    // Exception: totals shrank or the board is a single page → full reconcile.
-    if (
-      !!prev &&
-      sameBoard &&
-      prev.leads.length > 0 &&
-      !totalShrunk &&
-      !singlePageComplete
-    ) {
-      const patch = new Map(incomingLeads.map((l) => [l.id, l]));
-      const merged = omitDroppedLeadIds(prev.leads, dropped).map((l) => {
-        const incoming = patch.get(l.id);
-        return incoming
-          ? mergeSlimIntoCached(l, incoming, { fetchStartedAt })
-          : l;
-      });
-      const seen = new Set(merged.map((l) => l.id));
-      for (const l of incomingLeads) {
-        if (!seen.has(l.id)) merged.push(l);
-      }
-      const total = serverTotal;
-      const stillMore = !haveComplete && merged.length < total;
-      setBoard({
-        ...data,
-        leads: merged,
-        leadsTotal: total,
-        leadsHasMore: stillMore,
-        crmStageCounts: data.crmStageCounts ?? prev.crmStageCounts,
-      });
-      if (stillMore && !leadsBackfilling) {
-        setLeadsBackfilling(true);
-        void (async () => {
-          let offset = LEAD_PAGE_PER_LANE;
-          try {
-            while (true) {
-              if (leadsGenRef.current !== gen) return;
-              if (filterBoardIdRef.current !== boardKey) return;
-              const chunk = await api.boardLeadsChunk(boardKey, {
-                perLane: LEAD_PAGE_PER_LANE,
-                laneOffset: offset,
-              });
-              if (leadsGenRef.current !== gen) return;
-              setBoard((b) => {
-                if (!b) return b;
-                return {
-                  ...b,
-                  leads: appendUnseenLeads(
-                    b.leads,
-                    chunk.leads,
-                    droppedLeadIdsRef.current,
-                  ),
-                  leadsTotal: chunk.leadsTotal,
-                  leadsHasMore: chunk.leadsHasMore,
-                };
-              });
-              offset += LEAD_PAGE_PER_LANE;
-              if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
-            }
-          } catch {
-            /* keep partial list */
-          } finally {
-            if (leadsGenRef.current === gen) setLeadsBackfilling(false);
-          }
-        })();
-      } else if (
-        haveComplete &&
-        !stillMore &&
-        (prev.leadsTotal ?? prev.leads.length) !== total
-      ) {
-        // Count mismatch on a fully loaded board — walk pages once to drop ghosts.
-        void (async () => {
-          const ids = new Set<string>();
-          const byId = new Map<string, LeadWithOutreach>();
-          let offset = 0;
-          try {
-            while (true) {
-              if (leadsGenRef.current !== gen) return;
-              if (filterBoardIdRef.current !== boardKey) return;
-              const chunk = await api.boardLeadsChunk(boardKey, {
-                perLane: LEAD_PAGE_PER_LANE,
-                laneOffset: offset,
-              });
-              if (leadsGenRef.current !== gen) return;
-              for (const l of chunk.leads) {
-                if (droppedLeadIdsRef.current.has(l.id)) continue;
-                ids.add(l.id);
-                byId.set(l.id, l);
-              }
-              offset += LEAD_PAGE_PER_LANE;
-              if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
-            }
-            setBoard((b) => {
-              if (!b || leadsGenRef.current !== gen) return b;
-              const next = omitDroppedLeadIds(b.leads, droppedLeadIdsRef.current)
-                .filter((l) => ids.has(l.id))
-                .map((l) => {
-                  const incoming = byId.get(l.id);
-                  return incoming
-                    ? mergeSlimIntoCached(l, incoming, { fetchStartedAt })
-                    : l;
-                });
-              for (const [id, l] of byId) {
-                if (droppedLeadIdsRef.current.has(id)) continue;
-                if (!next.some((x) => x.id === id)) next.push(l);
-              }
-              return {
-                ...b,
-                leads: next,
-                leadsTotal: ids.size,
-                leadsHasMore: false,
-                crmStageCounts: data.crmStageCounts ?? b.crmStageCounts,
-              };
-            });
-          } catch {
-            /* keep prior list */
-          }
-        })();
-      }
-      return data;
-    }
-
-    // Full replace path (board switch, shrink, or single-page complete).
-    if (!!prev && sameBoard && (totalShrunk || singlePageComplete)) {
-      const prevById = new Map(prev.leads.map((l) => [l.id, l]));
-      setBoard({
-        ...data,
-        leads: incomingLeads.map((l) => {
-          const old = prevById.get(l.id);
-          return old
-            ? mergeSlimIntoCached(old, l, { fetchStartedAt })
-            : l;
-        }),
-        leadsTotal: serverTotal,
-        leadsHasMore: !!data.leadsHasMore,
-        crmStageCounts: data.crmStageCounts ?? prev.crmStageCounts,
-      });
-      if (data.leadsHasMore) {
-        setLeadsBackfilling(true);
-        void (async () => {
-          let offset = LEAD_PAGE_PER_LANE;
-          try {
-            while (true) {
-              if (leadsGenRef.current !== gen) return;
-              if (filterBoardIdRef.current !== boardKey) return;
-              const chunk = await api.boardLeadsChunk(boardKey, {
-                perLane: LEAD_PAGE_PER_LANE,
-                laneOffset: offset,
-              });
-              if (leadsGenRef.current !== gen) return;
-              setBoard((b) => {
-                if (!b) return b;
-                return {
-                  ...b,
-                  leads: appendUnseenLeads(
-                    b.leads,
-                    chunk.leads,
-                    droppedLeadIdsRef.current,
-                  ),
-                  leadsTotal: chunk.leadsTotal,
-                  leadsHasMore: chunk.leadsHasMore,
-                };
-              });
-              offset += LEAD_PAGE_PER_LANE;
-              if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
-            }
-          } catch {
-            /* keep partial */
-          } finally {
-            if (leadsGenRef.current === gen) setLeadsBackfilling(false);
-          }
-        })();
-      } else {
-        setLeadsBackfilling(false);
-      }
-      return data;
-    }
-
-    setBoard({
-      ...data,
-      leads: incomingLeads,
-    });
-
-    // Progressive: show first page, keep loading the rest without blocking UI.
-    if (data.leadsHasMore) {
+    const beginBackfill = (g: number, key: string | null) => {
+      if (leadsBackfillingRef.current) return;
+      leadsBackfillingRef.current = true;
       setLeadsBackfilling(true);
       void (async () => {
         let offset = LEAD_PAGE_PER_LANE;
         try {
           while (true) {
-            if (leadsGenRef.current !== gen) return;
-            if (filterBoardIdRef.current !== boardKey) return;
-            const chunk = await api.boardLeadsChunk(boardKey, {
+            if (leadsGenRef.current !== g) return;
+            if (filterBoardIdRef.current !== key) return;
+            const chunk = await api.boardLeadsChunk(key, {
               perLane: LEAD_PAGE_PER_LANE,
               laneOffset: offset,
             });
-            if (leadsGenRef.current !== gen) return;
+            if (leadsGenRef.current !== g) return;
+            if (filterBoardIdRef.current !== key) return;
             setBoard((b) => {
-              if (!b) return b;
+              if (!b || leadsGenRef.current !== g) return b;
+              if (filterBoardIdRef.current !== key) return b;
               return {
                 ...b,
                 leads: appendUnseenLeads(
@@ -742,16 +465,155 @@ export function Studio() {
             if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
           }
         } catch {
-          /* keep partial list; user can refresh */
+          /* keep partial list */
         } finally {
-          if (leadsGenRef.current === gen) setLeadsBackfilling(false);
+          if (leadsGenRef.current === g) {
+            leadsBackfillingRef.current = false;
+            setLeadsBackfilling(false);
+          }
         }
       })();
-    } else {
-      setLeadsBackfilling(false);
-    }
+    };
 
-    return data;
+    const pageOpts = { perLane: LEAD_PAGE_PER_LANE, laneOffset: 0 };
+    const fetchStartedAt = performance.now();
+    try {
+      const data = await api.board(boardKey, pageOpts);
+      if (leadsGenRef.current !== gen) return data;
+
+      boardLiteRef.current = false;
+      setBoards(data.boards ?? []);
+
+      // Requested board gone (deleted) — drop sticky filter + hard-replace leads.
+      if (
+        boardKey &&
+        !(data.boards ?? []).some((b) => b.id === boardKey)
+      ) {
+        storeBoardFilter("");
+        if (typeof window !== "undefined") {
+          const next = `/app${queryForView(viewRef.current, null)}`;
+          window.history.replaceState({}, "", next);
+        }
+        setBoard((b) => {
+          const dropped = droppedLeadIdsRef.current;
+          const incomingLeads = omitDroppedLeadIds(data.leads, dropped);
+          const prevById = new Map((b?.leads ?? []).map((l) => [l.id, l]));
+          return {
+            ...data,
+            leads: incomingLeads.map((l) => {
+              const old = prevById.get(l.id);
+              return old
+                ? mergeSlimIntoCached(old, l, { fetchStartedAt })
+                : l;
+            }),
+            leadsTotal: data.leadsTotal ?? incomingLeads.length,
+            leadsHasMore: !!data.leadsHasMore,
+          };
+        });
+        if (data.leadsHasMore) beginBackfill(gen, null);
+        else {
+          leadsBackfillingRef.current = false;
+          setLeadsBackfilling(false);
+        }
+        return data;
+      }
+
+      const pinned = activeRunIdRef.current;
+      if (pinned && pinned !== data.run?.id) {
+        try {
+          const { run, leads } = await api.runWithLeads(pinned);
+          if (leadsGenRef.current !== gen) return data;
+          setBoard((b) => {
+            const incoming = omitDroppedLeadIds(
+              leads,
+              droppedLeadIdsRef.current,
+            );
+            const prevById = new Map((b?.leads ?? []).map((l) => [l.id, l]));
+            return {
+              ...data,
+              run,
+              leads: incoming.map((l) => {
+                const old = prevById.get(l.id);
+                return old
+                  ? mergeSlimIntoCached(old, l, { fetchStartedAt })
+                  : l;
+              }),
+              leadsHasMore: false,
+            };
+          });
+          leadsBackfillingRef.current = false;
+          setLeadsBackfilling(false);
+          return data;
+        } catch {
+          activeRunIdRef.current = null;
+          setActiveRunId(null);
+        }
+      }
+
+      const hadBoard = !!boardRef.current;
+      const replaceList = replace || !hadBoard;
+
+      setBoard((b) => {
+        const dropped = droppedLeadIdsRef.current;
+        const incomingLeads = omitDroppedLeadIds(data.leads, dropped);
+        const sameBoard = (b?.activeBoardId ?? null) === (boardKey ?? null);
+        const prevById =
+          sameBoard && b
+            ? new Map(b.leads.map((l) => [l.id, l]))
+            : null;
+
+        if (replaceList || !b || !sameBoard) {
+          return {
+            ...data,
+            leads: incomingLeads.map((l) => {
+              const old = prevById?.get(l.id);
+              return old
+                ? mergeSlimIntoCached(old, l, { fetchStartedAt })
+                : l;
+            }),
+            leadsTotal: data.leadsTotal ?? incomingLeads.length,
+            leadsHasMore: !!data.leadsHasMore,
+            crmStageCounts: data.crmStageCounts ?? b?.crmStageCounts,
+          };
+        }
+
+        // Soft merge: patch page 1 into the already-loaded list. Never shrink
+        // to a single page (that emptied Pipeline Contacted) and never resurrect
+        // ids dropped this session.
+        const patch = new Map(incomingLeads.map((l) => [l.id, l]));
+        const merged = omitDroppedLeadIds(b.leads, dropped).map((l) => {
+          const incoming = patch.get(l.id);
+          return incoming
+            ? mergeSlimIntoCached(l, incoming, { fetchStartedAt })
+            : l;
+        });
+        const seen = new Set(merged.map((l) => l.id));
+        for (const l of incomingLeads) {
+          if (!seen.has(l.id)) merged.push(l);
+        }
+        return {
+          ...b,
+          ...data,
+          leads: merged,
+          leadsTotal: data.leadsTotal ?? b.leadsTotal ?? merged.length,
+          leadsHasMore:
+            b.leadsHasMore === false ? false : !!data.leadsHasMore,
+          crmStageCounts: data.crmStageCounts ?? b.crmStageCounts,
+        };
+      });
+
+      if (replaceList && data.leadsHasMore) {
+        beginBackfill(gen, boardKey);
+      } else if (replaceList) {
+        leadsBackfillingRef.current = false;
+        setLeadsBackfilling(false);
+      }
+      return data;
+    } finally {
+      if (replace && leadsGenRef.current === gen) {
+        loadInFlightRef.current = false;
+      }
+    }
   }, []);
 
   boardRef.current = board;
@@ -835,9 +697,7 @@ export function Studio() {
     const first = !hasLoadedRef.current;
     if (first) setLoading(true);
     else setLeadsHydrating(true);
-    // Cancel in-flight progressive pages for the previous board.
-    leadsGenRef.current += 1;
-    void refresh()
+    void refresh({ replace: true })
       .then(() => {
         hasLoadedRef.current = true;
       })
@@ -894,6 +754,7 @@ export function Studio() {
   useEffect(() => {
     if (view !== "pipeline") return;
     const id = window.setInterval(() => {
+      if (loadInFlightRef.current || leadsBackfillingRef.current) return;
       void refresh().catch(() => {});
     }, 15_000);
     return () => window.clearInterval(id);
@@ -1020,7 +881,7 @@ export function Studio() {
         boardId,
       });
       storeBoardFilter(boardId);
-      const data = await refresh();
+      const data = await refresh({ replace: true });
       const n = data.leadsTotal ?? data.run?.leadCount ?? data.leads.length;
       toast(
         "ok",
@@ -1179,12 +1040,12 @@ export function Studio() {
       );
       activeRunIdRef.current = runId ?? null;
       setActiveRunId(runId ?? null);
-      await refresh();
+      await refresh({ replace: true });
       setView("leads");
     } catch (e) {
       if (ac.signal.aborted || (e as Error).name === "AbortError") {
         toast("ok", "Import cancelled.");
-        await refresh();
+        await refresh({ replace: true });
         return;
       }
       throw e;
@@ -1988,7 +1849,10 @@ export function Studio() {
   const [, startLayoutTransition] = useTransition();
 
   const searchFilteredLeads = useMemo(() => {
-    const all = board?.leads ?? [];
+    const all = omitDroppedLeadIds(
+      board?.leads ?? [],
+      droppedLeadIdsRef.current,
+    );
     return all.filter((l) => leadMatchesSearch(l, deferredLeadSearch));
   }, [board?.leads, deferredLeadSearch, leadMatchesSearch]);
 
@@ -2130,9 +1994,6 @@ export function Studio() {
   const dropLeadsLocally = (ids: string[]) => {
     const idSet = new Set(ids);
     for (const id of ids) droppedLeadIdsRef.current.add(id);
-    // Cancel in-flight board fetch/backfill so it cannot re-apply the old list.
-    leadsGenRef.current += 1;
-    setLeadsBackfilling(false);
     setSelectedId((cur) => (cur && idSet.has(cur) ? null : cur));
     setBoard((b) => {
       if (!b) return b;
@@ -2211,7 +2072,6 @@ export function Studio() {
         "ok",
         `Deleted ${deleted} lead${deleted === 1 ? "" : "s"}.`,
       );
-      await refresh();
     } catch (e) {
       for (const id of leadIds) droppedLeadIdsRef.current.delete(id);
       await refresh();

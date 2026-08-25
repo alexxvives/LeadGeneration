@@ -19,6 +19,15 @@ export function useStableDuringLoad<T extends { id: string }>(
 ): T[] {
   const frozenIdsRef = useRef<string[] | null>(null);
 
+  if (!loadingMore) {
+    frozenIdsRef.current = null;
+  } else if (frozenIdsRef.current) {
+    const live = new Set(items.map((i) => i.id));
+    if (frozenIdsRef.current.some((id) => !live.has(id))) {
+      frozenIdsRef.current = frozenIdsRef.current.filter((id) => live.has(id));
+    }
+  }
+
   useEffect(() => {
     if (loadingMore) {
       if (frozenIdsRef.current === null && items.length > 0) {

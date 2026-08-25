@@ -127,6 +127,7 @@ export function LeadTable({
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ROW_ESTIMATE_PX,
     overscan: 16,
+    getItemKey: (index) => sortedLeads[index]?.id ?? index,
   });
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();

@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-08-25 — Delete stayed; hydrate never left page 1
+- Optimistic delete filtered `board.leads`, but Pipeline’s 15s `refresh()`
+  incremented the paging gen, cancelled backfill, and merged from a stale
+  snapshot — the row came back until a full reload. Soft merge now uses
+  functional `setBoard` + dropped ids; delete does not bump gen.
+- The same gen bump restarted hydrate from offset 50 every 15s. With two
+  users (slow D1) no chunk finished, so the spinner ran forever and later
+  batches never appeared. Soft poll skips while paging; only board switch
+  / search / import replace the list. Chunk GETs skip run/summaries/lock.
+  `ORDER BY` now ties on `l.id` so OFFSET pages don’t repeat.
+
 ### 2026-08-24 — Contact Draft = no draft; Ready = has draft (no Approve)
 - A `draft` status stayed in Contact Draft until Approve, so drafted copy
   never showed in Ready. Re-draft all only targeted Contact Draft `draft`

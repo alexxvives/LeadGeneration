@@ -635,7 +635,9 @@ export class JsonStore implements LeadRepository {
         const aSent = sentAt(a.id);
         const bSent = sentAt(b.id);
         if (aSent !== bSent) return bSent.localeCompare(aSent);
-        return b.createdAt.localeCompare(a.createdAt);
+        const byCreated = b.createdAt.localeCompare(a.createdAt);
+        if (byCreated !== 0) return byCreated;
+        return b.id.localeCompare(a.id);
       });
     const byLane = filter?.lane
       ? sorted.filter((l) => {

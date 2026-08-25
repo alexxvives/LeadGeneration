@@ -264,8 +264,11 @@ and uses `D1Store` instead. Pipeline/Leads respect the sidebar board filter
 Board hydrate is **progressive + slim**: **50 leads per Pipeline /
 Outreach lane** (New split into Contact Draft vs Ready, then Contacted /
 In Conversation / Closed / Not Interested), then the same 50-per-lane
-again in the background until the board is complete. Rows are slim — no
-email bodies / about blurbs (`detailLoaded: false`). Opening a
+again in the background until the board is complete. Background pages are
+a **leads-only** request (no run/summaries/lock) so paging stays cheap
+with two people on the board. Pipeline’s 15s slim poll **does not cancel
+or restart** that backfill — it only patches already-loaded rows. Rows
+are slim — no email bodies / about blurbs (`detailLoaded: false`). Opening a
 lead drawer fetches full detail via `GET /api/leads/:id`. That GET (and
 Pipeline’s 15s slim poll) is merged into the cached row via
 `mergeSlimIntoCached` (`src/lib/lead-cache.ts`). Journal follow-ups are
@@ -277,9 +280,9 @@ pending (`writePending`) or when the snapshot started before
 `lastWriteAt` — the same flash class as the journal bug. Slim list rows
 still omit body/about/notes (`detailLoaded: false`); empty email/phone
 arrays on a non-stale snapshot are authoritative (bounce strip). Deleted
-leads are removed from the cache immediately; stale polls are not
-allowed to push those ids back. Pipeline and Outreach stay mounted after
-first visit so switching back is instant.
+leads are removed from the cache immediately; later polls merge with
+functional `setBoard` so they cannot resurrect a dropped id. Pipeline and
+Outreach stay mounted after first visit so switching back is instant.
 
 ## 6. Guardrails baked into the flow
 

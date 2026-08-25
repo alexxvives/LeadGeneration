@@ -39,6 +39,7 @@ export async function GET(req: Request) {
     leadOffset: lite ? undefined : leadOffset,
     leadPerLane: lite ? undefined : leadPerLane,
     leadLaneOffset: lite ? undefined : leadLaneOffset,
+    leadsOnly: chunkOnly && !lite,
   });
 
   // Background pages: leads only (client already has workspace/caps).

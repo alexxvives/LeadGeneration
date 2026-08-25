@@ -90,6 +90,18 @@ import {
 
 const LOCK_TTL_MS = 150_000; // 2.5 minutes
 
+function uniqueById<T extends { id: string }>(rows: T[]): T[] {
+  if (rows.length < 2) return rows;
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  return out;
+}
+
 /** Persist scraped/imported names after stripping emoji and decorative punctuation. */
 async function persistCleanedLeadNames(
   db: LeadRepository,
@@ -937,6 +949,8 @@ export async function getLatestBoard(
     /** Round-robin hydrate: N rows from each Pipeline/Outreach lane. */
     leadPerLane?: number;
     leadLaneOffset?: number;
+    /** Background pages: skip run/summaries/name-clean so paging stays cheap. */
+    leadsOnly?: boolean;
   },
 ): Promise<{
   run: Run | null;
@@ -951,24 +965,6 @@ export async function getLatestBoard(
   activeBoardId: string | null;
   boardLock: BoardLock | null;
 }> {
-  await ensureDefaultBoard(ctx);
-  const boards = await listBoardSummaries(ctx);
-  const active =
-    boardId && boardId !== "all" && boards.some((b) => b.id === boardId)
-      ? boardId
-      : null;
-
-  let leadDb = ctx.db;
-  let boardLock: BoardLock | null = null;
-  if (active) {
-    const access = await resolveBoardAccess(ctx, active);
-    if (access) leadDb = access.db;
-    boardLock = await getBoardLockStatus(ctx, active);
-  }
-
-  const includeLeads = opts?.includeLeads !== false;
-  const filter = active ? { boardId: active } : undefined;
-
   const emptyStageCounts = (): Record<CrmStage, number> => ({
     new: 0,
     contacted: 0,
@@ -986,6 +982,92 @@ export async function getLatestBoard(
     }
     return next;
   };
+
+  const perLane =
+    opts?.leadPerLane != null && opts.leadPerLane > 0
+      ? Math.floor(opts.leadPerLane)
+      : null;
+  const laneOffset = Math.max(0, opts?.leadLaneOffset ?? 0);
+  const offset = Math.max(0, opts?.leadOffset ?? 0);
+  const limit = opts?.leadLimit;
+
+  const listPagedLeads = (
+    leadDb: LeadRepository,
+    filter: { boardId: string } | undefined,
+  ) =>
+    perLane != null
+      ? Promise.all(
+          LEAD_HYDRATE_LANES.map((lane) =>
+            leadDb.listLeads({
+              ...filter,
+              lane,
+              limit: perLane,
+              offset: laneOffset,
+            }),
+          ),
+        ).then((pages) => ({
+          raw: uniqueById(pages.flat()),
+          hasMore: pages.some((p) => p.length >= perLane),
+        }))
+      : leadDb
+          .listLeads({
+            ...filter,
+            ...(limit != null ? { limit, offset } : {}),
+          })
+          .then((raw) => ({
+            raw: uniqueById(raw),
+            hasMore: false,
+          }));
+
+  // Background pages: skip chrome queries so Pipeline poll / two users
+  // cannot starve the hydrate loop.
+  if (opts?.leadsOnly) {
+    const active = boardId && boardId !== "all" ? boardId : null;
+    let leadDb = ctx.db;
+    if (active) {
+      const access = await resolveBoardAccess(ctx, active);
+      if (access) leadDb = access.db;
+    }
+    const filter = active ? { boardId: active } : undefined;
+    const [leadsTotal, listed] = await Promise.all([
+      leadDb.countLeads(filter),
+      listPagedLeads(leadDb, filter),
+    ]);
+    const leadsHasMore =
+      perLane != null
+        ? listed.hasMore
+        : limit != null
+          ? offset + listed.raw.length < leadsTotal
+          : false;
+    return {
+      run: null,
+      leads: await attachOutreach(leadDb, listed.raw, { slim: true }),
+      leadsTotal,
+      leadsHasMore,
+      crmStageCounts: emptyStageCounts(),
+      boards: [],
+      activeBoardId: active,
+      boardLock: null,
+    };
+  }
+
+  await ensureDefaultBoard(ctx);
+  const boards = await listBoardSummaries(ctx);
+  const active =
+    boardId && boardId !== "all" && boards.some((b) => b.id === boardId)
+      ? boardId
+      : null;
+
+  let leadDb = ctx.db;
+  let boardLock: BoardLock | null = null;
+  if (active) {
+    const access = await resolveBoardAccess(ctx, active);
+    if (access) leadDb = access.db;
+    boardLock = await getBoardLockStatus(ctx, active);
+  }
+
+  const includeLeads = opts?.includeLeads !== false;
+  const filter = active ? { boardId: active } : undefined;
 
   if (!includeLeads) {
     const [leadsTotal, summary] = await Promise.all([
@@ -1011,44 +1093,12 @@ export async function getLatestBoard(
     (await leadDb.getLatestRun({ status: "complete" })) ??
     (await leadDb.getLatestRun());
 
-  const perLane =
-    opts?.leadPerLane != null && opts.leadPerLane > 0
-      ? Math.floor(opts.leadPerLane)
-      : null;
-  const laneOffset = Math.max(0, opts?.leadLaneOffset ?? 0);
-  const offset = Math.max(0, opts?.leadOffset ?? 0);
-  const limit = opts?.leadLimit;
-  const listLeads =
-    perLane != null
-      ? Promise.all(
-          LEAD_HYDRATE_LANES.map((lane) =>
-            leadDb.listLeads({
-              ...filter,
-              lane,
-              limit: perLane,
-              offset: laneOffset,
-            }),
-          ),
-        ).then((pages) => ({
-          raw: pages.flat(),
-          hasMore: pages.some((p) => p.length >= perLane),
-        }))
-      : leadDb
-          .listLeads({
-            ...filter,
-            ...(limit != null ? { limit, offset } : {}),
-          })
-          .then((raw) => ({
-            raw,
-            hasMore: false,
-          }));
   const [leadsTotal, summary, listed] = await Promise.all([
     leadDb.countLeads(filter),
     leadDb.summarizeLeads(filter),
-    listLeads,
+    listPagedLeads(leadDb, filter),
   ]);
-  const rawLeads = listed.raw;
-  const leads = await persistCleanedLeadNames(leadDb, rawLeads);
+  const leads = await persistCleanedLeadNames(leadDb, listed.raw);
   const leadsHasMore =
     perLane != null
       ? listed.hasMore

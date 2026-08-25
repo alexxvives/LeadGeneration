@@ -1286,7 +1286,8 @@ export class D1Store implements LeadRepository {
     const pageBind = limit != null ? [limit, offset] : [];
     const orderSql = `ORDER BY
          CASE WHEN o.status = 'sent' THEN o.sent_at ELSE NULL END DESC,
-         l.created_at DESC`;
+         l.created_at DESC,
+         l.id DESC`;
     const bind: unknown[] = [this.workspaceId];
     let where = `WHERE l.workspace_id = ?`;
     if (filter?.runId) {
