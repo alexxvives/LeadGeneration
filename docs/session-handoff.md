@@ -12,7 +12,8 @@ first, and update the top block at the end of any session that changes state.**
 ## ⏱️ Status — updated 2026-08-25 (outreach / calendar / Default boards)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0034** remote — apply `0034` on deploy (drop empty Default boards).
+**Migrations:** 0021–**0034** remote applied.  
+**Deploy:** rebuilt OpenNext then shipped (`ce4f0eee-04a5-4b74-85b6-7110a822a70f`) so studio chunks updated.
 
 ### This pass
 - Re-draft all moved to Contact Draft; also drafts remaining leads there.
@@ -22,8 +23,7 @@ first, and update the top block at the end of any session that changes state.**
 - Calendar: no “Missed” chip by name, search bar, counts on cells + titles.
 
 ### Next
-1. Apply `0034` remotely (`npm run cf:migrate`) then deploy.
-2. Hard-refresh Outreach + Calendar after deploy.
+1. Hard-refresh Outreach + Calendar after deploy.
 
 ---
 
