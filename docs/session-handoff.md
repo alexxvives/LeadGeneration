@@ -18,11 +18,13 @@ first, and update the top block at the end of any session that changes state.**
 - Lead drawer shows About / notes / email skeletons until GET hydrates.
 - Pipeline search misses no longer keep empty columns in a loading
   skeleton (that used unfiltered stage totals).
+- Rebuilt OpenNext then deployed (`f09c99e3-a0f1-4ab2-affa-3642f2bf1585`)
+  so client chunks actually updated.
 
 ### Next
-1. Deploy Worker so production gets drawer skeleton + pipeline search empty.
-2. Two-browser lock check if not already done.
-3. Ona: sign in as `onaparadell@gmail.com` → Boards → **Accept invite**.
+1. Hard-refresh Pipeline: search with no hits → empty copy, not skeletons.
+   Open a lead card → shimmer in About/notes until details land.
+2. Ona: sign in as `onaparadell@gmail.com` → Boards → **Accept invite**.
 
 ---
 
