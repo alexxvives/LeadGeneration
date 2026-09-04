@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-04 — Non-email contact stays in Outreach draft/send
+- Phone / form / Instagram alone no longer move email leads into Outreach
+  Contacted. They stay in Contact Draft / Ready until an email is sent (or the
+  email channel is logged). Drawer Send stays available when an address exists.
+- Phone-only logged contacts still land in Contacted.
+
 ### 2026-09-04 — Manual leads free; Agency grant; denser cards
 - `createManualLead` no longer checks quota or calls `recordLeadUsage` —
   only search/import burn monthly lead credits. Studio Add Lead UI matched.

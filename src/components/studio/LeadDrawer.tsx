@@ -512,8 +512,11 @@ export function LeadDrawer(props: DrawerProps) {
     crmStage === "not_interested";
   const needsMethod = isPastNew && contactMethods.length === 0;
   const outreachSent = outreach?.status === "sent";
-  /** Pipeline/CRM contacted — log methods/notes, don't push email approve/send. */
-  const registerOnly = isPastNew && !outreachSent;
+  const hasUsableEmail = Boolean(
+    (outreach?.toEmail ?? lead.emails[0] ?? "").trim(),
+  );
+  /** Phone/form/IG-only (no email) — log channels; email leads can still draft/send. */
+  const registerOnly = isPastNew && !outreachSent && !hasUsableEmail;
 
   const promptingCall =
     callPrompt === "call" ||
@@ -1440,8 +1443,8 @@ export function LeadDrawer(props: DrawerProps) {
             {registerOnly && !outreach ? (
               <div className="space-y-3">
                 <p className="text-sm text-mist-300">
-                  This lead is already contacted in the pipeline. Log how you
-                  reached them below — no email draft, approve, or send.
+                  No email on this lead — log how you reached them below. Add an
+                  email in Lead info if you want to draft and send later.
                 </p>
                 <div
                   className={`rounded-xl px-3 py-2.5 ${
@@ -1627,9 +1630,8 @@ export function LeadDrawer(props: DrawerProps) {
 
                 {!sent && registerOnly ? (
                   <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-mist-400">
-                    Pipeline already marks this lead as contacted — use the
-                    channels above to register how you reached them. Send stays
-                    available only for New → Ready email flow.
+                    No email on this lead — register contact channels above, or
+                    add an address in Lead info to unlock Send.
                   </p>
                 ) : null}
 

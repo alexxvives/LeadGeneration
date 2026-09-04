@@ -9,20 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-04 (dense cards, free manual leads, Agency grant)
+## ⏱️ Status — updated 2026-09-04 (Outreach: non-email ≠ done for email)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0035** remote applied (Agency gift live).  
 **Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
-- Leads cards: removed Open footer, tighter layout, up to 4 columns.
-- Manual Add lead does not consume monthly lead credits.
-- Migration 0035: all existing workspaces → `agency` plan.
+- Outreach: phone/form/IG contact keeps email leads in Draft/Ready for send.
+- Drawer no longer blocks Send when CRM is past New but an email exists.
 
 ### Next
-1. Confirm `npm run cf:migrate` applied 0035 on prod D1.
-2. Hard-refresh Leads cards + check usage meter after manual add.
+1. Hard-refresh Outreach after deploy; verify phone-contacted email lead still drafts/sends.
 
 ---
 

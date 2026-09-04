@@ -17,37 +17,13 @@ import {
   SendIcon,
 } from "@/components/icons";
 import { useStableDuringLoad } from "./skeletons";
-import { leadHydrateLane } from "@/lib/lead-lanes";
+import { isOutreachReadyStatus } from "@/lib/lead-lanes";
 import { VirtualColumnList } from "./virtual-list";
 import { Lockable, useBoardLockUi } from "./board-lock";
 
 type OutreachBucket = "review" | "ready" | "contacted";
 /** Ready-column contact-channel filter. */
 type ReadyChannelFilter = "all" | "email" | "phone";
-
-/** Any pipeline stage past New counts as contacted in the Outreach queue. */
-function isContacted(lead: LeadWithOutreach): boolean {
-  const methods = lead.contactMethods ?? [];
-  const reachedOtherwise =
-    methods.includes("phone") ||
-    methods.includes("contact_form") ||
-    methods.includes("instagram");
-  // A bounce is not contact — strip email and treat as New unless they were
-  // reached another way or later moved to conversation / closed.
-  if (lead.outreach?.deliveryStatus === "bounced" && !reachedOtherwise) {
-    const stage = lead.crmStage;
-    return stage === "in_conversation" || stage === "closed";
-  }
-  if (lead.outreach?.status === "sent") return true;
-  if (reachedOtherwise) return true;
-  const stage = lead.crmStage;
-  return (
-    stage === "contacted" ||
-    stage === "in_conversation" ||
-    stage === "closed" ||
-    stage === "not_interested"
-  );
-}
 
 function leadEmail(lead: LeadWithOutreach): string | null {
   const fromLead = lead.emails.find((e) => e.trim())?.trim() ?? null;
@@ -63,6 +39,64 @@ function leadPhone(lead: LeadWithOutreach): string | null {
   return t || null;
 }
 
+/**
+ * Outreach "Contacted" = email already sent / email channel logged, or a
+ * terminal CRM stage. Phone / form / Instagram alone must NOT pull an email
+ * lead out of Contact Draft / Ready — they can still draft & send.
+ */
+function isContacted(lead: LeadWithOutreach): boolean {
+  const methods = lead.contactMethods ?? [];
+  const stage = lead.crmStage;
+  const email = leadEmail(lead);
+  const nonEmailReach =
+    methods.includes("phone") ||
+    methods.includes("contact_form") ||
+    methods.includes("instagram");
+  const emailed =
+    lead.outreach?.status === "sent" || methods.includes("email");
+
+  // A bounce is not email contact — allow re-draft when a new address exists
+  // unless the pipeline is already past outreach (conversation / closed).
+  if (lead.outreach?.deliveryStatus === "bounced" && !emailed) {
+    if (email) {
+      return (
+        stage === "in_conversation" ||
+        stage === "closed" ||
+        stage === "not_interested"
+      );
+    }
+    // No usable email left: non-email reach (or nothing) → Contacted / hide.
+    return (
+      nonEmailReach ||
+      stage === "in_conversation" ||
+      stage === "closed" ||
+      stage === "not_interested" ||
+      stage === "contacted"
+    );
+  }
+
+  if (emailed) return true;
+
+  // Non-email contact with an email on file → stay in draft/send queue.
+  if (nonEmailReach && email) {
+    return (
+      stage === "in_conversation" ||
+      stage === "closed" ||
+      stage === "not_interested"
+    );
+  }
+
+  // Phone-only logged contact (no email) → Contacted column.
+  if (nonEmailReach) return true;
+
+  return (
+    stage === "contacted" ||
+    stage === "in_conversation" ||
+    stage === "closed" ||
+    stage === "not_interested"
+  );
+}
+
 function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   if (isContacted(lead)) return "contacted";
   const email = leadEmail(lead);
@@ -74,7 +108,9 @@ function bucketOf(lead: LeadWithOutreach): OutreachBucket | null {
   if (!email) return null;
 
   // Email leads: no draft → Contact Draft; saved draft → Ready (ADR 0029).
-  if (leadHydrateLane(lead, lead.outreach) === "ready") return "ready";
+  // Use draft status directly — CRM "contacted" via phone/form/IG can still
+  // sit in Ready when a draft exists.
+  if (isOutreachReadyStatus(lead.outreach?.status)) return "ready";
   return "review";
 }
 
@@ -123,8 +159,8 @@ const BUCKET_META: Record<
   },
   contacted: {
     title: "Contacted",
-    hint: "Sent emails and logged contacts — open a row to view the message",
-    empty: "No contacts logged yet.",
+    hint: "Sent emails — open a row to view the message",
+    empty: "No emails sent yet.",
   },
 };
 
