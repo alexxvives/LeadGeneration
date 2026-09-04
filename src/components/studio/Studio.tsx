@@ -1817,10 +1817,6 @@ export function Studio() {
           ? {
               ...b,
               leads: [lead, ...b.leads],
-              workspace: {
-                ...b.workspace,
-                leadsUsed: b.workspace.leadsUsed + 1,
-              },
             }
           : b,
       );

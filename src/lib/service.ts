@@ -2569,6 +2569,7 @@ export async function updateLeadCrm(
 /**
  * Create a blank lead on a board and open it for manual fill-in (Leads UI).
  * Reuses a single completed "manual" run per board so Runs stays tidy.
+ * Does not consume monthly lead credits (search / import still do).
  */
 export async function createManualLead(
   ctx: Ctx,
@@ -2590,30 +2591,7 @@ export async function createManualLead(
 
   await assertBoardEditable(ctx, boardId);
 
-  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
-  if (ws) await ensureUsageWindow(ctx.db, ws);
-
-  if (ctx.metered) {
-    const freshWs = ws ? await ctx.db.getWorkspace(ctx.workspaceId) : null;
-    if (freshWs) {
-      const plan = getPlan(freshWs.planId);
-      const used = freshWs.leadsUsedThisMonth;
-      const remaining =
-        freshWs.planId === "insider"
-          ? Number.POSITIVE_INFINITY
-          : Math.max(0, plan.leadCreditsPerMonth - used);
-      if (remaining < 1) {
-        throw new QuotaError({
-          kind: "leads",
-          planId: freshWs.planId,
-          limit: used + remaining,
-          used,
-          message: "No lead credits left this month — upgrade to add more.",
-        });
-      }
-    }
-  }
-
+  // Manual entry is free — does not consume monthly lead credits (search/import do).
   const runs = await db.listRuns();
   let run =
     runs.find((r) => r.boardId === boardId && r.provider === "manual") ?? null;
@@ -2666,7 +2644,6 @@ export async function createManualLead(
   };
 
   await db.createLeads([lead]);
-  await recordLeadUsage(ctx, 1);
   const boardCount = await db.countLeads({ boardId });
   await db.updateRun(run.id, { leadCount: boardCount });
 

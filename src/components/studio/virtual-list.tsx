@@ -81,7 +81,7 @@ export function VirtualCardGrid<T extends { id: string }>({
   const [cols, setCols] = useState(() => {
     if (typeof window === "undefined") return 3;
     const w = window.innerWidth;
-    return w >= 1024 ? 3 : w >= 640 ? 2 : 1;
+    return w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1;
   });
 
   useEffect(() => {
@@ -89,7 +89,7 @@ export function VirtualCardGrid<T extends { id: string }>({
     if (!el) return;
     const apply = () => {
       const w = el.clientWidth;
-      setCols(w >= 1024 ? 3 : w >= 640 ? 2 : 1);
+      setCols(w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1);
     };
     apply();
     const ro = new ResizeObserver(apply);
@@ -101,7 +101,7 @@ export function VirtualCardGrid<T extends { id: string }>({
   const virtualizer = useVirtualizer({
     count: items.length === 0 ? 0 : rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 220,
+    estimateSize: () => 148,
     overscan: 4,
     getItemKey: (index) => {
       const first = items[index * cols];
@@ -133,7 +133,7 @@ export function VirtualCardGrid<T extends { id: string }>({
               style={{ transform: `translateY(${vi.start}px)` }}
             >
               <div
-                className="grid gap-5 pb-5"
+                className="grid gap-3 pb-3"
                 style={{
                   gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
                 }}

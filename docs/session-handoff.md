@@ -9,21 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-04 (lead drawer UX + Instagram)
+## ⏱️ Status — updated 2026-09-04 (dense cards, free manual leads, Agency grant)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0034** remote applied.  
+**Migrations:** 0021–**0035** (apply **0035** remote for Agency gift).  
 **Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
-- Company name required in lead drawer (shake + red on Enter/close if empty).
-- Notes hydrate: prefer full GET bodies after slim list; clearer loading skeleton.
-- Cancel on post-contact note prompt → stage back to New.
-- Contact method: Instagram (types, API, Outreach picker, Pipeline icons).
+- Leads cards: removed Open footer, tighter layout, up to 4 columns.
+- Manual Add lead does not consume monthly lead credits.
+- Migration 0035: all existing workspaces → `agency` plan.
 
 ### Next
-1. Hard-refresh studio after deploy to verify drawer notes + Instagram.
-2. Optional: dogfood Create lead → empty name close, log contact → Cancel.
+1. Confirm `npm run cf:migrate` applied 0035 on prod D1.
+2. Hard-refresh Leads cards + check usage meter after manual add.
 
 ---
 

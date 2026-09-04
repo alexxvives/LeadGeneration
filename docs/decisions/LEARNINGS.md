@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-04 — Manual leads free; Agency grant; denser cards
+- `createManualLead` no longer checks quota or calls `recordLeadUsage` —
+  only search/import burn monthly lead credits. Studio Add Lead UI matched.
+- Migration **0035** sets every existing workspace `plan_id` to `agency`
+  (new signups still start free).
+- Leads cards: dropped the “Open →” footer, tighter padding/gaps, 4 columns
+  at ≥1280px so more cards fit on screen.
+
 ### 2026-09-04 — Drawer notes stayed blank after slim hydrate
 - Card/list rows strip journal note bodies (`slimFollowUpsForList`). LeadDrawer
   merged those empty strings with the full GET using default
