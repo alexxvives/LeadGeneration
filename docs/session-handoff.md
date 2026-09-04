@@ -12,7 +12,7 @@ first, and update the top block at the end of any session that changes state.**
 ## ⏱️ Status — updated 2026-09-04 (dense cards, free manual leads, Agency grant)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0035** (apply **0035** remote for Agency gift).  
+**Migrations:** 0021–**0035** remote applied (Agency gift live).  
 **Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
