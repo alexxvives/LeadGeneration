@@ -19,7 +19,7 @@ const RowSchema = z.object({
     .enum(["new", "contacted", "in_conversation", "closed", "not_interested"])
     .optional(),
   contactMethods: z
-    .array(z.enum(["email", "phone", "contact_form"]))
+    .array(z.enum(["email", "phone", "contact_form", "instagram"]))
     .max(3)
     .optional(),
 });

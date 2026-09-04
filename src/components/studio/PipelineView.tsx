@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
-import { MailIcon, PhoneIcon, FormIcon, InfoIcon, CalendarIcon } from "@/components/icons";
+import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, InfoIcon, CalendarIcon } from "@/components/icons";
 import {
   isUserFollowUp,
   leadHasMissedCall,
@@ -448,6 +448,7 @@ function MethodIcons({ methods }: { methods: ContactMethod[] }) {
       {methods.includes("email") && <MailIcon className="h-2.5 w-2.5" />}
       {methods.includes("phone") && <PhoneIcon className="h-2.5 w-2.5" />}
       {methods.includes("contact_form") && <FormIcon className="h-2.5 w-2.5" />}
+      {methods.includes("instagram") && <InstagramIcon className="h-2.5 w-2.5" />}
     </>
   );
 }

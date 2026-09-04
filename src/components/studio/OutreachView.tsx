@@ -9,6 +9,7 @@ import {
   EyeIcon,
   FormIcon,
   InfoIcon,
+  InstagramIcon,
   MailIcon,
   PencilIcon,
   PhoneIcon,
@@ -28,7 +29,9 @@ type ReadyChannelFilter = "all" | "email" | "phone";
 function isContacted(lead: LeadWithOutreach): boolean {
   const methods = lead.contactMethods ?? [];
   const reachedOtherwise =
-    methods.includes("phone") || methods.includes("contact_form");
+    methods.includes("phone") ||
+    methods.includes("contact_form") ||
+    methods.includes("instagram");
   // A bounce is not contact — strip email and treat as New unless they were
   // reached another way or later moved to conversation / closed.
   if (lead.outreach?.deliveryStatus === "bounced" && !reachedOtherwise) {
@@ -723,6 +726,7 @@ function OutreachRow({
                   [
                     ["phone", "Called"],
                     ["contact_form", "Form"],
+                    ["instagram", "Instagram"],
                   ] as const
                 ).map(([method, label]) => (
                   <button
@@ -780,6 +784,15 @@ function OutreachRow({
                   aria-label="Contact form"
                 >
                   <FormIcon className="h-3 w-3" />
+                </span>
+              ) : null}
+              {methods.includes("instagram") ? (
+                <span
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink-800/80 text-mist-300 ring-1 ring-ink-600/40"
+                  title="Instagram"
+                  aria-label="Instagram"
+                >
+                  <InstagramIcon className="h-3 w-3" />
                 </span>
               ) : null}
             </div>

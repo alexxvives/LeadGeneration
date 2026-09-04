@@ -4,6 +4,7 @@ const METHODS: readonly ContactMethod[] = [
   "email",
   "phone",
   "contact_form",
+  "instagram",
 ] as const;
 
 export function isContactMethod(v: unknown): v is ContactMethod {
@@ -61,6 +62,7 @@ const METHOD_ORDER: readonly ContactMethod[] = [
   "email",
   "phone",
   "contact_form",
+  "instagram",
 ];
 
 /**
@@ -118,18 +120,19 @@ export function contactMethodsEqual(
 export function contactMethodLabel(method: ContactMethod): string {
   if (method === "email") return "email";
   if (method === "phone") return "phone";
+  if (method === "instagram") return "Instagram";
   return "contact form";
 }
 
 /** Note for a newly added channel. Phone/email are omitted — the drawer writes those logs. */
 export function contactMethodAddedNote(
-  method: Exclude<ContactMethod, "phone">,
+  method: Exclude<ContactMethod, "phone" | "email">,
   byName?: string | null,
 ): { note: string; kind: FollowUpKind } {
   const who = byName?.trim();
-  if (method === "email") {
-    const base = "Contacted by email";
-    return { note: who ? `${base} — ${who}` : base, kind: "email" };
+  if (method === "instagram") {
+    const base = "Contacted via Instagram";
+    return { note: who ? `${base} — ${who}` : base, kind: "note" };
   }
   const base = "Contacted via contact form";
   return { note: who ? `${base} — ${who}` : base, kind: "note" };

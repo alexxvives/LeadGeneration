@@ -124,6 +124,7 @@ const CONTACT_METHODS: { method: ContactMethod; label: string }[] = [
   { method: "email",        label: "Email" },
   { method: "phone",        label: "Phone" },
   { method: "contact_form", label: "Contact form" },
+  { method: "instagram",    label: "Instagram" },
 ];
 
 // ─── Main drawer ──────────────────────────────────────────────────────────────
@@ -172,6 +173,9 @@ export function LeadDrawer(props: DrawerProps) {
   >(promptNote);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const companyInputRef = useRef<HTMLInputElement | null>(null);
+  const [companyInvalid, setCompanyInvalid] = useState(false);
+  const [companyShaking, setCompanyShaking] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editText, setEditText] = useState("");
@@ -232,9 +236,17 @@ export function LeadDrawer(props: DrawerProps) {
     followUpsLeadIdRef.current = lead.id;
     const dropped = new Set(lead.droppedFollowUpIds ?? []);
     if (deletedNote) dropped.add(deletedNote.id);
+    const detailReady = lead.detailLoaded === true;
     const next = leadChanged
       ? collapsed.filter((f) => !dropped.has(f.id))
-      : mergeFollowUpLists(followUps, collapsed, dropped.size ? dropped : undefined);
+      : mergeFollowUpLists(
+          followUps,
+          collapsed,
+          dropped.size ? dropped : undefined,
+          // Slim rows strip note bodies — once the drawer GET lands, take
+          // server text so journals aren't stuck blank until remount.
+          detailReady ? { preferIncoming: true } : undefined,
+        );
     const journalSame =
       !leadChanged &&
       next.length === followUps.length &&
@@ -262,7 +274,7 @@ export function LeadDrawer(props: DrawerProps) {
     if (
       changed &&
       !deletedNote &&
-      lead.detailLoaded !== false &&
+      lead.detailLoaded === true &&
       next.length >= raw.length &&
       next.length >= followUps.length
     ) {
@@ -295,7 +307,7 @@ export function LeadDrawer(props: DrawerProps) {
   // bare "Email sent" next to an existing "Email sent by …" line.
   useEffect(() => {
     if (outreach?.status !== "sent" || !outreach.sentAt) return;
-    if (lead.detailLoaded === false) return;
+    if (lead.detailLoaded !== true) return;
     const sentDay = outreach.sentAt.slice(0, 10);
     const existing = followUps.length ? followUps : (lead.followUps ?? []);
     const collapsed = collapseEmailSentFollowUps(
@@ -350,7 +362,29 @@ export function LeadDrawer(props: DrawerProps) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  const flashCompanyRequired = () => {
+    setCompanyInvalid(true);
+    setCompanyShaking(false);
+    // Retrigger CSS animation on repeated submits.
+    requestAnimationFrame(() => setCompanyShaking(true));
+    const el = companyInputRef.current;
+    if (el) {
+      el.focus();
+      el.select?.();
+    }
+  };
+
+  const companyNameOk = () => {
+    const typed = companyInputRef.current?.value.trim();
+    const name = (typed ?? lead.company).trim();
+    return name.length > 0;
+  };
+
   const requestClose = () => {
+    if (mode === "info" && !companyNameOk()) {
+      flashCompanyRequired();
+      return;
+    }
     if (
       dirtyRef.current &&
       !window.confirm(
@@ -503,6 +537,22 @@ export function LeadDrawer(props: DrawerProps) {
     }
   };
 
+  /** Dismiss the post-contact note prompt and put the lead back in New. */
+  const cancelContactPrompt = async () => {
+    if (editLocked) return;
+    setShowAddNote(false);
+    setCallPrompt(false);
+    setComposerKind("note");
+    setNewNoteDate(todayIsoDate());
+    setNewNoteText("");
+    if (props.onUndoMarkContacted) {
+      await props.onUndoMarkContacted();
+      return;
+    }
+    await commitStage("new", []);
+    if (promptNote) props.onPromptNoteDone?.();
+  };
+
   // ── Dated notes (journal) ──
   const addNote = async (variant?: "call" | "missed" | "email") => {
     if (editLocked) return;
@@ -650,7 +700,7 @@ export function LeadDrawer(props: DrawerProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="lead-drawer-title"
-        aria-busy={lead.detailLoaded === false}
+        aria-busy={lead.detailLoaded !== true}
         className={`animate-float-up relative flex w-full flex-col overflow-hidden border border-white/10 bg-ink-900 shadow-2xl ${
           mode === "info"
             ? "max-h-[min(90dvh,720px)] max-w-[67.1rem] rounded-xl2"
@@ -661,7 +711,7 @@ export function LeadDrawer(props: DrawerProps) {
         {/* Header */}
         <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
           <div className="min-w-0 flex-1 pr-2">
-            {lead.detailLoaded === false ? (
+            {lead.detailLoaded !== true ? (
               <p className="sr-only" role="status">
                 Loading full details
               </p>
@@ -691,21 +741,64 @@ export function LeadDrawer(props: DrawerProps) {
               >
                 <input
                   id="lead-drawer-title"
+                  ref={companyInputRef}
                   key={`${lead.id}-company-${lead.company}`}
                   defaultValue={lead.company}
                   placeholder="Company name"
                   disabled={editLocked}
                   title={editLocked ? lockHint : undefined}
+                  aria-invalid={companyInvalid}
+                  aria-required
+                  onChange={(e) => {
+                    if (companyInvalid && e.target.value.trim()) {
+                      setCompanyInvalid(false);
+                    }
+                  }}
                   onBlur={(e) => {
                     if (editLocked) return;
                     const next = e.target.value.trim();
-                    if (next && next !== lead.company) {
+                    if (!next) {
+                      // Don't shake on blur — only on submit (Enter / close).
+                      if (lead.company.trim()) {
+                        e.target.value = lead.company;
+                      }
+                      return;
+                    }
+                    setCompanyInvalid(false);
+                    if (next !== lead.company) {
+                      void props.onUpdateCrm(lead.id, { company: next });
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    if (editLocked) return;
+                    const next = e.currentTarget.value.trim();
+                    if (!next) {
+                      flashCompanyRequired();
+                      return;
+                    }
+                    setCompanyInvalid(false);
+                    e.currentTarget.blur();
+                    if (next !== lead.company) {
                       void props.onUpdateCrm(lead.id, { company: next });
                     }
                   }}
                   aria-label={editLocked ? lockHint : "Company name"}
-                  className="w-full min-w-0 rounded-md bg-transparent py-0.5 font-display text-xl font-semibold tracking-tight text-mist-100 outline-none placeholder:text-mist-500 focus:bg-ink-950/40 focus:underline focus:decoration-aurora-400/50 disabled:cursor-not-allowed disabled:opacity-70 sm:text-2xl"
+                  onAnimationEnd={() => setCompanyShaking(false)}
+                  className={`w-full min-w-0 rounded-md py-0.5 font-display text-xl font-semibold tracking-tight outline-none sm:text-2xl ${
+                    companyInvalid
+                      ? `bg-rose-500/10 text-rose-100 ring-2 ring-rose-400/70 placeholder:text-rose-300/70 ${
+                          companyShaking ? "animate-field-shake" : ""
+                        }`
+                      : "bg-transparent text-mist-100 placeholder:text-mist-500 focus:bg-ink-950/40 focus:underline focus:decoration-aurora-400/50"
+                  } disabled:cursor-not-allowed disabled:opacity-70`}
                 />
+                {companyInvalid ? (
+                  <p className="mt-1 text-xs font-medium text-rose-300" role="alert">
+                    Company name is required
+                  </p>
+                ) : null}
               </div>
             )}
           </div>
@@ -946,7 +1039,7 @@ export function LeadDrawer(props: DrawerProps) {
 
           <section>
             <SectionLabel>About</SectionLabel>
-            {lead.detailLoaded === false ? (
+            {lead.detailLoaded !== true ? (
               <LeadDrawerPendingSkeleton variant="about" />
             ) : (
               <AutoGrowAbout
@@ -1006,7 +1099,7 @@ export function LeadDrawer(props: DrawerProps) {
               </div>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-              {lead.detailLoaded === false ? (
+              {lead.detailLoaded !== true ? (
                 <LeadDrawerPendingSkeleton
                   variant="notes"
                   noteRows={Math.max(2, followUps.length)}
@@ -1028,21 +1121,19 @@ export function LeadDrawer(props: DrawerProps) {
                         Log the call
                       </p>
                     </div>
-                    {props.onUndoMarkContacted ? (
+                    {props.onUndoMarkContacted || promptingChannel ? (
                       <button
                         type="button"
                         disabled={busy === "undo-contact"}
                         onClick={() =>
-                          void run("undo-contact", async () => {
-                            await props.onUndoMarkContacted!();
-                          })
+                          void run("undo-contact", () => cancelContactPrompt())
                         }
                         className="shrink-0 rounded-full border border-white/15 bg-ink-950/40 px-2.5 py-1 text-[11px] font-medium text-mist-200 transition-colors hover:border-amber-400/40 hover:bg-amber-400/10 hover:text-amber-100 disabled:opacity-50"
                       >
                         {busy === "undo-contact" ? (
                           <Spinner className="h-3 w-3" />
                         ) : (
-                          "Undo"
+                          "Cancel"
                         )}
                       </button>
                     ) : null}
@@ -1112,41 +1203,59 @@ export function LeadDrawer(props: DrawerProps) {
                         </button>
                       </Lockable>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (promptingCall) {
-                          void addNote("call");
-                          return;
-                        }
-                        if (promptingEmail) {
-                          void addNote("email");
-                          return;
-                        }
-                        setShowAddNote(false);
-                        setCallPrompt(false);
-                        setComposerKind("note");
-                        setNewNoteText("");
-                        setNewNoteDate(todayIsoDate());
-                      }}
-                      className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
-                    >
-                      {promptingChannel ? "Skip details" : "Cancel"}
-                    </button>
-                    {promptNote && props.onUndoMarkContacted ? (
+                    {promptingChannel ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (promptingCall) {
+                              void addNote("call");
+                              return;
+                            }
+                            if (promptingEmail) {
+                              void addNote("email");
+                              return;
+                            }
+                          }}
+                          className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
+                        >
+                          Skip details
+                        </button>
+                        <button
+                          type="button"
+                          disabled={editLocked || busy === "undo-contact"}
+                          onClick={() =>
+                            void run("undo-contact", () => cancelContactPrompt())
+                          }
+                          title={
+                            editLocked
+                              ? lockHint
+                              : "Cancel and move lead back to New"
+                          }
+                          className="ml-auto rounded-full border border-rose-400/35 px-3 py-1 text-xs font-medium text-rose-200 hover:bg-rose-400/10 disabled:opacity-50"
+                        >
+                          {busy === "undo-contact" ? (
+                            <Spinner className="h-3 w-3" />
+                          ) : (
+                            "Cancel"
+                          )}
+                        </button>
+                      </>
+                    ) : (
                       <button
                         type="button"
-                        disabled={busy === "undo-contact"}
-                        onClick={() =>
-                          void run("undo-contact", async () => {
-                            await props.onUndoMarkContacted!();
-                          })
-                        }
-                        className="ml-auto rounded-full border border-amber-400/30 px-3 py-1 text-xs font-medium text-amber-200 hover:bg-amber-400/10 disabled:opacity-50"
+                        onClick={() => {
+                          setShowAddNote(false);
+                          setCallPrompt(false);
+                          setComposerKind("note");
+                          setNewNoteText("");
+                          setNewNoteDate(todayIsoDate());
+                        }}
+                        className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
                       >
-                        Undo call log
+                        Cancel
                       </button>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               )}
@@ -1398,7 +1507,7 @@ export function LeadDrawer(props: DrawerProps) {
                   </button>
                 </Lockable>
               </div>
-            ) : lead.detailLoaded === false ? (
+            ) : lead.detailLoaded !== true ? (
               <div
                 className="space-y-3"
                 role="status"

@@ -53,7 +53,7 @@ export function normalizeCrmStage(raw: unknown): CrmStage {
 }
 
 /** How a prospect was first reached. Set when crmStage → "contacted". */
-export type ContactMethod = "email" | "phone" | "contact_form";
+export type ContactMethod = "email" | "phone" | "contact_form" | "instagram";
 
 /**
  * Calendar / journal kind. A **note** is a log line; a **follow_up** is a

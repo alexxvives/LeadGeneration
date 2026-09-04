@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-04 — Drawer notes stayed blank after slim hydrate
+- Card/list rows strip journal note bodies (`slimFollowUpsForList`). LeadDrawer
+  merged those empty strings with the full GET using default
+  `mergeFollowUpLists` (prefer cache), so note text never updated until remount.
+- Fix: `preferIncoming: true` once `detailLoaded === true`. Treat anything other
+  than `detailLoaded === true` as still loading (skeleton). Manual create returns
+  `detailLoaded: true` so new leads skip a useless GET.
+- Contact prompt Cancel now moves the lead back to New (not only “Skip details”).
+- `ContactMethod` gained `instagram` (API zod, import labels, Outreach/Pipeline UI).
+
 ### 2026-08-25 — Locked board: disable buttons, don't hide them
 - When another user holds the board lock, write controls (Add lead, stage
   picker, delete, Send, Draft all, calendar follow-up ticks) stay visible and

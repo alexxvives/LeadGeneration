@@ -9,18 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-08-25 (board lock: disable, don't hide)
+## ⏱️ Status — updated 2026-09-04 (lead drawer UX + Instagram)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0034** remote applied.  
-**Deploy:** not in this pass (push to master for CI).
+**Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
-- Other-user lock: keep write buttons on screen, disabled, hover to take control.
-- Calendar follow-up ticks no longer fire while someone else is Live.
+- Company name required in lead drawer (shake + red on Enter/close if empty).
+- Notes hydrate: prefer full GET bodies after slim list; clearer loading skeleton.
+- Cancel on post-contact note prompt → stage back to New.
+- Contact method: Instagram (types, API, Outreach picker, Pipeline icons).
 
 ### Next
-1. Hard-refresh Outreach + Calendar + Leads after deploy (two-user lock).
+1. Hard-refresh studio after deploy to verify drawer notes + Instagram.
+2. Optional: dogfood Create lead → empty name close, log contact → Cancel.
 
 ---
 

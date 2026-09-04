@@ -84,6 +84,9 @@ export function parseImportCrmStage(raw: string | null | undefined): {
   ) {
     return { crmStage: "contacted", contactMethods: ["contact_form"] };
   }
+  if (s === "instagram" || s === "ig" || s === "insta") {
+    return { crmStage: "contacted", contactMethods: ["instagram"] };
+  }
   if (
     s === "contacted" ||
     s === "reached" ||
@@ -107,6 +110,9 @@ export function parseImportCrmStage(raw: string | null | undefined): {
   }
   if (/\bemail\b|\bemailed\b|\bmailed\b/.test(s)) {
     return { crmStage: "contacted", contactMethods: ["email"] };
+  }
+  if (/\binstagram\b|\big\b|\binsta\b/.test(s)) {
+    return { crmStage: "contacted", contactMethods: ["instagram"] };
   }
   if (/\bcall\b|\bcalled\b|\bphone\b/.test(s)) {
     return { crmStage: "contacted", contactMethods: ["phone"] };

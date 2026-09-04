@@ -1573,7 +1573,9 @@ export function Studio() {
           ? opts?.missed
             ? "Logged as missed call — moved to Contacted."
             : "Logged as called — moved to Contacted."
-          : "Logged contact form — moved to Contacted.",
+          : method === "instagram"
+            ? "Logged Instagram — moved to Contacted."
+            : "Logged contact form — moved to Contacted.",
       );
       if (opts?.promptNote) {
         setDrawerPromptNote(opts.missed ? "missed" : "call");
@@ -1596,8 +1598,7 @@ export function Studio() {
   const onUndoMarkContacted = async (leadId: string) => {
     await onMoveStage(leadId, "new", []);
     setDrawerPromptNote(false);
-    setSelectedId(null);
-    toast("ok", "Undone — lead back in Ready to Contact.");
+    toast("ok", "Cancelled — lead moved back to New.");
   };
 
   const onUpdateLeadCrm = async (
@@ -1766,7 +1767,8 @@ export function Studio() {
   const ensureLeadDetail = useCallback(
     async (id: string) => {
       const cur = boardRef.current?.leads.find((l) => l.id === id);
-      if (!cur || cur.detailLoaded !== false) return;
+      // Only skip when we already have a full drawer payload.
+      if (!cur || cur.detailLoaded === true) return;
       const fetchStartedAt = performance.now();
       try {
         const { lead } = await api.getLead(id);

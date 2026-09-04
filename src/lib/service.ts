@@ -2670,7 +2670,7 @@ export async function createManualLead(
   const boardCount = await db.countLeads({ boardId });
   await db.updateRun(run.id, { leadCount: boardCount });
 
-  return { ...lead, outreach: null };
+  return { ...lead, outreach: null, detailLoaded: true };
 }
 
 /** Row shape for CSV/Excel import (flexible mapping happens client-side). */
