@@ -53,6 +53,8 @@ function monthTitle(y: number, m: number): string {
 /**
  * Branded date field — glass trigger + mini month popover (portaled so
  * drawer overflow does not clip it). Replaces native `type="date"`.
+ * Popover is `z-[1200]`: above Lead/Contact drawers (`z-[1100]`), below
+ * toasts (`z-[2000]`).
  */
 export function DatePicker({
   value,
@@ -114,15 +116,18 @@ export function DatePicker({
       setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
       document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
 
@@ -168,7 +173,7 @@ export function DatePicker({
             ref={popRef}
             role="dialog"
             aria-label={monthTitle(cursor.y, cursor.m)}
-            className="fixed z-[80] w-[17.5rem] rounded-xl2 border border-white/10 bg-ink-900 p-3 shadow-xl"
+            className="fixed z-[1200] w-[17.5rem] rounded-xl2 border border-white/10 bg-ink-900 p-3 shadow-xl"
             style={{ top: pos.top, left: pos.left }}
           >
             <div className="mb-2 flex items-center justify-between gap-2">
