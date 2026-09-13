@@ -118,7 +118,7 @@ export function ContactsView({
       <div className="flex shrink-0 items-center justify-between gap-3">
         <p className="text-sm text-mist-400">
           {contacts.length > 0
-            ? `${contacts.length} contact${contacts.length === 1 ? "" : "s"}`
+            ? `${contacts.length} collaborator${contacts.length === 1 ? "" : "s"}`
             : null}
         </p>
         <Lockable>
@@ -130,13 +130,13 @@ export function ContactsView({
                 ? lockHint
                 : boards.length === 0
                   ? "Create a board first"
-                  : "Add contact"
+                  : "Add collaborator"
             }
             onClick={openCreate}
             className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
           >
             <PlusIcon className="h-4 w-4" />
-            Add contact
+            Add collaborator
           </button>
         </Lockable>
       </div>
@@ -144,7 +144,7 @@ export function ContactsView({
       {creating ? (
         <div className="glass rounded-xl2 p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-display text-lg font-semibold">New contact</h3>
+            <h3 className="font-display text-lg font-semibold">New collaborator</h3>
             <button
               type="button"
               onClick={() => setCreating(false)}
@@ -224,7 +224,7 @@ export function ContactsView({
 
       {contacts.length === 0 && !creating ? (
         <div className="glass rounded-xl2 px-6 py-12 text-center">
-          <p className="font-display text-xl font-semibold">No contacts yet</p>
+          <p className="font-display text-xl font-semibold">No collaborators yet</p>
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
@@ -292,7 +292,7 @@ export function ContactsView({
                 onClick={() => onSelect(null)}
                 className="mb-3 inline-flex min-h-11 items-center gap-2 self-start rounded-full border border-white/10 px-3 text-sm text-mist-300 transition-colors hover:border-white/20 hover:text-mist-100 lg:hidden"
               >
-                ← Back to contacts
+                ← Back to collaborators
               </button>
               <ContactPanel
                 contact={selected}
@@ -306,7 +306,7 @@ export function ContactsView({
             </div>
           ) : (
             <div className="hidden rounded-xl2 border border-dashed border-white/10 p-6 text-sm text-mist-500 lg:block">
-              Select a contact to add notes and follow-ups.
+              Select a collaborator to add notes and follow-ups.
             </div>
           )}
         </div>
@@ -452,10 +452,10 @@ function ContactPanel({
           <button
             type="button"
             disabled={disabled}
-            title={disabled ? lockHint : "Delete contact"}
+            title={disabled ? lockHint : "Delete collaborator"}
             onClick={() => void onDelete(contact.id)}
             className="ml-auto rounded-full p-1.5 text-mist-500 hover:text-rose-300 disabled:opacity-50"
-            aria-label="Delete contact"
+            aria-label="Delete collaborator"
           >
             <TrashIcon className="h-4 w-4" />
           </button>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Space_Grotesk, Syne } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import { DEFAULT_STUDIO_THEME, THEME_STORAGE_KEY } from "@/lib/theme";
@@ -26,8 +26,30 @@ const syne = Syne({
 
 export const metadata: Metadata = {
   title: "HERMES mail — Find, draft, deliver",
+  applicationName: "Hermes mail",
   description:
     "A human-in-the-loop lead studio. Search a niche, enrich prospects, draft outreach, and send — on your terms.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Hermes mail",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icons/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#050505",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 /** Prevent theme flash before React hydrates. Light only on /app (studio). */
@@ -63,6 +85,7 @@ export default function RootLayout({
       className={`${fraunces.variable} ${spaceGrotesk.variable} ${syne.variable}`}
     >
       <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body className="antialiased">

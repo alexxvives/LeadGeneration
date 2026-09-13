@@ -9,7 +9,7 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-13 (Wide layout + phone chrome)
+## ⏱️ Status — updated 2026-09-13 (PWA icon + Collaborators)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0036** applied on prod D1 (`lodestar-prod`).  
@@ -17,15 +17,15 @@ first, and update the top block at the end of any session that changes state.**
 in the same release window as any schema-dependent code.
 
 ### This pass
-- Studio fills the pane (no 90rem cap). Header usage meters removed.
-- Phone: Settings + sign-out in overlay (not top-bar gear). Pipeline hint
-  is “move to change stage”; compact on-card stage select. Calendar cells
-  no longer overflow on 390px. Studio default theme is light.
+- Home-screen web app: `favicon.ico`, `apple-touch-icon.png`,
+  `public/icons/icon-{192,512}.png`, `public/manifest.webmanifest`.
+  Install name is **Hermes mail**.
+- Contacts tab moved to Engage and labeled **Collaborators**
+  (`?view=contacts` unchanged).
 
 ### Next
-1. Hard-refresh on a phone (or 390px): overlay Settings, Pipeline move,
-   Calendar month + day list.
-2. Confirm ultrawide Pipeline columns stretch and kanban drag still works.
+1. On a phone: Add to Home Screen and confirm the wings icon + “Hermes mail”.
+2. Confirm Collaborators sits under Engage in sidebar and overlay.
 
 ---
 

@@ -2148,7 +2148,7 @@ export function Studio() {
                         : view === "conversations"
                           ? "Conversations"
                           : view === "contacts"
-                            ? "Contacts"
+                            ? "Collaborators"
                         : view === "calendar"
                           ? "Calendar"
                         : view === "runs"

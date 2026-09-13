@@ -17,7 +17,7 @@ current view, board pill) opens a labeled left overlay listing the same nav
 sections plus Settings. Sign out sits on the overlay account card (same as
 `lg+`). Pipeline and Outreach show one stage/bucket at a time via tabs. The
 lead drawer is an edge-to-edge sheet below `md`. Leads default to cards
-(table remains available). Contacts show a Back panel instead of list+detail
+(table remains available). Collaborators show a Back panel instead of list+detail
 stacked.
 
 **At `lg+`:** keep the expandable sidebar, kanban, and three-column Outreach.
@@ -29,7 +29,7 @@ No API, types, or persistence changes. Routing stays `?view=`.
 - **Keep the icon rail** — saves a chrome rewrite but labels stay hidden and
   content stays narrowed. Rejected.
 - **Bottom tabs (5 primaries + More)** — more native on phones, but the studio
-  has 11+ destinations; More would hide Search/Calendar/Contacts/Boards/Runs.
+  has 11+ destinations; More would hide Search/Calendar/Collaborators/Boards/Runs.
   Rejected in favor of a full labeled overlay.
 
 ## Consequences

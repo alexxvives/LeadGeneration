@@ -79,7 +79,7 @@ function studioViewTitle(settingsActive: boolean, displayView: string): string {
     case "calendar":
       return "Calendar";
     case "contacts":
-      return "Contacts";
+      return "Collaborators";
     case "boards":
       return "Boards";
     case "runs":
@@ -591,17 +591,17 @@ export function StudioShell({
           icon: CalendarDaysIcon,
           active: onApp && displayView === "calendar",
         },
+        {
+          href: "/app?view=contacts",
+          label: "Collaborators",
+          icon: ContactIcon,
+          active: onApp && displayView === "contacts",
+        },
       ],
     },
     {
       label: "Organize",
       items: [
-        {
-          href: "/app?view=contacts",
-          label: "Contacts",
-          icon: ContactIcon,
-          active: onApp && displayView === "contacts",
-        },
         {
           href: "/app?view=boards",
           label: "Boards",

@@ -847,7 +847,7 @@ export function StudioViewSkeleton({
                 : view === "conversations"
                   ? "Conversations"
                   : view === "contacts"
-                    ? "Contacts"
+                    ? "Collaborators"
                 : view === "runs"
                   ? "Search runs"
                   : view === "admin"

@@ -18,6 +18,7 @@ const SESSION_WRITE_PATHS = new Set([
 
 // Routes that are reachable without a session.
 const PUBLIC_PREFIXES = [
+  "/manifest.webmanifest",
   "/login",
   "/pricing",
   "/how-it-works",
@@ -99,6 +100,6 @@ export default async function middleware(
 export const config = {
   // Run on everything except Next internals and static image assets.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.png|images/|.*\\.(?:png|jpg|jpeg|webp|svg|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.png|apple-touch-icon.png|manifest.webmanifest|images/|.*\\.(?:png|jpg|jpeg|webp|svg|ico)$).*)",
   ],
 };

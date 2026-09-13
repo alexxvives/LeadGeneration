@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Home-screen icon + Collaborators nav
+- Phone “Add to Home Screen” needs `apple-touch-icon`, a web manifest, and
+  `appleWebApp` metadata — `app/icon.png` alone is only the tab favicon.
+  Install name is **Hermes mail**. Icons live in `public/icons/` +
+  `favicon.ico` / `apple-touch-icon.png`; manifest is
+  `public/manifest.webmanifest`.
+- Studio **Contacts** tab moved under Engage and labeled **Collaborators**.
+  Route stays `?view=contacts`.
+
 ### 2026-09-13 — Wide studio + phone chrome
 - Studio main is full-bleed (no `max-w-[90rem]`). Search form stays
   `max-w-5xl`; kanban/tables/cards use the remaining pane. Lead cards add

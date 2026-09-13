@@ -436,7 +436,7 @@ export function CalendarView({
         <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto">
           {dayEvents.length === 0 ? (
             <p className="text-sm leading-relaxed text-mist-400">
-              Add a dated follow-up in a lead or contact’s notes, send an email,
+              Add a dated follow-up in a lead or collaborator’s notes, send an email,
               or log a phone call — they show up here.
             </p>
           ) : (

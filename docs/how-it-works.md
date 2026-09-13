@@ -55,7 +55,7 @@ Search  →  Enrich  →  Draft  →  Send
   when set). `/login` only redirects here (Auth.js `pages.signIn`). Unauth
   `/app` → `/?signin=1&callbackUrl=/app`.
 - **`/app` Studio** — the core app (behind login when auth is enforced). Nav
-  destinations: **Dashboard · Search · Leads · Pipeline · Conversations · Outreach · Calendar · Contacts · Boards · Runs**.
+  destinations: **Dashboard · Search · Leads · Pipeline · Conversations · Outreach · Calendar · Collaborators · Boards · Runs**.
   At **`lg+`** these live in the left sidebar; the board filter sits above the
   account card. **Below `lg`** the sidebar is hidden — a top bar opens a
   labeled overlay (ADR 0037) and the board pill sits in that bar. Settings
@@ -138,11 +138,12 @@ Search  →  Enrich  →  Draft  →  Send
     The lead drawer
     shows a purple **Follow up** tag, no checkbox. Plain notes stay on the
     lead only and never count as follow-ups. Click a lead item to open the
-    drawer; a contact item opens Contacts.
+    drawer; a collaborator item opens Collaborators.
 
-  - **Contacts** (`?view=contacts`) — board-scoped collaborators (not leads;
+  - **Collaborators** (`?view=contacts`) — board-scoped people (not leads;
     ADR 0036). Name, org, email, phone, location, plus the same notes /
-    follow-up journal. Follow-ups show on Calendar. Does not consume lead quota.
+    follow-up journal. Lives under Engage. Follow-ups show on Calendar. Does
+    not consume lead quota.
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.
