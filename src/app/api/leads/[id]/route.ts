@@ -104,8 +104,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const ctx = await getCtx();
-  const ok = await deleteLead(ctx, id);
-  if (!ok) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
-  return NextResponse.json({ ok: true });
+  try {
+    const ctx = await getCtx();
+    const ok = await deleteLead(ctx, id);
+    if (!ok) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (isBoardLockedError(err)) {
+      return NextResponse.json({ error: err.message }, { status: 423 });
+    }
+    throw err;
+  }
 }

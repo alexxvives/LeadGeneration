@@ -1205,27 +1205,32 @@ async function attachOutreach(
   });
 }
 
+/** Resolve a lead in the caller's workspace or on a shared board. */
+async function findLeadAccess(
+  ctx: Ctx,
+  leadId: string,
+): Promise<{ lead: Lead; db: LeadRepository } | null> {
+  const owned = await ctx.db.getLead(leadId);
+  if (owned) return { lead: owned, db: ctx.db };
+  if (!ctx.userId) return null;
+  const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
+  for (const bid of sharedIds) {
+    const access = await resolveBoardAccess(ctx, bid);
+    if (!access) continue;
+    const found = await access.db.getLead(leadId);
+    if (found) return { lead: found, db: access.db };
+  }
+  return null;
+}
+
 /** Full lead + outreach for drawer / edit (not the slim board list). */
 export async function getLeadWithOutreach(
   ctx: Ctx,
   leadId: string,
 ): Promise<LeadWithOutreach | null> {
-  let db = ctx.db;
-  let lead = await db.getLead(leadId);
-  if (!lead && ctx.userId) {
-    const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
-    for (const bid of sharedIds) {
-      const access = await resolveBoardAccess(ctx, bid);
-      if (!access) continue;
-      const found = await access.db.getLead(leadId);
-      if (found) {
-        lead = found;
-        db = access.db;
-        break;
-      }
-    }
-  }
-  if (!lead) return null;
+  const found = await findLeadAccess(ctx, leadId);
+  if (!found) return null;
+  const { lead, db } = found;
   const [cleaned] = await persistCleanedLeadNames(db, [lead]);
   const [row] = await attachOutreach(db, [cleaned ?? lead], { slim: false });
   return row ?? null;
@@ -2309,9 +2314,10 @@ export async function updateWorkspaceEmailSettings(
 
 /** Permanently remove a lead and its outreach. */
 export async function deleteLead(ctx: Ctx, leadId: string): Promise<boolean> {
-  const lead = await ctx.db.getLead(leadId);
-  if (!lead) return false;
-  return ctx.db.deleteLead(leadId);
+  const found = await findLeadAccess(ctx, leadId);
+  if (!found) return false;
+  await assertBoardEditable(ctx, found.lead.boardId);
+  return found.db.deleteLead(leadId);
 }
 
 /**
@@ -2324,8 +2330,24 @@ export async function deleteLeads(
 ): Promise<{ deleted: number }> {
   const ids = [...new Set(leadIds.map((id) => id.trim()).filter(Boolean))];
   if (ids.length === 0) return { deleted: 0 };
+  const byDb = new Map<LeadRepository, string[]>();
+  const boardIds = new Set<string>();
+  for (const id of ids) {
+    const found = await findLeadAccess(ctx, id);
+    if (!found) continue;
+    boardIds.add(found.lead.boardId);
+    const list = byDb.get(found.db) ?? [];
+    list.push(id);
+    byDb.set(found.db, list);
+  }
+  for (const boardId of boardIds) {
+    await assertBoardEditable(ctx, boardId);
+  }
   await cancelRunningImportRuns(ctx);
-  const deleted = await ctx.db.deleteLeads(ids);
+  let deleted = 0;
+  for (const [db, chunkIds] of byDb) {
+    deleted += await db.deleteLeads(chunkIds);
+  }
   return { deleted };
 }
 
@@ -2430,23 +2452,9 @@ export async function updateLeadCrm(
     demoDone?: boolean;
   },
 ): Promise<Lead | null> {
-  let lead = await ctx.db.getLead(leadId);
-  let db = ctx.db;
-  if (!lead && ctx.userId) {
-    // Shared-board lead: find via membership boards.
-    const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
-    for (const bid of sharedIds) {
-      const access = await resolveBoardAccess(ctx, bid);
-      if (!access) continue;
-      const found = await access.db.getLead(leadId);
-      if (found) {
-        lead = found;
-        db = access.db;
-        break;
-      }
-    }
-  }
-  if (!lead) return null;
+  const found = await findLeadAccess(ctx, leadId);
+  if (!found) return null;
+  const { lead, db } = found;
   await assertBoardEditable(ctx, lead.boardId);
 
   const next: typeof patch & {
