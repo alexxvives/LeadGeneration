@@ -105,6 +105,12 @@ token becomes the page color in light mode).
   Overlay nav is a fade-scroller; Settings stays pinned under it (no
   bottom tabs). Quota pressure (≥80% leads/verifies, or a 402) is a
   Settings badge + toast — not a header UsageBar. Demo/unmetered stays quiet.
+  View subtitles stay `lg+` only. Board lock is `BoardLiveChip`: compact
+  pill beside the desktop title, full-width **Live · name · Take** bar
+  below `lg`. Do not unhide the desktop title stack on phone just to show
+  Live. Add collaborator / Create board sit on the title row (desktop) or
+  a `self-start` phone action — not a second toolbar that justify-betweens
+  against an empty count.
 - **Phone Leads toolbar:** one row — count, search icon (expands in place),
   layout+stage menu, Export, Add. Do not stack Export / search / Add /
   Table-Cards-Map / stage as five full-width rows. Desktop toolbar stays

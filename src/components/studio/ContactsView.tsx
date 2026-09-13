@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BoardSummary, Contact, FollowUp } from "@/lib/types";
 import { newId } from "@/lib/id";
 import {
@@ -11,8 +11,9 @@ import {
   sortFollowUpsNewestFirst,
   todayIsoDate,
 } from "@/lib/follow-ups";
-import { PinIcon, PlusIcon, TrashIcon, XIcon } from "@/components/icons";
+import { PinIcon, TrashIcon, XIcon } from "@/components/icons";
 import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
+import { DatePicker } from "@/components/ui/DatePicker";
 
 function formatCreated(iso: string): string {
   const d = new Date(iso);
@@ -33,12 +34,14 @@ export function ContactsView({
   onCreate,
   onUpdate,
   onDelete,
+  createRequestId = 0,
 }: {
   contacts: Contact[];
   boards: BoardSummary[];
   filterBoardId: string | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  createRequestId?: number;
   onCreate: (input: {
     boardId: string;
     name: string;
@@ -93,6 +96,12 @@ export function ContactsView({
     setCreating(true);
   };
 
+  useEffect(() => {
+    if (createRequestId > 0) openCreate();
+    // Parent increments to open the same create form the header button uses.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- request id is the trigger
+  }, [createRequestId]);
+
   const submitCreate = async () => {
     const name = form.name.trim();
     const boardId = form.boardId || defaultBoardId;
@@ -115,31 +124,11 @@ export function ContactsView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="flex shrink-0 items-center justify-between gap-3">
-        <p className="text-sm text-mist-400">
-          {contacts.length > 0
-            ? `${contacts.length} collaborator${contacts.length === 1 ? "" : "s"}`
-            : null}
+      {contacts.length > 0 ? (
+        <p className="shrink-0 text-sm text-mist-400">
+          {contacts.length} collaborator{contacts.length === 1 ? "" : "s"}
         </p>
-        <Lockable>
-          <button
-            type="button"
-            disabled={editLocked || boards.length === 0}
-            title={
-              editLocked
-                ? lockHint
-                : boards.length === 0
-                  ? "Create a board first"
-                  : "Add collaborator"
-            }
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-full bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Add collaborator
-          </button>
-        </Lockable>
-      </div>
+      ) : null}
 
       {creating ? (
         <div className="glass rounded-xl2 p-5">
@@ -464,11 +453,10 @@ function ContactPanel({
 
       {composer ? (
         <div className="mt-3 space-y-2">
-          <input
-            type="date"
+          <DatePicker
             value={noteDate}
-            onChange={(e) => setNoteDate(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none"
+            onChange={setNoteDate}
+            disabled={disabled}
           />
           <textarea
             value={noteText}

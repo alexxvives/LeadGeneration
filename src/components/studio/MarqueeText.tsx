@@ -40,7 +40,7 @@ export function MarqueeText({
     <span
       ref={wrapRef}
       title={title ?? children}
-      className={`block min-w-0 overflow-hidden whitespace-nowrap ${className}`}
+      className={`block w-full min-w-0 overflow-hidden whitespace-nowrap ${className}`}
     >
       <span
         ref={textRef}

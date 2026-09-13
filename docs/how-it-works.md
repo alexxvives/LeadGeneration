@@ -91,17 +91,19 @@ Search  →  Enrich  →  Draft  →  Send
     CRM **New** = needs human review (there is no separate “In review” tag).
     A **Missed call** stays in New but still shows the phone method icon
     (it does not count as Contacted). Contact channels: email, phone, contact
-    form, Instagram, WhatsApp, Organic / web. Cards show a star when
+    form, Instagram, WhatsApp, Organic / web. Cards show an hourglass when
     **Waiting on us** is on (in-conversation). Bounce is silent (address
     stripped; no Bounced chip).
 
   - **Conversations** (`?view=conversations`) — in-conversation leads only.
     Cards show name, city + country (not the street), pending follow-up,
     and recent **notes** (follow-up reminders are omitted from the preview).
-    A star on the top right means **Waiting on us**; a monitor icon means
-    **Demo done**. Created date sits bottom-left. Overflowing name / company /
-    city ping-pong like a now-playing title. Click opens the lead drawer
-    (waiting / demo toggles live there).
+    An hourglass on the title row means **Waiting on us**; a monitor icon
+    means **Demo done**. Created date sits bottom-left. Overflowing name /
+    company / city ping-pong like a now-playing title. Click opens the lead
+    drawer (waiting / demo toggles live there). Phone cards stay within the
+    pane (`min-w-0` + hidden X overflow) so they do not force a sideways
+    scroll.
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
     cards / map) with a shared **Pipeline** stage filter; Notes + Type columns
@@ -126,7 +128,9 @@ Search  →  Enrich  →  Draft  →  Send
     (constitution Art. I.1 / ADR 0029).
 
   - **Calendar** (`?view=calendar`) — month view of the active board filter.
-    Each day lists **follow-ups** (dated reminders from **Follow up**),
+    Month and year are custom glass menus (plus chevrons / Today). Note and
+    follow-up dates use the same branded `DatePicker` — not the OS date
+    control. Each day lists **follow-ups** (dated reminders from **Follow up**),
     **emails sent**, and **phone calls** logged that day — shown as calendar /
     mail / phone icons **with counts** on the day cell. Sidebar group titles
     (Follow-ups / Emails sent / Phone calls) show the same totals. The
@@ -137,7 +141,9 @@ Search  →  Enrich  →  Draft  →  Send
     Tick the checkbox on Calendar to mark a follow-up done (strikethrough
     is follow-ups only — calls and emails stay unstruck). If another collaborator
     holds the board, the tick stays on screen but is disabled; hover explains they
-    must **Take control**. Calendar also notes that the other user is active.
+    must **Take control**. A compact **Live · name · Take** chip (full-width
+    bar below `lg`) sits in the studio header instead of a wrapping pill.
+    Calendar also notes that the other user is active.
     The lead drawer
     shows a purple **Follow up** tag, no checkbox. Plain notes stay on the
     lead only and never count as follow-ups. Click a lead item to open the
@@ -145,8 +151,10 @@ Search  →  Enrich  →  Draft  →  Send
 
   - **Collaborators** (`?view=contacts`) — board-scoped people (not leads;
     ADR 0036). Name, org, email, phone, location, plus the same notes /
-    follow-up journal. Lives under Engage. Follow-ups show on Calendar. Does
-    not consume lead quota.
+    follow-up journal. **Add collaborator** sits next to the desktop title
+    (and as a phone action under the top bar), same pattern as Create board.
+    Lives under Engage. Follow-ups show on Calendar. Does
+    not consume lead quota. View subtitles stay desktop-only (`lg+`).
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.

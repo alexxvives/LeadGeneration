@@ -20,7 +20,12 @@ import {
   mergeSlimIntoCached,
   rememberDroppedFollowUps,
 } from "@/lib/lead-cache";
-import { BoardLockUiProvider, Lockable } from "./board-lock";
+import {
+  BoardLiveChip,
+  BoardLockUiProvider,
+  Lockable,
+  boardLockHint,
+} from "./board-lock";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadCard } from "./LeadCard";
 import { VirtualCardGrid } from "./virtual-list";
@@ -244,6 +249,7 @@ export function Studio() {
   const editLockedRef = useRef(false);
   editLockedRef.current = editLocked;
   const [takingOver, setTakingOver] = useState(false);
+  const lockHint = boardLockHint(lockHolder);
   const takeoverRef = useRef(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [noteUndo, setNoteUndo] = useState<{
@@ -299,6 +305,7 @@ export function Studio() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignMode, setAssignMode] = useState<"search" | "import">("search");
   const [boardCreateReq, setBoardCreateReq] = useState(0);
+  const [contactCreateReq, setContactCreateReq] = useState(0);
   const activeRunIdRef = useRef<string | null>(null);
   const verifyLimitShownRef = useRef(false);
   const filterBoardIdRef = useRef<string | null>(filterBoardId);
@@ -2077,8 +2084,8 @@ export function Studio() {
       view === "calendar");
   const phoneHeader =
     view === "boards" ||
-    (editLocked && !!filterBoardId) ||
-    (showLeadSearch && view !== "leads");
+    view === "contacts" ||
+    (editLocked && !!filterBoardId);
 
   // Skeleton for hydrate / first body / first visit to a layout tab only.
   const layoutPaneReady = visitedLayouts.has(shownLayoutTab);
@@ -2206,9 +2213,9 @@ export function Studio() {
           phoneHeader ? "mb-2 lg:mb-6" : "mb-0 lg:mb-6"
         }`}
       >
-        <div className={`min-w-0 ${phoneHeader ? "" : "hidden lg:block"}`}>
+        <div className="hidden min-w-0 lg:block">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="hidden font-display text-3xl font-semibold tracking-tight lg:block lg:text-4xl">
+            <h1 className="font-display text-3xl font-semibold tracking-tight lg:text-4xl">
               {view === "dashboard"
                 ? "Dashboard"
                 : view === "boards"
@@ -2242,34 +2249,39 @@ export function Studio() {
                 Create board
               </button>
             ) : null}
+            {view === "contacts" ? (
+              <Lockable>
+                <button
+                  type="button"
+                  disabled={editLocked || boards.length === 0}
+                  title={
+                    editLocked
+                      ? lockHint
+                      : boards.length === 0
+                        ? "Create a board first"
+                        : "Add collaborator"
+                  }
+                  onClick={() => setContactCreateReq((n) => n + 1)}
+                  className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
+                >
+                  Add collaborator
+                </button>
+              </Lockable>
+            ) : null}
             {view === "leads" && hasLeads ? (
-              <span className="hidden lg:inline-flex">
+              <span className="inline-flex">
                 <ExportButton />
               </span>
             ) : null}
             {editLocked && filterBoardId ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-aurora-400/25 bg-aurora-400/10 py-1 pl-2.5 pr-1 text-xs text-mist-200">
-                <span
-                  className="pulse-ring h-1.5 w-1.5 shrink-0 rounded-full bg-aurora-400"
-                  aria-hidden
-                />
-                <span className="font-medium text-aurora-200">Live</span>
-                <span className="max-w-[9rem] truncate text-mist-400">
-                  {lockHolder ?? "Someone else"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void onTakeControl()}
-                  disabled={takingOver}
-                  aria-label={`Take control of this board from ${lockHolder ?? "the other editor"}`}
-                  className="rounded-full bg-aurora-400/20 px-2.5 py-1 font-medium text-aurora-100 transition-colors hover:bg-aurora-400/30 disabled:opacity-50"
-                >
-                  {takingOver ? "Taking…" : "Take control"}
-                </button>
-              </span>
+              <BoardLiveChip
+                holder={lockHolder}
+                takingOver={takingOver}
+                onTakeControl={() => void onTakeControl()}
+              />
             ) : null}
           </div>
-          <p className="mt-0.5 hidden text-sm text-mist-500 lg:block">
+          <p className="mt-0.5 text-sm text-mist-500">
             {view === "dashboard"
               ? "Overview of leads and activity across your boards."
               : view === "boards"
@@ -2295,6 +2307,46 @@ export function Studio() {
                             : "Find prospects by niche and location."}
           </p>
         </div>
+        {phoneHeader ? (
+          <div className="flex min-w-0 flex-col gap-2 lg:hidden">
+            {editLocked && filterBoardId ? (
+              <BoardLiveChip
+                variant="bar"
+                holder={lockHolder}
+                takingOver={takingOver}
+                onTakeControl={() => void onTakeControl()}
+              />
+            ) : null}
+            {view === "boards" ? (
+              <button
+                type="button"
+                onClick={() => setBoardCreateReq((n) => n + 1)}
+                className="self-start rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent"
+              >
+                Create board
+              </button>
+            ) : null}
+            {view === "contacts" ? (
+              <Lockable className="self-start">
+                <button
+                  type="button"
+                  disabled={editLocked || boards.length === 0}
+                  title={
+                    editLocked
+                      ? lockHint
+                      : boards.length === 0
+                        ? "Create a board first"
+                        : "Add collaborator"
+                  }
+                  onClick={() => setContactCreateReq((n) => n + 1)}
+                  className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent disabled:opacity-50"
+                >
+                  Add collaborator
+                </button>
+              </Lockable>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           {view === "dashboard" && boards.length > 0 ? (
@@ -2765,7 +2817,7 @@ export function Studio() {
       )}
 
       {view === "conversations" && (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto pb-6">
           {loading || leadsHydrating || !board ? (
             <div role="status" aria-busy="true" aria-label="Loading conversations">
               <PipelineSkeleton />
@@ -2787,6 +2839,7 @@ export function Studio() {
             boards={board?.boards ?? boards}
             filterBoardId={filterBoardId}
             selectedId={selectedContactId}
+            createRequestId={contactCreateReq}
             onSelect={setSelectedContactId}
             onCreate={async (input) => {
               try {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Contact, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import {
   calendarEventsFromContacts,
@@ -15,6 +15,7 @@ import {
 import {
   CalendarIcon,
   CheckIcon,
+  ChevronDownIcon,
   MailIcon,
   PhoneIcon,
 } from "@/components/icons";
@@ -111,6 +112,104 @@ function kindCounts(events: CalendarEvent[]): Record<FollowUpKind, number> {
 function missedCallCount(events: CalendarEvent[]): number {
   return events.filter((e) => e.kind === "phone" && isMissedCallNote(e.note))
     .length;
+}
+
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, m) => ({
+  value: String(m),
+  label: new Date(2020, m, 1).toLocaleString("en-GB", { month: "long" }),
+}));
+
+function yearOptions(around: number): { value: string; label: string }[] {
+  const start = around - 4;
+  return Array.from({ length: 8 }, (_, i) => {
+    const y = start + i;
+    return { value: String(y), label: String(y) };
+  });
+}
+
+function GlassMenu({
+  label,
+  ariaLabel,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  ariaLabel: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex max-w-full items-center gap-1 rounded-lg px-2 py-1 font-display text-base font-semibold text-mist-100 transition-colors hover:bg-white/5 sm:text-xl"
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDownIcon
+          className={`h-3.5 w-3.5 shrink-0 text-mist-400 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+          aria-hidden
+        />
+      </button>
+      {open ? (
+        <ul
+          role="listbox"
+          aria-label={ariaLabel}
+          className="absolute left-1/2 top-[calc(100%+0.35rem)] z-40 max-h-64 min-w-[8.5rem] -translate-x-1/2 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
+        >
+          {options.map((opt) => {
+            const active = opt.value === value;
+            return (
+              <li key={opt.value} role="option" aria-selected={active}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full px-3 py-1.5 text-left text-sm ${
+                    active
+                      ? "bg-aurora-400/15 font-medium text-aurora-100"
+                      : "text-mist-200 hover:bg-white/5"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
+  );
 }
 
 function MonthChevron({
@@ -259,15 +358,47 @@ export function CalendarView({
     setSelected(today);
   };
 
+  const jumpTo = (year: number, month: number) => {
+    setCursor({ year, month });
+    const inThis = year === now.getFullYear() && month === now.getMonth();
+    setSelected(
+      inThis ? today : isoFromParts(year, month, 1),
+    );
+  };
+
+  const thisYear = now.getFullYear();
+  const years = useMemo(() => {
+    const base = yearOptions(thisYear);
+    if (base.some((y) => y.value === String(cursor.year))) return base;
+    return [...base, { value: String(cursor.year), label: String(cursor.year) }]
+      .sort((a, b) => Number(a.value) - Number(b.value));
+  }, [cursor.year, thisYear]);
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto sm:gap-4 lg:flex-row lg:items-stretch lg:overflow-hidden">
       <section className="glass flex w-full min-w-0 shrink-0 flex-col rounded-xl2 p-3 sm:p-5 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
         <div className="relative mb-2 flex shrink-0 items-center justify-between gap-2 sm:mb-3 sm:justify-center">
-          <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+          <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
             <MonthChevron dir="prev" onClick={() => shiftMonth(-1)} />
-            <h2 className="min-w-0 truncate text-center font-display text-base font-semibold text-mist-100 sm:min-w-[10rem] sm:text-xl">
-              {monthLabel(cursor.year, cursor.month)}
-            </h2>
+            <div className="flex min-w-0 items-center gap-0.5">
+              <GlassMenu
+                label={new Date(cursor.year, cursor.month, 1).toLocaleString(
+                  "en-GB",
+                  { month: "short" },
+                )}
+                ariaLabel="Month"
+                options={MONTH_OPTIONS}
+                value={String(cursor.month)}
+                onChange={(v) => jumpTo(cursor.year, Number(v))}
+              />
+              <GlassMenu
+                label={String(cursor.year)}
+                ariaLabel="Year"
+                options={years}
+                value={String(cursor.year)}
+                onChange={(v) => jumpTo(Number(v), cursor.month)}
+              />
+            </div>
             <MonthChevron dir="next" onClick={() => shiftMonth(1)} />
           </div>
           <button

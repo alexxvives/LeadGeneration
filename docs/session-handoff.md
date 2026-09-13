@@ -9,7 +9,7 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-13 (Conversations cards)
+## ⏱️ Status — updated 2026-09-13 (Studio chrome polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0036** applied on prod D1 (`lodestar-prod`).  
@@ -17,14 +17,16 @@ first, and update the top block at the end of any session that changes state.**
 in the same release window as any schema-dependent code.
 
 ### This pass
-- Conversations cards: city + country only (not street); created date
-  bottom-left; no “Waiting” footer label.
-- Waiting on us → amber star top-right; demo done → monitor icon.
-- Overflowing name / company / city ping-pong (Spotify-style marquee).
+- Conversations: hourglass (not sparkle) + demo icon on the title row;
+  location tight under the name; phone cards no longer force X-scroll.
+- Calendar month/year + note dates are branded dropdowns (`DatePicker`).
+- Phone: no view subtitles. Live is a full-width Take bar. Add
+  collaborator sits with the title (Create-board pattern).
 
 ### Next
-1. Hard-refresh Conversations: confirm icons, short location, marquee.
-2. Toggle waiting / demo from the lead drawer and check the card icons.
+1. Phone: Conversations cards stay in-pane; Live bar + Add collaborator
+   align with the top bar.
+2. Calendar: month/year menus and follow-up DatePicker match studio glass.
 
 ---
 

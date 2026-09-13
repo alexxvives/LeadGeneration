@@ -4,11 +4,28 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Conversation / calendar chrome follow-up
+- Waiting-on-us reads as a sparkle if we reuse `StarIcon`. Use a dedicated
+  hourglass (`WaitingIcon`) on cards, pipeline, and the drawer toggle.
+- Conversation location lived in a second `mt-3` button, so it sat too far
+  under the title. One block: title+icons row, then location (`mt-1`).
+- `whitespace-nowrap` marquees expand the card past the phone viewport
+  unless the article is `min-w-0 max-w-full` and the scroll pane is
+  `overflow-x-hidden` (overflow-y-auto implies overflow-x: auto).
+- Native `type="date"` drops an OS calendar that ignores studio tokens.
+  Use `DatePicker` (glass trigger + mini month). Calendar month/year are
+  the same kind of custom menu.
+- Phone used `phoneHeader` to unhide the desktop title stack so Live /
+  Create board could appear — that also leaked space (and felt like a
+  subtitle). Keep title+subtitle `hidden lg:block`; Live is a full-width
+  bar on phone, a compact pill on desktop. Add collaborator belongs next
+  to the title like Create board (`createRequestId`).
+
 ### 2026-09-13 — Conversations card chrome
 - Conversation cards should not dump the full street address — reuse
   `shortLocation()` (city + country / state). Street stays in the drawer.
-- Waiting / demo are flags, not footer copy. Show them as top-right icons
-  only when on (amber star, aurora monitor). Toggles stay in the drawer.
+- Waiting / demo are flags, not footer copy. Show them on the title row
+  only when on (amber hourglass, aurora monitor). Toggles stay in the drawer.
 - Created date belongs bottom-left, not next to the pin. Long name /
   company / city use a ping-pong marquee (`MarqueeText`) so the card
   width does not clip them — respect `prefers-reduced-motion`.

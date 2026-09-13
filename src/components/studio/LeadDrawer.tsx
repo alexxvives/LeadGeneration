@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
 import { Spinner } from "@/components/ui";
+import { DatePicker } from "@/components/ui/DatePicker";
 import {
   ArrowIcon,
   BuildingIcon,
@@ -13,8 +14,8 @@ import {
   PhoneIcon,
   PinIcon,
   SparkIcon,
-  StarIcon,
   TrashIcon,
+  WaitingIcon,
   XIcon,
 } from "@/components/icons";
 import { newId } from "@/lib/id";
@@ -1145,23 +1146,19 @@ export function LeadDrawer(props: DrawerProps) {
 
               {showAddNote && (
                 <div className="space-y-2 rounded-xl border border-white/10 bg-ink-900/60 p-3">
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] uppercase tracking-wider text-mist-500">
-                      {promptingCall
+                  <DatePicker
+                    label={
+                      promptingCall
                         ? "Call date"
                         : promptingEmail
                           ? "Email date"
                           : composerKind === "follow_up"
                             ? "Follow up on"
-                            : "Date"}
-                    </span>
-                    <input
-                      type="date"
-                      value={newNoteDate}
-                      onChange={(e) => setNewNoteDate(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
-                    />
-                  </label>
+                            : "Date"
+                    }
+                    value={newNoteDate}
+                    onChange={setNewNoteDate}
+                  />
                   <textarea
                     ref={noteInputRef}
                     value={newNoteText}
@@ -1324,11 +1321,10 @@ export function LeadDrawer(props: DrawerProps) {
                           </span>
                           {editingId === fu.id ? (
                             <div className="min-w-0 flex-1 space-y-2">
-                              <input
-                                type="date"
+                              <DatePicker
                                 value={editDate}
-                                onChange={(e) => setEditDate(e.target.value)}
-                                className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+                                onChange={setEditDate}
+                                disabled={editLocked}
                               />
                               <textarea
                                 value={editText}
@@ -1849,7 +1845,7 @@ function FlagToggle({
       >
         <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-mist-200">
           {on && label === "Waiting on us" ? (
-            <StarIcon className="h-3 w-3 shrink-0 text-amber-300" />
+            <WaitingIcon className="h-3 w-3 shrink-0 text-amber-300" />
           ) : null}
           <span className="truncate">{label}</span>
         </span>

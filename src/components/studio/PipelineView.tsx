@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
-import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, InfoIcon, CalendarIcon, StarIcon } from "@/components/icons";
+import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, InfoIcon, CalendarIcon, WaitingIcon } from "@/components/icons";
 import {
   isUserFollowUp,
   leadHasMissedCall,
@@ -663,7 +663,7 @@ function PipelineCardFace({
             {lead.company}
           </p>
           {lead.waitingOnUs ? (
-            <StarIcon
+            <WaitingIcon
               className="h-3 w-3 shrink-0 text-amber-300"
               aria-label="Waiting on us"
             />

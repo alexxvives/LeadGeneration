@@ -7,7 +7,7 @@ import {
   sortFollowUpsNewestFirst,
 } from "@/lib/follow-ups";
 import { shortLocation } from "@/lib/format-location";
-import { CalendarIcon, DemoIcon, PinIcon, StarIcon } from "@/components/icons";
+import { CalendarIcon, DemoIcon, PinIcon, WaitingIcon } from "@/components/icons";
 import { EmptyState } from "@/components/studio/StudioHelpers";
 import { MarqueeText } from "@/components/studio/MarqueeText";
 
@@ -54,7 +54,7 @@ export function ConversationsView({
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {rows.map((lead) => {
         const pendingFollowUps =
           lead.followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
@@ -64,53 +64,47 @@ export function ConversationsView({
         return (
           <article
             key={lead.id}
-            className="glass card-hover flex flex-col rounded-xl2 p-5"
+            className="glass card-hover flex min-w-0 max-w-full flex-col overflow-hidden rounded-xl2 p-4 sm:p-5"
           >
-            <div className="flex items-start gap-2">
-              <button
-                type="button"
-                onClick={() => onOpen(lead.id)}
-                className="min-w-0 flex-1 text-left"
-              >
-                <h3 className="font-display text-base font-semibold leading-tight">
-                  <MarqueeText>{name}</MarqueeText>
-                </h3>
-                {lead.contactName && lead.company ? (
-                  <p className="mt-0.5 text-xs text-mist-400">
-                    <MarqueeText>{lead.company}</MarqueeText>
-                  </p>
-                ) : null}
-              </button>
-              {(lead.waitingOnUs || lead.demoDone) ? (
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {lead.waitingOnUs ? (
-                    <span
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/20 text-amber-300 shadow-[0_0_12px_rgba(247,185,85,0.35)] ring-1 ring-amber-400/45"
-                      title="Waiting on us"
-                      aria-label="Waiting on us"
-                    >
-                      <StarIcon className="h-4 w-4" />
-                    </span>
-                  ) : null}
-                  {lead.demoDone ? (
-                    <span
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-aurora-400/20 text-aurora-300 ring-1 ring-aurora-400/40"
-                      title="Demo done"
-                      aria-label="Demo done"
-                    >
-                      <DemoIcon className="h-4 w-4" />
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
             <button
               type="button"
               onClick={() => onOpen(lead.id)}
-              className="mt-3 min-w-0 flex-1 text-left"
+              className="flex min-w-0 w-full flex-1 flex-col text-left"
             >
+              <div className="flex min-w-0 items-center gap-2">
+                <h3 className="min-w-0 flex-1 font-display text-base font-semibold leading-tight">
+                  <MarqueeText>{name}</MarqueeText>
+                </h3>
+                {(lead.waitingOnUs || lead.demoDone) ? (
+                  <span className="inline-flex shrink-0 items-center gap-1">
+                    {lead.waitingOnUs ? (
+                      <span
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 text-amber-300 shadow-[0_0_12px_rgba(247,185,85,0.35)] ring-1 ring-amber-400/45"
+                        title="Waiting on us"
+                        aria-label="Waiting on us"
+                      >
+                        <WaitingIcon className="h-3.5 w-3.5" />
+                      </span>
+                    ) : null}
+                    {lead.demoDone ? (
+                      <span
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-aurora-400/20 text-aurora-300 ring-1 ring-aurora-400/40"
+                        title="Demo done"
+                        aria-label="Demo done"
+                      >
+                        <DemoIcon className="h-3.5 w-3.5" />
+                      </span>
+                    ) : null}
+                  </span>
+                ) : null}
+              </div>
+              {lead.contactName && lead.company ? (
+                <p className="mt-0.5 text-xs text-mist-400">
+                  <MarqueeText>{lead.company}</MarqueeText>
+                </p>
+              ) : null}
               {cityCountry ? (
-                <span className="flex min-w-0 items-center gap-1 text-xs text-mist-400">
+                <span className="mt-1 flex min-w-0 items-center gap-1 text-xs text-mist-400">
                   <PinIcon className="h-3 w-3 shrink-0" />
                   <MarqueeText
                     className="min-w-0 flex-1"
@@ -121,7 +115,9 @@ export function ConversationsView({
                 </span>
               ) : null}
               {pendingFollowUps > 0 ? (
-                <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                <p className={`inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300 ${
+                  cityCountry ? "mt-1.5" : "mt-1"
+                }`}>
                   <CalendarIcon className="h-2.5 w-2.5" />
                   {pendingFollowUps === 1
                     ? "Follow-up needed"
@@ -129,7 +125,7 @@ export function ConversationsView({
                 </p>
               ) : null}
               {comments.length > 0 ? (
-                <ul className="mt-3 space-y-1.5">
+                <ul className="mt-2 space-y-1.5">
                   {comments.map((c) => (
                     <li
                       key={c}
@@ -140,11 +136,11 @@ export function ConversationsView({
                   ))}
                 </ul>
               ) : (
-                <p className="mt-3 text-xs text-mist-600">No comments yet.</p>
+                <p className="mt-2 text-xs text-mist-600">No comments yet.</p>
               )}
             </button>
             <time
-              className="mt-auto pt-4 text-[11px] text-mist-500"
+              className="mt-auto pt-3 text-[11px] text-mist-500"
               dateTime={lead.createdAt}
             >
               {formatCreated(lead.createdAt)}

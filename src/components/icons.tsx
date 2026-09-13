@@ -18,6 +18,20 @@ export function StarIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Hourglass — we still owe this lead something. */
+export function WaitingIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path d="M7 4h10M7 20h10" strokeLinecap="round" />
+      <path
+        d="M8 4c0 4.2 2.6 5.8 4 7.5C13.4 13.2 16 14.8 16 19M16 4c0 4.2-2.6 5.8-4 7.5C10.6 13.2 8 14.8 8 19"
+        strokeLinejoin="round"
+      />
+      <path d="M10 17.5h4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** Monitor + play — a demo has been given. */
 export function DemoIcon(props: SVGProps<SVGSVGElement>) {
   return (
