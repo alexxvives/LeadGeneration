@@ -9,7 +9,7 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-13 (PWA icon + Collaborators)
+## ⏱️ Status — updated 2026-09-13 (Phone chrome follow-up)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0036** applied on prod D1 (`lodestar-prod`).  
@@ -17,15 +17,19 @@ first, and update the top block at the end of any session that changes state.**
 in the same release window as any schema-dependent code.
 
 ### This pass
-- Home-screen web app: `favicon.ico`, `apple-touch-icon.png`,
-  `public/icons/icon-{192,512}.png`, `public/manifest.webmanifest`.
-  Install name is **Hermes mail**.
-- Contacts tab moved to Engage and labeled **Collaborators**
-  (`?view=contacts` unchanged).
+- Phone Leads: one-row toolbar (search icon, layout+stage menu, Export, Add).
+- Pipeline / Calendar: “Search leads…” is an icon below `lg` (lg+ unchanged).
+- Phone Pipeline tabs wrap so Closed / Not interested are not swipe-clipped.
+- Quota ≥80% (metered) or 402 → existing toast + Settings badge. No header
+  UsageBar. Demo/unmetered stays quiet.
+- Overlay nav is a fade-scroller; Settings stays pinned above the profile card.
+- Earlier today: PWA home-screen icons + Contacts relabeled Collaborators
+  under Engage (`?view=contacts` unchanged).
 
 ### Next
-1. On a phone: Add to Home Screen and confirm the wings icon + “Hermes mail”.
-2. Confirm Collaborators sits under Engage in sidebar and overlay.
+1. Hard-refresh on a phone: Leads compact toolbar, Pipeline tabs + search icon,
+   overlay Settings still pinned (Admin accounts).
+2. Confirm desktop Leads toolbar and Pipeline drag are unchanged.
 
 ---
 

@@ -4,6 +4,21 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Phone chrome follow-up (search / tabs / quota)
+- Phone Leads chrome must be one row. Dual layout (`lg:hidden` vs
+  `hidden lg:grid`) avoids hydration flash; search expands in place
+  (`CollapsibleLeadSearch`) instead of a full-width field.
+- Pipeline/Calendar share that search control. Do not leave an always-visible
+  “Search leads…” input below `lg` — it pushes the kanban / month off-screen.
+- Phone Pipeline tabs wrap (`flex-wrap`); `overflow-x-auto` hid Closed / Not
+  interested behind a swipe users did not know to make.
+- After removing the header UsageBar, first-time 402s surprise people. Reuse
+  the existing toast + a Settings badge at ≥80% leads/verifies (or on 402).
+  Gate on `workspace.metered` so demo stays quiet. UsageBar stays in Settings.
+- Overlay with Admin + 11 destinations: tighten section gaps and fade the
+  nav scroller. Keep Settings pinned above the profile card — no bottom tabs,
+  no top-bar gear.
+
 ### 2026-09-13 — Home-screen icon + Collaborators nav
 - Phone “Add to Home Screen” needs `apple-touch-icon`, a web manifest, and
   `appleWebApp` metadata — `app/icon.png` alone is only the tab favicon.

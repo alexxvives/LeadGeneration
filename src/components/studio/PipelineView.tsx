@@ -75,6 +75,14 @@ const PARKED_COLUMNS: {
 
 const ALL_STAGE_TABS = [...MAIN_COLUMNS, ...PARKED_COLUMNS];
 
+const TAB_SHORT: Record<CrmStage, string> = {
+  new: "New",
+  contacted: "Contacted",
+  in_conversation: "In convo",
+  closed: "Closed",
+  not_interested: "Not interested",
+};
+
 // ─── Pipeline (CRM kanban with drag-and-drop) ─────────────────────────────────
 
 function compareColumnLeads(stage: CrmStage) {
@@ -256,9 +264,10 @@ export function PipelineView({
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
         <div
-          className="flex shrink-0 gap-1 overflow-x-auto pb-1"
+          className="flex shrink-0 flex-wrap gap-1"
           role="tablist"
           aria-label="Pipeline stage"
+          data-testid="pipeline-stage-tabs"
         >
           {ALL_STAGE_TABS.map((col) => {
             const count = filterActive
@@ -280,7 +289,7 @@ export function PipelineView({
                 }`}
               >
                 <span className={`h-2 w-2 rounded-full ${col.color} ${active ? "ring-1 ring-ink-950/40" : ""}`} />
-                {col.title}
+                {TAB_SHORT[col.stage]}
                 <span className="tabular-nums opacity-80">{count}</span>
               </button>
             );
@@ -628,6 +637,7 @@ function PipelineCardFace({
   return (
     <div
       onClick={() => onOpen(lead.id)}
+      data-testid={hideInfo ? "pipeline-lead-card" : undefined}
       className={`group flex h-auto cursor-pointer items-start gap-1 rounded-xl px-3 py-2.5 transition-all ${
         replied
           ? "border border-sky-400/50 bg-sky-400/10 shadow-[0_0_0_1px_rgba(56,189,248,0.25)] ring-1 ring-sky-400/30 hover:bg-sky-400/15"

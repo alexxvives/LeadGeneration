@@ -54,6 +54,7 @@ import {
   useIconMotion,
   type IconMotionHandle,
 } from "@/components/lucide-animated/hover";
+import { useQuotaHint } from "./quota-hint";
 
 const SIDEBAR_COLLAPSED_KEY = "hermes_sidebar_collapsed";
 
@@ -101,6 +102,8 @@ function StudioNavLink({
   wide,
   onNavigate,
   variant = "rail",
+  badge = false,
+  badgeLabel,
 }: {
   href: string;
   label: string;
@@ -109,6 +112,8 @@ function StudioNavLink({
   wide: boolean;
   onNavigate: () => void;
   variant?: "rail" | "sheet";
+  badge?: boolean;
+  badgeLabel?: string;
 }) {
   const { ref, bind } = useIconMotion();
   const sheet = variant === "sheet";
@@ -137,6 +142,13 @@ function StudioNavLink({
         aria-hidden
       />
       <span className={sheet || wide ? "inline" : "hidden"}>{label}</span>
+      {badge ? (
+        <span
+          data-testid="settings-quota-badge"
+          className="ml-auto h-2 w-2 shrink-0 rounded-full bg-amber-400"
+          aria-label={badgeLabel ?? "Usage near plan limit"}
+        />
+      ) : null}
     </Link>
   );
 }
@@ -308,6 +320,7 @@ export function StudioShell({
   const inviteRedirectTried = useRef(false);
   /** Optimistic sidebar highlight — set on click, cleared when URL catches up. */
   const [pendingNavView, setPendingNavView] = useState<string | null>(null);
+  const { warn: quotaWarn } = useQuotaHint();
 
   const view = searchParams.get("view");
   const urlView = view ?? "";
@@ -646,11 +659,14 @@ export function StudioShell({
 
   const renderNavItems = (variant: "rail" | "sheet") =>
     navSections.map((section) => (
-      <div key={section.label} className="flex flex-col gap-1">
+      <div
+        key={section.label}
+        className={`flex flex-col ${variant === "sheet" ? "gap-0.5" : "gap-1"}`}
+      >
         <p
-          className={`mb-0.5 px-3 text-[0.9rem] uppercase tracking-wider text-mist-500 ${
-            variant === "sheet" || wide ? "block" : "hidden"
-          }`}
+          className={`px-3 text-[0.9rem] uppercase tracking-wider text-mist-500 ${
+            variant === "sheet" ? "mb-0 mt-0.5" : "mb-0.5"
+          } ${variant === "sheet" || wide ? "block" : "hidden"}`}
         >
           {section.label}
         </p>
@@ -767,13 +783,20 @@ export function StudioShell({
           {wide ? (
             <Link
               href="/app/settings"
-              className={`block rounded-xl border p-2 transition-colors ${
+              className={`relative block rounded-xl border p-2 transition-colors ${
                 settingsActive
                   ? "border-aurora-400/30 bg-aurora-400/10"
                   : "border-white/8 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.05]"
               }`}
               title="Open settings"
             >
+              {quotaWarn ? (
+                <span
+                  data-testid="settings-quota-badge"
+                  className="absolute right-2 top-2 h-2 w-2 rounded-full bg-amber-400"
+                  aria-label="Usage near plan limit"
+                />
+              ) : null}
               <div className="flex items-center gap-2">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-aurora-400/15 text-xs font-semibold text-aurora-300">
                   {signedIn ? (displayName?.[0] ?? userEmail?.[0] ?? "U").toUpperCase() : "G"}
@@ -819,13 +842,20 @@ export function StudioShell({
               <Link
                 href="/app/settings"
                 title="Settings"
-                className={`rounded-xl p-2.5 transition-colors ${
+                className={`relative rounded-xl p-2.5 transition-colors ${
                   settingsActive
                     ? "bg-aurora-400/10 text-aurora-300"
                     : "text-mist-500 hover:bg-white/5 hover:text-aurora-300"
                 }`}
               >
                 <SettingsIcon size={20} className="flex" aria-hidden />
+                {quotaWarn ? (
+                  <span
+                    data-testid="settings-quota-badge"
+                    className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-400"
+                    aria-label="Usage near plan limit"
+                  />
+                ) : null}
               </Link>
               {signedIn ? (
                 <MotionIconControl
@@ -873,10 +903,10 @@ export function StudioShell({
           <h2 id={navTitleId} className="sr-only">
             Studio navigation
           </h2>
-          <nav className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+          <nav className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain pb-3 [mask-image:linear-gradient(to_bottom,transparent,#000_0.75rem,#000_calc(100%-1.25rem),transparent)]">
             {renderNavItems("sheet")}
           </nav>
-          <div className="mt-3 border-t border-white/5 pt-3">
+          <div className="mt-2 shrink-0 border-t border-white/5 pt-2">
             <div className="mb-2">
               <StudioNavLink
                 href="/app/settings"
@@ -885,6 +915,8 @@ export function StudioShell({
                 active={settingsActive}
                 wide
                 variant="sheet"
+                badge={quotaWarn}
+                badgeLabel="Usage near plan limit — open Settings"
                 onNavigate={closeNav}
               />
             </div>

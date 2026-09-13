@@ -102,11 +102,20 @@ token becomes the page color in light mode).
   profile card), not the top bar. Sign out is the logout icon on the
   profile card (same as desktop). Overlay: `role="dialog"`, focus trap,
   Escape / backdrop / link close, focus return. Top-bar targets ≥ 44px.
+  Overlay nav is a fade-scroller; Settings stays pinned under it (no
+  bottom tabs). Quota pressure (≥80% leads/verifies, or a 402) is a
+  Settings badge + toast — not a header UsageBar. Demo/unmetered stays quiet.
+- **Phone Leads toolbar:** one row — count, search icon (expands in place),
+  layout+stage menu, Export, Add. Do not stack Export / search / Add /
+  Table-Cards-Map / stage as five full-width rows. Desktop toolbar stays
+  split. Pipeline/Calendar: hide the always-visible “Search leads…” field
+  behind the same search icon below `lg`.
 - **Kanban / multi-column queues** (Pipeline, Outreach): keep columns at `lg+`.
-  Below `lg`, use stage/bucket **tabs** + a single list. Do not put
-  `@dnd-kit` `useDraggable` on cards that render outside `DndContext`.
-  Phone Pipeline: compact on-card stage `<select>`, not a full-width
-  “Move to…” row under every card.
+  Below `lg`, use stage/bucket **tabs** + a single list. Phone Pipeline
+  tabs wrap (or a stage picker) so Closed / Not interested are not clipped
+  behind a swipe. Do not put `@dnd-kit` `useDraggable` on cards that
+  render outside `DndContext`. Phone Pipeline: compact on-card stage
+  `<select>`, not a full-width “Move to…” row under every card.
 - **Lead drawer:** edge-to-edge `h-dvh` sheet below `md`; centered modal at `md+`.
 - Fill-viewport views live in a `h-dvh` shell; page content is `h-full`, not a
   second `h-dvh`.

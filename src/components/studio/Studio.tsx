@@ -78,7 +78,11 @@ import {
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { TypeFilterMenu } from "./TypeFilterMenu";
+import { CollapsibleLeadSearch } from "./CollapsibleLeadSearch";
+import { LeadsFilterMenu } from "./LeadsFilterMenu";
+import { quotaPressure, useQuotaHint } from "./quota-hint";
 import { useMinBreakpoint } from "./use-min-breakpoint";
+import { PlusIcon } from "@/components/icons";
 import type { BoardSummary, ImportLeadRow } from "@/lib/types";
 
 const CRM_STAGE_FILTERS: CrmStage[] = [
@@ -216,6 +220,7 @@ export function Studio() {
   /** Explicit pick on narrow screens — does not overwrite the desktop-stored layout. */
   const [narrowLayout, setNarrowLayout] = useState<LeadsLayout | null>(null);
   const isLg = useMinBreakpoint("lg");
+  const { setWarn: setQuotaWarn } = useQuotaHint();
   /** Keep each layout mounted after first visit so switching stays instant. */
   const [visitedLayouts, setVisitedLayouts] = useState<Set<LeadsLayout>>(
     () => new Set(["table", "cards"]),
@@ -226,6 +231,7 @@ export function Studio() {
   );
   const [pipelineFilter, setPipelineFilter] = useState<CrmStage | "all">("all");
   const [leadSearch, setLeadSearch] = useState("");
+  const [leadSearchExpanded, setLeadSearchExpanded] = useState(false);
   /** Outreach-only company-type filter (chrome next to search). */
   const [outreachTypeFilter, setOutreachTypeFilter] = useState("all");
   /** Skip the first persist pass so we don’t overwrite sessionStorage with defaults. */
@@ -371,8 +377,19 @@ export function Studio() {
   const handleError = useCallback(
     (e: unknown) => {
       if (e instanceof QuotaExceededError) {
+        setQuotaWarn(true);
         if (e.kind === "verifies") setVerifyLimitPlan(e.planId);
         else setUpgrade({ kind: e.kind, planId: e.planId });
+        toast(
+          "err",
+          e.message || "Plan limit reached.",
+          8000,
+          "quota-hit",
+          {
+            label: "Settings",
+            onClick: () => router.push("/app/settings"),
+          },
+        );
       } else if (e instanceof RateLimitedError) {
         const sec = Math.max(1, Math.ceil(e.retryAfterMs / 1000));
         toast(
@@ -386,7 +403,7 @@ export function Studio() {
         toast("err", (e as Error).message);
       }
     },
-    [toast],
+    [toast, router, setQuotaWarn],
   );
 
   const refresh = useCallback(async (opts?: { forceFull?: boolean; replace?: boolean }) => {
@@ -869,6 +886,55 @@ export function Studio() {
     board?.capabilities.emailVerify,
     board?.workspace,
   ]);
+
+  // Approaching quota (metered only) — toast once per session + Settings badge.
+  useEffect(() => {
+    const ws = board?.workspace;
+    const pressure = quotaPressure(ws);
+    setQuotaWarn(pressure.any);
+    if (!ws?.metered || !pressure.any) return;
+    if (pressure.leads) {
+      try {
+        if (!sessionStorage.getItem("hermes_quota_toast_leads")) {
+          sessionStorage.setItem("hermes_quota_toast_leads", "1");
+          toast(
+            "ok",
+            "Lead credits are at 80% or more. Usage is in Settings.",
+            8000,
+            "quota-warn-leads",
+            {
+              label: "Settings",
+              onClick: () => router.push("/app/settings"),
+            },
+          );
+        }
+      } catch {
+        /* private mode */
+      }
+    }
+    if (
+      pressure.verifies &&
+      ws.verifiesUsed < ws.verifiesLimit
+    ) {
+      try {
+        if (!sessionStorage.getItem("hermes_quota_toast_verifies")) {
+          sessionStorage.setItem("hermes_quota_toast_verifies", "1");
+          toast(
+            "ok",
+            "Daily email verifies are at 80% or more. Usage is in Settings.",
+            8000,
+            "quota-warn-verifies",
+            {
+              label: "Settings",
+              onClick: () => router.push("/app/settings"),
+            },
+          );
+        }
+      } catch {
+        /* private mode */
+      }
+    }
+  }, [board?.workspace, toast, router, setQuotaWarn]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2009,6 +2075,10 @@ export function Studio() {
       view === "outreach" ||
       view === "conversations" ||
       view === "calendar");
+  const phoneHeader =
+    view === "boards" ||
+    (editLocked && !!filterBoardId) ||
+    (showLeadSearch && view !== "leads");
 
   // Skeleton for hydrate / first body / first visit to a layout tab only.
   const layoutPaneReady = visitedLayouts.has(shownLayoutTab);
@@ -2131,8 +2201,12 @@ export function Studio() {
   return (
     <BoardLockUiProvider locked={editLocked} holder={lockHolder}>
     <main className="flex h-full min-w-0 w-full flex-col overflow-hidden px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-4 sm:pt-8 lg:px-6 lg:pt-8">
-      <div className="mb-4 flex shrink-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
+      <div
+        className={`flex shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between lg:gap-3 ${
+          phoneHeader ? "mb-2 lg:mb-6" : "mb-0 lg:mb-6"
+        }`}
+      >
+        <div className={`min-w-0 ${phoneHeader ? "" : "hidden lg:block"}`}>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="hidden font-display text-3xl font-semibold tracking-tight lg:block lg:text-4xl">
               {view === "dashboard"
@@ -2168,7 +2242,11 @@ export function Studio() {
                 Create board
               </button>
             ) : null}
-            {view === "leads" && hasLeads ? <ExportButton /> : null}
+            {view === "leads" && hasLeads ? (
+              <span className="hidden lg:inline-flex">
+                <ExportButton />
+              </span>
+            ) : null}
             {editLocked && filterBoardId ? (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-aurora-400/25 bg-aurora-400/10 py-1 pl-2.5 pr-1 text-xs text-mist-200">
                 <span
@@ -2218,7 +2296,7 @@ export function Studio() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-start gap-3 sm:justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           {view === "dashboard" && boards.length > 0 ? (
             <label className="inline-flex items-center">
               <span className="sr-only">Filter by board</span>
@@ -2241,8 +2319,8 @@ export function Studio() {
               </select>
             </label>
           ) : null}
-          {showLeadSearch ? (
-            <div className="flex min-h-9 w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+          {showLeadSearch && view !== "leads" ? (
+            <div className="flex min-h-11 min-w-0 items-center justify-end gap-2 sm:min-h-9">
               {view === "outreach" ? (
                 <TypeFilterMenu
                   value={outreachTypeFilter}
@@ -2250,16 +2328,19 @@ export function Studio() {
                   onChange={setOutreachTypeFilter}
                 />
               ) : null}
-              <label className="relative inline-flex h-9 min-w-0 flex-1 items-center sm:w-56 sm:flex-none">
-                <span className="sr-only">Search leads</span>
-                <input
-                  type="search"
-                  value={leadSearch}
-                  onChange={(e) => setLeadSearch(e.target.value)}
-                  placeholder="Search leads…"
-                  className="h-full w-full rounded-xl border border-white/10 bg-ink-900/60 py-0 pl-3 pr-3 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/50"
-                />
-              </label>
+              <CollapsibleLeadSearch
+                value={leadSearch}
+                onChange={setLeadSearch}
+              />
+            </div>
+          ) : null}
+          {showLeadSearch && view === "leads" ? (
+            <div className="hidden lg:flex min-h-9 items-center justify-end">
+              <CollapsibleLeadSearch
+                value={leadSearch}
+                onChange={setLeadSearch}
+                mode="field"
+              />
             </div>
           ) : null}
         </div>
@@ -2401,7 +2482,68 @@ export function Studio() {
           }
           aria-hidden={view !== "leads"}
         >
-          <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
+          <div className="flex shrink-0 items-center gap-1.5 lg:hidden">
+            {!leadSearchExpanded ? (
+              <p className="min-w-0 flex-1 truncate text-xs uppercase tracking-widest text-mist-500">
+                <span className="font-semibold text-mist-200">
+                  {loading ||
+                  leadsHydrating ||
+                  !board ||
+                  leadsFilterPending ||
+                  (hasLeads && !leadsBodyReady)
+                    ? "…"
+                    : filteredLeads.length}
+                </span>
+                {board &&
+                hasLeads &&
+                (pipelineFilter !== "all" || leadSearch.trim()) ? (
+                  <>
+                    {" "}
+                    of{" "}
+                    <span className="font-semibold text-mist-200">
+                      {board.leadsTotal ?? board.leads.length}
+                    </span>
+                  </>
+                ) : null}{" "}
+                leads
+              </p>
+            ) : null}
+            {hasLeads ? (
+              <CollapsibleLeadSearch
+                value={leadSearch}
+                onChange={setLeadSearch}
+                mode="icon"
+                onExpandedChange={setLeadSearchExpanded}
+              />
+            ) : null}
+            <LeadsFilterMenu
+              layout={shownLayoutTab}
+              onLayout={selectLayout}
+              stage={pipelineFilter}
+              onStage={setPipelineFilter}
+            />
+            {hasLeads ? <ExportButton compact /> : null}
+            {board ? (
+              <Lockable>
+                <button
+                  type="button"
+                  onClick={() => void onAddLead()}
+                  disabled={
+                    editLocked || addingLead || loading || leadsHydrating
+                  }
+                  aria-label="Add lead"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-aurora-300 transition-colors hover:border-white/20 disabled:opacity-50"
+                >
+                  {addingLead ? (
+                    <Spinner className="h-4 w-4" />
+                  ) : (
+                    <PlusIcon className="h-4 w-4" />
+                  )}
+                </button>
+              </Lockable>
+            ) : null}
+          </div>
+          <div className="hidden shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 lg:grid">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-xs uppercase tracking-widest text-mist-500">
                 <span className="font-semibold text-mist-200">

@@ -70,7 +70,7 @@ function autoFitColumns(
  * Export leads as a real Excel Table with conditional formatting rules
  * and data-validation dropdowns for categorical columns (not hardcoded fills).
  */
-export function ExportButton() {
+export function ExportButton({ compact = false }: { compact?: boolean }) {
   const [exporting, setExporting] = useState(false);
 
   const exportExcel = async () => {
@@ -223,10 +223,15 @@ export function ExportButton() {
       type="button"
       onClick={() => void exportExcel()}
       disabled={exporting}
-      className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-mist-300 transition-colors hover:border-white/20 hover:text-mist-100 disabled:opacity-50"
+      aria-label={exporting ? "Exporting Excel" : "Export Excel"}
+      className={
+        compact
+          ? "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-mist-300 transition-colors hover:border-white/20 hover:text-mist-100 disabled:opacity-50"
+          : "inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-mist-300 transition-colors hover:border-white/20 hover:text-mist-100 disabled:opacity-50"
+      }
     >
       {exporting ? <Spinner className="h-4 w-4" /> : <ExportIcon className="h-4 w-4" />}
-      {exporting ? "Exporting…" : "Export Excel"}
+      {compact ? null : exporting ? "Exporting…" : "Export Excel"}
     </button>
   );
 }
