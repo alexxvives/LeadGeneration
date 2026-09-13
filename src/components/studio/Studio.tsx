@@ -46,6 +46,7 @@ import {
 } from "./OutreachView";
 import { CalendarView } from "./CalendarView";
 import { ConversationsView } from "./ConversationsView";
+import { ContactDrawer } from "./ContactDrawer";
 import { ContactsView } from "./ContactsView";
 import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
@@ -1911,6 +1912,8 @@ export function Studio() {
   };
 
   const selected = board?.leads.find((l) => l.id === selectedId) ?? null;
+  const selectedContact =
+    contacts.find((c) => c.id === selectedContactId) ?? null;
 
   /** Accent-fold + every token must appear (company, email, location, …). */
   const leadMatchesSearch = useCallback((l: LeadWithOutreach, raw: string) => {
@@ -2846,7 +2849,6 @@ export function Studio() {
             contacts={contacts}
             boards={board?.boards ?? boards}
             filterBoardId={filterBoardId}
-            selectedId={selectedContactId}
             createRequestId={contactCreateReq}
             onSelect={setSelectedContactId}
             onCreate={async (input) => {
@@ -2860,32 +2862,6 @@ export function Studio() {
               } catch (e) {
                 toast("err", (e as Error).message);
                 throw e;
-              }
-            }}
-            onUpdate={async (id, patch) => {
-              setContacts((prev) =>
-                prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-              );
-              try {
-                const { contact } = await api.updateContact(id, patch);
-                setContacts((prev) =>
-                  prev.map((c) => (c.id === id ? contact : c)),
-                );
-              } catch (e) {
-                toast("err", (e as Error).message);
-                const { contacts: rows } = await api.listContacts(filterBoardId);
-                setContacts(rows);
-              }
-            }}
-            onDelete={async (id) => {
-              setSelectedContactId((cur) => (cur === id ? null : cur));
-              setContacts((prev) => prev.filter((c) => c.id !== id));
-              try {
-                await api.deleteContact(id);
-              } catch (e) {
-                toast("err", (e as Error).message);
-                const { contacts: rows } = await api.listContacts(filterBoardId);
-                setContacts(rows);
               }
             }}
           />
@@ -2962,6 +2938,45 @@ export function Studio() {
         />
       )}
       </div>
+
+      {selectedContact ? (
+        <ContactDrawer
+          contact={selectedContact}
+          boardName={
+            (board?.boards ?? boards).find(
+              (b) => b.id === selectedContact.boardId,
+            )?.name ?? "Board"
+          }
+          onClose={() => setSelectedContactId(null)}
+          onUpdate={async (id, patch) => {
+            setContacts((prev) =>
+              prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+            );
+            try {
+              const { contact } = await api.updateContact(id, patch);
+              setContacts((prev) =>
+                prev.map((c) => (c.id === id ? contact : c)),
+              );
+            } catch (e) {
+              toast("err", (e as Error).message);
+              const { contacts: rows } = await api.listContacts(filterBoardId);
+              setContacts(rows);
+            }
+          }}
+          onDelete={async (id) => {
+            setSelectedContactId(null);
+            setContacts((prev) => prev.filter((c) => c.id !== id));
+            try {
+              await api.deleteContact(id);
+              toast("ok", "Collaborator deleted.");
+            } catch (e) {
+              toast("err", (e as Error).message);
+              const { contacts: rows } = await api.listContacts(filterBoardId);
+              setContacts(rows);
+            }
+          }}
+        />
+      ) : null}
 
       {selected && board && (
         <LeadDrawer
