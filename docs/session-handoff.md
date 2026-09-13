@@ -9,7 +9,7 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-13 (Phone top bar + locations)
+## ⏱️ Status — updated 2026-09-13 (Delete fix + Collaborators drawer)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0036** applied on prod D1 (`lodestar-prod`).  
@@ -17,16 +17,15 @@ first, and update the top block at the end of any session that changes state.**
 in the same release window as any schema-dependent code.
 
 ### This pass
-- Conversations: follow-up tag bottom-right; `shortLocation` drops
-  venue/floor (Teknon / 1er pis → city only).
-- Phone top bar: search icon (not board). Board picker in the overlay.
-  Live = pulse-dot next to the title (tap to take control).
-- Phone Pipeline: scrolling stage tabs, no on-card Move select.
-- Collaborators: removed the empty “Select a collaborator…” pane.
+- **Lead delete:** `findLeadAccess` before delete — shared-board leads no
+  longer 404 “Lead not found”.
+- **Collaborators:** `ContactDrawer` overlay (LeadDrawer pattern) — click a
+  card to open; inline edit name/org/email/phone/location; journal +
+  follow-ups; create via Modal; grid search + richer cards.
 
 ### Next
-1. Hard-refresh on a phone: top-bar search, overlay board, live dot.
-2. Confirm conversation locations show city/country only.
+1. Hard-refresh prod — delete a lead on a shared board; open/edit a collaborator.
+2. Phone: confirm collaborator drawer is full-screen and fields save on blur.
 
 ---
 
