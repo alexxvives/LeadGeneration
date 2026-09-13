@@ -15,6 +15,7 @@ import type {
   DashboardStats,
   FollowUp,
   Lead,
+  LeadDocument,
   LeadWithOutreach,
   Outreach,
   PlanId,
@@ -542,6 +543,32 @@ export const api = {
 
   deleteContact: (id: string) =>
     jsonFetch<{ ok: boolean }>(`/api/contacts/${id}`, { method: "DELETE" }),
+
+  listLeadDocuments: (leadId: string) =>
+    jsonFetch<{ documents: LeadDocument[] }>(`/api/leads/${leadId}/documents`),
+
+  uploadLeadDocument: async (leadId: string, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    const res = await fetch(`/api/leads/${leadId}/documents`, {
+      method: "POST",
+      body,
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      document?: LeadDocument;
+      error?: string;
+    };
+    if (!res.ok) {
+      throw new Error(data.error || `Upload failed (${res.status})`);
+    }
+    if (!data.document) throw new Error("Upload failed");
+    return { document: data.document };
+  },
+
+  deleteLeadDocument: (leadId: string, docId: string) =>
+    jsonFetch<{ ok: boolean }>(`/api/leads/${leadId}/documents/${docId}`, {
+      method: "DELETE",
+    }),
 };
 
 export type FirecrawlUsage = {

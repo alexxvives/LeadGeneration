@@ -198,7 +198,7 @@ export function PipelineView({
     contactMethods?: ContactMethod[] | null,
   ) => void;
 }) {
-  const { locked: editLocked, holder } = useBoardLockUi();
+  const { locked: editLocked } = useBoardLockUi();
   const [activeId, setActiveId] = useState<string | null>(null);
   const dragStartedRef = useRef(false);
   const [parkedOpen, setParkedOpen] = useState<Record<string, boolean>>({
@@ -252,13 +252,9 @@ export function PipelineView({
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
         {leads.length === 1 ? "" : "s"}
-        {editLocked
-          ? ` · ${holder ?? "Someone else"} is editing — take control to move stages`
-          : (
-            <>
-              <span className="hidden lg:inline"> · drag to change stage</span>
-            </>
-          )}
+        {editLocked ? null : (
+          <span className="hidden lg:inline"> · drag to change stage</span>
+        )}
       </p>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">

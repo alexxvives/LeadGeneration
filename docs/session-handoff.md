@@ -9,23 +9,31 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-13 (Delete fix + Collaborators drawer)
+## ⏱️ Status — updated 2026-09-13 (DatePicker z-index + drawer polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0036** applied on prod D1 (`lodestar-prod`).  
-**Deploy:** push to master for CI / Workers deploy; run `npm run cf:migrate`
-in the same release window as any schema-dependent code.
+**Migrations:** 0021–**0037** — run `npm run cf:migrate` for **0037**
+(`lead_documents`) in the same release window as this deploy.  
+**Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
-- **Lead delete:** `findLeadAccess` before delete — shared-board leads no
-  longer 404 “Lead not found”.
-- **Collaborators:** `ContactDrawer` overlay (LeadDrawer pattern) — click a
-  card to open; inline edit name/org/email/phone/location; journal +
-  follow-ups; create via Modal; grid search + richer cards.
+- Collaborator cards: no avatar circle.
+- Calendar day marks larger (icons + counts on phone too).
+- Conversation cards: **Follow-up** (not “Follow-up needed”).
+- Skeletons match chrome (phone vs desktop; Conversations/Collaborators cards).
+- Live lock copy only on the Live chip / phone pulse-dot — not page body.
+- Sales-stage chips scroll horizontally on phone.
+- **Waiting on us** on → opens Follow-up composer.
+- About sits in the lead-info column.
+- Closed leads: drag-and-drop **Documents** (ADR 0038, 4 MB).
+- **DatePicker:** popover was `z-[80]` under drawers (`z-[1100]`) — month
+  opened but stayed invisible. Now `z-[1200]`; Escape closes the picker
+  only. Calendar month/year menus are portaled the same way.
 
 ### Next
-1. Hard-refresh prod — delete a lead on a shared board; open/edit a collaborator.
-2. Phone: confirm collaborator drawer is full-screen and fields save on blur.
+1. `npm run cf:migrate` on prod D1 before relying on documents.
+2. Hard-refresh: open a lead note date — month should sit above the drawer.
+3. Calendar view: month and year menus should list options.
 
 ---
 

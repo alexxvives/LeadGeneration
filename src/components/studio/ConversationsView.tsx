@@ -140,7 +140,7 @@ export function ConversationsView({
                 <span className="inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
                   <CalendarIcon className="h-2.5 w-2.5" />
                   {pendingFollowUps === 1
-                    ? "Follow-up needed"
+                    ? "Follow-up"
                     : `${pendingFollowUps} follow-ups`}
                 </span>
               ) : null}

@@ -57,6 +57,8 @@ import {
   OutreachSkeleton,
   PipelineSkeleton,
   CalendarSkeleton,
+  ConversationsSkeleton,
+  ContactsSkeleton,
   useDeferredLoading,
 } from "./skeletons";
 import { recordWarmupSend } from "@/lib/email/warmup";
@@ -216,6 +218,7 @@ export function Studio() {
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactsReady, setContactsReady] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
   const [drawerPromptNote, setDrawerPromptNote] = useState<
@@ -669,7 +672,10 @@ export function Studio() {
       .then(({ contacts: rows }) => {
         if (!cancelled) setContacts(rows);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setContactsReady(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -2831,7 +2837,7 @@ export function Studio() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto pb-6">
           {loading || leadsHydrating || !board ? (
             <div role="status" aria-busy="true" aria-label="Loading conversations">
-              <PipelineSkeleton />
+              <ConversationsSkeleton />
             </div>
           ) : (
             <ConversationsView
@@ -2845,6 +2851,11 @@ export function Studio() {
 
       {view === "contacts" && (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6">
+          {!contactsReady ? (
+            <div role="status" aria-busy="true" aria-label="Loading collaborators">
+              <ContactsSkeleton />
+            </div>
+          ) : (
           <ContactsView
             contacts={contacts}
             boards={board?.boards ?? boards}
@@ -2865,6 +2876,7 @@ export function Studio() {
               }
             }}
           />
+          )}
         </div>
       )}
 

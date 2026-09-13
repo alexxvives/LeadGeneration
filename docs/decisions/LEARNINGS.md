@@ -4,6 +4,30 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Drawer chrome + closed-lead docs
+- Conversation cards only need “Follow-up”, not “Follow-up needed”.
+- Phone Live is the pulse-dot + popover. Do not repeat “X is editing / Take
+  control” in Pipeline or Calendar body copy.
+- Sales-stage chips wrap on a phone drawer; `flex-nowrap overflow-x-auto`
+  (wrap from `md`) keeps them on one row.
+- Waiting on us already means “we owe them something” — flipping it on
+  opens the existing Follow-up composer (no extra control).
+- About belongs in the lead-info column, not a full-width footer under notes.
+- Closed-lead files stay off the lead row (board payload). Metadata + bytes
+  go through `/api/leads/:id/documents` (D1 BLOB / `data/documents/`). 4 MB cap.
+- Studio skeletons must mirror chrome: no title/subtitle below `lg`; Pipeline
+  and Outreach are tabs+list on phone; Conversations/Collaborators are cards
+  (not the Pipeline kanban).
+
+### 2026-09-13 — DatePicker / calendar menus under drawers
+- `DatePicker` portals to `document.body` so drawer `overflow-hidden` does
+  not clip the month. Drawers are `z-[1100]` (above Leaflet ~1000); the
+  popover was `z-[80]`, so the calendar opened behind the sheet — click
+  looked like a no-op. Use `z-[1200]` (below toasts at `z-[2000]`).
+- Calendar month/year `GlassMenu` sat inside `lg:overflow-hidden` +
+  `min-w-0` flex chrome and could clip the same way. Portal + same z-index.
+- Escape on an open picker must capture-stop so the drawer does not close.
+
 ### 2026-09-13 — Phone top bar + city-only location
 - Conversation location cannot be “last two comma parts”. Venue names
   (`Centro Médico Teknon`) and floors (`1er pis Figueres`) leak through.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { Contact, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import {
   calendarEventsFromContacts,
@@ -80,21 +81,21 @@ function KindMark({ kind }: { kind: FollowUpKind }) {
 function DayKindMark({ kind }: { kind: FollowUpKind }) {
   if (kind === "email") {
     return (
-      <MailIcon className="h-3.5 w-3.5 text-aurora-400 drop-shadow-[0_0_4px_rgba(52,211,153,0.45)]" aria-hidden />
+      <MailIcon className="h-4 w-4 text-aurora-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.5)] sm:h-5 sm:w-5" aria-hidden />
     );
   }
   if (kind === "phone") {
     return (
-      <PhoneIcon className="h-3.5 w-3.5 text-sky-400 drop-shadow-[0_0_4px_rgba(56,189,248,0.45)]" aria-hidden />
+      <PhoneIcon className="h-4 w-4 text-sky-400 drop-shadow-[0_0_6px_rgba(56,189,248,0.5)] sm:h-5 sm:w-5" aria-hidden />
     );
   }
   if (kind === "follow_up") {
     return (
-      <CalendarIcon className="h-3.5 w-3.5 text-violet-300 drop-shadow-[0_0_4px_rgba(167,139,250,0.55)]" aria-hidden />
+      <CalendarIcon className="h-4 w-4 text-violet-300 drop-shadow-[0_0_6px_rgba(167,139,250,0.6)] sm:h-5 sm:w-5" aria-hidden />
     );
   }
   return (
-    <span className={`h-2.5 w-2.5 rounded-full ${KIND_DOT[kind]}`} aria-hidden />
+    <span className={`h-3 w-3 rounded-full sm:h-3.5 sm:w-3.5 ${KIND_DOT[kind]}`} aria-hidden />
   );
 }
 
@@ -127,6 +128,9 @@ function yearOptions(around: number): { value: string; label: string }[] {
   });
 }
 
+const MENU_W = 136;
+const MENU_MAX_H = 256;
+
 function GlassMenu({
   label,
   ariaLabel,
@@ -141,25 +145,83 @@ function GlassMenu({
   onChange: (next: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
+    const place = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      let top = r.bottom + 6;
+      let left = r.left + r.width / 2 - MENU_W / 2;
+      if (top + MENU_MAX_H > window.innerHeight - 8) {
+        top = Math.max(8, r.top - MENU_MAX_H - 6);
       }
+      left = Math.min(Math.max(8, left), window.innerWidth - MENU_W - 8);
+      setPos({ top, left });
+    };
+    place();
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
     };
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
     document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
       document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
+
+  const menu =
+    open && pos && typeof document !== "undefined"
+      ? createPortal(
+          <ul
+            ref={popRef}
+            role="listbox"
+            aria-label={ariaLabel}
+            className="fixed z-[1200] max-h-64 min-w-[8.5rem] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
+            style={{ top: pos.top, left: pos.left, width: MENU_W }}
+          >
+            {options.map((opt) => {
+              const active = opt.value === value;
+              return (
+                <li key={opt.value} role="option" aria-selected={active}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(opt.value);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full px-3 py-1.5 text-left text-sm ${
+                      active
+                        ? "bg-aurora-400/15 font-medium text-aurora-100"
+                        : "text-mist-200 hover:bg-white/5"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>,
+          document.body,
+        )
+      : null;
 
   return (
     <div ref={rootRef} className="relative">
@@ -179,35 +241,7 @@ function GlassMenu({
           aria-hidden
         />
       </button>
-      {open ? (
-        <ul
-          role="listbox"
-          aria-label={ariaLabel}
-          className="absolute left-1/2 top-[calc(100%+0.35rem)] z-40 max-h-64 min-w-[8.5rem] -translate-x-1/2 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
-        >
-          {options.map((opt) => {
-            const active = opt.value === value;
-            return (
-              <li key={opt.value} role="option" aria-selected={active}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value);
-                    setOpen(false);
-                  }}
-                  className={`flex w-full px-3 py-1.5 text-left text-sm ${
-                    active
-                      ? "bg-aurora-400/15 font-medium text-aurora-100"
-                      : "text-mist-200 hover:bg-white/5"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+      {menu}
     </div>
   );
 }
@@ -260,7 +294,6 @@ export function CalendarView({
   onOpenEvent: (ev: CalendarEvent) => void;
   onToggleFollowUp?: (ev: CalendarEvent, done: boolean) => void;
 }) {
-  const { locked: editLocked, holder } = useBoardLockUi();
   const today = todayIsoDate();
   const now = new Date();
   const [cursor, setCursor] = useState({
@@ -416,7 +449,7 @@ export function CalendarView({
             aria-label={`Calendar for ${monthLabel(cursor.year, cursor.month)}`}
             className="grid min-w-0 grid-cols-7 gap-px sm:gap-1 lg:min-h-0 lg:flex-1"
             style={{
-              gridTemplateRows: `auto repeat(${weekRows}, minmax(2.75rem, 1fr))`,
+              gridTemplateRows: `auto repeat(${weekRows}, minmax(4.25rem, 1fr))`,
             }}
           >
             {WEEKDAYS.map((d) => (
@@ -457,7 +490,7 @@ export function CalendarView({
                     overdue ? ", overdue follow-up" : ""
                   }${missed ? `, ${missed} missed call${missed === 1 ? "" : "s"}` : ""}`}
                   onClick={() => setSelected(cell.iso)}
-                  className={`flex min-h-11 min-w-0 flex-col items-start overflow-hidden rounded-md px-1 py-1 text-left transition-colors sm:min-h-[4.25rem] sm:rounded-xl sm:px-1.5 sm:py-1.5 lg:h-full lg:min-h-0 ${
+                  className={`flex min-h-[4.25rem] min-w-0 flex-col items-start overflow-hidden rounded-md px-1 py-1 text-left transition-colors sm:min-h-[5.5rem] sm:rounded-xl sm:px-1.5 sm:py-1.5 lg:h-full lg:min-h-0 ${
                     isSelected
                       ? overdue
                         ? "bg-rose-400/20 ring-1 ring-rose-400/60"
@@ -470,7 +503,7 @@ export function CalendarView({
                   } ${cell.inMonth ? "" : "opacity-40"}`}
                 >
                   <span
-                    className={`text-[11px] tabular-nums sm:text-xs ${
+                    className={`text-xs tabular-nums sm:text-sm ${
                       isToday && !overdue
                         ? "font-semibold text-aurora-300"
                         : "text-mist-200"
@@ -479,48 +512,28 @@ export function CalendarView({
                     {cell.day}
                   </span>
                   {KIND_ORDER.some((k) => counts[k] > 0) ? (
-                    <>
-                      <span className="mt-auto flex flex-wrap items-center gap-0.5 pt-0.5 sm:hidden">
-                        {KIND_ORDER.map((k) => {
-                          const n = counts[k];
-                          if (n === 0) return null;
-                          return (
-                            <span
-                              key={k}
-                              className={`h-1.5 w-1.5 rounded-full ${KIND_DOT[k]}`}
-                              aria-hidden
-                            />
-                          );
-                        })}
-                        {pending > 0 ? (
-                          <span className="sr-only">
-                            {pending} open follow-up{pending === 1 ? "" : "s"}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="mt-auto hidden flex-wrap items-center gap-1 pt-1 sm:flex">
-                        {KIND_ORDER.map((k) => {
-                          const n = counts[k];
-                          if (n === 0) return null;
-                          return (
-                            <span
-                              key={k}
-                              className="inline-flex items-center gap-0.5"
-                            >
-                              <DayKindMark kind={k} />
-                              <span className="text-[10px] font-medium tabular-nums text-mist-400">
-                                {n}
-                              </span>
+                    <span className="mt-auto flex flex-wrap items-center gap-1 pt-1 sm:gap-1.5">
+                      {KIND_ORDER.map((k) => {
+                        const n = counts[k];
+                        if (n === 0) return null;
+                        return (
+                          <span
+                            key={k}
+                            className="inline-flex items-center gap-0.5"
+                          >
+                            <DayKindMark kind={k} />
+                            <span className="text-[11px] font-medium tabular-nums text-mist-300 sm:text-xs">
+                              {n}
                             </span>
-                          );
-                        })}
-                        {pending > 0 ? (
-                          <span className="sr-only">
-                            {pending} open follow-up{pending === 1 ? "" : "s"}
                           </span>
-                        ) : null}
-                      </span>
-                    </>
+                        );
+                      })}
+                      {pending > 0 ? (
+                        <span className="sr-only">
+                          {pending} open follow-up{pending === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                    </span>
                   ) : null}
                 </button>
               );
@@ -557,13 +570,6 @@ export function CalendarView({
             ? "Nothing logged"
             : `${dayEvents.length} on this day`}
         </h3>
-        {editLocked ? (
-          <p className="mt-2 rounded-lg border border-aurora-400/20 bg-aurora-400/5 px-3 py-2 text-xs text-aurora-100/90">
-            {holder ?? "Someone else"} is editing this board. Take control to
-            mark follow-ups done.
-          </p>
-        ) : null}
-
         <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto">
           {dayEvents.length === 0 ? (
             <p className="text-sm leading-relaxed text-mist-400">

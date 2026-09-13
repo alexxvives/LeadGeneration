@@ -99,8 +99,8 @@ Search  →  Enrich  →  Draft  →  Send
     Cards show name, city + country (not the street), pending follow-up,
     and recent **notes** (follow-up reminders are omitted from the preview).
     An hourglass on the title row means **Waiting on us**; a monitor icon
-    means **Demo done**. Created date sits bottom-left; a follow-up tag
-    sits bottom-right. Overflowing name / company / city ping-pong like a
+    means **Demo done**. Created date sits bottom-left; a **Follow-up** tag
+    sits bottom-right when one is pending. Overflowing name / company / city ping-pong like a
     now-playing title. Location on the card is city + country only
     (`shortLocation` drops street, floor, and venue names). Click opens
     the lead drawer (waiting / demo toggles live there). Phone cards stay
@@ -146,7 +146,8 @@ Search  →  Enrich  →  Draft  →  Send
     pill beside the title. Below `lg` a pulsating dot sits next to the
     phone top-bar title (tap to see who and take control). Search is the
     top-bar icon; the board picker lives in the overlay menu.
-    Calendar also notes that the other user is active.
+    Day cells show the same icons + counts on phone and desktop (larger
+    marks — the cell is otherwise empty).
     The lead drawer
     shows a purple **Follow up** tag, no checkbox. Plain notes stay on the
     lead only and never count as follow-ups. Click a lead item to open the
@@ -156,7 +157,8 @@ Search  →  Enrich  →  Draft  →  Send
     ADR 0036). Name, org, email, phone, location, plus the same notes /
     follow-up journal. **Add collaborator** sits next to the desktop title
     (and as a phone action under the top bar), same pattern as Create board.
-    Lives under Engage. Follow-ups show on Calendar. Does
+    Cards are name + org + contact lines (no avatar circle). Lives under
+    Engage. Follow-ups show on Calendar. Does
     not consume lead quota. View subtitles stay desktop-only (`lg+`).
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
@@ -191,9 +193,12 @@ Search  →  Enrich  →  Draft  →  Send
     no Bounced chip, toast, or drawer button. The outreach composer
     (draft → edit → send) is on the draft pane. In Conversation hides the
     “how did you reach them” chips and shows compact **Waiting on us** /
-    **Demo done** toggles side by side (titles only). About spans the full
-    drawer width under the profile + notes columns. The header no longer
-    repeats the CRM stage pill.
+    **Demo done** toggles side by side (titles only). Turning **Waiting on
+    us** on opens the Follow-up composer (default “Follow up”, one week out)
+    and scrolls to Notes. About sits in the lead-info column under contact
+    fields. Closed leads also get a **Documents** drop zone (PDF / Office /
+    images, 4 MB — ADR 0038). Sales-stage chips scroll sideways on phone
+    instead of wrapping. The header no longer repeats the CRM stage pill.
 
 - **`/app/settings`** — sender profile (language flag persists as
   `templateLang` and only changes the **preview** — template editors stay as
@@ -317,7 +322,10 @@ card columns (no about/notes/tags/fit/source). Rows on the wire omit
 email bodies and subjects, blurbs, notes, tags, fit, source URL, and
 journal note text (`detailLoaded: false`) — Calendar still gets
 id/date/kind/done for dots. Opening a
-lead drawer fetches full detail via `GET /api/leads/:id`. Pipeline,
+lead drawer fetches full detail via `GET /api/leads/:id`. Closed-lead
+files are a separate `lead_documents` table / `data/documents/` folder
+(`GET|POST /api/leads/:id/documents`, ADR 0038) so they never ride on
+the board hydrate. Pipeline,
 Outreach, and Leads cards **window** the DOM (only on-screen rows mount).
 Background pages are
 a **leads-only** request (no run/summaries/lock) so paging stays cheap

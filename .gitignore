@@ -30,6 +30,7 @@ yarn-error.log*
 
 # local file database
 /data/*.json
+/data/documents/
 !/data/.gitkeep
 
 # Real lead spreadsheets (PII) — keep only the intentional example

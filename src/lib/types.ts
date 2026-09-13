@@ -430,6 +430,20 @@ export interface Lead {
 }
 
 /**
+ * File attached to a closed lead (proposal, contract, tramit…).
+ * Bytes live in the store (JSON files / D1 BLOB) — this is metadata only.
+ */
+export interface LeadDocument {
+  id: string;
+  workspaceId: string;
+  leadId: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+}
+
+/**
  * Board-scoped collaborator (not a lead). Notes / follow-ups share the
  * lead journal shape so they can appear on Calendar (ADR 0036).
  */

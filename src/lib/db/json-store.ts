@@ -10,6 +10,7 @@ import {
   type BoardMemberRole,
   type Contact,
   type Lead,
+  type LeadDocument,
   type Outreach,
   type Run,
   type Workspace,
@@ -27,6 +28,7 @@ interface DbShape {
   leads: Lead[];
   outreach: Outreach[];
   contacts: Contact[];
+  documents: LeadDocument[];
   boardMembers: BoardMember[];
   boardInvites: BoardInvite[];
   boardLocks: BoardLock[];
@@ -152,6 +154,19 @@ function normalizeOutreach(o: Outreach): Outreach {
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
+const DOC_DIR = path.join(DATA_DIR, "documents");
+
+function docPath(workspaceId: string, id: string): string {
+  return path.join(DOC_DIR, workspaceId, id);
+}
+
+async function removeDocFile(workspaceId: string, id: string): Promise<void> {
+  try {
+    await fs.unlink(docPath(workspaceId, id));
+  } catch {
+    /* already gone */
+  }
+}
 
 const EMPTY: DbShape = {
   workspaces: [],
@@ -160,6 +175,7 @@ const EMPTY: DbShape = {
   leads: [],
   outreach: [],
   contacts: [],
+  documents: [],
   boardMembers: [],
   boardInvites: [],
   boardLocks: [],
@@ -197,6 +213,7 @@ export class JsonStore implements LeadRepository {
         leads: parsed.leads ?? [],
         outreach: parsed.outreach ?? [],
         contacts: parsed.contacts ?? [],
+        documents: parsed.documents ?? [],
         boardMembers: parsed.boardMembers ?? [],
         boardInvites: parsed.boardInvites ?? [],
         boardLocks: parsed.boardLocks ?? [],
@@ -687,6 +704,60 @@ export class JsonStore implements LeadRepository {
     });
   }
 
+  async listLeadDocuments(leadId: string): Promise<LeadDocument[]> {
+    const data = await this.read();
+    return data.documents
+      .filter((d) => this.inScope(d) && d.leadId === leadId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async getLeadDocument(id: string): Promise<LeadDocument | null> {
+    const data = await this.read();
+    return data.documents.find((d) => d.id === id && this.inScope(d)) ?? null;
+  }
+
+  async getLeadDocumentBytes(id: string): Promise<Uint8Array | null> {
+    const doc = await this.getLeadDocument(id);
+    if (!doc) return null;
+    try {
+      const buf = await fs.readFile(docPath(doc.workspaceId, doc.id));
+      return new Uint8Array(buf);
+    } catch {
+      return null;
+    }
+  }
+
+  async createLeadDocument(
+    doc: LeadDocument,
+    bytes: Uint8Array,
+  ): Promise<LeadDocument> {
+    await fs.mkdir(path.join(DOC_DIR, doc.workspaceId), { recursive: true });
+    await fs.writeFile(docPath(doc.workspaceId, doc.id), bytes);
+    try {
+      return await this.mutate((data) => {
+        data.documents.push(doc);
+        return { data, result: doc };
+      });
+    } catch (err) {
+      await removeDocFile(doc.workspaceId, doc.id);
+      throw err;
+    }
+  }
+
+  async deleteLeadDocument(id: string): Promise<boolean> {
+    const doc = await this.getLeadDocument(id);
+    if (!doc) return false;
+    const ok = await this.mutate((data) => {
+      const before = data.documents.length;
+      data.documents = data.documents.filter(
+        (d) => !(d.id === id && this.inScope(d)),
+      );
+      return { data, result: data.documents.length < before };
+    });
+    if (ok) await removeDocFile(doc.workspaceId, doc.id);
+    return ok;
+  }
+
   async listLeads(filter?: LeadListFilter): Promise<Lead[]> {
     const data = await this.read();
     const leads = data.leads.filter((l) => {
@@ -788,33 +859,51 @@ export class JsonStore implements LeadRepository {
     return { sentCount, draftedCount };
   }
 
-  deleteLead(id: string): Promise<boolean> {
-    return this.mutate((data) => {
+  async deleteLead(id: string): Promise<boolean> {
+    const docs = await this.mutate((data) => {
       const before = data.leads.length;
       data.leads = data.leads.filter((l) => !(l.id === id && this.inScope(l)));
-      if (data.leads.length === before) return { data, result: false };
+      if (data.leads.length === before) return { data, result: null };
       data.outreach = data.outreach.filter(
         (o) => !(o.leadId === id && this.inScope(o)),
       );
-      return { data, result: true };
+      const removed = data.documents.filter(
+        (d) => d.leadId === id && this.inScope(d),
+      );
+      data.documents = data.documents.filter(
+        (d) => !(d.leadId === id && this.inScope(d)),
+      );
+      return { data, result: removed };
     });
+    if (!docs) return false;
+    await Promise.all(docs.map((d) => removeDocFile(d.workspaceId, d.id)));
+    return true;
   }
 
-  deleteLeads(ids: string[]): Promise<number> {
+  async deleteLeads(ids: string[]): Promise<number> {
     const idSet = new Set(ids);
-    return this.mutate((data) => {
+    const { deleted, docs } = await this.mutate((data) => {
       const before = data.leads.length;
       data.leads = data.leads.filter(
         (l) => !(this.inScope(l) && idSet.has(l.id)),
       );
-      const deleted = before - data.leads.length;
-      if (deleted > 0) {
+      const deletedCount = before - data.leads.length;
+      const removed =
+        deletedCount > 0
+          ? data.documents.filter((d) => this.inScope(d) && idSet.has(d.leadId))
+          : [];
+      if (deletedCount > 0) {
         data.outreach = data.outreach.filter(
           (o) => !(this.inScope(o) && idSet.has(o.leadId)),
         );
+        data.documents = data.documents.filter(
+          (d) => !(this.inScope(d) && idSet.has(d.leadId)),
+        );
       }
-      return { data, result: deleted };
+      return { data, result: { deleted: deletedCount, docs: removed } };
     });
+    await Promise.all(docs.map((d) => removeDocFile(d.workspaceId, d.id)));
+    return deleted;
   }
 
   async reassignOrphansToBoard(boardId: string): Promise<void> {
@@ -837,23 +926,29 @@ export class JsonStore implements LeadRepository {
     });
   }
 
-  deleteLeadsByBoard(boardId: string): Promise<number> {
-    if (!boardId) return Promise.resolve(0);
-    return this.mutate((data) => {
+  async deleteLeadsByBoard(boardId: string): Promise<number> {
+    if (!boardId) return 0;
+    const { deleted, docs } = await this.mutate((data) => {
       const remove = new Set(
         data.leads
           .filter((l) => this.inScope(l) && l.boardId === boardId)
           .map((l) => l.id),
       );
-      if (remove.size === 0) return { data, result: 0 };
+      if (remove.size === 0) return { data, result: { deleted: 0, docs: [] } };
       const before = data.leads.length;
+      const removed = data.documents.filter(
+        (d) => this.inScope(d) && remove.has(d.leadId),
+      );
       data.leads = data.leads.filter((l) => !remove.has(l.id));
       data.outreach = data.outreach.filter((o) => !remove.has(o.leadId));
+      data.documents = data.documents.filter((d) => !remove.has(d.leadId));
       data.contacts = data.contacts.filter(
         (c) => !(this.inScope(c) && c.boardId === boardId),
       );
-      return { data, result: before - data.leads.length };
+      return { data, result: { deleted: before - data.leads.length, docs: removed } };
     });
+    await Promise.all(docs.map((d) => removeDocFile(d.workspaceId, d.id)));
+    return deleted;
   }
 
   // ---- Outreach ----
@@ -1010,10 +1105,13 @@ export class JsonStore implements LeadRepository {
     }).length;
   }
 
-  clearWorkspaceData(): Promise<void> {
-    return this.mutate((data) => {
+  async clearWorkspaceData(): Promise<void> {
+    const docs = await this.mutate((data) => {
       const ownedBoardIds = new Set(
         data.boards.filter((b) => b.workspaceId === this.workspaceId).map((b) => b.id),
+      );
+      const removed = data.documents.filter(
+        (d) => (d.workspaceId ?? this.workspaceId) === this.workspaceId,
       );
       data.boardMembers = data.boardMembers.filter((m) => !ownedBoardIds.has(m.boardId));
       data.boardInvites = data.boardInvites.filter((i) => !ownedBoardIds.has(i.boardId));
@@ -1027,8 +1125,12 @@ export class JsonStore implements LeadRepository {
       data.contacts = data.contacts.filter(
         (c) => (c.workspaceId ?? this.workspaceId) !== this.workspaceId,
       );
-      return { data, result: undefined };
+      data.documents = data.documents.filter(
+        (d) => (d.workspaceId ?? this.workspaceId) !== this.workspaceId,
+      );
+      return { data, result: removed };
     });
+    await Promise.all(docs.map((d) => removeDocFile(d.workspaceId, d.id)));
   }
 
   deleteWorkspace(id: string): Promise<boolean> {

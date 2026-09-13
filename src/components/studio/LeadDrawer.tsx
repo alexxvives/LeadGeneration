@@ -42,6 +42,7 @@ import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
 import { Bone, LeadDrawerPendingSkeleton } from "@/components/studio/skeletons";
 import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
+import { LeadDocuments } from "@/components/studio/LeadDocuments";
 import {
   toggleContactMethod,
   contactMethodsEqual,
@@ -180,6 +181,7 @@ export function LeadDrawer(props: DrawerProps) {
   >(promptNote);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const notesPaneRef = useRef<HTMLElement | null>(null);
   const companyInputRef = useRef<HTMLInputElement | null>(null);
   const [companyInvalid, setCompanyInvalid] = useState(false);
   const [companyShaking, setCompanyShaking] = useState(false);
@@ -865,15 +867,15 @@ export function LeadDrawer(props: DrawerProps) {
           {/* CRM Stage picker */}
           <section>
             <SectionLabel>Sales stage</SectionLabel>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-nowrap gap-1.5 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
               {CRM_STAGES.map(({ stage, label, color }) => (
-                <Lockable key={stage}>
+                <Lockable key={stage} className="shrink-0">
                   <button
                     type="button"
                     disabled={editLocked}
                     onClick={() => handleStageClick(stage)}
                     title={editLocked ? lockHint : undefined}
-                    className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition-all disabled:opacity-60 ${
+                    className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition-all disabled:opacity-60 ${
                       crmStage === stage
                         ? color
                         : "bg-white/5 text-mist-500 ring-white/10 hover:text-mist-300"
@@ -939,9 +941,15 @@ export function LeadDrawer(props: DrawerProps) {
                   on={lead.waitingOnUs}
                   disabled={editLocked}
                   lockHint={lockHint}
-                  onToggle={(next) =>
-                    void props.onUpdateCrm(lead.id, { waitingOnUs: next })
-                  }
+                  onToggle={(next) => {
+                    void props.onUpdateCrm(lead.id, { waitingOnUs: next });
+                    if (!next) return;
+                    openComposer("follow_up");
+                    notesPaneRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "nearest",
+                    });
+                  }}
                 />
                 <FlagToggle
                   label="Demo done"
@@ -1059,10 +1067,39 @@ export function LeadDrawer(props: DrawerProps) {
               }}
             />
           </section>
+          <section>
+            <SectionLabel>About</SectionLabel>
+            {lead.detailLoaded !== true ? (
+              <LeadDrawerPendingSkeleton variant="about" />
+            ) : (
+              <AutoGrowAbout
+                key={`${lead.id}-about-${lead.aboutBlurb ?? ""}`}
+                defaultValue={lead.aboutBlurb ?? ""}
+                disabled={editLocked}
+                lockHint={lockHint}
+                onSave={(raw) => {
+                  const next = raw.trim() || null;
+                  if (next !== (lead.aboutBlurb ?? null)) {
+                    void props.onUpdateCrm(lead.id, { aboutBlurb: next });
+                  }
+                }}
+              />
+            )}
+          </section>
+          {crmStage === "closed" ? (
+            <LeadDocuments
+              leadId={lead.id}
+              disabled={editLocked}
+              lockHint={lockHint}
+            />
+          ) : null}
           </div>
 
           {/* Notes column — grows independently so the left profile stays readable */}
-          <aside className="flex min-h-0 flex-col border-t border-white/5 bg-ink-950/40 sm:border-l sm:border-t-0">
+          <aside
+            ref={notesPaneRef}
+            className="flex min-h-0 flex-col border-t border-white/5 bg-ink-950/40 sm:border-l sm:border-t-0"
+          >
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/5 px-4 py-3">
               <SectionLabel>Notes</SectionLabel>
               <div className="flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1">
@@ -1403,25 +1440,6 @@ export function LeadDrawer(props: DrawerProps) {
             </div>
           </aside>
           </div>
-          <section className="shrink-0 border-t border-white/5 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
-            <SectionLabel>About</SectionLabel>
-            {lead.detailLoaded !== true ? (
-              <LeadDrawerPendingSkeleton variant="about" />
-            ) : (
-              <AutoGrowAbout
-                key={`${lead.id}-about-${lead.aboutBlurb ?? ""}`}
-                defaultValue={lead.aboutBlurb ?? ""}
-                disabled={editLocked}
-                lockHint={lockHint}
-                onSave={(raw) => {
-                  const next = raw.trim() || null;
-                  if (next !== (lead.aboutBlurb ?? null)) {
-                    void props.onUpdateCrm(lead.id, { aboutBlurb: next });
-                  }
-                }}
-              />
-            )}
-          </section>
             </>
           ) : (
             <>

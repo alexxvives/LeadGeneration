@@ -63,6 +63,7 @@ import type {
   Contact,
   FollowUp,
   Lead,
+  LeadDocument,
   LeadWithOutreach,
   Outreach,
   PlanId,
@@ -71,6 +72,12 @@ import type {
   Workspace,
 } from "@/lib/types";
 import { normalizeCrmStage } from "@/lib/types";
+import {
+  inferDocumentMime,
+  isAllowedDocument,
+  LEAD_DOCUMENT_MAX_BYTES,
+  sanitizeDocumentName,
+} from "@/lib/lead-documents";
 import { scoreImportedLead } from "@/lib/fit-score";
 import {
   contactMethodsEqual,
@@ -3454,4 +3461,74 @@ export async function setFindLeadsEnabled(
     findLeadsEnabled: enabled,
     updatedAt: nowIso(),
   });
+}
+
+export async function listLeadDocuments(
+  ctx: Ctx,
+  leadId: string,
+): Promise<LeadDocument[]> {
+  const found = await findLeadAccess(ctx, leadId);
+  if (!found) throw new NotFoundError("Lead not found");
+  return found.db.listLeadDocuments(leadId);
+}
+
+export async function addLeadDocument(
+  ctx: Ctx,
+  leadId: string,
+  input: { name: string; mimeType?: string | null; bytes: Uint8Array },
+): Promise<LeadDocument> {
+  const found = await findLeadAccess(ctx, leadId);
+  if (!found) throw new NotFoundError("Lead not found");
+  await assertBoardEditable(ctx, found.lead.boardId);
+  if (found.lead.crmStage !== "closed") {
+    throw new Error("Documents can only be added on closed leads.");
+  }
+  const name = sanitizeDocumentName(input.name);
+  const mimeType = inferDocumentMime(name, input.mimeType);
+  if (!isAllowedDocument(name, mimeType)) {
+    throw new Error("That file type is not allowed.");
+  }
+  if (input.bytes.byteLength === 0) {
+    throw new Error("File is empty.");
+  }
+  if (input.bytes.byteLength > LEAD_DOCUMENT_MAX_BYTES) {
+    throw new Error("File is larger than 4 MB.");
+  }
+  const doc: LeadDocument = {
+    id: newId("doc"),
+    workspaceId: found.lead.workspaceId,
+    leadId,
+    name,
+    mimeType,
+    size: input.bytes.byteLength,
+    createdAt: nowIso(),
+  };
+  return found.db.createLeadDocument(doc, input.bytes);
+}
+
+export async function getLeadDocumentFile(
+  ctx: Ctx,
+  leadId: string,
+  docId: string,
+): Promise<{ doc: LeadDocument; bytes: Uint8Array } | null> {
+  const found = await findLeadAccess(ctx, leadId);
+  if (!found) return null;
+  const doc = await found.db.getLeadDocument(docId);
+  if (!doc || doc.leadId !== leadId) return null;
+  const bytes = await found.db.getLeadDocumentBytes(docId);
+  if (!bytes) return null;
+  return { doc, bytes };
+}
+
+export async function deleteLeadDocument(
+  ctx: Ctx,
+  leadId: string,
+  docId: string,
+): Promise<boolean> {
+  const found = await findLeadAccess(ctx, leadId);
+  if (!found) return false;
+  await assertBoardEditable(ctx, found.lead.boardId);
+  const doc = await found.db.getLeadDocument(docId);
+  if (!doc || doc.leadId !== leadId) return false;
+  return found.db.deleteLeadDocument(docId);
 }

@@ -275,19 +275,25 @@ export function RunsSkeleton() {
 
 export function CalendarSkeleton() {
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
-      <div className="glass min-w-0 flex-1 rounded-xl2 p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <Bone className="h-7 w-40" />
+    <div className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4 lg:flex-row">
+      <div className="glass min-w-0 flex-1 rounded-xl2 p-3 sm:p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <Bone className="h-7 w-36 sm:w-44" />
           <Bone className="h-8 w-16 rounded-full" />
         </div>
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-px sm:gap-1">
+          {Array.from({ length: 7 }, (_, i) => (
+            <Bone key={`h-${i}`} className="mx-auto h-3 w-6" />
+          ))}
           {Array.from({ length: 35 }, (_, i) => (
-            <Bone key={i} className="min-h-11 rounded-md sm:min-h-[4.25rem] sm:rounded-xl" />
+            <Bone
+              key={i}
+              className="min-h-[4.25rem] rounded-md sm:min-h-[5.5rem] sm:rounded-xl"
+            />
           ))}
         </div>
       </div>
-      <div className="glass w-full rounded-xl2 p-5 lg:w-[22rem]">
+      <div className="glass w-full rounded-xl2 p-3 sm:p-5 lg:w-[22rem]">
         <Bone className="h-3 w-24" />
         <Bone className="mt-2 h-6 w-36" />
         <div className="mt-4 space-y-2">
@@ -300,51 +306,68 @@ export function CalendarSkeleton() {
   );
 }
 
+function PipelineCardBone() {
+  return (
+    <div className="flex items-start gap-1 rounded-xl border border-white/5 bg-ink-900/60 px-3 py-2.5">
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <Bone className="h-4 w-28 max-w-full" />
+        <Bone className="h-3 w-20" />
+        <div className="flex items-center gap-1.5 pt-0.5">
+          <Bone className="h-1 w-10 rounded-full" />
+          <Bone className="h-3 w-6" />
+          <Bone className="h-4 w-12 rounded-full" />
+        </div>
+      </div>
+      <Bone className="h-5 w-5 shrink-0 rounded-md" />
+    </div>
+  );
+}
+
 export function PipelineSkeleton() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <Bone className="h-3 w-56 shrink-0" />
-      <div
-        className="grid min-h-0 flex-1 gap-3"
-        style={{ gridTemplateColumns: "repeat(4, minmax(11rem, 1fr))" }}
-      >
-        {Array.from({ length: 4 }, (_, i) => (
-          <div
-            key={i}
-            className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-900/40"
-          >
-            <div className="flex items-center gap-2 border-b border-white/5 px-3 py-2.5">
-              <Bone className="h-2.5 w-2.5 rounded-full" />
-              <Bone className="h-3 w-20" />
-              <Bone className="ml-auto h-5 w-7 rounded-md" />
-            </div>
-            <div className="flex flex-1 flex-col gap-2 p-2">
-              {Array.from({ length: 3 }, (_, j) => (
-                <div
-                  key={j}
-                  className="flex items-start gap-1 rounded-xl border border-white/5 bg-ink-900/60 px-3 py-2.5"
-                >
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <Bone className="h-4 w-28 max-w-full" />
-                    <Bone className="h-3 w-20" />
-                    <div className="flex items-center gap-1.5 pt-0.5">
-                      <Bone className="h-1 w-10 rounded-full" />
-                      <Bone className="h-3 w-6" />
-                      <Bone className="h-4 w-12 rounded-full" />
-                    </div>
-                  </div>
-                  <Bone className="h-5 w-5 shrink-0 rounded-md" />
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+      <Bone className="h-3 w-40 shrink-0 lg:w-56" />
+      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
+        <div className="flex shrink-0 gap-1 overflow-hidden">
+          {Array.from({ length: 5 }, (_, i) => (
+            <Bone key={i} className="h-11 w-24 shrink-0 rounded-full" />
+          ))}
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 p-3">
+          {Array.from({ length: 4 }, (_, i) => (
+            <PipelineCardBone key={i} />
+          ))}
+        </div>
       </div>
-      <div className="shrink-0 rounded-xl2 border border-white/10 bg-ink-900/40">
-        <div className="flex items-center gap-2 px-3 py-2.5">
-          <Bone className="h-2.5 w-2.5 rounded-full" />
-          <Bone className="h-3 w-24" />
-          <Bone className="ml-auto h-5 w-7 rounded-md" />
+      <div className="hidden min-h-0 flex-1 flex-col gap-3 lg:flex">
+        <div
+          className="grid min-h-0 flex-1 gap-3"
+          style={{ gridTemplateColumns: "repeat(4, minmax(11rem, 1fr))" }}
+        >
+          {Array.from({ length: 4 }, (_, i) => (
+            <div
+              key={i}
+              className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-900/40"
+            >
+              <div className="flex items-center gap-2 border-b border-white/5 px-3 py-2.5">
+                <Bone className="h-2.5 w-2.5 rounded-full" />
+                <Bone className="h-3 w-20" />
+                <Bone className="ml-auto h-5 w-7 rounded-md" />
+              </div>
+              <div className="flex flex-1 flex-col gap-2 p-2">
+                {Array.from({ length: 3 }, (_, j) => (
+                  <PipelineCardBone key={j} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="shrink-0 rounded-xl2 border border-white/10 bg-ink-900/40">
+          <div className="flex items-center gap-2 px-3 py-2.5">
+            <Bone className="h-2.5 w-2.5 rounded-full" />
+            <Bone className="h-3 w-24" />
+            <Bone className="ml-auto h-5 w-7 rounded-md" />
+          </div>
         </div>
       </div>
     </div>
@@ -416,13 +439,19 @@ function LeadsTableRowsSkeleton({ rows = 10 }: { rows?: number }) {
 export function LeadsTableSkeleton() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="grid shrink-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
+      <div className="flex shrink-0 items-center gap-2 lg:hidden">
+        <Bone className="h-3 w-16" />
+        <Bone className="ml-auto h-9 w-20 rounded-full" />
+        <Bone className="h-9 w-16 rounded-full" />
+        <Bone className="h-9 w-14 rounded-full" />
+      </div>
+      <div className="hidden shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 lg:grid">
         <div className="flex items-center gap-2">
           <Bone className="h-3 w-20" />
           <Bone className="h-8 w-24 rounded-full" />
         </div>
-        <Bone className="h-8 w-48 rounded-full justify-self-start sm:justify-self-center" />
-        <Bone className="h-8 w-36 justify-self-start sm:justify-self-end" />
+        <Bone className="h-8 w-48 rounded-full justify-self-center" />
+        <Bone className="h-8 w-36 justify-self-end" />
       </div>
       <div className="min-h-0 flex-1">
         <LeadsTableRowsSkeleton />
@@ -479,10 +508,40 @@ export function LeadsLayoutSkeleton({
   return <LeadsTableBodySkeleton />;
 }
 
+function OutreachRowBone() {
+  return (
+    <li className="flex items-center justify-between gap-2 px-3 py-2">
+      <div className="min-w-0 flex-1 space-y-1">
+        <Bone className="h-4 w-32 max-w-full" />
+        <Bone className="h-3 w-24" />
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <Bone className="h-1 w-10 rounded-full" />
+        <Bone className="h-6 w-14 rounded-full" />
+        <Bone className="h-6 w-6 rounded-md" />
+      </div>
+    </li>
+  );
+}
+
 export function OutreachSkeleton() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
+        <div className="flex shrink-0 gap-1 overflow-hidden">
+          {Array.from({ length: 3 }, (_, i) => (
+            <Bone key={i} className="h-11 w-28 shrink-0 rounded-full" />
+          ))}
+        </div>
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40">
+          <ul className="divide-y divide-white/5">
+            {Array.from({ length: 6 }, (_, j) => (
+              <OutreachRowBone key={j} />
+            ))}
+          </ul>
+        </section>
+      </div>
+      <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-cols-3 lg:items-stretch">
         {Array.from({ length: 3 }, (_, i) => (
           <section
             key={i}
@@ -501,23 +560,54 @@ export function OutreachSkeleton() {
             </div>
             <ul className="min-h-0 flex-1 divide-y divide-white/5 overflow-hidden">
               {Array.from({ length: 5 }, (_, j) => (
-                <li
-                  key={j}
-                  className="flex items-center justify-between gap-2 px-3 py-2"
-                >
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <Bone className="h-4 w-32 max-w-full" />
-                    <Bone className="h-3 w-24" />
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <Bone className="h-1 w-10 rounded-full" />
-                    <Bone className="h-6 w-14 rounded-full" />
-                    <Bone className="h-6 w-6 rounded-md" />
-                  </div>
-                </li>
+                <OutreachRowBone key={j} />
               ))}
             </ul>
           </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ConversationsSkeleton() {
+  return (
+    <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="glass flex flex-col rounded-xl2 p-4 sm:p-5">
+          <Bone className="h-5 w-36 max-w-full" />
+          <Bone className="mt-1.5 h-3 w-24" />
+          <Bone className="mt-2 h-3 w-28" />
+          <Bone className="mt-3 h-3.5 w-full" />
+          <Bone className="mt-1.5 h-3.5 w-4/5" />
+          <div className="mt-4 flex items-center justify-between">
+            <Bone className="h-3 w-16" />
+            <Bone className="h-5 w-20 rounded-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ContactsSkeleton() {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex shrink-0 items-center gap-3">
+        <Bone className="h-4 w-32" />
+        <Bone className="ml-auto hidden h-9 w-56 rounded-full sm:block" />
+      </div>
+      <div className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="glass rounded-xl2 p-4">
+            <Bone className="h-5 w-32 max-w-full" />
+            <Bone className="mt-1.5 h-3 w-24" />
+            <div className="mt-3 space-y-1.5">
+              <Bone className="h-3 w-40 max-w-full" />
+              <Bone className="h-3 w-28" />
+            </div>
+            <Bone className="mt-3 h-3 w-20" />
+          </div>
         ))}
       </div>
     </div>
@@ -877,6 +967,10 @@ export function StudioViewSkeleton({
       <div className="min-h-0 flex-1">
         <CalendarSkeleton />
       </div>
+    ) : view === "conversations" ? (
+      <ConversationsSkeleton />
+    ) : view === "contacts" ? (
+      <ContactsSkeleton />
     ) : view === "runs" ? (
       <RunsSkeleton />
     ) : view === "admin" ? (
@@ -900,12 +994,15 @@ export function StudioViewSkeleton({
       aria-busy="true"
       aria-label={`Loading ${title}`}
     >
-      <div className="mb-5 flex shrink-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-2 hidden shrink-0 flex-col gap-3 lg:mb-6 lg:flex lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <Bone className="h-9 w-36 sm:h-10" />
+            <Bone className="h-10 w-36" />
             {view === "boards" ? (
               <Bone className="h-8 w-28 rounded-full" />
+            ) : null}
+            {view === "contacts" ? (
+              <Bone className="h-8 w-36 rounded-full" />
             ) : null}
             {view === "leads" ? (
               <Bone className="h-8 w-24 rounded-full" />
@@ -913,10 +1010,12 @@ export function StudioViewSkeleton({
           </div>
           <Bone className="mt-2 h-3 w-64 max-w-full" />
         </div>
-        <div className="justify-self-start sm:justify-self-end">
+      </div>
+      {view === "boards" || view === "contacts" ? (
+        <div className="mb-3 lg:hidden">
           <Bone className="h-9 w-32 rounded-full" />
         </div>
-      </div>
+      ) : null}
       <div
         className={
           fill

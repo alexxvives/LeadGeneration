@@ -19,13 +19,6 @@ function formatCreated(iso: string): string {
   });
 }
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
-}
-
 export function ContactsView({
   contacts,
   boards,
@@ -251,23 +244,15 @@ export function ContactsView({
                 onClick={() => onSelect(c.id)}
                 className="glass card-hover rounded-xl2 p-4 text-left transition-transform"
               >
-                <div className="flex items-start gap-3">
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-aurora-400/10 text-xs font-semibold text-aurora-200 ring-1 ring-aurora-400/25"
-                    aria-hidden
-                  >
-                    {initials(c.name)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate font-display text-base font-semibold">
-                      {c.name}
-                    </h3>
-                    {c.organization ? (
-                      <p className="mt-0.5 truncate text-xs text-mist-400">
-                        {c.organization}
-                      </p>
-                    ) : null}
-                  </div>
+                <div className="min-w-0">
+                  <h3 className="truncate font-display text-base font-semibold">
+                    {c.name}
+                  </h3>
+                  {c.organization ? (
+                    <p className="mt-0.5 truncate text-xs text-mist-400">
+                      {c.organization}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="mt-3 space-y-1 text-xs text-mist-500">
                   {c.email ? (

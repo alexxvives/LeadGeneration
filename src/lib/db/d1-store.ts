@@ -12,6 +12,7 @@ import type {
   FollowUp,
   DeliveryStatus,
   Contact,
+  LeadDocument,
 } from "@/lib/types";
 import { normalizeCrmStage, normalizeEasyEmailProvider } from "@/lib/types";
 import {
@@ -187,6 +188,40 @@ type ContactRow = {
   follow_ups: string | null;
   created_at: string;
 };
+
+type LeadDocumentRow = {
+  id: string;
+  workspace_id: string;
+  lead_id: string;
+  name: string;
+  mime_type: string;
+  size: number;
+  created_at: string;
+};
+
+function rowToLeadDocument(r: LeadDocumentRow): LeadDocument {
+  return {
+    id: r.id,
+    workspaceId: r.workspace_id,
+    leadId: r.lead_id,
+    name: r.name,
+    mimeType: r.mime_type,
+    size: Number(r.size) || 0,
+    createdAt: r.created_at,
+  };
+}
+
+function bytesFromD1(raw: unknown): Uint8Array | null {
+  if (!raw) return null;
+  if (raw instanceof Uint8Array) return raw;
+  if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+  if (ArrayBuffer.isView(raw)) {
+    const view = raw as ArrayBufferView;
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+  }
+  if (Array.isArray(raw)) return Uint8Array.from(raw as number[]);
+  return null;
+}
 
 /** Card/list hydrate — skip about/notes/tags/fit/source (drawer GET loads them). */
 const CARD_LEAD_SELECT = `l.id, l.workspace_id, l.run_id, l.board_id, l.company, l.website,
@@ -1277,6 +1312,10 @@ export class D1Store implements LeadRepository {
       .prepare(`DELETE FROM outreach WHERE lead_id = ? AND workspace_id = ?`)
       .bind(id, this.workspaceId)
       .run();
+    await this.db
+      .prepare(`DELETE FROM lead_documents WHERE lead_id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .run();
     const result = await this.db
       .prepare(`DELETE FROM leads WHERE id = ? AND workspace_id = ?`)
       .bind(id, this.workspaceId)
@@ -1296,6 +1335,12 @@ export class D1Store implements LeadRepository {
       await this.db
         .prepare(
           `DELETE FROM outreach WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
+        )
+        .bind(this.workspaceId, ...chunk)
+        .run();
+      await this.db
+        .prepare(
+          `DELETE FROM lead_documents WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
         )
         .bind(this.workspaceId, ...chunk)
         .run();
@@ -1383,6 +1428,73 @@ export class D1Store implements LeadRepository {
     return (result.meta?.changes ?? 0) > 0;
   }
 
+  async listLeadDocuments(leadId: string): Promise<LeadDocument[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT id, workspace_id, lead_id, name, mime_type, size, created_at
+         FROM lead_documents
+         WHERE workspace_id = ? AND lead_id = ?
+         ORDER BY created_at DESC`,
+      )
+      .bind(this.workspaceId, leadId)
+      .all<LeadDocumentRow>();
+    return (results ?? []).map(rowToLeadDocument);
+  }
+
+  async getLeadDocument(id: string): Promise<LeadDocument | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT id, workspace_id, lead_id, name, mime_type, size, created_at
+         FROM lead_documents
+         WHERE id = ? AND workspace_id = ?`,
+      )
+      .bind(id, this.workspaceId)
+      .first<LeadDocumentRow>();
+    return row ? rowToLeadDocument(row) : null;
+  }
+
+  async getLeadDocumentBytes(id: string): Promise<Uint8Array | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT content FROM lead_documents WHERE id = ? AND workspace_id = ?`,
+      )
+      .bind(id, this.workspaceId)
+      .first<{ content: unknown }>();
+    return bytesFromD1(row?.content);
+  }
+
+  async createLeadDocument(
+    doc: LeadDocument,
+    bytes: Uint8Array,
+  ): Promise<LeadDocument> {
+    await this.db
+      .prepare(
+        `INSERT INTO lead_documents
+         (id, workspace_id, lead_id, name, mime_type, size, content, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        doc.id,
+        this.workspaceId,
+        doc.leadId,
+        doc.name,
+        doc.mimeType,
+        doc.size,
+        bytes,
+        doc.createdAt,
+      )
+      .run();
+    return doc;
+  }
+
+  async deleteLeadDocument(id: string): Promise<boolean> {
+    const result = await this.db
+      .prepare(`DELETE FROM lead_documents WHERE id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .run();
+    return (result.meta?.changes ?? 0) > 0;
+  }
+
   async reassignOrphansToBoard(boardId: string): Promise<void> {
     if (!boardId) return;
     const orphanLead = await this.db
@@ -1427,6 +1539,14 @@ export class D1Store implements LeadRepository {
     await this.db
       .prepare(
         `DELETE FROM outreach WHERE workspace_id = ? AND lead_id IN (
+           SELECT id FROM leads WHERE workspace_id = ? AND board_id = ?
+         )`,
+      )
+      .bind(this.workspaceId, this.workspaceId, boardId)
+      .run();
+    await this.db
+      .prepare(
+        `DELETE FROM lead_documents WHERE workspace_id = ? AND lead_id IN (
            SELECT id FROM leads WHERE workspace_id = ? AND board_id = ?
          )`,
       )
@@ -1888,6 +2008,11 @@ export class D1Store implements LeadRepository {
     stmts.push(
       this.db
         .prepare(`DELETE FROM outreach WHERE workspace_id = ?`)
+        .bind(this.workspaceId),
+    );
+    stmts.push(
+      this.db
+        .prepare(`DELETE FROM lead_documents WHERE workspace_id = ?`)
         .bind(this.workspaceId),
     );
     stmts.push(

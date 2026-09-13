@@ -6,6 +6,7 @@ import type {
   BoardMemberRole,
   Contact,
   Lead,
+  LeadDocument,
   Outreach,
   Run,
   Workspace,
@@ -185,6 +186,13 @@ export interface LeadRepository {
   createContact(contact: Contact): Promise<Contact>;
   updateContact(id: string, patch: Partial<Contact>): Promise<Contact | null>;
   deleteContact(id: string): Promise<boolean>;
+
+  // Closed-lead documents (ADR 0038)
+  listLeadDocuments(leadId: string): Promise<LeadDocument[]>;
+  getLeadDocument(id: string): Promise<LeadDocument | null>;
+  getLeadDocumentBytes(id: string): Promise<Uint8Array | null>;
+  createLeadDocument(doc: LeadDocument, bytes: Uint8Array): Promise<LeadDocument>;
+  deleteLeadDocument(id: string): Promise<boolean>;
 
   // Outreach
   upsertOutreach(outreach: Outreach): Promise<Outreach>;
