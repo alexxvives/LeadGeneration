@@ -221,7 +221,7 @@ export function DashboardSkeleton() {
 export function BoardsSkeleton() {
   return (
     <div className="animate-float-up">
-      <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {Array.from({ length: 3 }, (_, i) => (
           <li key={i} className="glass rounded-xl2 p-5">
             <div className="flex items-start justify-between gap-2">
@@ -283,7 +283,7 @@ export function CalendarSkeleton() {
         </div>
         <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: 35 }, (_, i) => (
-            <Bone key={i} className="min-h-[3.25rem] rounded-xl sm:min-h-[4.25rem]" />
+            <Bone key={i} className="min-h-11 rounded-md sm:min-h-[4.25rem] sm:rounded-xl" />
           ))}
         </div>
       </div>
@@ -856,9 +856,6 @@ export function StudioViewSkeleton({
                       ? "Users"
                       : "Search";
 
-  const showUsage =
-    view !== "admin" && view !== "admin-users" && view !== "boards";
-
   const body =
     view === "dashboard" ? (
       <DashboardSkeleton />
@@ -898,12 +895,12 @@ export function StudioViewSkeleton({
 
   return (
     <main
-      className="mx-auto flex h-dvh max-w-[90rem] flex-col overflow-hidden px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-3 sm:pt-8"
+      className="flex h-full min-w-0 w-full flex-col overflow-hidden px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-4 sm:pt-8 lg:px-6 lg:pt-8"
       role="status"
       aria-busy="true"
       aria-label={`Loading ${title}`}
     >
-      <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+      <div className="mb-5 flex shrink-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <Bone className="h-9 w-36 sm:h-10" />
@@ -916,16 +913,6 @@ export function StudioViewSkeleton({
           </div>
           <Bone className="mt-2 h-3 w-64 max-w-full" />
         </div>
-        {showUsage ? (
-          <div className="hidden justify-self-center sm:block">
-            <div className="flex gap-3">
-              <Bone className="h-10 w-28 rounded-lg" />
-              <Bone className="h-10 w-28 rounded-lg" />
-            </div>
-          </div>
-        ) : (
-          <div />
-        )}
         <div className="justify-self-start sm:justify-self-end">
           <Bone className="h-9 w-32 rounded-full" />
         </div>

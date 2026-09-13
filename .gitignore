@@ -47,3 +47,6 @@ next-env.d.ts
 # local dev logs
 *.log
 dev.log
+
+# local QA screenshots
+/dogfood-output/

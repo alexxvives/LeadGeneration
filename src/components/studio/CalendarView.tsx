@@ -126,7 +126,7 @@ function MonthChevron({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-mist-300 transition-colors hover:bg-white/5 hover:text-mist-100 sm:h-9 sm:w-9"
       aria-label={dir === "prev" ? "Previous month" : "Next month"}
       {...bind}
     >
@@ -260,12 +260,12 @@ export function CalendarView({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:flex-row lg:items-stretch lg:overflow-hidden">
-      <section className="glass flex min-h-0 min-w-0 flex-1 flex-col rounded-xl2 p-4 sm:p-5">
-        <div className="relative mb-3 flex shrink-0 flex-col items-center gap-2 sm:flex-row sm:justify-center">
-          <div className="flex items-center gap-2">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto sm:gap-4 lg:flex-row lg:items-stretch lg:overflow-hidden">
+      <section className="glass flex w-full min-w-0 shrink-0 flex-col rounded-xl2 p-3 sm:p-5 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
+        <div className="relative mb-2 flex shrink-0 items-center justify-between gap-2 sm:mb-3 sm:justify-center">
+          <div className="flex min-w-0 items-center gap-1 sm:gap-2">
             <MonthChevron dir="prev" onClick={() => shiftMonth(-1)} />
-            <h2 className="min-w-0 text-center font-display text-lg font-semibold text-mist-100 sm:min-w-[10rem] sm:text-xl">
+            <h2 className="min-w-0 truncate text-center font-display text-base font-semibold text-mist-100 sm:min-w-[10rem] sm:text-xl">
               {monthLabel(cursor.year, cursor.month)}
             </h2>
             <MonthChevron dir="next" onClick={() => shiftMonth(1)} />
@@ -273,19 +273,19 @@ export function CalendarView({
           <button
             type="button"
             onClick={goToday}
-            className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-mist-300 transition-colors hover:border-aurora-400/40 hover:text-mist-100 sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2"
+            className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-mist-300 transition-colors hover:border-aurora-400/40 hover:text-mist-100 sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2"
           >
             Today
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-col lg:min-h-0 lg:flex-1">
           <div
             role="grid"
             aria-label={`Calendar for ${monthLabel(cursor.year, cursor.month)}`}
-            className="grid min-h-0 min-w-0 flex-1 grid-cols-7 gap-0.5 sm:gap-1"
+            className="grid min-w-0 grid-cols-7 gap-px sm:gap-1 lg:min-h-0 lg:flex-1"
             style={{
-              gridTemplateRows: `auto repeat(${weekRows}, minmax(0, 1fr))`,
+              gridTemplateRows: `auto repeat(${weekRows}, minmax(2.75rem, 1fr))`,
             }}
           >
             {WEEKDAYS.map((d) => (
@@ -326,7 +326,7 @@ export function CalendarView({
                     overdue ? ", overdue follow-up" : ""
                   }${missed ? `, ${missed} missed call${missed === 1 ? "" : "s"}` : ""}`}
                   onClick={() => setSelected(cell.iso)}
-                  className={`flex h-full min-h-0 min-w-0 flex-col items-start rounded-lg px-1 py-1 text-left transition-colors sm:rounded-xl sm:px-1.5 sm:py-1.5 ${
+                  className={`flex min-h-11 min-w-0 flex-col items-start overflow-hidden rounded-md px-1 py-1 text-left transition-colors sm:min-h-[4.25rem] sm:rounded-xl sm:px-1.5 sm:py-1.5 lg:h-full lg:min-h-0 ${
                     isSelected
                       ? overdue
                         ? "bg-rose-400/20 ring-1 ring-rose-400/60"
@@ -339,7 +339,7 @@ export function CalendarView({
                   } ${cell.inMonth ? "" : "opacity-40"}`}
                 >
                   <span
-                    className={`text-xs tabular-nums ${
+                    className={`text-[11px] tabular-nums sm:text-xs ${
                       isToday && !overdue
                         ? "font-semibold text-aurora-300"
                         : "text-mist-200"
@@ -348,28 +348,48 @@ export function CalendarView({
                     {cell.day}
                   </span>
                   {KIND_ORDER.some((k) => counts[k] > 0) ? (
-                    <span className="mt-auto flex flex-wrap items-center gap-1 pt-1">
-                      {KIND_ORDER.map((k) => {
-                        const n = counts[k];
-                        if (n === 0) return null;
-                        return (
-                          <span
-                            key={k}
-                            className="inline-flex items-center gap-0.5"
-                          >
-                            <DayKindMark kind={k} />
-                            <span className="text-[10px] font-medium tabular-nums text-mist-400">
-                              {n}
-                            </span>
+                    <>
+                      <span className="mt-auto flex flex-wrap items-center gap-0.5 pt-0.5 sm:hidden">
+                        {KIND_ORDER.map((k) => {
+                          const n = counts[k];
+                          if (n === 0) return null;
+                          return (
+                            <span
+                              key={k}
+                              className={`h-1.5 w-1.5 rounded-full ${KIND_DOT[k]}`}
+                              aria-hidden
+                            />
+                          );
+                        })}
+                        {pending > 0 ? (
+                          <span className="sr-only">
+                            {pending} open follow-up{pending === 1 ? "" : "s"}
                           </span>
-                        );
-                      })}
-                      {pending > 0 ? (
-                        <span className="sr-only">
-                          {pending} open follow-up{pending === 1 ? "" : "s"}
-                        </span>
-                      ) : null}
-                    </span>
+                        ) : null}
+                      </span>
+                      <span className="mt-auto hidden flex-wrap items-center gap-1 pt-1 sm:flex">
+                        {KIND_ORDER.map((k) => {
+                          const n = counts[k];
+                          if (n === 0) return null;
+                          return (
+                            <span
+                              key={k}
+                              className="inline-flex items-center gap-0.5"
+                            >
+                              <DayKindMark kind={k} />
+                              <span className="text-[10px] font-medium tabular-nums text-mist-400">
+                                {n}
+                              </span>
+                            </span>
+                          );
+                        })}
+                        {pending > 0 ? (
+                          <span className="sr-only">
+                            {pending} open follow-up{pending === 1 ? "" : "s"}
+                          </span>
+                        ) : null}
+                      </span>
+                    </>
                   ) : null}
                 </button>
               );
@@ -377,7 +397,7 @@ export function CalendarView({
           </div>
         </div>
 
-        <ul className="mt-3 flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] text-mist-400 sm:relative sm:pr-24">
+        <ul className="mt-2 flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[10px] text-mist-400 sm:relative sm:mt-3 sm:gap-x-4 sm:gap-y-2 sm:pr-24 sm:text-[11px]">
           <LegendItem label="Follow up">
             <CalendarDaysIcon size={14} className="flex text-violet-300" aria-hidden />
           </LegendItem>
@@ -397,7 +417,7 @@ export function CalendarView({
         </ul>
       </section>
 
-      <aside className="glass flex min-h-0 w-full shrink-0 flex-col self-stretch rounded-xl2 p-4 sm:p-5 lg:w-[22rem] lg:overflow-hidden">
+      <aside className="glass flex min-h-0 w-full shrink-0 flex-col self-stretch rounded-xl2 p-3 sm:p-5 lg:w-[22rem] lg:overflow-hidden">
         <p className="text-[11px] uppercase tracking-wider text-mist-500">
           {selected === today ? "Today" : formatNoteDate(selected)}
         </p>

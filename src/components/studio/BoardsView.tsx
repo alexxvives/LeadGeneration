@@ -188,7 +188,7 @@ export function BoardsView({
         <p className="text-xs text-mist-500">Working…</p>
       ) : null}
 
-      <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {invites.map((inv) => (
           <li key={inv.id}>
             <div className="flex h-full flex-col rounded-xl2 border-2 border-dashed border-amber-400/45 bg-amber-400/[0.06] p-5">

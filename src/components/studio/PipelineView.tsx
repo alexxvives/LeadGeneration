@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -243,13 +243,15 @@ export function PipelineView({
     <div className="flex h-full min-h-0 flex-col gap-3">
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
-        {leads.length === 1 ? "" : "s"} · tap for info
+        {leads.length === 1 ? "" : "s"}
         {editLocked
           ? ` · ${holder ?? "Someone else"} is editing — take control to move stages`
-          : <span className="hidden lg:inline"> · drag to move stage</span>}
-        {editLocked ? null : (
-          <span className="lg:hidden"> · use Move to change stage</span>
-        )}
+          : (
+            <>
+              <span className="hidden lg:inline"> · drag to change stage</span>
+              <span className="lg:hidden"> · move to change stage</span>
+            </>
+          )}
       </p>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
@@ -310,7 +312,7 @@ export function PipelineView({
           ) : (
             <VirtualColumnList
               items={narrowLeads}
-              estimateSize={96}
+              estimateSize={72}
               padding={12}
               gap={8}
               renderItem={(l) => (
@@ -558,29 +560,35 @@ function NarrowPipelineCard({
 }) {
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   return (
-    <div className="flex flex-col gap-1.5">
-      <PipelineCardFace lead={lead} onOpen={onOpen} />
-      <label className="px-1">
-        <span className="sr-only">Move {lead.company} to stage</span>
-        <select
-          value={lead.crmStage ?? "new"}
-          disabled={editLocked}
-          title={editLocked ? lockHint : "Move to stage"}
-          onChange={(e) => {
-            const next = e.target.value as CrmStage;
-            if (next === lead.crmStage) return;
-            onMoveStage(lead.id, next);
-          }}
-          className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-xs text-mist-100 outline-none focus:border-aurora-400/50 disabled:opacity-50"
-        >
-          {ALL_STAGE_TABS.map((col) => (
-            <option key={col.stage} value={col.stage}>
-              Move to {col.title}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
+    <PipelineCardFace
+      lead={lead}
+      onOpen={onOpen}
+      hideInfo
+      extra={
+        <label className="shrink-0">
+          <span className="sr-only">Move {lead.company} to stage</span>
+          <select
+            value={lead.crmStage ?? "new"}
+            disabled={editLocked}
+            title={editLocked ? lockHint : "Move to stage"}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              const next = e.target.value as CrmStage;
+              if (next === lead.crmStage) return;
+              onMoveStage(lead.id, next);
+            }}
+            className="h-7 max-w-[6.25rem] rounded-md border border-white/10 bg-ink-900/70 px-1.5 text-[10px] font-medium text-mist-300 outline-none focus:border-aurora-400/50 disabled:opacity-50"
+          >
+            {ALL_STAGE_TABS.map((col) => (
+              <option key={col.stage} value={col.stage}>
+                {col.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      }
+    />
   );
 }
 
@@ -605,10 +613,14 @@ function PipelineCardFace({
   lead,
   onOpen,
   className = "",
+  extra,
+  hideInfo = false,
 }: {
   lead: LeadWithOutreach;
   onOpen: (id: string) => void;
   className?: string;
+  extra?: ReactNode;
+  hideInfo?: boolean;
 }) {
   const { pendingFollowUps, noteCount, replied, methods, missedCall, iconMethods, needsMethod } =
     pipelineCardChrome(lead);
@@ -693,27 +705,34 @@ function PipelineCardFace({
         </div>
       </div>
 
-      <button
-        type="button"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpen(lead.id);
-        }}
-        aria-label={
-          needsMethod
-            ? `Set how you contacted ${lead.company}`
-            : `Lead info for ${lead.company}`
-        }
-        title={needsMethod ? "How contacted? Open to set method" : "Lead info"}
-        className={`shrink-0 rounded-md p-1 transition-colors ${
-          needsMethod
-            ? "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40 hover:bg-amber-400/30"
-            : "text-mist-500 hover:bg-white/10 hover:text-mist-100"
-        }`}
-      >
-        <InfoIcon className="h-3.5 w-3.5" />
-      </button>
+      {extra || !hideInfo ? (
+        <div className="flex shrink-0 items-center gap-1">
+          {extra}
+          {hideInfo ? null : (
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen(lead.id);
+              }}
+              aria-label={
+                needsMethod
+                  ? `Set how you contacted ${lead.company}`
+                  : `Lead info for ${lead.company}`
+              }
+              title={needsMethod ? "How contacted? Open to set method" : "Lead info"}
+              className={`rounded-md p-1 transition-colors ${
+                needsMethod
+                  ? "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40 hover:bg-amber-400/30"
+                  : "text-mist-500 hover:bg-white/10 hover:text-mist-100"
+              }`}
+            >
+              <InfoIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

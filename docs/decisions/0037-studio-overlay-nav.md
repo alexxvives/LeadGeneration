@@ -13,11 +13,12 @@ constitution already requires mobile to remain usable (Art. IV.3).
 ## Decision
 
 **Below `lg` (1024px):** hide the in-flow sidebar. A compact top bar (hamburger,
-current view, board pill, Settings) opens a labeled left overlay listing the
-same nav sections. Pipeline and Outreach show one stage/bucket at a time via
-tabs. The lead drawer is an edge-to-edge sheet below `md`. Leads default to
-cards (table remains available). Contacts show a Back panel instead of
-list+detail stacked.
+current view, board pill) opens a labeled left overlay listing the same nav
+sections plus Settings. Sign out sits on the overlay account card (same as
+`lg+`). Pipeline and Outreach show one stage/bucket at a time via tabs. The
+lead drawer is an edge-to-edge sheet below `md`. Leads default to cards
+(table remains available). Contacts show a Back panel instead of list+detail
+stacked.
 
 **At `lg+`:** keep the expandable sidebar, kanban, and three-column Outreach.
 

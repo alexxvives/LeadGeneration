@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Space_Grotesk, Syne } from "next/font/google";
 import { Providers } from "@/components/Providers";
-import { THEME_STORAGE_KEY } from "@/lib/theme";
+import { DEFAULT_STUDIO_THEME, THEME_STORAGE_KEY } from "@/lib/theme";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -38,8 +38,14 @@ const themeBootScript = `
     var onApp=path==="/app"||path.indexOf("/app/")===0;
     var k=${JSON.stringify(THEME_STORAGE_KEY)};
     var t=localStorage.getItem(k);
-    if(onApp&&(t==="light"||t==="dark")) document.documentElement.setAttribute("data-theme",t);
-    else document.documentElement.setAttribute("data-theme","dark");
+    if(onApp) {
+      document.documentElement.setAttribute(
+        "data-theme",
+        (t==="light"||t==="dark")?t:${JSON.stringify(DEFAULT_STUDIO_THEME)}
+      );
+    } else {
+      document.documentElement.setAttribute("data-theme","dark");
+    }
   } catch(e) {
     document.documentElement.setAttribute("data-theme","dark");
   }

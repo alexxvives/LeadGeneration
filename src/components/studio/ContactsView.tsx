@@ -117,9 +117,9 @@ export function ContactsView({
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex shrink-0 items-center justify-between gap-3">
         <p className="text-sm text-mist-400">
-          {contacts.length === 0
-            ? "People you collaborate with on this board."
-            : `${contacts.length} contact${contacts.length === 1 ? "" : "s"}`}
+          {contacts.length > 0
+            ? `${contacts.length} contact${contacts.length === 1 ? "" : "s"}`
+            : null}
         </p>
         <Lockable>
           <button
@@ -225,10 +225,6 @@ export function ContactsView({
       {contacts.length === 0 && !creating ? (
         <div className="glass rounded-xl2 px-6 py-12 text-center">
           <p className="font-display text-xl font-semibold">No contacts yet</p>
-          <p className="mt-2 text-sm text-mist-400">
-            Add collaborators you work with — notes and follow-ups show on
-            Calendar.
-          </p>
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">

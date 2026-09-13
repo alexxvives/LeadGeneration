@@ -23,10 +23,10 @@ minimal (2–3 cues max per screen).
 
 Palettes live in `globals.css` (`:root` / `[data-theme="light"]`). Edit those
 vars to retune; classes stay the same. Theme toggle = `ThemeToggle` (Settings
-page top-right only) + `data-theme` on `<html>`. Light theme applies only on `/app`;
-marketing pages always stay dark.
+page top-right only) + `data-theme` on `<html>`. Light is the studio default
+(`DEFAULT_STUDIO_THEME`); marketing pages always stay dark.
 
-| Role | Class | Dark (default) |
+| Role | Class | Dark |
 |------|-------|----------------|
 | Page background | `bg-ink-950` | `#050505` |
 | Card/surface bg | `bg-ink-900` → `bg-ink-800` | `#0a0e14` → `#141c28` |
@@ -94,13 +94,19 @@ token becomes the page color in light mode).
 ```
 
 ### Studio chrome (ADR 0037)
-- **`lg+` (1024px):** expandable left sidebar with labels.
-- **Below `lg`:** no in-flow rail. Top bar (hamburger, view name, board pill,
-  Settings) + labeled overlay sheet. Overlay: `role="dialog"`, focus trap,
+- **`lg+` (1024px):** expandable left sidebar with labels. Studio main is
+  full-bleed (`w-full`, no `max-w-[90rem]`). Cap forms (`max-w-5xl`), not
+  kanban/tables.
+- **Below `lg`:** no in-flow rail. Top bar (hamburger, view name, board pill)
+  + labeled overlay sheet. Settings lives in the overlay (Account row +
+  profile card), not the top bar. Sign out is the logout icon on the
+  profile card (same as desktop). Overlay: `role="dialog"`, focus trap,
   Escape / backdrop / link close, focus return. Top-bar targets ≥ 44px.
 - **Kanban / multi-column queues** (Pipeline, Outreach): keep columns at `lg+`.
   Below `lg`, use stage/bucket **tabs** + a single list. Do not put
   `@dnd-kit` `useDraggable` on cards that render outside `DndContext`.
+  Phone Pipeline: compact on-card stage `<select>`, not a full-width
+  “Move to…” row under every card.
 - **Lead drawer:** edge-to-edge `h-dvh` sheet below `md`; centered modal at `md+`.
 - Fill-viewport views live in a `h-dvh` shell; page content is `h-full`, not a
   second `h-dvh`.

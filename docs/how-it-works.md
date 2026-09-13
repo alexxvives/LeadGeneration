@@ -59,8 +59,9 @@ Search  →  Enrich  →  Draft  →  Send
   At **`lg+`** these live in the left sidebar; the board filter sits above the
   account card. **Below `lg`** the sidebar is hidden — a top bar opens a
   labeled overlay (ADR 0037) and the board pill sits in that bar. Settings
-  opens from the account card (or the top-bar gear), not a Workspace nav
-  item. **Platform admins** get a slim ops nav (**Dashboard · Users**) and
+  is a labeled overlay row above the account card (logout icon on that
+  card, same as `lg+`) — not a top-bar gear. **Platform admins** get a slim
+  ops nav (**Dashboard · Users**) and
   an ops-only Settings page (no outreach/send profiles). Views use `?view=`:
 
   - **Dashboard** (`?view=dashboard`) — workspace-wide stats across all boards

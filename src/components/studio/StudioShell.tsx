@@ -713,18 +713,6 @@ export function StudioShell({
             variant="bar"
           />
         ) : null}
-        <Link
-          href="/app/settings"
-          title="Settings"
-          aria-label="Settings"
-          className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
-            settingsActive
-              ? "bg-aurora-400/10 text-aurora-300"
-              : "text-mist-500 hover:bg-white/5 hover:text-aurora-300"
-          }`}
-        >
-          <SettingsIcon size={20} className="flex" aria-hidden />
-        </Link>
       </header>
 
       <aside
@@ -889,6 +877,17 @@ export function StudioShell({
             {renderNavItems("sheet")}
           </nav>
           <div className="mt-3 border-t border-white/5 pt-3">
+            <div className="mb-2">
+              <StudioNavLink
+                href="/app/settings"
+                label="Settings"
+                icon={SettingsIcon}
+                active={settingsActive}
+                wide
+                variant="sheet"
+                onNavigate={closeNav}
+              />
+            </div>
             <Link
               href="/app/settings"
               onClick={closeNav}
@@ -897,6 +896,7 @@ export function StudioShell({
                   ? "border-aurora-400/30 bg-aurora-400/10"
                   : "border-white/8 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.05]"
               }`}
+              title="Open settings"
             >
               <div className="flex items-center gap-2">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-aurora-400/15 text-xs font-semibold text-aurora-300">
@@ -906,33 +906,40 @@ export function StudioShell({
                   <p className="truncate text-base font-medium text-mist-100">
                     {signedIn ? (displayName ?? userEmail ?? "Account") : "Guest"}
                   </p>
-                  <p className="truncate text-sm text-mist-500">Settings</p>
+                  <p className="truncate text-sm text-mist-500">
+                    {signedIn && userEmail && displayName
+                      ? userEmail
+                      : "Settings"}
+                  </p>
                 </div>
+                {signedIn ? (
+                  <MotionIconControl
+                    label="Sign out"
+                    icon={LogoutIcon}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      closeNav();
+                      void signOut({ callbackUrl: "/" });
+                    }}
+                    className="rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      closeNav();
+                      setAuthOpen(true);
+                    }}
+                    className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-aurora-300 transition-colors hover:bg-aurora-400/10"
+                  >
+                    Sign in
+                  </button>
+                )}
               </div>
             </Link>
-            {signedIn ? (
-              <button
-                type="button"
-                onClick={() => {
-                  closeNav();
-                  void signOut({ callbackUrl: "/" });
-                }}
-                className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl text-sm text-mist-400 transition-colors hover:bg-white/5 hover:text-mist-100"
-              >
-                Sign out
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  closeNav();
-                  setAuthOpen(true);
-                }}
-                className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl text-sm font-medium text-aurora-300 transition-colors hover:bg-aurora-400/10"
-              >
-                Sign in
-              </button>
-            )}
           </div>
         </div>
       </StudioNavSheet>

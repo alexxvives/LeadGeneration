@@ -9,7 +9,7 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-13 (Responsive studio UI)
+## ⏱️ Status — updated 2026-09-13 (Wide layout + phone chrome)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0036** applied on prod D1 (`lodestar-prod`).  
@@ -17,15 +17,15 @@ first, and update the top block at the end of any session that changes state.**
 in the same release window as any schema-dependent code.
 
 ### This pass
-- Studio chrome: overlay nav + top bar below `lg`; sidebar unchanged at `lg+`
-  (ADR 0037). Pipeline/Outreach are tabbed lists on narrow; Lead drawer is a
-  full-viewport sheet below `md`. Leads default to cards; Contacts use a Back
-  panel.
+- Studio fills the pane (no 90rem cap). Header usage meters removed.
+- Phone: Settings + sign-out in overlay (not top-bar gear). Pipeline hint
+  is “move to change stage”; compact on-card stage select. Calendar cells
+  no longer overflow on 390px. Studio default theme is light.
 
 ### Next
-1. Hard-refresh on a phone (or 390px) and walk overlay → Pipeline → lead
-   drawer → Send (still per-lead).
-2. Confirm `lg+` sidebar collapse and kanban drag still work.
+1. Hard-refresh on a phone (or 390px): overlay Settings, Pipeline move,
+   Calendar month + day list.
+2. Confirm ultrawide Pipeline columns stretch and kanban drag still works.
 
 ---
 

@@ -28,7 +28,7 @@ import { LeadTable } from "./LeadTable";
 import { LeadMap } from "./LeadMap";
 import { prefetchLeadGeocodes } from "@/lib/geocode-client";
 import { LeadDrawer } from "./LeadDrawer";
-import { UpgradeModal, UsageBar } from "./UpgradeModal";
+import { UpgradeModal } from "./UpgradeModal";
 import { VerifyLimitModal } from "./VerifyLimitModal";
 import { crmStageLabel, Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
@@ -2128,21 +2128,10 @@ export function Studio() {
     }
   };
 
-  const showVerifyMeter = Boolean(
-    board?.capabilities.emailVerify &&
-      board.workspace.emailVerifyEnabled !== false,
-  );
-  const showLeadsMeter = Boolean(
-    board?.workspace &&
-      (board.workspace.planId !== "insider" ||
-        board.workspace.firecrawlCreditsRemaining != null),
-  );
-  const meterCount = (showLeadsMeter ? 1 : 0) + (showVerifyMeter ? 1 : 0);
-
   return (
     <BoardLockUiProvider locked={editLocked} holder={lockHolder}>
-    <main className="mx-auto flex h-full max-w-[90rem] flex-col overflow-hidden px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-3 sm:pt-8 lg:pt-8">
-      <div className="mb-4 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+    <main className="flex h-full min-w-0 w-full flex-col overflow-hidden px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-4 sm:pt-8 lg:px-6 lg:pt-8">
+      <div className="mb-4 flex shrink-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="hidden font-display text-3xl font-semibold tracking-tight lg:block lg:text-4xl">
@@ -2228,51 +2217,6 @@ export function Studio() {
                             : "Find prospects by niche and location."}
           </p>
         </div>
-
-        {view !== "dashboard" &&
-        view !== "boards" &&
-        view !== "admin" &&
-        view !== "admin-users" &&
-        board?.workspace &&
-        meterCount > 0 ? (
-          <div className="flex min-w-0 max-w-md flex-col gap-1 justify-self-stretch sm:justify-self-center">
-            <div
-              className={`grid gap-4 ${
-                meterCount > 1 ? "grid-cols-2" : "grid-cols-1"
-              }`}
-            >
-              {showLeadsMeter && board.workspace.planId === "insider" ? (
-                <UsageBar
-                  label="Leads"
-                  title="Firecrawl credits"
-                  remaining={
-                    board.workspace.firecrawlCreditsRemaining ?? undefined
-                  }
-                />
-              ) : showLeadsMeter ? (
-                <UsageBar
-                  label="Leads"
-                  used={board.workspace.leadsUsed}
-                  limit={board.workspace.leadsLimit}
-                />
-              ) : null}
-              {showVerifyMeter ? (
-                <UsageBar
-                  label="Verifies"
-                  used={board.workspace.verifiesUsed}
-                  limit={board.workspace.verifiesLimit}
-                />
-              ) : null}
-            </div>
-            {!board.workspace.metered && (
-              <p className="text-center text-[10px] text-mist-500">
-                Local preview — quotas enforced on the live app
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="hidden sm:block" aria-hidden />
-        )}
 
         <div className="flex flex-wrap items-center justify-start gap-3 sm:justify-end">
           {view === "dashboard" && boards.length > 0 ? (

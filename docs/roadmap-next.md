@@ -60,7 +60,7 @@ Order of work:
 - [x] D1 + auth + Stripe **wired in code**; live secrets/webhook are deploy ops
   (`AUTH_SECRET`, Stripe keys, `cf:migrate` through 0007, Turnstile optional)
 - [x] Deliverability checklist in Settings (capability ticks + link to full guide)
-- [x] Usage caps UX when metered (Studio header `UsageBar` + existing UpgradeModal)
+- [x] Usage caps UX when metered (Settings `UsageBar` + existing UpgradeModal)
 
 ---
 

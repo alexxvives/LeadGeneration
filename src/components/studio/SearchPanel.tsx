@@ -401,7 +401,7 @@ export function SearchPanel({
   return (
     <form
       onSubmit={submit}
-      className="glass rounded-xl2 p-5 sm:p-6"
+      className="glass w-full max-w-5xl rounded-xl2 p-5 sm:p-6"
       data-tour="search-panel"
     >
       <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">

@@ -4,6 +4,18 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Wide studio + phone chrome
+- Studio main is full-bleed (no `max-w-[90rem]`). Search form stays
+  `max-w-5xl`; kanban/tables/cards use the remaining pane. Lead cards add
+  columns at 1600/1920.
+- Header `UsageBar` removed — quotas stay in Settings. Phone top bar has
+  no Settings gear (overlay Account row + profile card with logout icon).
+- Studio default theme is light (`DEFAULT_STUDIO_THEME`); stored preference
+  still wins. Marketing stays dark.
+- Phone Pipeline: no full-width “Move to…” under each card — compact stage
+  select on the card. Calendar month is content-sized on narrow; day cells
+  use dots instead of icon+count so 7 columns fit.
+
 ### 2026-09-13 — Studio overlay nav + phone layouts
 - Sidebar is `hidden lg:flex`. Below `lg`, `StudioShell` is `h-dvh` column +
   top bar + labeled overlay (`StudioNavSheet` focus trap). Studio/settings

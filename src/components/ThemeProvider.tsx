@@ -10,6 +10,7 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 import {
+  DEFAULT_STUDIO_THEME,
   THEME_STORAGE_KEY,
   isThemeId,
   isStudioPath,
@@ -35,11 +36,11 @@ function applyTheme(theme: ThemeId) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "/";
   const onStudio = isStudioPath(pathname);
-  const [pref, setPref] = useState<ThemeId>("dark");
+  const [pref, setPref] = useState<ThemeId>(DEFAULT_STUDIO_THEME);
 
   useEffect(() => {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    const initial: ThemeId = isThemeId(stored) ? stored : "dark";
+    const initial: ThemeId = isThemeId(stored) ? stored : DEFAULT_STUDIO_THEME;
     setPref(initial);
   }, []);
 

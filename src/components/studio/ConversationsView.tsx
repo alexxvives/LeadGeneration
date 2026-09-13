@@ -59,7 +59,7 @@ export function ConversationsView({
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {rows.map((lead) => {
         const pendingFollowUps =
           lead.followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;

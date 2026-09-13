@@ -69,6 +69,15 @@ export function VirtualColumnList<T extends { id: string }>({
   );
 }
 
+function cardColumnsForWidth(w: number): number {
+  if (w >= 1920) return 6;
+  if (w >= 1600) return 5;
+  if (w >= 1280) return 4;
+  if (w >= 1024) return 3;
+  if (w >= 640) return 2;
+  return 1;
+}
+
 /** Responsive card grid window for the Leads cards layout. */
 export function VirtualCardGrid<T extends { id: string }>({
   items,
@@ -81,15 +90,14 @@ export function VirtualCardGrid<T extends { id: string }>({
   const [cols, setCols] = useState(() => {
     if (typeof window === "undefined") return 3;
     const w = window.innerWidth;
-    return w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1;
+    return cardColumnsForWidth(w);
   });
 
   useEffect(() => {
     const el = parentRef.current;
     if (!el) return;
     const apply = () => {
-      const w = el.clientWidth;
-      setCols(w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1);
+      setCols(cardColumnsForWidth(el.clientWidth));
     };
     apply();
     const ro = new ResizeObserver(apply);
