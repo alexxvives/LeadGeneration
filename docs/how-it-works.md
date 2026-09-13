@@ -91,9 +91,9 @@ Search  →  Enrich  →  Draft  →  Send
     stripped; no Bounced chip).
 
   - **Conversations** (`?view=conversations`) — in-conversation leads only.
-    Cards show name, location, created date, waiting star, demo chip, pending
-    follow-up, and recent comments. Inline toggles for waiting / demo; click
-    opens the lead drawer.
+    Cards show name, location, created date, waiting star, pending follow-up,
+    and recent **notes** (follow-up reminders are omitted from the preview).
+    Inline waiting toggle; click opens the lead drawer.
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
     cards / map) with a shared **Pipeline** stage filter; Notes + Type columns
@@ -168,8 +168,11 @@ Search  →  Enrich  →  Draft  →  Send
     chip off.
     A bounce silently deletes that address (and may return the lead to New) —
     no Bounced chip, toast, or drawer button. The outreach composer
-    (draft → edit → send) is on the draft pane. In Conversation also has
-    **Waiting on us** and **Demo done** toggles.
+    (draft → edit → send) is on the draft pane. In Conversation hides the
+    “how did you reach them” chips and shows compact **Waiting on us** /
+    **Demo done** toggles side by side (titles only). About spans the full
+    drawer width under the profile + notes columns. The header no longer
+    repeats the CRM stage pill.
 
 - **`/app/settings`** — sender profile (language flag persists as
   `templateLang` and only changes the **preview** — template editors stay as

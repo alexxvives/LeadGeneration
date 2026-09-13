@@ -61,7 +61,7 @@ export function Lockable({
   if (!locked) return <>{children}</>;
   return (
     <span
-      className={`inline-flex cursor-not-allowed [&>*]:pointer-events-none ${className ?? ""}`}
+      className={`cursor-not-allowed [&>*]:pointer-events-none ${className ?? "inline-flex"}`}
       title={hint}
     >
       {children}

@@ -22,10 +22,7 @@ function formatCreated(iso: string): string {
 
 function recentComments(followUps: FollowUp[] | undefined): string[] {
   return sortFollowUpsNewestFirst(followUps ?? [])
-    .filter((f) => {
-      const kind = resolveFollowUpKind(f);
-      return (kind === "note" || kind === "follow_up") && f.note.trim();
-    })
+    .filter((f) => resolveFollowUpKind(f) === "note" && f.note.trim())
     .slice(0, 2)
     .map((f) => f.note.trim());
 }
@@ -78,32 +75,21 @@ export function ConversationsView({
               onClick={() => onOpen(lead.id)}
               className="min-w-0 text-left"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="flex items-center gap-1.5 truncate font-display text-base font-semibold leading-tight">
-                    <span className="truncate">{name}</span>
-                    {lead.waitingOnUs ? (
-                      <StarIcon
-                        className="h-3.5 w-3.5 shrink-0 text-amber-300"
-                        aria-label="Waiting on us"
-                      />
-                    ) : null}
-                  </h3>
-                  {lead.contactName && lead.company ? (
-                    <p className="mt-0.5 truncate text-xs text-mist-400">
-                      {lead.company}
-                    </p>
+              <div className="min-w-0">
+                <h3 className="flex items-center gap-1.5 truncate font-display text-base font-semibold leading-tight">
+                  <span className="truncate">{name}</span>
+                  {lead.waitingOnUs ? (
+                    <StarIcon
+                      className="h-3.5 w-3.5 shrink-0 text-amber-300"
+                      aria-label="Waiting on us"
+                    />
                   ) : null}
-                </div>
-                {lead.demoDone ? (
-                  <span className="shrink-0 rounded-full bg-aurora-400/15 px-2 py-0.5 text-[10px] font-medium text-aurora-200">
-                    Demo done
-                  </span>
-                ) : (
-                  <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-mist-500">
-                    No demo
-                  </span>
-                )}
+                </h3>
+                {lead.contactName && lead.company ? (
+                  <p className="mt-0.5 truncate text-xs text-mist-400">
+                    {lead.company}
+                  </p>
+                ) : null}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-mist-400">
                 {lead.location ? (
@@ -158,22 +144,6 @@ export function ConversationsView({
                 >
                   <StarIcon className="h-3 w-3" />
                   Waiting
-                </button>
-              </Lockable>
-              <Lockable>
-                <button
-                  type="button"
-                  disabled={editLocked}
-                  title={editLocked ? lockHint : "Toggle demo done"}
-                  aria-pressed={lead.demoDone}
-                  onClick={() => onUpdate(lead.id, { demoDone: !lead.demoDone })}
-                  className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset disabled:opacity-60 ${
-                    lead.demoDone
-                      ? "bg-aurora-400/15 text-aurora-200 ring-aurora-400/30"
-                      : "text-mist-400 ring-white/10 hover:text-mist-200"
-                  }`}
-                >
-                  Demo
                 </button>
               </Lockable>
             </div>

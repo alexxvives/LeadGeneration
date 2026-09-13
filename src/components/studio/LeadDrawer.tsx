@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
-import { CrmStagePill, Spinner } from "@/components/ui";
+import { Spinner } from "@/components/ui";
 import {
   ArrowIcon,
   BuildingIcon,
@@ -725,11 +725,6 @@ export function LeadDrawer(props: DrawerProps) {
                 Loading full details
               </p>
             ) : null}
-            {mode === "info" && crmStage && crmStage !== "new" ? (
-              <div className="flex items-center gap-2">
-                <CrmStagePill stage={crmStage} />
-              </div>
-            ) : null}
             {mode === "draft" ? (
               <>
                 <h2
@@ -741,13 +736,7 @@ export function LeadDrawer(props: DrawerProps) {
                 <p className="mt-1 truncate text-sm text-mist-500">{lead.company}</p>
               </>
             ) : (
-              <div
-                className={`min-w-0 ${
-                  mode === "info" && crmStage && crmStage !== "new"
-                    ? "mt-3"
-                    : ""
-                }`}
-              >
+              <div className="min-w-0">
                 <input
                   id="lead-drawer-title"
                   ref={companyInputRef}
@@ -864,12 +853,13 @@ export function LeadDrawer(props: DrawerProps) {
         <div
           className={
             mode === "info"
-              ? "grid min-h-0 flex-1 gap-0 overflow-hidden sm:grid-cols-[minmax(0,1fr)_minmax(16rem,1fr)]"
+              ? "flex min-h-0 flex-1 flex-col overflow-hidden"
               : "min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6"
           }
         >
           {mode === "info" ? (
             <>
+          <div className="grid min-h-0 flex-1 overflow-hidden sm:grid-cols-[minmax(0,1fr)_minmax(16rem,1fr)]">
           <div className="min-h-0 space-y-6 overflow-y-auto p-6">
           {/* CRM Stage picker */}
           <section>
@@ -894,8 +884,8 @@ export function LeadDrawer(props: DrawerProps) {
               ))}
             </div>
 
-            {/* How contacted — multi-select; amber when Contacted+ with none set */}
-            {crmStage !== "new" && (
+            {/* How contacted — skip In Conversation (collaborators already reached). */}
+            {crmStage !== "new" && crmStage !== "in_conversation" && (
               <div
                 className={`mt-3 rounded-xl px-3 py-2.5 ${
                   needsMethod
@@ -942,10 +932,9 @@ export function LeadDrawer(props: DrawerProps) {
             )}
 
             {crmStage === "in_conversation" ? (
-              <div className="mt-3 space-y-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+              <div className="mt-3 flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
                 <FlagToggle
                   label="Waiting on us"
-                  hint="Document, tramit, or something they need from you"
                   on={lead.waitingOnUs}
                   disabled={editLocked}
                   lockHint={lockHint}
@@ -955,7 +944,6 @@ export function LeadDrawer(props: DrawerProps) {
                 />
                 <FlagToggle
                   label="Demo done"
-                  hint="A demo has been given"
                   on={lead.demoDone}
                   disabled={editLocked}
                   lockHint={lockHint}
@@ -1069,26 +1057,6 @@ export function LeadDrawer(props: DrawerProps) {
                 }
               }}
             />
-          </section>
-
-          <section>
-            <SectionLabel>About</SectionLabel>
-            {lead.detailLoaded !== true ? (
-              <LeadDrawerPendingSkeleton variant="about" />
-            ) : (
-              <AutoGrowAbout
-                key={`${lead.id}-about-${lead.aboutBlurb ?? ""}`}
-                defaultValue={lead.aboutBlurb ?? ""}
-                disabled={editLocked}
-                lockHint={lockHint}
-                onSave={(raw) => {
-                  const next = raw.trim() || null;
-                  if (next !== (lead.aboutBlurb ?? null)) {
-                    void props.onUpdateCrm(lead.id, { aboutBlurb: next });
-                  }
-                }}
-              />
-            )}
           </section>
           </div>
 
@@ -1438,6 +1406,26 @@ export function LeadDrawer(props: DrawerProps) {
               )}
             </div>
           </aside>
+          </div>
+          <section className="shrink-0 border-t border-white/5 px-6 py-4">
+            <SectionLabel>About</SectionLabel>
+            {lead.detailLoaded !== true ? (
+              <LeadDrawerPendingSkeleton variant="about" />
+            ) : (
+              <AutoGrowAbout
+                key={`${lead.id}-about-${lead.aboutBlurb ?? ""}`}
+                defaultValue={lead.aboutBlurb ?? ""}
+                disabled={editLocked}
+                lockHint={lockHint}
+                onSave={(raw) => {
+                  const next = raw.trim() || null;
+                  if (next !== (lead.aboutBlurb ?? null)) {
+                    void props.onUpdateCrm(lead.id, { aboutBlurb: next });
+                  }
+                }}
+              />
+            )}
+          </section>
             </>
           ) : (
             <>
@@ -1806,8 +1794,8 @@ function AutoGrowAbout({
   }, [defaultValue]);
 
   return (
-    <Lockable className="w-full">
-    <div className="flex items-start gap-2 rounded-lg border border-white/10 bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50">
+    <Lockable className="flex w-full">
+    <div className="flex w-full items-start gap-2 rounded-lg border border-white/10 bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50">
       <textarea
         ref={ref}
         defaultValue={defaultValue}
@@ -1838,37 +1826,32 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function FlagToggle({
   label,
-  hint,
   on,
   disabled,
   lockHint,
   onToggle,
 }: {
   label: string;
-  hint: string;
   on: boolean;
   disabled: boolean;
   lockHint: string;
   onToggle: (next: boolean) => void;
 }) {
   return (
-    <Lockable>
+    <Lockable className="min-w-0 flex-1">
       <button
         type="button"
         disabled={disabled}
-        title={disabled ? lockHint : hint}
+        title={disabled ? lockHint : label}
         aria-pressed={on}
         onClick={() => onToggle(!on)}
-        className="flex w-full items-center justify-between gap-3 text-left disabled:opacity-60"
+        className="flex w-full items-center justify-between gap-2 text-left disabled:opacity-60"
       >
-        <span className="min-w-0">
-          <span className="flex items-center gap-1.5 text-xs font-medium text-mist-200">
-            {on && label === "Waiting on us" ? (
-              <StarIcon className="h-3 w-3 text-amber-300" />
-            ) : null}
-            {label}
-          </span>
-          <span className="mt-0.5 block text-[11px] text-mist-500">{hint}</span>
+        <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-mist-200">
+          {on && label === "Waiting on us" ? (
+            <StarIcon className="h-3 w-3 shrink-0 text-amber-300" />
+          ) : null}
+          <span className="truncate">{label}</span>
         </span>
         <span
           className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${

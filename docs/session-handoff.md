@@ -9,7 +9,7 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-13 (Prod D1 0036 applied)
+## ⏱️ Status — updated 2026-09-13 (Conversation drawer polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0036** applied on prod D1 (`lodestar-prod`).  
@@ -17,13 +17,15 @@ first, and update the top block at the end of any session that changes state.**
 in the same release window as any schema-dependent code.
 
 ### This pass
-- Applied remote migration **0036** (`contacts` table + `leads.waiting_on_us`
-  / `leads.demo_done`). That was the cause of live 500s on `/api/board` and
-  `/api/contacts` after the Conversation CRM deploy.
+- Lead drawer: dropped header CRM pill; About spans full width; In
+  Conversation flags are title-only and side by side; no method chips on
+  that stage.
+- Conversation cards: waiting highlight only (no demo chip/toggle);
+  note preview skips follow-up reminders.
 
 ### Next
-1. Hard-refresh studio — board + Contacts should load again.
-2. Spot-check Conversations flags, Contacts page, Calendar contact events.
+1. Hard-refresh studio and check Conversations + an In Conversation drawer.
+2. Spot-check Contacts (still no method/demo chrome) and Calendar.
 
 ---
 

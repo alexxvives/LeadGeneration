@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Conversation drawer chrome
+- Lead info drawer no longer repeats the CRM stage pill above the name.
+- About sits under the two columns so the blurb can use the full width
+  (`Lockable` is `flex w-full` when locked, not `inline-flex`).
+- In Conversation: no contact-method chips; Waiting / Demo are title-only
+  switches on one row. Conversation cards keep the waiting star (no demo
+  chip) and preview notes only — not follow-up reminders.
+
 ### 2026-09-13 — Prod 500s until D1 0036
 - Live `/api/board` and `/api/contacts` returned opaque 500s after the
   Conversation CRM deploy: D1 still lacked `leads.waiting_on_us` /
