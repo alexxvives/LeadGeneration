@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Conversations card chrome
+- Conversation cards should not dump the full street address — reuse
+  `shortLocation()` (city + country / state). Street stays in the drawer.
+- Waiting / demo are flags, not footer copy. Show them as top-right icons
+  only when on (amber star, aurora monitor). Toggles stay in the drawer.
+- Created date belongs bottom-left, not next to the pin. Long name /
+  company / city use a ping-pong marquee (`MarqueeText`) so the card
+  width does not clip them — respect `prefers-reduced-motion`.
+
 ### 2026-09-13 — Phone chrome follow-up (search / tabs / quota)
 - Phone Leads chrome must be one row. Dual layout (`lg:hidden` vs
   `hidden lg:grid`) avoids hydration flash; search expands in place
@@ -56,8 +65,9 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 - About sits under the two columns so the blurb can use the full width
   (`Lockable` is `flex w-full` when locked, not `inline-flex`).
 - In Conversation: no contact-method chips; Waiting / Demo are title-only
-  switches on one row. Conversation cards keep the waiting star (no demo
-  chip) and preview notes only — not follow-up reminders.
+  switches on one row. Conversation cards show a waiting star and a demo
+  icon when those flags are on, and preview notes only — not follow-up
+  reminders.
 
 ### 2026-09-13 — Prod 500s until D1 0036
 - Live `/api/board` and `/api/contacts` returned opaque 500s after the

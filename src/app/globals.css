@@ -502,6 +502,28 @@ html[data-theme="light"] {
   .pulse-ring {
     animation: pulse-ring 2s infinite;
   }
+  @keyframes marquee-x {
+    0%,
+    18% {
+      transform: translateX(0);
+    }
+    48%,
+    58% {
+      transform: translateX(var(--marquee-shift, 0));
+    }
+    88%,
+    100% {
+      transform: translateX(0);
+    }
+  }
+  .animate-marquee-x {
+    animation: marquee-x var(--marquee-duration, 8s) ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-marquee-x {
+      animation: none;
+    }
+  }
 
   @keyframes aurora-shine {
     0%,

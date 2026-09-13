@@ -9,7 +9,7 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-13 (Phone chrome follow-up)
+## ⏱️ Status — updated 2026-09-13 (Conversations cards)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0036** applied on prod D1 (`lodestar-prod`).  
@@ -17,19 +17,14 @@ first, and update the top block at the end of any session that changes state.**
 in the same release window as any schema-dependent code.
 
 ### This pass
-- Phone Leads: one-row toolbar (search icon, layout+stage menu, Export, Add).
-- Pipeline / Calendar: “Search leads…” is an icon below `lg` (lg+ unchanged).
-- Phone Pipeline tabs wrap so Closed / Not interested are not swipe-clipped.
-- Quota ≥80% (metered) or 402 → existing toast + Settings badge. No header
-  UsageBar. Demo/unmetered stays quiet.
-- Overlay nav is a fade-scroller; Settings stays pinned above the profile card.
-- Earlier today: PWA home-screen icons + Contacts relabeled Collaborators
-  under Engage (`?view=contacts` unchanged).
+- Conversations cards: city + country only (not street); created date
+  bottom-left; no “Waiting” footer label.
+- Waiting on us → amber star top-right; demo done → monitor icon.
+- Overflowing name / company / city ping-pong (Spotify-style marquee).
 
 ### Next
-1. Hard-refresh on a phone: Leads compact toolbar, Pipeline tabs + search icon,
-   overlay Settings still pinned (Admin accounts).
-2. Confirm desktop Leads toolbar and Pipeline drag are unchanged.
+1. Hard-refresh Conversations: confirm icons, short location, marquee.
+2. Toggle waiting / demo from the lead drawer and check the card icons.
 
 ---
 

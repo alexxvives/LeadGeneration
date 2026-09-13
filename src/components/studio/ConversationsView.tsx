@@ -6,9 +6,10 @@ import {
   resolveFollowUpKind,
   sortFollowUpsNewestFirst,
 } from "@/lib/follow-ups";
-import { CalendarIcon, PinIcon, StarIcon } from "@/components/icons";
-import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
+import { shortLocation } from "@/lib/format-location";
+import { CalendarIcon, DemoIcon, PinIcon, StarIcon } from "@/components/icons";
 import { EmptyState } from "@/components/studio/StudioHelpers";
+import { MarqueeText } from "@/components/studio/MarqueeText";
 
 function formatCreated(iso: string): string {
   const d = new Date(iso);
@@ -31,17 +32,11 @@ export function ConversationsView({
   leads,
   emptyHref,
   onOpen,
-  onUpdate,
 }: {
   leads: LeadWithOutreach[];
   emptyHref: string;
   onOpen: (id: string) => void;
-  onUpdate: (
-    id: string,
-    patch: { waitingOnUs?: boolean; demoDone?: boolean },
-  ) => void;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const rows = [...leads]
     .filter((l) => (l.crmStage ?? "new") === "in_conversation")
     .sort((a, b) => {
@@ -65,41 +60,66 @@ export function ConversationsView({
           lead.followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
         const comments = recentComments(lead.followUps);
         const name = lead.contactName?.trim() || lead.company || "Untitled";
+        const cityCountry = shortLocation(lead.location);
         return (
           <article
             key={lead.id}
             className="glass card-hover flex flex-col rounded-xl2 p-5"
           >
+            <div className="flex items-start gap-2">
+              <button
+                type="button"
+                onClick={() => onOpen(lead.id)}
+                className="min-w-0 flex-1 text-left"
+              >
+                <h3 className="font-display text-base font-semibold leading-tight">
+                  <MarqueeText>{name}</MarqueeText>
+                </h3>
+                {lead.contactName && lead.company ? (
+                  <p className="mt-0.5 text-xs text-mist-400">
+                    <MarqueeText>{lead.company}</MarqueeText>
+                  </p>
+                ) : null}
+              </button>
+              {(lead.waitingOnUs || lead.demoDone) ? (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {lead.waitingOnUs ? (
+                    <span
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/20 text-amber-300 shadow-[0_0_12px_rgba(247,185,85,0.35)] ring-1 ring-amber-400/45"
+                      title="Waiting on us"
+                      aria-label="Waiting on us"
+                    >
+                      <StarIcon className="h-4 w-4" />
+                    </span>
+                  ) : null}
+                  {lead.demoDone ? (
+                    <span
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-aurora-400/20 text-aurora-300 ring-1 ring-aurora-400/40"
+                      title="Demo done"
+                      aria-label="Demo done"
+                    >
+                      <DemoIcon className="h-4 w-4" />
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
               onClick={() => onOpen(lead.id)}
-              className="min-w-0 text-left"
+              className="mt-3 min-w-0 flex-1 text-left"
             >
-              <div className="min-w-0">
-                <h3 className="flex items-center gap-1.5 truncate font-display text-base font-semibold leading-tight">
-                  <span className="truncate">{name}</span>
-                  {lead.waitingOnUs ? (
-                    <StarIcon
-                      className="h-3.5 w-3.5 shrink-0 text-amber-300"
-                      aria-label="Waiting on us"
-                    />
-                  ) : null}
-                </h3>
-                {lead.contactName && lead.company ? (
-                  <p className="mt-0.5 truncate text-xs text-mist-400">
-                    {lead.company}
-                  </p>
-                ) : null}
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-mist-400">
-                {lead.location ? (
-                  <span className="inline-flex min-w-0 items-center gap-1">
-                    <PinIcon className="h-3 w-3 shrink-0" />
-                    <span className="truncate">{lead.location}</span>
-                  </span>
-                ) : null}
-                <span>Created {formatCreated(lead.createdAt)}</span>
-              </div>
+              {cityCountry ? (
+                <span className="flex min-w-0 items-center gap-1 text-xs text-mist-400">
+                  <PinIcon className="h-3 w-3 shrink-0" />
+                  <MarqueeText
+                    className="min-w-0 flex-1"
+                    title={lead.location ?? cityCountry}
+                  >
+                    {cityCountry}
+                  </MarqueeText>
+                </span>
+              ) : null}
               {pendingFollowUps > 0 ? (
                 <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
                   <CalendarIcon className="h-2.5 w-2.5" />
@@ -123,30 +143,12 @@ export function ConversationsView({
                 <p className="mt-3 text-xs text-mist-600">No comments yet.</p>
               )}
             </button>
-            <div
-              className="mt-4 flex flex-wrap gap-2 border-t border-white/5 pt-3"
-              onClick={(e) => e.stopPropagation()}
+            <time
+              className="mt-auto pt-4 text-[11px] text-mist-500"
+              dateTime={lead.createdAt}
             >
-              <Lockable>
-                <button
-                  type="button"
-                  disabled={editLocked}
-                  title={editLocked ? lockHint : "Toggle waiting on us"}
-                  aria-pressed={lead.waitingOnUs}
-                  onClick={() =>
-                    onUpdate(lead.id, { waitingOnUs: !lead.waitingOnUs })
-                  }
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset disabled:opacity-60 ${
-                    lead.waitingOnUs
-                      ? "bg-amber-400/15 text-amber-200 ring-amber-400/30"
-                      : "text-mist-400 ring-white/10 hover:text-mist-200"
-                  }`}
-                >
-                  <StarIcon className="h-3 w-3" />
-                  Waiting
-                </button>
-              </Lockable>
-            </div>
+              {formatCreated(lead.createdAt)}
+            </time>
           </article>
         );
       })}

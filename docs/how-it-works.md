@@ -96,9 +96,12 @@ Search  →  Enrich  →  Draft  →  Send
     stripped; no Bounced chip).
 
   - **Conversations** (`?view=conversations`) — in-conversation leads only.
-    Cards show name, location, created date, waiting star, pending follow-up,
+    Cards show name, city + country (not the street), pending follow-up,
     and recent **notes** (follow-up reminders are omitted from the preview).
-    Inline waiting toggle; click opens the lead drawer.
+    A star on the top right means **Waiting on us**; a monitor icon means
+    **Demo done**. Created date sits bottom-left. Overflowing name / company /
+    city ping-pong like a now-playing title. Click opens the lead drawer
+    (waiting / demo toggles live there).
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
     cards / map) with a shared **Pipeline** stage filter; Notes + Type columns

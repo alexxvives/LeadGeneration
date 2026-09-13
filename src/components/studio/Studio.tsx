@@ -2775,9 +2775,6 @@ export function Studio() {
               leads={searchFilteredLeads}
               emptyHref={`/app${queryForView("pipeline", filterBoardId)}`}
               onOpen={openInfo}
-              onUpdate={(id, patch) => {
-                void onUpdateLeadCrm(id, patch);
-              }}
             />
           )}
         </div>
