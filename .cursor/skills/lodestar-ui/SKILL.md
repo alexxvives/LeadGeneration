@@ -106,22 +106,20 @@ token becomes the page color in light mode).
   bottom tabs). Quota pressure (≥80% leads/verifies, or a 402) is a
   Settings badge + toast — not a header UsageBar. Demo/unmetered stays quiet.
   View subtitles stay `lg+` only. Board lock is `BoardLiveChip`: compact
-  pill beside the desktop title, full-width **Live · name · Take** bar
-  below `lg`. Do not unhide the desktop title stack on phone just to show
-  Live. Add collaborator / Create board sit on the title row (desktop) or
+  pill beside the desktop title; below `lg` a pulsating dot next to the
+  phone top-bar title (tap for who + Take). Search lives in the phone top
+  bar; the board picker lives in the overlay sheet (not the top bar).
+  Add collaborator / Create board sit on the title row (desktop) or
   a `self-start` phone action — not a second toolbar that justify-betweens
   against an empty count.
-- **Phone Leads toolbar:** one row — count, search icon (expands in place),
-  layout+stage menu, Export, Add. Do not stack Export / search / Add /
-  Table-Cards-Map / stage as five full-width rows. Desktop toolbar stays
-  split. Pipeline/Calendar: hide the always-visible “Search leads…” field
-  behind the same search icon below `lg`.
+- **Phone Leads toolbar:** one row — count, layout+stage menu, Export, Add.
+  Search is the top-bar icon. Do not stack Export / Add / Table-Cards-Map /
+  stage as full-width rows. Desktop toolbar stays split.
 - **Kanban / multi-column queues** (Pipeline, Outreach): keep columns at `lg+`.
   Below `lg`, use stage/bucket **tabs** + a single list. Phone Pipeline
-  tabs wrap (or a stage picker) so Closed / Not interested are not clipped
-  behind a swipe. Do not put `@dnd-kit` `useDraggable` on cards that
-  render outside `DndContext`. Phone Pipeline: compact on-card stage
-  `<select>`, not a full-width “Move to…” row under every card.
+  tabs stay on one row and scroll (`flex-nowrap overflow-x-auto`) so Closed
+  / Not interested stay reachable. Do not put `@dnd-kit` `useDraggable` on
+  cards that render outside `DndContext`. No on-card stage `<select>`.
 - **Lead drawer:** edge-to-edge `h-dvh` sheet below `md`; centered modal at `md+`.
 - Fill-viewport views live in a `h-dvh` shell; page content is `h-full`, not a
   second `h-dvh`.

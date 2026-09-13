@@ -25,7 +25,6 @@ import {
 } from "@/components/studio/GettingStartedWizard";
 import {
   BoardPicker,
-  MobileBoardButton,
   loadStoredBoardFilter,
   storeBoardFilter,
 } from "@/components/studio/BoardPicker";
@@ -718,17 +717,16 @@ export function StudioShell({
             </span>
           )}
         </button>
-        <p className="min-w-0 flex-1 truncate font-display text-lg font-semibold text-mist-100">
-          {viewTitle}
-        </p>
-        {showBoardChrome ? (
-          <MobileBoardButton
-            boards={boards}
-            activeBoardId={activeBoardId}
-            onChange={setBoardFilter}
-            variant="bar"
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
+          <p className="mr-auto flex min-w-0 items-center gap-0.5 font-display text-lg font-semibold text-mist-100">
+            <span className="truncate">{viewTitle}</span>
+            <span id="studio-phone-live" className="inline-flex shrink-0" />
+          </p>
+          <div
+            id="studio-phone-search"
+            className="flex min-w-0 flex-1 items-center justify-end"
           />
-        ) : null}
+        </div>
       </header>
 
       <aside
@@ -907,6 +905,18 @@ export function StudioShell({
             {renderNavItems("sheet")}
           </nav>
           <div className="mt-2 shrink-0 border-t border-white/5 pt-2">
+            {showBoardChrome ? (
+              <div className="mb-2">
+                <BoardPicker
+                  boards={boards}
+                  activeBoardId={activeBoardId}
+                  onChange={(id) => {
+                    setBoardFilter(id);
+                    closeNav();
+                  }}
+                />
+              </div>
+            ) : null}
             <div className="mb-2">
               <StudioNavLink
                 href="/app/settings"

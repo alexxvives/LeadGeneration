@@ -3,7 +3,10 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
+  useState,
   type ReactNode,
 } from "react";
 
@@ -69,7 +72,7 @@ export function Lockable({
   );
 }
 
-/** Compact “someone else is editing” chip — banner on phone, pill on desktop. */
+/** Compact “someone else is editing” chip — pill on desktop, pulse-dot on phone. */
 export function BoardLiveChip({
   holder,
   takingOver,
@@ -79,7 +82,7 @@ export function BoardLiveChip({
   holder: string | null;
   takingOver: boolean;
   onTakeControl: () => void;
-  variant?: "pill" | "bar";
+  variant?: "pill" | "dot";
 }) {
   const who = holder?.trim() || "Someone else";
   const take = (
@@ -95,21 +98,12 @@ export function BoardLiveChip({
   );
   const pulse = (
     <span
-      className="pulse-ring h-1.5 w-1.5 shrink-0 rounded-full bg-aurora-400"
+      className="pulse-ring h-2 w-2 shrink-0 rounded-full bg-aurora-400"
       aria-hidden
     />
   );
-  if (variant === "bar") {
-    return (
-      <div className="flex w-full min-w-0 items-center gap-2 rounded-xl border border-aurora-400/20 bg-aurora-400/10 px-3 py-2">
-        {pulse}
-        <p className="min-w-0 flex-1 truncate text-xs text-mist-200">
-          <span className="font-medium text-aurora-200">Live</span>
-          <span className="text-mist-400"> · {who}</span>
-        </p>
-        {take}
-      </div>
-    );
+  if (variant === "dot") {
+    return <LiveDot who={who} takingOver={takingOver} onTakeControl={onTakeControl} />;
   }
   return (
     <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-aurora-400/20 bg-aurora-400/10 py-1 pl-2.5 pr-1 text-xs text-mist-200">
@@ -118,5 +112,73 @@ export function BoardLiveChip({
       <span className="max-w-[7rem] truncate text-mist-400">{who}</span>
       {take}
     </span>
+  );
+}
+
+function LiveDot({
+  who,
+  takingOver,
+  onTakeControl,
+}: {
+  who: string;
+  takingOver: boolean;
+  onTakeControl: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-label={`${who} is editing this board`}
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex h-11 w-8 items-center justify-center"
+      >
+        <span className="pulse-ring h-2.5 w-2.5 rounded-full bg-aurora-400" />
+      </button>
+      {open ? (
+        <div
+          role="dialog"
+          className="absolute left-1/2 top-[calc(100%+0.35rem)] z-50 w-52 -translate-x-1/2 rounded-xl border border-white/10 bg-ink-900 p-3 shadow-xl"
+        >
+          <p className="text-xs text-mist-300">
+            <span className="font-medium text-aurora-200">{who}</span> is
+            editing this board.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              onTakeControl();
+              setOpen(false);
+            }}
+            disabled={takingOver}
+            className="mt-2 w-full rounded-full bg-aurora-400 px-3 py-1.5 text-xs font-medium text-on-accent disabled:opacity-50"
+          >
+            {takingOver ? "Taking…" : "Take control"}
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }

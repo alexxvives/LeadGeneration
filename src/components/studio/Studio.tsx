@@ -84,6 +84,7 @@ import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { TypeFilterMenu } from "./TypeFilterMenu";
 import { CollapsibleLeadSearch } from "./CollapsibleLeadSearch";
+import { PhoneTopBarSlot } from "./PhoneTopBarSlot";
 import { LeadsFilterMenu } from "./LeadsFilterMenu";
 import { quotaPressure, useQuotaHint } from "./quota-hint";
 import { useMinBreakpoint } from "./use-min-breakpoint";
@@ -236,7 +237,6 @@ export function Studio() {
   );
   const [pipelineFilter, setPipelineFilter] = useState<CrmStage | "all">("all");
   const [leadSearch, setLeadSearch] = useState("");
-  const [leadSearchExpanded, setLeadSearchExpanded] = useState(false);
   /** Outreach-only company-type filter (chrome next to search). */
   const [outreachTypeFilter, setOutreachTypeFilter] = useState("all");
   /** Skip the first persist pass so we don’t overwrite sessionStorage with defaults. */
@@ -2082,10 +2082,7 @@ export function Studio() {
       view === "outreach" ||
       view === "conversations" ||
       view === "calendar");
-  const phoneHeader =
-    view === "boards" ||
-    view === "contacts" ||
-    (editLocked && !!filterBoardId);
+  const phoneHeader = view === "boards" || view === "contacts";
 
   // Skeleton for hydrate / first body / first visit to a layout tab only.
   const layoutPaneReady = visitedLayouts.has(shownLayoutTab);
@@ -2307,16 +2304,27 @@ export function Studio() {
                             : "Find prospects by niche and location."}
           </p>
         </div>
+        {editLocked && filterBoardId ? (
+          <PhoneTopBarSlot id="studio-phone-live">
+            <BoardLiveChip
+              variant="dot"
+              holder={lockHolder}
+              takingOver={takingOver}
+              onTakeControl={() => void onTakeControl()}
+            />
+          </PhoneTopBarSlot>
+        ) : null}
+        {showLeadSearch ? (
+          <PhoneTopBarSlot id="studio-phone-search">
+            <CollapsibleLeadSearch
+              value={leadSearch}
+              onChange={setLeadSearch}
+              mode="icon"
+            />
+          </PhoneTopBarSlot>
+        ) : null}
         {phoneHeader ? (
           <div className="flex min-w-0 flex-col gap-2 lg:hidden">
-            {editLocked && filterBoardId ? (
-              <BoardLiveChip
-                variant="bar"
-                holder={lockHolder}
-                takingOver={takingOver}
-                onTakeControl={() => void onTakeControl()}
-              />
-            ) : null}
             {view === "boards" ? (
               <button
                 type="button"
@@ -2372,7 +2380,7 @@ export function Studio() {
             </label>
           ) : null}
           {showLeadSearch && view !== "leads" ? (
-            <div className="flex min-h-11 min-w-0 items-center justify-end gap-2 sm:min-h-9">
+            <div className="hidden min-h-9 items-center justify-end gap-2 lg:flex">
               {view === "outreach" ? (
                 <TypeFilterMenu
                   value={outreachTypeFilter}
@@ -2383,6 +2391,7 @@ export function Studio() {
               <CollapsibleLeadSearch
                 value={leadSearch}
                 onChange={setLeadSearch}
+                mode="field"
               />
             </div>
           ) : null}
@@ -2392,6 +2401,15 @@ export function Studio() {
                 value={leadSearch}
                 onChange={setLeadSearch}
                 mode="field"
+              />
+            </div>
+          ) : null}
+          {view === "outreach" ? (
+            <div className="flex min-h-11 items-center justify-end lg:hidden">
+              <TypeFilterMenu
+                value={outreachTypeFilter}
+                options={outreachCompanyTypes}
+                onChange={setOutreachTypeFilter}
               />
             </div>
           ) : null}
@@ -2535,39 +2553,29 @@ export function Studio() {
           aria-hidden={view !== "leads"}
         >
           <div className="flex shrink-0 items-center gap-1.5 lg:hidden">
-            {!leadSearchExpanded ? (
-              <p className="min-w-0 flex-1 truncate text-xs uppercase tracking-widest text-mist-500">
-                <span className="font-semibold text-mist-200">
-                  {loading ||
-                  leadsHydrating ||
-                  !board ||
-                  leadsFilterPending ||
-                  (hasLeads && !leadsBodyReady)
-                    ? "…"
-                    : filteredLeads.length}
-                </span>
-                {board &&
-                hasLeads &&
-                (pipelineFilter !== "all" || leadSearch.trim()) ? (
-                  <>
-                    {" "}
-                    of{" "}
-                    <span className="font-semibold text-mist-200">
-                      {board.leadsTotal ?? board.leads.length}
-                    </span>
-                  </>
-                ) : null}{" "}
-                leads
-              </p>
-            ) : null}
-            {hasLeads ? (
-              <CollapsibleLeadSearch
-                value={leadSearch}
-                onChange={setLeadSearch}
-                mode="icon"
-                onExpandedChange={setLeadSearchExpanded}
-              />
-            ) : null}
+            <p className="min-w-0 flex-1 truncate text-xs uppercase tracking-widest text-mist-500">
+              <span className="font-semibold text-mist-200">
+                {loading ||
+                leadsHydrating ||
+                !board ||
+                leadsFilterPending ||
+                (hasLeads && !leadsBodyReady)
+                  ? "…"
+                  : filteredLeads.length}
+              </span>
+              {board &&
+              hasLeads &&
+              (pipelineFilter !== "all" || leadSearch.trim()) ? (
+                <>
+                  {" "}
+                  of{" "}
+                  <span className="font-semibold text-mist-200">
+                    {board.leadsTotal ?? board.leads.length}
+                  </span>
+                </>
+              ) : null}{" "}
+              leads
+            </p>
             <LeadsFilterMenu
               layout={shownLayoutTab}
               onLayout={selectLayout}

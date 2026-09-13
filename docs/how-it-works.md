@@ -86,7 +86,7 @@ Search  →  Enrich  →  Draft  →  Send
     (**All** = every board) across four active stages (*New · Contacted · In
     Conversation · Closed*) plus *Not Interested*. At `lg+` this is a kanban
     (drag cards between columns). Below `lg` it is one stage at a time
-    (tabs + Move select).
+    (a single scrolling row of tabs — no on-card stage select).
     Bulk draft lives on **Outreach** (Send stays per-lead).
     CRM **New** = needs human review (there is no separate “In review” tag).
     A **Missed call** stays in New but still shows the phone method icon
@@ -99,11 +99,12 @@ Search  →  Enrich  →  Draft  →  Send
     Cards show name, city + country (not the street), pending follow-up,
     and recent **notes** (follow-up reminders are omitted from the preview).
     An hourglass on the title row means **Waiting on us**; a monitor icon
-    means **Demo done**. Created date sits bottom-left. Overflowing name /
-    company / city ping-pong like a now-playing title. Click opens the lead
-    drawer (waiting / demo toggles live there). Phone cards stay within the
-    pane (`min-w-0` + hidden X overflow) so they do not force a sideways
-    scroll.
+    means **Demo done**. Created date sits bottom-left; a follow-up tag
+    sits bottom-right. Overflowing name / company / city ping-pong like a
+    now-playing title. Location on the card is city + country only
+    (`shortLocation` drops street, floor, and venue names). Click opens
+    the lead drawer (waiting / demo toggles live there). Phone cards stay
+    within the pane so they do not force a sideways scroll.
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
     cards / map) with a shared **Pipeline** stage filter; Notes + Type columns
@@ -141,8 +142,10 @@ Search  →  Enrich  →  Draft  →  Send
     Tick the checkbox on Calendar to mark a follow-up done (strikethrough
     is follow-ups only — calls and emails stay unstruck). If another collaborator
     holds the board, the tick stays on screen but is disabled; hover explains they
-    must **Take control**. A compact **Live · name · Take** chip (full-width
-    bar below `lg`) sits in the studio header instead of a wrapping pill.
+    must **Take control**. Desktop shows a compact **Live · name · Take**
+    pill beside the title. Below `lg` a pulsating dot sits next to the
+    phone top-bar title (tap to see who and take control). Search is the
+    top-bar icon; the board picker lives in the overlay menu.
     Calendar also notes that the other user is active.
     The lead drawer
     shows a purple **Follow up** tag, no checkbox. Plain notes stay on the

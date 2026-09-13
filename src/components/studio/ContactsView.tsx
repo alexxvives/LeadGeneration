@@ -216,7 +216,11 @@ export function ContactsView({
           <p className="font-display text-xl font-semibold">No collaborators yet</p>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+        <div
+          className={`grid min-h-0 flex-1 gap-4 ${
+            selected ? "lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]" : ""
+          }`}
+        >
           <div
             className={`grid content-start gap-3 sm:grid-cols-2 ${
               selected ? "hidden lg:grid" : ""
@@ -293,11 +297,7 @@ export function ContactsView({
                 onDelete={onDelete}
               />
             </div>
-          ) : (
-            <div className="hidden rounded-xl2 border border-dashed border-white/10 p-6 text-sm text-mist-500 lg:block">
-              Select a collaborator to add notes and follow-ups.
-            </div>
-          )}
+          ) : null}
         </div>
       )}
     </div>

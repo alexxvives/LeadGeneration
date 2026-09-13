@@ -114,16 +114,6 @@ export function ConversationsView({
                   </MarqueeText>
                 </span>
               ) : null}
-              {pendingFollowUps > 0 ? (
-                <p className={`inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300 ${
-                  cityCountry ? "mt-1.5" : "mt-1"
-                }`}>
-                  <CalendarIcon className="h-2.5 w-2.5" />
-                  {pendingFollowUps === 1
-                    ? "Follow-up needed"
-                    : `${pendingFollowUps} follow-ups`}
-                </p>
-              ) : null}
               {comments.length > 0 ? (
                 <ul className="mt-2 space-y-1.5">
                   {comments.map((c) => (
@@ -139,12 +129,22 @@ export function ConversationsView({
                 <p className="mt-2 text-xs text-mist-600">No comments yet.</p>
               )}
             </button>
-            <time
-              className="mt-auto pt-3 text-[11px] text-mist-500"
-              dateTime={lead.createdAt}
-            >
-              {formatCreated(lead.createdAt)}
-            </time>
+            <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+              <time
+                className="text-[11px] text-mist-500"
+                dateTime={lead.createdAt}
+              >
+                {formatCreated(lead.createdAt)}
+              </time>
+              {pendingFollowUps > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                  <CalendarIcon className="h-2.5 w-2.5" />
+                  {pendingFollowUps === 1
+                    ? "Follow-up needed"
+                    : `${pendingFollowUps} follow-ups`}
+                </span>
+              ) : null}
+            </div>
           </article>
         );
       })}

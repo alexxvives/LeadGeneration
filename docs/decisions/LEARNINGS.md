@@ -4,6 +4,20 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Phone top bar + city-only location
+- Conversation location cannot be “last two comma parts”. Venue names
+  (`Centro Médico Teknon`) and floors (`1er pis Figueres`) leak through.
+  `shortLocation` now drops street / floor / venue and keeps city +
+  country. Trim before stripping postcodes (` 08013 Barcelona`).
+- Phone top bar is hamburger + title + optional live dot + search. Board
+  picker belongs in the overlay sheet (same `BoardPicker` as the desktop
+  rail). Search is portaled into `#studio-phone-search`.
+- Live on phone is a pulse-dot next to the title, not a full-width bar.
+  Tap opens who + Take.
+- Phone Pipeline tabs stay one row (`flex-nowrap overflow-x-auto`). The
+  on-card stage `<select>` fights the tabs — remove it; stage change is
+  the tab list + the drawer.
+
 ### 2026-09-13 — Conversation / calendar chrome follow-up
 - Waiting-on-us reads as a sparkle if we reuse `StarIcon`. Use a dedicated
   hourglass (`WaitingIcon`) on cards, pipeline, and the drawer toggle.

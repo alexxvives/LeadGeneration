@@ -257,14 +257,13 @@ export function PipelineView({
           : (
             <>
               <span className="hidden lg:inline"> · drag to change stage</span>
-              <span className="lg:hidden"> · move to change stage</span>
             </>
           )}
       </p>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
         <div
-          className="flex shrink-0 flex-wrap gap-1"
+          className="flex shrink-0 flex-nowrap gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
           aria-label="Pipeline stage"
           data-testid="pipeline-stage-tabs"
@@ -325,10 +324,10 @@ export function PipelineView({
               padding={12}
               gap={8}
               renderItem={(l) => (
-                <NarrowPipelineCard
+                <PipelineCardFace
                   lead={l}
                   onOpen={onOpen}
-                  onMoveStage={onMoveStage}
+                  hideInfo
                 />
               )}
             />
@@ -551,53 +550,6 @@ function MethodIcons({ methods }: { methods: ContactMethod[] }) {
       {methods.includes("whatsapp") && <WhatsAppIcon className="h-2.5 w-2.5" />}
       {methods.includes("organic") && <GlobeIcon className="h-2.5 w-2.5" />}
     </>
-  );
-}
-
-function NarrowPipelineCard({
-  lead,
-  onOpen,
-  onMoveStage,
-}: {
-  lead: LeadWithOutreach;
-  onOpen: (id: string) => void;
-  onMoveStage: (
-    leadId: string,
-    stage: CrmStage,
-    contactMethods?: ContactMethod[] | null,
-  ) => void;
-}) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
-  return (
-    <PipelineCardFace
-      lead={lead}
-      onOpen={onOpen}
-      hideInfo
-      extra={
-        <label className="shrink-0">
-          <span className="sr-only">Move {lead.company} to stage</span>
-          <select
-            value={lead.crmStage ?? "new"}
-            disabled={editLocked}
-            title={editLocked ? lockHint : "Move to stage"}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => {
-              const next = e.target.value as CrmStage;
-              if (next === lead.crmStage) return;
-              onMoveStage(lead.id, next);
-            }}
-            className="h-7 max-w-[6.25rem] rounded-md border border-white/10 bg-ink-900/70 px-1.5 text-[10px] font-medium text-mist-300 outline-none focus:border-aurora-400/50 disabled:opacity-50"
-          >
-            {ALL_STAGE_TABS.map((col) => (
-              <option key={col.stage} value={col.stage}>
-                {col.title}
-              </option>
-            ))}
-          </select>
-        </label>
-      }
-    />
   );
 }
 
