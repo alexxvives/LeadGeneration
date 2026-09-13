@@ -9,24 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-13 (Conversation CRM upgrades)
+## ⏱️ Status — updated 2026-09-13 (Prod D1 0036 applied)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0036** (0036 = waiting/demo flags + `contacts` table).  
-**Deploy:** push to master for CI / Workers deploy; run `npm run cf:migrate` so
-prod D1 gets 0036.
+**Migrations:** 0021–**0036** applied on prod D1 (`lodestar-prod`).  
+**Deploy:** push to master for CI / Workers deploy; run `npm run cf:migrate`
+in the same release window as any schema-dependent code.
 
 ### This pass
-- Contact channels: WhatsApp + Organic / web.
-- In-conversation: waiting-on-us star + demo-done toggles.
-- `?view=conversations` card grid; notes newest-first.
-- Board-scoped Contacts page; follow-ups on Calendar (ADR 0036).
-- Bounce chip / toast / drawer button removed (silent email strip stays).
+- Applied remote migration **0036** (`contacts` table + `leads.waiting_on_us`
+  / `leads.demo_done`). That was the cause of live 500s on `/api/board` and
+  `/api/contacts` after the Conversation CRM deploy.
 
 ### Next
-1. Apply D1 migration **0036** on prod (`npm run cf:migrate`).
-2. Hard-refresh studio: Conversations, Contacts, Calendar contact events,
-   WhatsApp/organic chips, no Bounced chip.
+1. Hard-refresh studio — board + Contacts should load again.
+2. Spot-check Conversations flags, Contacts page, Calendar contact events.
 
 ---
 

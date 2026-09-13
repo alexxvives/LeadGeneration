@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Prod 500s until D1 0036
+- Live `/api/board` and `/api/contacts` returned opaque 500s after the
+  Conversation CRM deploy: D1 still lacked `leads.waiting_on_us` /
+  `leads.demo_done` and the `contacts` table. `npm run cf:migrate` applied
+  0036 and the queries succeed. Same class of miss as ADR 0014 (ship schema
+  code and migrate in the same window).
+
 ### 2026-09-13 — Conversations flags, contacts, newest notes, silent bounce
 - `ContactMethod` now includes `whatsapp` and `organic` (Organic / web).
 - In-conversation leads: `waitingOnUs` (amber star on Pipeline / Conversations
