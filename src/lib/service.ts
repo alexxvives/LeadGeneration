@@ -60,6 +60,7 @@ import type {
   AdminUserRow,
   DashboardStats,
   DeliveryStatus,
+  Contact,
   FollowUp,
   Lead,
   LeadWithOutreach,
@@ -828,6 +829,8 @@ export async function createAndRunSearch(
       notes: null,
       followUps: [],
       customFields: {},
+      waitingOnUs: false,
+      demoDone: false,
       createdAt: nowIso(),
     }));
     await db.createLeads(leads);
@@ -2423,6 +2426,8 @@ export async function updateLeadCrm(
     aboutBlurb?: string | null;
     followUps?: FollowUp[];
     customFields?: Record<string, string>;
+    waitingOnUs?: boolean;
+    demoDone?: boolean;
   },
 ): Promise<Lead | null> {
   let lead = await ctx.db.getLead(leadId);
@@ -2640,6 +2645,8 @@ export async function createManualLead(
     notes: null,
     followUps: [],
     customFields: {},
+    waitingOnUs: false,
+    demoDone: false,
     createdAt: nowIso(),
   };
 
@@ -3008,6 +3015,8 @@ export async function importLeads(
         notes: null,
         followUps: [],
         customFields: {},
+        waitingOnUs: false,
+        demoDone: false,
         createdAt: nowIso(),
       };
     });
@@ -3303,6 +3312,126 @@ export async function deleteWorkspaceAccount(
 /** Self-serve: delete the signed-in user’s workspace + auth identity. */
 export async function deleteOwnAccount(ctx: Ctx): Promise<void> {
   await deleteWorkspaceAccount(ctx, ctx.workspaceId);
+}
+
+async function findContactAccess(
+  ctx: Ctx,
+  contactId: string,
+): Promise<{ contact: Contact; db: LeadRepository } | null> {
+  const owned = await ctx.db.getContact(contactId);
+  if (owned) return { contact: owned, db: ctx.db };
+  if (!ctx.userId) return null;
+  const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
+  for (const bid of sharedIds) {
+    const access = await resolveBoardAccess(ctx, bid);
+    if (!access) continue;
+    const found = await access.db.getContact(contactId);
+    if (found) return { contact: found, db: access.db };
+  }
+  return null;
+}
+
+/** Board-scoped collaborators (ADR 0036). `boardId` null/"all" → every accessible board. */
+export async function listContacts(
+  ctx: Ctx,
+  boardId?: string | null,
+): Promise<Contact[]> {
+  if (boardId && boardId !== "all") {
+    const access = await resolveBoardAccess(ctx, boardId);
+    if (!access) return [];
+    return access.db.listContacts(boardId);
+  }
+  const owned = await ctx.db.listContacts();
+  if (!ctx.userId) return owned;
+  const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
+  const extra: Contact[] = [];
+  for (const bid of sharedIds) {
+    const access = await resolveBoardAccess(ctx, bid);
+    if (!access || access.board.workspaceId === ctx.workspaceId) continue;
+    extra.push(...(await access.db.listContacts(bid)));
+  }
+  return [...owned, ...extra].sort((a, b) => {
+    const byCreated = b.createdAt.localeCompare(a.createdAt);
+    if (byCreated !== 0) return byCreated;
+    return b.id.localeCompare(a.id);
+  });
+}
+
+export async function createContact(
+  ctx: Ctx,
+  input: {
+    boardId: string;
+    name: string;
+    organization?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    location?: string | null;
+  },
+): Promise<Contact> {
+  const access = await resolveBoardAccess(ctx, input.boardId);
+  if (!access) throw new NotFoundError("Board not found");
+  await assertBoardEditable(ctx, access.board.id);
+  const name = input.name.trim();
+  if (!name) throw new Error("Name is required");
+  const contact: Contact = {
+    id: newId("contact"),
+    workspaceId: access.board.workspaceId,
+    boardId: access.board.id,
+    name,
+    organization: input.organization?.trim() || null,
+    email: input.email?.trim() || null,
+    phone: input.phone?.trim() || null,
+    location: input.location?.trim() || null,
+    followUps: [],
+    createdAt: nowIso(),
+  };
+  return access.db.createContact(contact);
+}
+
+export async function updateContact(
+  ctx: Ctx,
+  contactId: string,
+  patch: {
+    name?: string;
+    organization?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    location?: string | null;
+    followUps?: FollowUp[];
+  },
+): Promise<Contact | null> {
+  const found = await findContactAccess(ctx, contactId);
+  if (!found) return null;
+  await assertBoardEditable(ctx, found.contact.boardId);
+  const next: Partial<Contact> = { ...patch };
+  if (next.name !== undefined) {
+    const name = next.name.trim();
+    if (!name) throw new Error("Name is required");
+    next.name = name;
+  }
+  if (next.organization !== undefined) {
+    next.organization = next.organization?.trim() || null;
+  }
+  if (next.email !== undefined) {
+    next.email = next.email?.trim() || null;
+  }
+  if (next.phone !== undefined) {
+    next.phone = next.phone?.trim() || null;
+  }
+  if (next.location !== undefined) {
+    next.location = next.location?.trim() || null;
+  }
+  return found.db.updateContact(contactId, next);
+}
+
+export async function deleteContact(
+  ctx: Ctx,
+  contactId: string,
+): Promise<boolean> {
+  const found = await findContactAccess(ctx, contactId);
+  if (!found) return false;
+  await assertBoardEditable(ctx, found.contact.boardId);
+  return found.db.deleteContact(contactId);
 }
 
 /** Admin: toggle Find leads (Search) for any workspace. */

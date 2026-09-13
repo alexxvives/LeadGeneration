@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import type { FollowUpKind, LeadWithOutreach } from "@/lib/types";
+import type { Contact, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import {
+  calendarEventsFromContacts,
   calendarEventsFromLeads,
   followUpKindLabel,
   formatNoteDate,
@@ -151,12 +152,14 @@ function LegendItem({
 
 export function CalendarView({
   leads,
-  onOpenLead,
+  contacts = [],
+  onOpenEvent,
   onToggleFollowUp,
 }: {
   leads: LeadWithOutreach[];
-  onOpenLead: (leadId: string) => void;
-  onToggleFollowUp?: (leadId: string, followUpId: string, done: boolean) => void;
+  contacts?: Contact[];
+  onOpenEvent: (ev: CalendarEvent) => void;
+  onToggleFollowUp?: (ev: CalendarEvent, done: boolean) => void;
 }) {
   const { locked: editLocked, holder } = useBoardLockUi();
   const today = todayIsoDate();
@@ -167,7 +170,13 @@ export function CalendarView({
   });
   const [selected, setSelected] = useState(today);
 
-  const events = useMemo(() => calendarEventsFromLeads(leads), [leads]);
+  const events = useMemo(
+    () => [
+      ...calendarEventsFromLeads(leads),
+      ...calendarEventsFromContacts(contacts),
+    ],
+    [leads, contacts],
+  );
   const byDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const ev of events) {
@@ -406,8 +415,8 @@ export function CalendarView({
         <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto">
           {dayEvents.length === 0 ? (
             <p className="text-sm leading-relaxed text-mist-400">
-              Add a dated follow-up in a lead’s notes, send an email, or log a
-              phone call — they show up here.
+              Add a dated follow-up in a lead or contact’s notes, send an email,
+              or log a phone call — they show up here.
             </p>
           ) : (
             <>
@@ -415,20 +424,20 @@ export function CalendarView({
                 title="Follow-ups"
                 kind="follow_up"
                 events={followUps}
-                onOpenLead={onOpenLead}
+                onOpenEvent={onOpenEvent}
                 onToggleFollowUp={onToggleFollowUp}
               />
               <DayGroup
                 title="Emails sent"
                 kind="email"
                 events={emails}
-                onOpenLead={onOpenLead}
+                onOpenEvent={onOpenEvent}
               />
               <DayGroup
                 title="Phone calls"
                 kind="phone"
                 events={calls}
-                onOpenLead={onOpenLead}
+                onOpenEvent={onOpenEvent}
               />
             </>
           )}
@@ -483,14 +492,14 @@ function DayGroup({
   title,
   kind,
   events,
-  onOpenLead,
+  onOpenEvent,
   onToggleFollowUp,
 }: {
   title: string;
   kind: FollowUpKind;
   events: CalendarEvent[];
-  onOpenLead: (leadId: string) => void;
-  onToggleFollowUp?: (leadId: string, followUpId: string, done: boolean) => void;
+  onOpenEvent: (ev: CalendarEvent) => void;
+  onToggleFollowUp?: (ev: CalendarEvent, done: boolean) => void;
 }) {
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   if (events.length === 0) return null;
@@ -504,7 +513,7 @@ function DayGroup({
           const overdue =
             ev.kind === "follow_up" && isOverdueFollowUp(ev.date, ev.done);
           return (
-          <li key={ev.id}>
+          <li key={`${ev.source}-${ev.contactId ?? ev.leadId}-${ev.id}`}>
             <div
               className={`flex items-start gap-2 rounded-xl border p-2.5 ${
                 overdue
@@ -517,7 +526,7 @@ function DayGroup({
                   <button
                     type="button"
                     disabled={editLocked}
-                    onClick={() => onToggleFollowUp(ev.leadId, ev.id, !ev.done)}
+                    onClick={() => onToggleFollowUp(ev, !ev.done)}
                     aria-pressed={ev.done}
                     aria-label={
                       editLocked
@@ -558,7 +567,7 @@ function DayGroup({
               )}
               <button
                 type="button"
-                onClick={() => onOpenLead(ev.leadId)}
+                onClick={() => onOpenEvent(ev)}
                 className="min-w-0 flex-1 text-left"
               >
                 <p className="flex min-w-0 items-baseline gap-1.5">

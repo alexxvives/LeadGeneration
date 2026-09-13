@@ -9,11 +9,13 @@ import {
   EyeIcon,
   FormIcon,
   InfoIcon,
+  GlobeIcon,
   InstagramIcon,
   MailIcon,
   PencilIcon,
   PhoneIcon,
   PlusIcon,
+  WhatsAppIcon,
   SendIcon,
 } from "@/components/icons";
 import { useStableDuringLoad } from "./skeletons";
@@ -51,7 +53,9 @@ function isContacted(lead: LeadWithOutreach): boolean {
   const nonEmailReach =
     methods.includes("phone") ||
     methods.includes("contact_form") ||
-    methods.includes("instagram");
+    methods.includes("instagram") ||
+    methods.includes("whatsapp") ||
+    methods.includes("organic");
   const emailed =
     lead.outreach?.status === "sent" || methods.includes("email");
 
@@ -763,6 +767,8 @@ function OutreachRow({
                     ["phone", "Called"],
                     ["contact_form", "Form"],
                     ["instagram", "Instagram"],
+                    ["whatsapp", "WhatsApp"],
+                    ["organic", "Organic / web"],
                   ] as const
                 ).map(([method, label]) => (
                   <button
@@ -829,6 +835,24 @@ function OutreachRow({
                   aria-label="Instagram"
                 >
                   <InstagramIcon className="h-3 w-3" />
+                </span>
+              ) : null}
+              {methods.includes("whatsapp") ? (
+                <span
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink-800/80 text-mist-300 ring-1 ring-ink-600/40"
+                  title="WhatsApp"
+                  aria-label="WhatsApp"
+                >
+                  <WhatsAppIcon className="h-3 w-3" />
+                </span>
+              ) : null}
+              {methods.includes("organic") ? (
+                <span
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink-800/80 text-mist-300 ring-1 ring-ink-600/40"
+                  title="Organic / web"
+                  aria-label="Organic / web"
+                >
+                  <GlobeIcon className="h-3 w-3" />
                 </span>
               ) : null}
             </div>

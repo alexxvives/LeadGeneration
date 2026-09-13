@@ -236,6 +236,21 @@ export function InstagramIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function WhatsAppIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path
+        d="M4.8 19.2 6 15.6A7.5 7.5 0 1 1 19.2 12a7.5 7.5 0 0 1-7.6 7.5H4.8Z"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.2 9.8c.3-.6.5-.6.8-.6h.4c.2 0 .4.1.5.4l.6 1.4c.1.3 0 .5-.2.7l-.4.4c-.1.1-.1.3 0 .5.4.7 1.1 1.4 1.8 1.8.2.1.4.1.5 0l.4-.4c.2-.2.4-.3.7-.2l1.4.6c.3.1.4.3.4.5v.4c0 .3 0 .5-.6.8-.4.2-1 .3-1.6.1-1.4-.4-2.8-1.4-3.9-2.6-1-1.1-1.8-2.4-2-3.8-.1-.6 0-1.2.2-1.6Z"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function EyeIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>

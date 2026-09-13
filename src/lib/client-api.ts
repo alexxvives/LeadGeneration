@@ -7,6 +7,7 @@ import type {
   BoardLock,
   BoardMember,
   BoardSummary,
+  Contact,
   ContactMethod,
   CrmStage,
   AdminPlatformStats,
@@ -413,6 +414,8 @@ export const api = {
       aboutBlurb?: string | null;
       followUps?: FollowUp[];
       customFields?: Record<string, string>;
+      waitingOnUs?: boolean;
+      demoDone?: boolean;
     },
   ) => jsonFetch<{ lead: Lead }>(`/api/leads/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 
@@ -502,6 +505,43 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ headers }),
     }),
+
+  listContacts: (boardId?: string | null) => {
+    const q = boardId ? `?boardId=${encodeURIComponent(boardId)}` : "";
+    return jsonFetch<{ contacts: Contact[] }>(`/api/contacts${q}`);
+  },
+
+  createContact: (input: {
+    boardId: string;
+    name: string;
+    organization?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    location?: string | null;
+  }) =>
+    jsonFetch<{ contact: Contact }>("/api/contacts", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateContact: (
+    id: string,
+    patch: {
+      name?: string;
+      organization?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      location?: string | null;
+      followUps?: FollowUp[];
+    },
+  ) =>
+    jsonFetch<{ contact: Contact }>(`/api/contacts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+
+  deleteContact: (id: string) =>
+    jsonFetch<{ ok: boolean }>(`/api/contacts/${id}`, { method: "DELETE" }),
 };
 
 export type FirecrawlUsage = {

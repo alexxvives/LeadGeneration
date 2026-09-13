@@ -11,6 +11,7 @@ import type {
   PlanId,
   FollowUp,
   DeliveryStatus,
+  Contact,
 } from "@/lib/types";
 import { normalizeCrmStage, normalizeEasyEmailProvider } from "@/lib/types";
 import {
@@ -169,6 +170,21 @@ type LeadRow = {
   notes?: string | null;
   follow_ups: string | null; // JSON-encoded FollowUp[]
   custom_fields: string | null; // JSON-encoded Record<string, string>
+  waiting_on_us: number | boolean | string | null;
+  demo_done: number | boolean | string | null;
+  created_at: string;
+};
+
+type ContactRow = {
+  id: string;
+  workspace_id: string;
+  board_id: string;
+  name: string;
+  organization: string | null;
+  email: string | null;
+  phone: string | null;
+  location: string | null;
+  follow_ups: string | null;
   created_at: string;
 };
 
@@ -176,7 +192,8 @@ type LeadRow = {
 const CARD_LEAD_SELECT = `l.id, l.workspace_id, l.run_id, l.board_id, l.company, l.website,
          l.emails, l.phones, l.contact_name, l.location, l.company_type,
          l.status, l.crm_stage, l.contact_method, l.contacted_by_user_id,
-         l.contacted_by_name, l.created_at, l.custom_fields, l.follow_ups`;
+         l.contacted_by_name, l.created_at, l.custom_fields, l.follow_ups,
+         l.waiting_on_us, l.demo_done`;
 
 type OutreachRow = {
   id: string;
@@ -358,6 +375,23 @@ function rowToLead(r: LeadRow): Lead {
     notes: r.notes ?? null,
     followUps: parseFollowUps(r.follow_ups),
     customFields: parseCustomFields(r.custom_fields),
+    waitingOnUs: isSqliteOn(r.waiting_on_us),
+    demoDone: isSqliteOn(r.demo_done),
+    createdAt: r.created_at,
+  };
+}
+
+function rowToContact(r: ContactRow): Contact {
+  return {
+    id: r.id,
+    workspaceId: r.workspace_id ?? LOCAL_WORKSPACE_ID,
+    boardId: r.board_id,
+    name: r.name,
+    organization: r.organization ?? null,
+    email: r.email ?? null,
+    phone: r.phone ?? null,
+    location: r.location ?? null,
+    followUps: parseFollowUps(r.follow_ups),
     createdAt: r.created_at,
   };
 }
@@ -383,6 +417,11 @@ function rowToOutreach(r: OutreachRow): Outreach {
 /** INTEGER/boolean/string off flags from D1 (0, false, "0"). */
 function isSqliteOff(v: unknown): boolean {
   return v === 0 || v === false || v === "0";
+}
+
+/** INTEGER/boolean/string on flags from D1 (1, true, "1"). */
+function isSqliteOn(v: unknown): boolean {
+  return v === 1 || v === true || v === "1";
 }
 
 /**
@@ -705,6 +744,7 @@ export class D1Store implements LeadRepository {
         this.db.prepare(`DELETE FROM board_members WHERE board_id = ?`).bind(id),
         this.db.prepare(`DELETE FROM board_invites WHERE board_id = ?`).bind(id),
         this.db.prepare(`DELETE FROM board_locks WHERE board_id = ?`).bind(id),
+        this.db.prepare(`DELETE FROM contacts WHERE board_id = ?`).bind(id),
       ]);
     }
     return result.meta.changes > 0;
@@ -1120,8 +1160,8 @@ export class D1Store implements LeadRepository {
            (id, workspace_id, run_id, board_id, company, website, emails, phones, contact_name,
             location, about_blurb, company_type, tags, fit_score, fit_reasons, source_url,
             status, crm_stage, contact_method, contacted_by_user_id, contacted_by_name,
-            notes, follow_ups, custom_fields, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            notes, follow_ups, custom_fields, waiting_on_us, demo_done, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           l.id,
@@ -1148,6 +1188,8 @@ export class D1Store implements LeadRepository {
           l.notes ?? null,
           JSON.stringify(l.followUps ?? []),
           JSON.stringify(l.customFields ?? {}),
+          l.waitingOnUs ? 1 : 0,
+          l.demoDone ? 1 : 0,
           l.createdAt,
         ),
     );
@@ -1185,6 +1227,8 @@ export class D1Store implements LeadRepository {
     if ("notes" in patch) row.notes = patch.notes ?? null;
     if ("followUps" in patch) row.follow_ups = JSON.stringify(patch.followUps ?? []);
     if ("customFields" in patch) row.custom_fields = JSON.stringify(patch.customFields ?? {});
+    if ("waitingOnUs" in patch) row.waiting_on_us = patch.waitingOnUs ? 1 : 0;
+    if ("demoDone" in patch) row.demo_done = patch.demoDone ? 1 : 0;
     if ("createdAt" in patch) row.created_at = patch.createdAt;
     return row;
   }
@@ -1266,6 +1310,79 @@ export class D1Store implements LeadRepository {
     return deleted;
   }
 
+  async listContacts(boardId?: string): Promise<Contact[]> {
+    const sql = boardId
+      ? `SELECT * FROM contacts WHERE workspace_id = ? AND board_id = ? ORDER BY created_at DESC`
+      : `SELECT * FROM contacts WHERE workspace_id = ? ORDER BY created_at DESC`;
+    const stmt = boardId
+      ? this.db.prepare(sql).bind(this.workspaceId, boardId)
+      : this.db.prepare(sql).bind(this.workspaceId);
+    const { results } = await stmt.all<ContactRow>();
+    return (results ?? []).map(rowToContact);
+  }
+
+  async getContact(id: string): Promise<Contact | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM contacts WHERE id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .first<ContactRow>();
+    return row ? rowToContact(row) : null;
+  }
+
+  async createContact(contact: Contact): Promise<Contact> {
+    await this.db
+      .prepare(
+        `INSERT INTO contacts
+         (id, workspace_id, board_id, name, organization, email, phone, location, follow_ups, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        contact.id,
+        this.workspaceId,
+        contact.boardId,
+        contact.name,
+        contact.organization ?? null,
+        contact.email ?? null,
+        contact.phone ?? null,
+        contact.location ?? null,
+        JSON.stringify(contact.followUps ?? []),
+        contact.createdAt,
+      )
+      .run();
+    return contact;
+  }
+
+  async updateContact(
+    id: string,
+    patch: Partial<Contact>,
+  ): Promise<Contact | null> {
+    const row: Record<string, unknown> = {};
+    if ("boardId" in patch) row.board_id = patch.boardId;
+    if ("name" in patch) row.name = patch.name;
+    if ("organization" in patch) row.organization = patch.organization ?? null;
+    if ("email" in patch) row.email = patch.email ?? null;
+    if ("phone" in patch) row.phone = patch.phone ?? null;
+    if ("location" in patch) row.location = patch.location ?? null;
+    if ("followUps" in patch) {
+      row.follow_ups = JSON.stringify(patch.followUps ?? []);
+    }
+    if (Object.keys(row).length === 0) return this.getContact(id);
+    const { clause, values } = buildSet(row);
+    await this.db
+      .prepare(`UPDATE contacts SET ${clause} WHERE id = ? AND workspace_id = ?`)
+      .bind(...values, id, this.workspaceId)
+      .run();
+    return this.getContact(id);
+  }
+
+  async deleteContact(id: string): Promise<boolean> {
+    const result = await this.db
+      .prepare(`DELETE FROM contacts WHERE id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .run();
+    return (result.meta?.changes ?? 0) > 0;
+  }
+
   async reassignOrphansToBoard(boardId: string): Promise<void> {
     if (!boardId) return;
     const orphanLead = await this.db
@@ -1317,6 +1434,10 @@ export class D1Store implements LeadRepository {
       .run();
     const result = await this.db
       .prepare(`DELETE FROM leads WHERE workspace_id = ? AND board_id = ?`)
+      .bind(this.workspaceId, boardId)
+      .run();
+    await this.db
+      .prepare(`DELETE FROM contacts WHERE workspace_id = ? AND board_id = ?`)
       .bind(this.workspaceId, boardId)
       .run();
     return result.meta?.changes ?? 0;
@@ -1772,6 +1893,11 @@ export class D1Store implements LeadRepository {
     stmts.push(
       this.db
         .prepare(`DELETE FROM leads WHERE workspace_id = ?`)
+        .bind(this.workspaceId),
+    );
+    stmts.push(
+      this.db
+        .prepare(`DELETE FROM contacts WHERE workspace_id = ?`)
         .bind(this.workspaceId),
     );
     stmts.push(

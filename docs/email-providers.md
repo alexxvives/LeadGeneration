@@ -141,7 +141,7 @@ Lodestar already helps on (5). Product work should bias toward (1)–(4).
   email was the only contact method, strip the bounced address from the lead
   (and from `outreach.toEmail` — idempotent, including already-bounced rows).
   Migration **0032** backfills leftover addresses from before strip-on-bounce.
-  Pipeline toast on soft refresh. No bounce follow-up journal line. Resend inbound `email.received` →
+  No bounce chip, toast, or drawer button — address strip is enough. No bounce follow-up journal line. Resend inbound `email.received` →
   `replied` (+ CRM In Conversation). Missing signing secret / unexpected
   handler errors return **200 ignored** (not 5xx) so Resend does not
   auto-disable the endpoint. Saving Easy settings auto-registers **one**

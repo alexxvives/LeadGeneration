@@ -1,4 +1,4 @@
-import type { FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
+import type { Contact, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 
 /** Local calendar day (YYYY-MM-DD), not UTC — follow-ups are “today” in the user’s timezone. */
 export function todayIsoDate(d = new Date()): string {
@@ -138,22 +138,40 @@ export function resolveFollowUpKind(fu: FollowUp): FollowUpKind {
   return "note";
 }
 
+const NOTE_PREVIEW_MAX = 140;
+
 /**
- * Card-list journal: keep id/date/done/kind (Pipeline chips + Calendar dots)
- * and drop note bodies until the drawer GET. Missed-call prefix stays so
- * `leadHasMissedCall` still works without the extra comment text.
+ * Card-list journal: keep id/date/done/kind (Pipeline chips + Calendar dots).
+ * Missed-call prefix stays so `leadHasMissedCall` still works. Note / follow-up
+ * kinds keep a short preview so Conversations cards can show recent comments.
  */
 export function slimFollowUpsForList(followUps: FollowUp[]): FollowUp[] {
   return followUps.map((f) => {
     const kind = resolveFollowUpKind(f);
     const missed = isMissedCallNote(f.note);
+    const keepPreview = kind === "note" || kind === "follow_up";
+    const trimmed = f.note.trim();
+    const note = missed
+      ? trimmed.replace(/:[\s\S]*$/, "")
+      : keepPreview
+        ? trimmed.slice(0, NOTE_PREVIEW_MAX)
+        : "";
     return {
       id: f.id,
       date: f.date,
       done: f.done,
       kind,
-      note: missed ? f.note.trim().replace(/:[\s\S]*$/, "") : "",
+      note,
     };
+  });
+}
+
+/** Newest date first, then newest id — display only; storage order is unchanged. */
+export function sortFollowUpsNewestFirst(followUps: FollowUp[]): FollowUp[] {
+  return [...followUps].sort((a, b) => {
+    const byDate = b.date.localeCompare(a.date);
+    if (byDate !== 0) return byDate;
+    return b.id.localeCompare(a.id);
   });
 }
 
@@ -180,7 +198,9 @@ export function isOverdueFollowUp(
 
 export interface CalendarEvent {
   id: string;
+  source: "lead" | "contact";
   leadId: string;
+  contactId?: string;
   company: string;
   date: string;
   note: string;
@@ -198,8 +218,31 @@ export function calendarEventsFromLeads(
       if (kind === "note") continue;
       out.push({
         id: fu.id,
+        source: "lead",
         leadId: lead.id,
         company: lead.company,
+        date: fu.date,
+        note: fu.note,
+        done: fu.done,
+        kind,
+      });
+    }
+  }
+  return out;
+}
+
+export function calendarEventsFromContacts(contacts: Contact[]): CalendarEvent[] {
+  const out: CalendarEvent[] = [];
+  for (const contact of contacts) {
+    for (const fu of contact.followUps ?? []) {
+      const kind = resolveFollowUpKind(fu);
+      if (kind === "note") continue;
+      out.push({
+        id: fu.id,
+        source: "contact",
+        leadId: "",
+        contactId: contact.id,
+        company: contact.name,
         date: fu.date,
         note: fu.note,
         done: fu.done,

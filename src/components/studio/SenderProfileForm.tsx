@@ -78,6 +78,8 @@ const PREVIEW_LEAD: Lead = {
   notes: null,
   followUps: [],
   customFields: {},
+  waitingOnUs: false,
+  demoDone: false,
   createdAt: new Date(0).toISOString(),
 };
 

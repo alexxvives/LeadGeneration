@@ -13,6 +13,7 @@ import {
   PhoneIcon,
   PinIcon,
   SparkIcon,
+  StarIcon,
   TrashIcon,
   XIcon,
 } from "@/components/icons";
@@ -33,6 +34,7 @@ import {
   normalizeMissedCallNote,
   phoneCallNotePrefix,
   resolveFollowUpKind,
+  sortFollowUpsNewestFirst,
   todayIsoDate,
 } from "@/lib/follow-ups";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
@@ -93,6 +95,8 @@ interface DrawerProps {
       location?: string | null;
       aboutBlurb?: string | null;
       followUps?: FollowUp[];
+      waitingOnUs?: boolean;
+      demoDone?: boolean;
     },
   ) => Promise<void>;
   /** Parent-owned note-delete undo (survives drawer remounts). */
@@ -125,6 +129,8 @@ const CONTACT_METHODS: { method: ContactMethod; label: string }[] = [
   { method: "phone",        label: "Phone" },
   { method: "contact_form", label: "Contact form" },
   { method: "instagram",    label: "Instagram" },
+  { method: "whatsapp",     label: "WhatsApp" },
+  { method: "organic",      label: "Organic / web" },
 ];
 
 // ─── Main drawer ──────────────────────────────────────────────────────────────
@@ -934,6 +940,31 @@ export function LeadDrawer(props: DrawerProps) {
                 </div>
               </div>
             )}
+
+            {crmStage === "in_conversation" ? (
+              <div className="mt-3 space-y-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                <FlagToggle
+                  label="Waiting on us"
+                  hint="Document, tramit, or something they need from you"
+                  on={lead.waitingOnUs}
+                  disabled={editLocked}
+                  lockHint={lockHint}
+                  onToggle={(next) =>
+                    void props.onUpdateCrm(lead.id, { waitingOnUs: next })
+                  }
+                />
+                <FlagToggle
+                  label="Demo done"
+                  hint="A demo has been given"
+                  on={lead.demoDone}
+                  disabled={editLocked}
+                  lockHint={lockHint}
+                  onToggle={(next) =>
+                    void props.onUpdateCrm(lead.id, { demoDone: next })
+                  }
+                />
+              </div>
+            ) : null}
           </section>
 
           {/* Contact info — all fields editable */}
@@ -1287,12 +1318,7 @@ export function LeadDrawer(props: DrawerProps) {
                 )
               ) : (
                 <ul className="space-y-2">
-                  {[...followUps]
-                    .sort((a, b) => {
-                      const byDate = a.date.localeCompare(b.date);
-                      if (byDate !== 0) return byDate;
-                      return a.id.localeCompare(b.id);
-                    })
+                  {sortFollowUpsNewestFirst(followUps)
                     .map((fu) => {
                       const kind = resolveFollowUpKind(fu);
                       const isFollow = kind === "follow_up";
@@ -1584,7 +1610,7 @@ export function LeadDrawer(props: DrawerProps) {
                         {(
                           [
                             { id: "sent", label: "Delivered" },
-                            { id: "bounced", label: "Bounced" },
+                            { id: "replied", label: "Replied" },
                           ] as const
                         ).map((opt) => {
                           const active = (outreach.deliveryStatus ?? "unknown") === opt.id;
@@ -1601,8 +1627,8 @@ export function LeadDrawer(props: DrawerProps) {
                                 }
                                 className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition-colors disabled:opacity-50 ${
                                   active
-                                    ? opt.id === "bounced"
-                                      ? "bg-rose-500/15 text-rose-300 ring-rose-400/30"
+                                    ? opt.id === "replied"
+                                      ? "bg-sky-500/15 text-sky-300 ring-sky-400/30"
                                       : "bg-aurora-400/15 text-aurora-300 ring-aurora-400/30"
                                     : "text-mist-400 ring-white/10 hover:bg-white/5 hover:text-mist-100"
                                 }`}
@@ -1807,6 +1833,56 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-mist-500">
       {children}
     </h4>
+  );
+}
+
+function FlagToggle({
+  label,
+  hint,
+  on,
+  disabled,
+  lockHint,
+  onToggle,
+}: {
+  label: string;
+  hint: string;
+  on: boolean;
+  disabled: boolean;
+  lockHint: string;
+  onToggle: (next: boolean) => void;
+}) {
+  return (
+    <Lockable>
+      <button
+        type="button"
+        disabled={disabled}
+        title={disabled ? lockHint : hint}
+        aria-pressed={on}
+        onClick={() => onToggle(!on)}
+        className="flex w-full items-center justify-between gap-3 text-left disabled:opacity-60"
+      >
+        <span className="min-w-0">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-mist-200">
+            {on && label === "Waiting on us" ? (
+              <StarIcon className="h-3 w-3 text-amber-300" />
+            ) : null}
+            {label}
+          </span>
+          <span className="mt-0.5 block text-[11px] text-mist-500">{hint}</span>
+        </span>
+        <span
+          className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
+            on ? "bg-aurora-400" : "bg-ink-700"
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 h-4 w-4 rounded-full bg-ink-950 transition-[left] ${
+              on ? "left-[1.125rem]" : "left-0.5"
+            }`}
+          />
+        </span>
+      </button>
+    </Lockable>
   );
 }
 

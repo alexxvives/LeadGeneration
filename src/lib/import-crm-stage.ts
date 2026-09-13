@@ -87,6 +87,18 @@ export function parseImportCrmStage(raw: string | null | undefined): {
   if (s === "instagram" || s === "ig" || s === "insta") {
     return { crmStage: "contacted", contactMethods: ["instagram"] };
   }
+  if (s === "whatsapp" || s === "wa" || s === "whats app") {
+    return { crmStage: "contacted", contactMethods: ["whatsapp"] };
+  }
+  if (
+    s === "organic" ||
+    s === "own web" ||
+    s === "own website" ||
+    s === "website" ||
+    s === "web"
+  ) {
+    return { crmStage: "contacted", contactMethods: ["organic"] };
+  }
   if (
     s === "contacted" ||
     s === "reached" ||
@@ -113,6 +125,12 @@ export function parseImportCrmStage(raw: string | null | undefined): {
   }
   if (/\binstagram\b|\big\b|\binsta\b/.test(s)) {
     return { crmStage: "contacted", contactMethods: ["instagram"] };
+  }
+  if (/\bwhatsapp\b|\bwhats app\b|\bwa\b/.test(s)) {
+    return { crmStage: "contacted", contactMethods: ["whatsapp"] };
+  }
+  if (/\borganic\b|\bown web\b|\bown website\b/.test(s)) {
+    return { crmStage: "contacted", contactMethods: ["organic"] };
   }
   if (/\bcall\b|\bcalled\b|\bphone\b/.test(s)) {
     return { crmStage: "contacted", contactMethods: ["phone"] };

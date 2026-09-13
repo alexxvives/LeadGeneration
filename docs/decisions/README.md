@@ -69,5 +69,6 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0028 — Board invites never expire](0028-board-invites-never-expire.md) _(amends 0015)_
 - [0029 — Draft is Ready to Contact — no Approve step](0029-draft-is-ready-no-approve.md) _(amends constitution Art. I.1)_
 - [0030 — Board lock: Live chip + take control](0030-board-lock-take-control.md) _(amends 0015)_
+- [0036 — Board-scoped collaborators (Contacts)](0036-board-contacts.md)
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

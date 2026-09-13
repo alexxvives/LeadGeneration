@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
-import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, InfoIcon, CalendarIcon } from "@/components/icons";
+import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, InfoIcon, CalendarIcon, StarIcon } from "@/components/icons";
 import {
   isUserFollowUp,
   leadHasMissedCall,
@@ -449,6 +449,8 @@ function MethodIcons({ methods }: { methods: ContactMethod[] }) {
       {methods.includes("phone") && <PhoneIcon className="h-2.5 w-2.5" />}
       {methods.includes("contact_form") && <FormIcon className="h-2.5 w-2.5" />}
       {methods.includes("instagram") && <InstagramIcon className="h-2.5 w-2.5" />}
+      {methods.includes("whatsapp") && <WhatsAppIcon className="h-2.5 w-2.5" />}
+      {methods.includes("organic") && <GlobeIcon className="h-2.5 w-2.5" />}
     </>
   );
 }
@@ -473,7 +475,6 @@ function DraggablePipelineCard({
     lead.followUps?.filter((f) => resolveFollowUpKind(f) === "note").length ?? 0;
   const noteCount = journalNotes > 0 ? journalNotes : lead.notes?.trim() ? 1 : 0;
   const replied = lead.outreach?.deliveryStatus === "replied";
-  const bounced = lead.outreach?.deliveryStatus === "bounced";
   const methods = lead.contactMethods ?? [];
   const missedCall = leadHasMissedCall(lead);
   const iconMethods: ContactMethod[] =
@@ -515,13 +516,14 @@ function DraggablePipelineCard({
           <p className="truncate text-sm font-medium leading-snug text-mist-100">
             {lead.company}
           </p>
+          {lead.waitingOnUs ? (
+            <StarIcon
+              className="h-3 w-3 shrink-0 text-amber-300"
+              aria-label="Waiting on us"
+            />
+          ) : null}
         </div>
         <div className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden">
-          {bounced ? (
-            <span className="shrink-0 rounded-full bg-rose-400/20 px-1.5 py-0.5 text-[10px] font-medium text-rose-200">
-              Bounced
-            </span>
-          ) : null}
           {pendingFollowUps > 0 ? (
             <span
               className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-400/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300"

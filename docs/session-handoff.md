@@ -9,18 +9,24 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-04 (Outreach: non-email ≠ done for email)
+## ⏱️ Status — updated 2026-09-13 (Conversation CRM upgrades)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0035** remote applied (Agency gift live).  
-**Deploy:** push to master for CI / Workers deploy.
+**Migrations:** 0021–**0036** (0036 = waiting/demo flags + `contacts` table).  
+**Deploy:** push to master for CI / Workers deploy; run `npm run cf:migrate` so
+prod D1 gets 0036.
 
 ### This pass
-- Outreach: phone/form/IG contact keeps email leads in Draft/Ready for send.
-- Drawer no longer blocks Send when CRM is past New but an email exists.
+- Contact channels: WhatsApp + Organic / web.
+- In-conversation: waiting-on-us star + demo-done toggles.
+- `?view=conversations` card grid; notes newest-first.
+- Board-scoped Contacts page; follow-ups on Calendar (ADR 0036).
+- Bounce chip / toast / drawer button removed (silent email strip stays).
 
 ### Next
-1. Hard-refresh Outreach after deploy; verify phone-contacted email lead still drafts/sends.
+1. Apply D1 migration **0036** on prod (`npm run cf:migrate`).
+2. Hard-refresh studio: Conversations, Contacts, Calendar contact events,
+   WhatsApp/organic chips, no Bounced chip.
 
 ---
 

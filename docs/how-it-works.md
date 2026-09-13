@@ -55,7 +55,7 @@ Search  →  Enrich  →  Draft  →  Send
   when set). `/login` only redirects here (Auth.js `pages.signIn`). Unauth
   `/app` → `/?signin=1&callbackUrl=/app`.
 - **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar
-  nav: **Dashboard · Search · Leads · Pipeline · Outreach · Calendar · Boards · Runs**.
+  nav: **Dashboard · Search · Leads · Pipeline · Conversations · Outreach · Calendar · Contacts · Boards · Runs**.
   Board filter (the active board) sits above the account card. Settings
   opens from the **account card** at the bottom of the sidebar (not a Workspace
   nav item). **Platform admins** get a slim ops nav (**Dashboard · Users**) and
@@ -85,7 +85,15 @@ Search  →  Enrich  →  Draft  →  Send
     Bulk draft lives on **Outreach** (Send stays per-lead).
     CRM **New** = needs human review (there is no separate “In review” tag).
     A **Missed call** stays in New but still shows the phone method icon
-    (it does not count as Contacted).
+    (it does not count as Contacted). Contact channels: email, phone, contact
+    form, Instagram, WhatsApp, Organic / web. Cards show a star when
+    **Waiting on us** is on (in-conversation). Bounce is silent (address
+    stripped; no Bounced chip).
+
+  - **Conversations** (`?view=conversations`) — in-conversation leads only.
+    Cards show name, location, created date, waiting star, demo chip, pending
+    follow-up, and recent comments. Inline toggles for waiting / demo; click
+    opens the lead drawer.
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
     cards / map) with a shared **Pipeline** stage filter; Notes + Type columns
@@ -113,7 +121,8 @@ Search  →  Enrich  →  Draft  →  Send
     **emails sent**, and **phone calls** logged that day — shown as calendar /
     mail / phone icons **with counts** on the day cell. Sidebar group titles
     (Follow-ups / Emails sent / Phone calls) show the same totals. The
-    studio search bar filters calendar events by lead. An open follow-up whose date is at
+    studio search bar filters calendar events by lead. Contact follow-ups
+    appear on the same grid. An open follow-up whose date is at
     least one day past fills that day square in **red** (same selected-day
     treatment, rose instead of aurora) — the calendar icon stays violet.
     Tick the checkbox on Calendar to mark a follow-up done (strikethrough
@@ -122,7 +131,12 @@ Search  →  Enrich  →  Draft  →  Send
     must **Take control**. Calendar also notes that the other user is active.
     The lead drawer
     shows a purple **Follow up** tag, no checkbox. Plain notes stay on the
-    lead only and never count as follow-ups. Click an item to open the lead.
+    lead only and never count as follow-ups. Click a lead item to open the
+    drawer; a contact item opens Contacts.
+
+  - **Contacts** (`?view=contacts`) — board-scoped collaborators (not leads;
+    ADR 0036). Name, org, email, phone, location, plus the same notes /
+    follow-up journal. Follow-ups show on Calendar. Does not consume lead quota.
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.
@@ -140,7 +154,7 @@ Search  →  Enrich  →  Draft  →  Send
     (incl. full address), about blurb, CRM stage, dated notes journal
     (**Add Note** for a log line; **Follow up** pre-fills “Follow up” one week
     out and shows on Calendar; **Missed call** writes the journal line
-    immediately — no composer — as `Missed call by {name}`, no trailing colon). Journal lines are chronological (oldest first)
+    immediately — no composer — as `Missed call by {name}`, no trailing colon). Journal lines are newest first
     with a kind tag (purple **Follow up**, amber **Note**, gray **Missed** —
     tag only; the date/body use the same ink as other notes). Calendar cards
     do not repeat a “Missed” chip next to the company name — the journal line
@@ -152,9 +166,10 @@ Search  →  Enrich  →  Draft  →  Send
     already on) logs another send dated today and opens a note with
     `Email sent by {name}:` so you can add details — it does not turn the
     chip off.
-    A bounce deletes that address and returns the lead to New — it is not a
-    follow-up. The outreach composer (draft → edit → approve → send) is on
-    the draft pane.
+    A bounce silently deletes that address (and may return the lead to New) —
+    no Bounced chip, toast, or drawer button. The outreach composer
+    (draft → edit → send) is on the draft pane. In Conversation also has
+    **Waiting on us** and **Demo done** toggles.
 
 - **`/app/settings`** — sender profile (language flag persists as
   `templateLang` and only changes the **preview** — template editors stay as

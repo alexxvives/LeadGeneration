@@ -30,8 +30,19 @@ const PatchSchema = z.object({
     ])
     .optional(),
   contactMethods: z
-    .array(z.enum(["email", "phone", "contact_form", "instagram"]))
+    .array(
+      z.enum([
+        "email",
+        "phone",
+        "contact_form",
+        "instagram",
+        "whatsapp",
+        "organic",
+      ]),
+    )
     .optional(),
+  waitingOnUs: z.boolean().optional(),
+  demoDone: z.boolean().optional(),
   notes: z.string().nullable().optional(),
   companyType: z.string().max(120).nullable().optional(),
   company: z.string().min(1).max(200).optional(),

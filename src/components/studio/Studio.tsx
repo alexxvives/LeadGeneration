@@ -11,9 +11,9 @@ import {
   RateLimitedError,
   type BoardResponse,
 } from "@/lib/client-api";
-import type { ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId } from "@/lib/types";
+import type { Contact, ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId } from "@/lib/types";
 import { mergeFollowUpLists } from "@/lib/follow-ups";
-import { rememberDroppedContactMethods } from "@/lib/contact-methods";
+import { contactMethodLabel, rememberDroppedContactMethods } from "@/lib/contact-methods";
 import {
   droppedFollowUpIdSet,
   mergeMutationIntoCached,
@@ -40,6 +40,8 @@ import {
   needsOutreachDraft,
 } from "./OutreachView";
 import { CalendarView } from "./CalendarView";
+import { ConversationsView } from "./ConversationsView";
+import { ContactsView } from "./ContactsView";
 import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
@@ -99,6 +101,8 @@ type StudioView =
   | "pipeline"
   | "leads"
   | "outreach"
+  | "conversations"
+  | "contacts"
   | "calendar"
   | "runs"
   | "dashboard"
@@ -130,6 +134,8 @@ function viewFromParams(view: string | null): StudioView {
   if (view === "pipeline") return "pipeline";
   if (view === "leads") return "leads";
   if (view === "outreach") return "outreach";
+  if (view === "conversations") return "conversations";
+  if (view === "contacts") return "contacts";
   if (view === "calendar") return "calendar";
   if (view === "runs") return "runs";
   if (view === "dashboard") return "dashboard";
@@ -154,6 +160,8 @@ function queryForView(next: StudioView, boardId?: string | null): string {
   if (next === "pipeline") params.set("view", "pipeline");
   else if (next === "leads") params.set("view", "leads");
   else if (next === "outreach") params.set("view", "outreach");
+  else if (next === "conversations") params.set("view", "conversations");
+  else if (next === "contacts") params.set("view", "contacts");
   else if (next === "calendar") params.set("view", "calendar");
   else if (next === "runs") params.set("view", "runs");
   else if (next === "dashboard") params.set("view", "dashboard");
@@ -195,6 +203,8 @@ export function Studio() {
 
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
   const [drawerPromptNote, setDrawerPromptNote] = useState<
     false | "call" | "missed"
@@ -294,9 +304,6 @@ export function Studio() {
   const loadInFlightRef = useRef(false);
   /** Serialize CRM PATCHes per lead so a heal cannot last-write-win over a newer journal. */
   const leadWriteTailRef = useRef(new Map<string, Promise<void>>());
-  /** Lead ids already toasted as bounced this session (null = not seeded yet). */
-  const seenBouncedIdsRef = useRef<Set<string> | null>(null);
-
   const setView = useCallback(
     (next: StudioView) => {
       const stored = loadStoredBoardFilter();
@@ -625,27 +632,19 @@ export function Studio() {
 
   boardRef.current = board;
 
-  // Notify when new bounces appear (webhooks update deliveryStatus asynchronously).
   useEffect(() => {
-    const leads = board?.leads;
-    if (!leads) return;
-    const bounced = leads.filter((l) => l.outreach?.deliveryStatus === "bounced");
-    const ids = bounced.map((l) => l.id);
-    if (seenBouncedIdsRef.current === null) {
-      seenBouncedIdsRef.current = new Set(ids);
-      return;
-    }
-    const fresh = bounced.filter((l) => !seenBouncedIdsRef.current!.has(l.id));
-    for (const id of ids) seenBouncedIdsRef.current.add(id);
-    if (fresh.length === 0) return;
-    const names = fresh.map((l) => l.company).slice(0, 2);
-    toast(
-      "err",
-      fresh.length === 1
-        ? `Email bounced: ${names[0]} — removed from Contacted.`
-        : `${fresh.length} emails bounced (${names.join(", ")}${fresh.length > 2 ? "…" : ""}) — removed from Contacted.`,
-    );
-  }, [board?.leads, toast]);
+    let cancelled = false;
+    const boardId = filterBoardId;
+    void api
+      .listContacts(boardId)
+      .then(({ contacts: rows }) => {
+        if (!cancelled) setContacts(rows);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [filterBoardId, view]);
 
   // Hydrate drafting profiles from the workspace (localStorage write-through).
   useEffect(() => {
@@ -730,6 +729,7 @@ export function Studio() {
       view === "pipeline" ||
       view === "leads" ||
       view === "outreach" ||
+      view === "conversations" ||
       view === "calendar" ||
       view === "board" ||
       view === "runs";
@@ -1487,12 +1487,10 @@ export function Studio() {
       const lead = findLeadByOutreach(outreachId);
       if (lead) patchLeadLocal(lead.id, { outreach });
       toast(
-        deliveryStatus === "bounced" ? "err" : "ok",
+        "ok",
         deliveryStatus === "replied"
           ? "Marked replied — moved to In Conversation."
-          : deliveryStatus === "bounced"
-            ? "Bounced — removed from Contacted. Fix the address and try again."
-            : "Delivery status updated.",
+          : "Delivery status updated.",
       );
     } catch (e) {
       toast("err", (e as Error).message);
@@ -1573,9 +1571,7 @@ export function Studio() {
           ? opts?.missed
             ? "Logged as missed call — moved to Contacted."
             : "Logged as called — moved to Contacted."
-          : method === "instagram"
-            ? "Logged Instagram — moved to Contacted."
-            : "Logged contact form — moved to Contacted.",
+          : `Logged ${contactMethodLabel(method)} — moved to Contacted.`,
       );
       if (opts?.promptNote) {
         setDrawerPromptNote(opts.missed ? "missed" : "call");
@@ -1643,8 +1639,12 @@ export function Studio() {
             else if (key === "notes") body.notes = latest.notes;
             else if (key === "companyType") {
               body.companyType = latest.companyType;
-            } else if (key === "customFields") {
+            }             else if (key === "customFields") {
               body.customFields = latest.customFields;
+            } else if (key === "waitingOnUs") {
+              body.waitingOnUs = latest.waitingOnUs;
+            } else if (key === "demoDone") {
+              body.demoDone = latest.demoDone;
             }
           }
         }
@@ -1987,12 +1987,15 @@ export function Studio() {
     view === "pipeline" ||
     view === "outreach" ||
     view === "leads" ||
+    view === "conversations" ||
+    view === "contacts" ||
     view === "calendar";
   const showLeadSearch =
     hasLeads &&
     (view === "leads" ||
       view === "pipeline" ||
       view === "outreach" ||
+      view === "conversations" ||
       view === "calendar");
 
   // Skeleton for hydrate / first body / first visit to a layout tab only.
@@ -2012,6 +2015,8 @@ export function Studio() {
     view === "pipeline" ||
     view === "leads" ||
     view === "outreach" ||
+    view === "conversations" ||
+    view === "contacts" ||
     view === "calendar" ||
     view === "runs";
   if (loading && !board && needsBoardPayload) {
@@ -2139,6 +2144,10 @@ export function Studio() {
                       ? "Leads"
                       : view === "outreach"
                         ? "Outreach"
+                        : view === "conversations"
+                          ? "Conversations"
+                          : view === "contacts"
+                            ? "Contacts"
                         : view === "calendar"
                           ? "Calendar"
                         : view === "runs"
@@ -2192,6 +2201,10 @@ export function Studio() {
                     ? "All prospects on this board — filter, edit, and export."
                     : view === "outreach"
                       ? "Draft and send outreach one lead at a time."
+                      : view === "conversations"
+                        ? "Active dialogues — demo, waiting, and follow-ups."
+                        : view === "contacts"
+                          ? "Collaborators on this board — notes and follow-ups land on Calendar."
                       : view === "calendar"
                         ? "Follow-ups, emails sent, and phone calls — day by day."
                       : view === "runs"
@@ -2653,6 +2666,76 @@ export function Studio() {
         </div>
       )}
 
+      {view === "conversations" && (
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6">
+          {loading || leadsHydrating || !board ? (
+            <div role="status" aria-busy="true" aria-label="Loading conversations">
+              <PipelineSkeleton />
+            </div>
+          ) : (
+            <ConversationsView
+              leads={searchFilteredLeads}
+              emptyHref={`/app${queryForView("pipeline", filterBoardId)}`}
+              onOpen={openInfo}
+              onUpdate={(id, patch) => {
+                void onUpdateLeadCrm(id, patch);
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {view === "contacts" && (
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6">
+          <ContactsView
+            contacts={contacts}
+            boards={board?.boards ?? boards}
+            filterBoardId={filterBoardId}
+            selectedId={selectedContactId}
+            onSelect={setSelectedContactId}
+            onCreate={async (input) => {
+              try {
+                const { contact } = await api.createContact(input);
+                setContacts((prev) => [
+                  contact,
+                  ...prev.filter((c) => c.id !== contact.id),
+                ]);
+                setSelectedContactId(contact.id);
+              } catch (e) {
+                toast("err", (e as Error).message);
+                throw e;
+              }
+            }}
+            onUpdate={async (id, patch) => {
+              setContacts((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+              );
+              try {
+                const { contact } = await api.updateContact(id, patch);
+                setContacts((prev) =>
+                  prev.map((c) => (c.id === id ? contact : c)),
+                );
+              } catch (e) {
+                toast("err", (e as Error).message);
+                const { contacts: rows } = await api.listContacts(filterBoardId);
+                setContacts(rows);
+              }
+            }}
+            onDelete={async (id) => {
+              setSelectedContactId((cur) => (cur === id ? null : cur));
+              setContacts((prev) => prev.filter((c) => c.id !== id));
+              try {
+                await api.deleteContact(id);
+              } catch (e) {
+                toast("err", (e as Error).message);
+                const { contacts: rows } = await api.listContacts(filterBoardId);
+                setContacts(rows);
+              }
+            }}
+          />
+        </div>
+      )}
+
       {/* Calendar — follow-ups, sends, and calls by day */}
       {view === "calendar" && (
         <div className="flex min-h-0 flex-1 flex-col pb-6">
@@ -2660,19 +2743,48 @@ export function Studio() {
             <div role="status" aria-busy="true" aria-label="Loading calendar">
               <CalendarSkeleton />
             </div>
-          ) : !hasLeads ? (
+          ) : !hasLeads && contacts.length === 0 ? (
             <EmptyState actionHref={searchHref} actionLabel="Find leads to follow up" />
           ) : (
             <CalendarView
               leads={searchFilteredLeads}
-              onOpenLead={openInfo}
-              onToggleFollowUp={(leadId, fuId, done) => {
-                const lead = board.leads.find((l) => l.id === leadId);
+              contacts={contacts}
+              onOpenEvent={(ev) => {
+                if (ev.source === "contact" && ev.contactId) {
+                  setSelectedContactId(ev.contactId);
+                  setView("contacts");
+                  return;
+                }
+                if (ev.leadId) openInfo(ev.leadId);
+              }}
+              onToggleFollowUp={(ev, done) => {
+                if (ev.source === "contact" && ev.contactId) {
+                  const contact = contacts.find((c) => c.id === ev.contactId);
+                  if (!contact) return;
+                  const followUps = (contact.followUps ?? []).map((f) =>
+                    f.id === ev.id ? { ...f, done } : f,
+                  );
+                  setContacts((prev) =>
+                    prev.map((c) =>
+                      c.id === ev.contactId ? { ...c, followUps } : c,
+                    ),
+                  );
+                  void api
+                    .updateContact(ev.contactId, { followUps })
+                    .then(({ contact }) => {
+                      setContacts((prev) =>
+                        prev.map((c) => (c.id === contact.id ? contact : c)),
+                      );
+                    })
+                    .catch((e) => toast("err", (e as Error).message));
+                  return;
+                }
+                const lead = board.leads.find((l) => l.id === ev.leadId);
                 if (!lead) return;
                 const followUps = (lead.followUps ?? []).map((f) =>
-                  f.id === fuId ? { ...f, done } : f,
+                  f.id === ev.id ? { ...f, done } : f,
                 );
-                void onUpdateLeadCrm(leadId, { followUps });
+                void onUpdateLeadCrm(ev.leadId, { followUps });
               }}
             />
           )}

@@ -53,7 +53,13 @@ export function normalizeCrmStage(raw: unknown): CrmStage {
 }
 
 /** How a prospect was first reached. Set when crmStage → "contacted". */
-export type ContactMethod = "email" | "phone" | "contact_form" | "instagram";
+export type ContactMethod =
+  | "email"
+  | "phone"
+  | "contact_form"
+  | "instagram"
+  | "whatsapp"
+  | "organic";
 
 /**
  * Calendar / journal kind. A **note** is a log line; a **follow_up** is a
@@ -416,6 +422,27 @@ export interface Lead {
   followUps: FollowUp[]; // dated notes / follow-ups / send & call log (Calendar)
   /** User-defined table column values (column id → string). */
   customFields: Record<string, string>;
+  /** In-conversation: we owe them something (doc, tramit, …). */
+  waitingOnUs: boolean;
+  /** In-conversation: a demo has been given. */
+  demoDone: boolean;
+  createdAt: string;
+}
+
+/**
+ * Board-scoped collaborator (not a lead). Notes / follow-ups share the
+ * lead journal shape so they can appear on Calendar (ADR 0036).
+ */
+export interface Contact {
+  id: string;
+  workspaceId: string;
+  boardId: string;
+  name: string;
+  organization: string | null;
+  email: string | null;
+  phone: string | null;
+  location: string | null;
+  followUps: FollowUp[];
   createdAt: string;
 }
 

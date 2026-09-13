@@ -4,6 +4,7 @@ import type {
   BoardLock,
   BoardMember,
   BoardMemberRole,
+  Contact,
   Lead,
   Outreach,
   Run,
@@ -177,6 +178,13 @@ export interface LeadRepository {
   deleteLeads(ids: string[]): Promise<number>;
   /** Delete every lead (and outreach) on a board. Returns number removed. */
   deleteLeadsByBoard(boardId: string): Promise<number>;
+
+  // Contacts (board-scoped collaborators — ADR 0036)
+  listContacts(boardId?: string): Promise<Contact[]>;
+  getContact(id: string): Promise<Contact | null>;
+  createContact(contact: Contact): Promise<Contact>;
+  updateContact(id: string, patch: Partial<Contact>): Promise<Contact | null>;
+  deleteContact(id: string): Promise<boolean>;
 
   // Outreach
   upsertOutreach(outreach: Outreach): Promise<Outreach>;

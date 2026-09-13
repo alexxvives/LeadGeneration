@@ -5,6 +5,8 @@ const METHODS: readonly ContactMethod[] = [
   "phone",
   "contact_form",
   "instagram",
+  "whatsapp",
+  "organic",
 ] as const;
 
 export function isContactMethod(v: unknown): v is ContactMethod {
@@ -63,6 +65,8 @@ const METHOD_ORDER: readonly ContactMethod[] = [
   "phone",
   "contact_form",
   "instagram",
+  "whatsapp",
+  "organic",
 ];
 
 /**
@@ -121,6 +125,8 @@ export function contactMethodLabel(method: ContactMethod): string {
   if (method === "email") return "email";
   if (method === "phone") return "phone";
   if (method === "instagram") return "Instagram";
+  if (method === "whatsapp") return "WhatsApp";
+  if (method === "organic") return "Organic / web";
   return "contact form";
 }
 
@@ -132,6 +138,14 @@ export function contactMethodAddedNote(
   const who = byName?.trim();
   if (method === "instagram") {
     const base = "Contacted via Instagram";
+    return { note: who ? `${base} — ${who}` : base, kind: "note" };
+  }
+  if (method === "whatsapp") {
+    const base = "Contacted via WhatsApp";
+    return { note: who ? `${base} — ${who}` : base, kind: "note" };
+  }
+  if (method === "organic") {
+    const base = "Contacted via Organic / web";
     return { note: who ? `${base} — ${who}` : base, kind: "note" };
   }
   const base = "Contacted via contact form";

@@ -8,6 +8,7 @@ import {
   type BoardLock,
   type BoardMember,
   type BoardMemberRole,
+  type Contact,
   type Lead,
   type Outreach,
   type Run,
@@ -25,6 +26,7 @@ interface DbShape {
   runs: Run[];
   leads: Lead[];
   outreach: Outreach[];
+  contacts: Contact[];
   boardMembers: BoardMember[];
   boardInvites: BoardInvite[];
   boardLocks: BoardLock[];
@@ -101,6 +103,23 @@ function normalizeLead(l: Lead): Lead {
       raw.customFields && typeof raw.customFields === "object"
         ? (raw.customFields as Record<string, string>)
         : {},
+    waitingOnUs: raw.waitingOnUs === true,
+    demoDone: raw.demoDone === true,
+  };
+}
+
+function normalizeContact(c: Contact): Contact {
+  const raw = c as unknown as Record<string, unknown>;
+  return {
+    ...c,
+    organization:
+      typeof raw.organization === "string" ? raw.organization : null,
+    email: typeof raw.email === "string" ? raw.email : null,
+    phone: typeof raw.phone === "string" ? raw.phone : null,
+    location: typeof raw.location === "string" ? raw.location : null,
+    followUps: ((raw.followUps as Contact["followUps"] | undefined) ?? [])
+      .filter((f) => !isContactRegisteredNote(f?.note ?? ""))
+      .map((f) => ({ ...f, note: normalizeMissedCallNote(f?.note ?? "") })),
   };
 }
 
@@ -140,6 +159,7 @@ const EMPTY: DbShape = {
   runs: [],
   leads: [],
   outreach: [],
+  contacts: [],
   boardMembers: [],
   boardInvites: [],
   boardLocks: [],
@@ -176,6 +196,7 @@ export class JsonStore implements LeadRepository {
         runs: parsed.runs ?? [],
         leads: parsed.leads ?? [],
         outreach: parsed.outreach ?? [],
+        contacts: parsed.contacts ?? [],
         boardMembers: parsed.boardMembers ?? [],
         boardInvites: parsed.boardInvites ?? [],
         boardLocks: parsed.boardLocks ?? [],
@@ -370,6 +391,7 @@ export class JsonStore implements LeadRepository {
       data.boardMembers = data.boardMembers.filter((m) => m.boardId !== id);
       data.boardInvites = data.boardInvites.filter((i) => i.boardId !== id);
       data.boardLocks = data.boardLocks.filter((l) => l.boardId !== id);
+      data.contacts = data.contacts.filter((c) => c.boardId !== id);
       return { data, result: data.boards.length < before };
     });
   }
@@ -616,6 +638,55 @@ export class JsonStore implements LeadRepository {
     return normalizeLead(l);
   }
 
+  async listContacts(boardId?: string): Promise<Contact[]> {
+    const data = await this.read();
+    return data.contacts
+      .filter((c) => {
+        if (!this.inScope(c)) return false;
+        if (boardId && c.boardId !== boardId) return false;
+        return true;
+      })
+      .map(normalizeContact)
+      .sort((a, b) => {
+        const byCreated = b.createdAt.localeCompare(a.createdAt);
+        if (byCreated !== 0) return byCreated;
+        return b.id.localeCompare(a.id);
+      });
+  }
+
+  async getContact(id: string): Promise<Contact | null> {
+    const data = await this.read();
+    const c = data.contacts.find((c) => c.id === id && this.inScope(c));
+    return c ? normalizeContact(c) : null;
+  }
+
+  createContact(contact: Contact): Promise<Contact> {
+    return this.mutate((data) => {
+      data.contacts.push(contact);
+      return { data, result: contact };
+    });
+  }
+
+  updateContact(
+    id: string,
+    patch: Partial<Contact>,
+  ): Promise<Contact | null> {
+    return this.mutate((data) => {
+      const idx = data.contacts.findIndex((c) => c.id === id && this.inScope(c));
+      if (idx === -1) return { data, result: null };
+      data.contacts[idx] = { ...data.contacts[idx], ...patch };
+      return { data, result: normalizeContact(data.contacts[idx]) };
+    });
+  }
+
+  deleteContact(id: string): Promise<boolean> {
+    return this.mutate((data) => {
+      const before = data.contacts.length;
+      data.contacts = data.contacts.filter((c) => !(c.id === id && this.inScope(c)));
+      return { data, result: data.contacts.length < before };
+    });
+  }
+
   async listLeads(filter?: LeadListFilter): Promise<Lead[]> {
     const data = await this.read();
     const leads = data.leads.filter((l) => {
@@ -778,6 +849,9 @@ export class JsonStore implements LeadRepository {
       const before = data.leads.length;
       data.leads = data.leads.filter((l) => !remove.has(l.id));
       data.outreach = data.outreach.filter((o) => !remove.has(o.leadId));
+      data.contacts = data.contacts.filter(
+        (c) => !(this.inScope(c) && c.boardId === boardId),
+      );
       return { data, result: before - data.leads.length };
     });
   }
@@ -949,6 +1023,9 @@ export class JsonStore implements LeadRepository {
       data.leads = data.leads.filter((l) => (l.workspaceId ?? this.workspaceId) !== this.workspaceId);
       data.outreach = data.outreach.filter(
         (o) => (o.workspaceId ?? this.workspaceId) !== this.workspaceId,
+      );
+      data.contacts = data.contacts.filter(
+        (c) => (c.workspaceId ?? this.workspaceId) !== this.workspaceId,
       );
       return { data, result: undefined };
     });

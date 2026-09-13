@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Conversations flags, contacts, newest notes, silent bounce
+- `ContactMethod` now includes `whatsapp` and `organic` (Organic / web).
+- In-conversation leads: `waitingOnUs` (amber star on Pipeline / Conversations
+  cards) and `demoDone`. Toggles live on the drawer and Conversations cards.
+- Journal display is newest-first (`sortFollowUpsNewestFirst`); storage order
+  unchanged. Slim follow-ups keep a 140-char preview on note / follow-up kinds.
+- Contacts are a board-scoped table (ADR 0036), not leads. Follow-ups merge
+  onto Calendar (`source: "lead" | "contact"`).
+- Bounce UI removed (chip, toast, drawer button). Webhook still strips the
+  address. Drawer delivery toggle is Delivered / Replied only.
+
 ### 2026-09-04 — Non-email contact stays in Outreach draft/send
 - Phone / form / Instagram alone no longer move email leads into Outreach
   Contacted. They stay in Contact Draft / Ready until an email is sent (or the

@@ -113,7 +113,7 @@ src/app/             Routes. Pages + thin API handlers (api/*/route.ts).
   api/{auth,billing,webhooks/stripe,turnstile}   Commercial endpoints.
 src/components/      UI. studio/* is the app; BrandMark / icons / ui are primitives.
 src/lib/
-  types.ts           Domain models (Workspace/Board/Run/Lead/Outreach) — source of truth.
+  types.ts           Domain models (Workspace/Board/Run/Lead/Contact/Outreach) — source of truth.
   lead-cache.ts      Client merge of slim poll/GET into cached leads (lastWriteAt / writePending).
   service.ts         Coordination layer + plan/quota enforcement (Ctx-based).
   request-context.ts getCtx(): D1 binding + session → workspace-scoped repo.
@@ -130,7 +130,7 @@ src/lib/
   billing/           Stripe client + plan↔price mapping.
 docs/                All long-form docs (see index above).
 scripts/             seed + smoke.
-migrations/          D1 SQL 0001–**0035** (init … gift all workspaces Agency).
+migrations/          D1 SQL 0001–**0036** (init … conversation flags + contacts).
 wrangler.jsonc, open-next.config.ts   Cloudflare Workers deploy config.
 data/                Local JSON DB (git-ignored).
 ```
