@@ -128,15 +128,17 @@ export function BoardPicker({
   );
 }
 
-/** Icon-rail board switcher for narrow viewports (opens a sheet). */
+/** Board switcher for the phone top bar (icon or named pill). */
 export function MobileBoardButton({
   boards,
   activeBoardId,
   onChange,
+  variant = "icon",
 }: {
   boards: BoardSummary[];
   activeBoardId: string | null;
   onChange: (boardId: string) => void;
+  variant?: "icon" | "bar";
 }) {
   const [open, setOpen] = useState(false);
   const titleId = useId();
@@ -150,11 +152,20 @@ export function MobileBoardButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-aurora-300 transition-colors hover:border-white/15 hover:bg-white/[0.05]"
+        className={
+          variant === "bar"
+            ? "inline-flex h-11 max-w-[10rem] items-center gap-1.5 rounded-xl border border-white/8 bg-white/[0.03] px-2.5 text-aurora-300 transition-colors hover:border-white/15 hover:bg-white/[0.05]"
+            : "mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03] text-aurora-300 transition-colors hover:border-white/15 hover:bg-white/[0.05]"
+        }
         aria-label={active ? `Board: ${active.name}` : "Select board"}
         title={active?.name ?? "Select board"}
       >
-        <BoardsIcon className="h-5 w-5" />
+        <BoardsIcon className="h-5 w-5 shrink-0" />
+        {variant === "bar" ? (
+          <span className="min-w-0 truncate text-sm font-medium text-mist-100">
+            {active?.name ?? "Board"}
+          </span>
+        ) : null}
       </button>
       <Modal
         open={open}

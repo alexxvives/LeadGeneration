@@ -8,9 +8,11 @@ import {
   type Ref,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
+import { XIcon } from "@/components/icons";
 import { signOut, useSession } from "next-auth/react";
 import { BrandMark } from "@/components/BrandMark";
 import { AuthModal } from "@/components/AuthModal";
@@ -61,6 +63,36 @@ type AnimatedIcon = ComponentType<{
   ref?: Ref<IconMotionHandle>;
 }>;
 
+function studioViewTitle(settingsActive: boolean, displayView: string): string {
+  if (settingsActive) return "Settings";
+  switch (displayView) {
+    case "dashboard":
+      return "Dashboard";
+    case "leads":
+      return "Leads";
+    case "pipeline":
+      return "Pipeline";
+    case "conversations":
+      return "Conversations";
+    case "outreach":
+      return "Outreach";
+    case "calendar":
+      return "Calendar";
+    case "contacts":
+      return "Contacts";
+    case "boards":
+      return "Boards";
+    case "runs":
+      return "Runs";
+    case "admin":
+      return "Platform";
+    case "admin-users":
+      return "Users";
+    default:
+      return "Search";
+  }
+}
+
 function StudioNavLink({
   href,
   label,
@@ -68,6 +100,7 @@ function StudioNavLink({
   active,
   wide,
   onNavigate,
+  variant = "rail",
 }: {
   href: string;
   label: string;
@@ -75,16 +108,20 @@ function StudioNavLink({
   active: boolean;
   wide: boolean;
   onNavigate: () => void;
+  variant?: "rail" | "sheet";
 }) {
   const { ref, bind } = useIconMotion();
+  const sheet = variant === "sheet";
   return (
     <Link
       href={href}
       onClick={onNavigate}
       title={label}
       {...bind}
-      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[1.05rem] font-medium transition-colors ${
-        wide ? "justify-center sm:justify-start" : "justify-center"
+      className={`group flex items-center gap-2.5 rounded-lg px-2.5 font-medium transition-colors ${
+        sheet
+          ? "min-h-11 justify-start py-2.5 text-base"
+          : `py-2 text-[1.05rem] ${wide ? "justify-start" : "justify-center"}`
       } ${
         active
           ? "bg-aurora-400/10 text-aurora-300"
@@ -99,8 +136,91 @@ function StudioNavLink({
         }`}
         aria-hidden
       />
-      <span className={wide ? "hidden sm:inline" : "hidden"}>{label}</span>
+      <span className={sheet || wide ? "inline" : "hidden"}>{label}</span>
     </Link>
+  );
+}
+
+function StudioNavSheet({
+  open,
+  onClose,
+  titleId,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  titleId: string;
+  children: React.ReactNode;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const prevFocus = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    prevFocus.current = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    const focusables = () =>
+      panel
+        ? Array.from(
+            panel.querySelectorAll<HTMLElement>(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+            ),
+          ).filter((el) => !el.hasAttribute("disabled"))
+        : [];
+    focusables()[0]?.focus();
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !panel) return;
+      const list = focusables();
+      if (list.length === 0) return;
+      const firstEl = list[0]!;
+      const lastEl = list[list.length - 1]!;
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      prevFocus.current?.focus?.();
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 lg:hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
+        aria-label="Close menu"
+        onClick={onClose}
+      />
+      <div
+        ref={panelRef}
+        className="absolute inset-y-0 left-0 flex w-[min(20rem,100%)] flex-col border-r border-white/10 bg-ink-950 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] shadow-2xl"
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -154,8 +274,8 @@ function markGuestSession(): void {
 }
 
 /**
- * Studio chrome: left sidebar with product navigation + account footer.
- * Settings opens from the account card (not a Workspace nav item).
+ * Studio chrome: labeled overlay nav below `lg`, expandable sidebar at `lg+`.
+ * Settings opens from the account card / top-bar icon (not a Workspace nav item).
  */
 export function StudioShell({
   children,
@@ -371,6 +491,9 @@ export function StudioShell({
   const settingsActive = pathname.startsWith("/app/settings");
   const onApp = pathname === "/app";
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const navTitleId = useId();
+  const closeNav = useCallback(() => setNavOpen(false), []);
 
   useEffect(() => {
     try {
@@ -380,6 +503,15 @@ export function StudioShell({
     } catch {
       /* ignore */
     }
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => {
+      if (mq.matches) setNavOpen(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   const toggleSidebarCollapsed = () => {
@@ -508,14 +640,96 @@ export function StudioShell({
   ];
 
   const wide = !sidebarCollapsed;
+  const viewTitle = studioViewTitle(settingsActive, displayView);
+  const showBoardChrome =
+    displayView !== "admin" && displayView !== "admin-users";
+
+  const renderNavItems = (variant: "rail" | "sheet") =>
+    navSections.map((section) => (
+      <div key={section.label} className="flex flex-col gap-1">
+        <p
+          className={`mb-0.5 px-3 text-[0.9rem] uppercase tracking-wider text-mist-500 ${
+            variant === "sheet" || wide ? "block" : "hidden"
+          }`}
+        >
+          {section.label}
+        </p>
+        {section.items.map((item) => {
+          const viewKey = (() => {
+            const q = item.href.indexOf("?");
+            if (q < 0) return "";
+            return new URLSearchParams(item.href.slice(q + 1)).get("view") ?? "";
+          })();
+          return (
+            <StudioNavLink
+              key={item.href}
+              href={boardHref(item.href)}
+              label={item.label}
+              icon={item.icon}
+              active={item.active}
+              wide={wide}
+              variant={variant}
+              onNavigate={() => {
+                setPendingNavView(viewKey);
+                if (variant === "sheet") closeNav();
+              }}
+            />
+          );
+        })}
+      </div>
+    ));
 
   return (
-    <div className="relative flex min-h-screen">
+    <div className="relative flex h-dvh flex-col overflow-hidden lg:flex-row">
       <div className="pointer-events-none fixed inset-0 -z-10 aurora-glow opacity-40" />
 
+      <header className="sticky top-0 z-40 flex shrink-0 items-center gap-2 border-b border-white/5 bg-ink-950/90 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-xl lg:hidden">
+        <button
+          type="button"
+          aria-expanded={navOpen}
+          aria-controls="studio-nav-sheet"
+          aria-label={navOpen ? "Close menu" : "Open menu"}
+          onClick={() => setNavOpen((v) => !v)}
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-mist-100 transition-colors hover:border-white/20"
+        >
+          {navOpen ? (
+            <XIcon className="h-4 w-4" />
+          ) : (
+            <span className="flex flex-col gap-1" aria-hidden>
+              <span className="block h-0.5 w-4 rounded-full bg-mist-100" />
+              <span className="block h-0.5 w-4 rounded-full bg-mist-100" />
+              <span className="block h-0.5 w-3 rounded-full bg-mist-100" />
+            </span>
+          )}
+        </button>
+        <p className="min-w-0 flex-1 truncate font-display text-lg font-semibold text-mist-100">
+          {viewTitle}
+        </p>
+        {showBoardChrome ? (
+          <MobileBoardButton
+            boards={boards}
+            activeBoardId={activeBoardId}
+            onChange={setBoardFilter}
+            variant="bar"
+          />
+        ) : null}
+        <Link
+          href="/app/settings"
+          title="Settings"
+          aria-label="Settings"
+          className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
+            settingsActive
+              ? "bg-aurora-400/10 text-aurora-300"
+              : "text-mist-500 hover:bg-white/5 hover:text-aurora-300"
+          }`}
+        >
+          <SettingsIcon size={20} className="flex" aria-hidden />
+        </Link>
+      </header>
+
       <aside
-        className={`sticky top-0 z-30 flex h-screen flex-col border-r border-white/5 bg-ink-950/90 py-3 backdrop-blur-xl transition-[width] duration-200 ease-out ${
-          wide ? "relative w-16 sm:w-[16.5rem] sm:px-3" : "relative w-16"
+        className={`sticky top-0 z-30 hidden h-dvh shrink-0 flex-col border-r border-white/5 bg-ink-950/90 py-3 backdrop-blur-xl transition-[width] duration-200 ease-out lg:flex ${
+          wide ? "relative w-[16.5rem] px-3" : "relative w-16"
         }`}
       >
         {wide ? (
@@ -523,69 +737,37 @@ export function StudioShell({
             label="Collapse sidebar"
             icon={ChevronLeftIcon}
             onClick={toggleSidebarCollapsed}
-            className="absolute right-2 top-3 z-10 hidden rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100 sm:inline-flex"
+            className="absolute right-2 top-3 z-10 inline-flex rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100"
           />
         ) : (
           <MotionIconControl
             label="Expand sidebar"
             icon={ChevronRightIcon}
             onClick={toggleSidebarCollapsed}
-            className="mb-3 hidden items-center justify-center self-center rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100 sm:inline-flex"
+            className="mb-3 inline-flex items-center justify-center self-center rounded-lg p-1.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100"
           />
         )}
 
         <Link
           href="/"
           className={`mb-3 flex px-1 transition-opacity hover:opacity-80 ${
-            wide ? "justify-center sm:justify-start sm:pr-8" : "justify-center"
+            wide ? "justify-start pr-8" : "justify-center"
           }`}
         >
-          <span className={wide ? "hidden sm:inline" : "hidden"}>
+          {wide ? (
             <BrandMark />
-          </span>
-          <span className={wide ? "sm:hidden" : ""}>
+          ) : (
             <BrandMark size="sm" withWordmark={false} />
-          </span>
+          )}
         </Link>
 
         <nav className="flex flex-1 flex-col gap-3 overflow-y-auto">
-          {navSections.map((section) => (
-            <div key={section.label} className="flex flex-col gap-1">
-              <p
-                className={`mb-0.5 px-3 text-[0.9rem] uppercase tracking-wider text-mist-500 ${
-                  wide ? "hidden sm:block" : "hidden"
-                }`}
-              >
-                {section.label}
-              </p>
-              {section.items.map((item) => {
-                const viewKey = (() => {
-                  const q = item.href.indexOf("?");
-                  if (q < 0) return "";
-                  return new URLSearchParams(item.href.slice(q + 1)).get("view") ?? "";
-                })();
-                return (
-                  <StudioNavLink
-                    key={item.href}
-                    href={boardHref(item.href)}
-                    label={item.label}
-                    icon={item.icon}
-                    active={item.active}
-                    wide={wide}
-                    onNavigate={() => setPendingNavView(viewKey)}
-                  />
-                );
-              })}
-            </div>
-          ))}
+          {renderNavItems("rail")}
         </nav>
 
-        {/* Board + outreach profile filters + account card */}
         <div className="mt-auto border-t border-white/5 pt-3">
-          {wide &&
-          displayView !== "admin" &&
-          displayView !== "admin-users" ? (
-            <div className="mb-2 hidden sm:block">
+          {wide && showBoardChrome ? (
+            <div className="mb-2">
               <BoardPicker
                 boards={boards}
                 activeBoardId={activeBoardId}
@@ -593,19 +775,8 @@ export function StudioShell({
               />
             </div>
           ) : null}
-          {wide &&
-          displayView !== "admin" &&
-          displayView !== "admin-users" ? (
-            <div className="mb-3 sm:hidden">
-              <MobileBoardButton
-                boards={boards}
-                activeBoardId={activeBoardId}
-                onChange={setBoardFilter}
-              />
-            </div>
-          ) : null}
 
-          <div className={wide ? "hidden sm:block" : "hidden"}>
+          {wide ? (
             <Link
               href="/app/settings"
               className={`block rounded-xl border p-2 transition-colors ${
@@ -655,46 +826,116 @@ export function StudioShell({
                 )}
               </div>
             </Link>
-          </div>
-
-          <div
-            className={`flex flex-col items-center gap-1 ${
-              wide ? "sm:hidden" : ""
-            }`}
-          >
-            <Link
-              href="/app/settings"
-              title="Settings"
-              className={`rounded-xl p-2.5 transition-colors ${
-                settingsActive
-                  ? "bg-aurora-400/10 text-aurora-300"
-                  : "text-mist-500 hover:bg-white/5 hover:text-aurora-300"
-              }`}
-            >
-              <SettingsIcon size={20} className="flex" aria-hidden />
-            </Link>
-            {signedIn ? (
-              <MotionIconControl
-                label="Sign out"
-                icon={LogoutIcon}
-                size={20}
-                onClick={() => void signOut({ callbackUrl: "/" })}
-                className="rounded-xl p-2.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200"
-              />
-            ) : (
-              <MotionIconControl
-                label="Sign in"
-                icon={MailboxIcon}
-                size={20}
-                onClick={() => setAuthOpen(true)}
-                className="rounded-xl p-2.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-aurora-300"
-              />
-            )}
-          </div>
+          ) : (
+            <div className="flex flex-col items-center gap-1">
+              <Link
+                href="/app/settings"
+                title="Settings"
+                className={`rounded-xl p-2.5 transition-colors ${
+                  settingsActive
+                    ? "bg-aurora-400/10 text-aurora-300"
+                    : "text-mist-500 hover:bg-white/5 hover:text-aurora-300"
+                }`}
+              >
+                <SettingsIcon size={20} className="flex" aria-hidden />
+              </Link>
+              {signedIn ? (
+                <MotionIconControl
+                  label="Sign out"
+                  icon={LogoutIcon}
+                  size={20}
+                  onClick={() => void signOut({ callbackUrl: "/" })}
+                  className="rounded-xl p-2.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200"
+                />
+              ) : (
+                <MotionIconControl
+                  label="Sign in"
+                  icon={MailboxIcon}
+                  size={20}
+                  onClick={() => setAuthOpen(true)}
+                  className="rounded-xl p-2.5 text-mist-500 transition-colors hover:bg-white/5 hover:text-aurora-300"
+                />
+              )}
+            </div>
+          )}
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">{children}</div>
+
+      <StudioNavSheet
+        open={navOpen}
+        onClose={closeNav}
+        titleId={navTitleId}
+      >
+        <div id="studio-nav-sheet" className="flex min-h-0 flex-1 flex-col">
+          <div className="mb-3 flex items-center justify-between gap-2 px-1">
+            <Link href="/" onClick={closeNav} className="transition-opacity hover:opacity-80">
+              <BrandMark />
+            </Link>
+            <button
+              type="button"
+              onClick={closeNav}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-mist-400 transition-colors hover:bg-white/5 hover:text-mist-100"
+              aria-label="Close menu"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+          </div>
+          <h2 id={navTitleId} className="sr-only">
+            Studio navigation
+          </h2>
+          <nav className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+            {renderNavItems("sheet")}
+          </nav>
+          <div className="mt-3 border-t border-white/5 pt-3">
+            <Link
+              href="/app/settings"
+              onClick={closeNav}
+              className={`block rounded-xl border p-2 transition-colors ${
+                settingsActive
+                  ? "border-aurora-400/30 bg-aurora-400/10"
+                  : "border-white/8 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.05]"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-aurora-400/15 text-xs font-semibold text-aurora-300">
+                  {signedIn ? (displayName?.[0] ?? userEmail?.[0] ?? "U").toUpperCase() : "G"}
+                </div>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p className="truncate text-base font-medium text-mist-100">
+                    {signedIn ? (displayName ?? userEmail ?? "Account") : "Guest"}
+                  </p>
+                  <p className="truncate text-sm text-mist-500">Settings</p>
+                </div>
+              </div>
+            </Link>
+            {signedIn ? (
+              <button
+                type="button"
+                onClick={() => {
+                  closeNav();
+                  void signOut({ callbackUrl: "/" });
+                }}
+                className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl text-sm text-mist-400 transition-colors hover:bg-white/5 hover:text-mist-100"
+              >
+                Sign out
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  closeNav();
+                  setAuthOpen(true);
+                }}
+                className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl text-sm font-medium text-aurora-300 transition-colors hover:bg-aurora-400/10"
+              >
+                Sign in
+              </button>
+            )}
+          </div>
+        </div>
+      </StudioNavSheet>
 
       <AuthModal
         open={authOpen}

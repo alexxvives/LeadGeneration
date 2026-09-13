@@ -232,7 +232,11 @@ export function ContactsView({
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
-          <div className="grid content-start gap-3 sm:grid-cols-2">
+          <div
+            className={`grid content-start gap-3 sm:grid-cols-2 ${
+              selected ? "hidden lg:grid" : ""
+            }`}
+          >
             {contacts.map((c) => {
               const pending =
                 c.followUps?.filter((f) => isUserFollowUp(f) && !f.done)
@@ -286,15 +290,24 @@ export function ContactsView({
             })}
           </div>
           {selected ? (
-            <ContactPanel
-              contact={selected}
-              boardName={boardName(selected.boardId)}
-              disabled={editLocked}
-              lockHint={lockHint}
-              onClose={() => onSelect(null)}
-              onUpdate={onUpdate}
-              onDelete={onDelete}
-            />
+            <div className="flex min-h-0 min-w-0 flex-col">
+              <button
+                type="button"
+                onClick={() => onSelect(null)}
+                className="mb-3 inline-flex min-h-11 items-center gap-2 self-start rounded-full border border-white/10 px-3 text-sm text-mist-300 transition-colors hover:border-white/20 hover:text-mist-100 lg:hidden"
+              >
+                ← Back to contacts
+              </button>
+              <ContactPanel
+                contact={selected}
+                boardName={boardName(selected.boardId)}
+                disabled={editLocked}
+                lockHint={lockHint}
+                onClose={() => onSelect(null)}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+              />
+            </div>
           ) : (
             <div className="hidden rounded-xl2 border border-dashed border-white/10 p-6 text-sm text-mist-500 lg:block">
               Select a contact to add notes and follow-ups.

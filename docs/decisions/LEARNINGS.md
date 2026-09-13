@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-13 — Studio overlay nav + phone layouts
+- Sidebar is `hidden lg:flex`. Below `lg`, `StudioShell` is `h-dvh` column +
+  top bar + labeled overlay (`StudioNavSheet` focus trap). Studio/settings
+  children must be `h-full` (not a second `h-dvh`) or the top bar overflows.
+- Pipeline/Outreach use CSS dual layouts (`lg:hidden` tabs vs `hidden lg:flex`
+  columns) so hydration does not flash the wrong chrome. Cards on the
+  narrow Pipeline list must **not** call `useDraggable` — they sit outside
+  `DndContext`.
+- Leads table preference is kept for desktop; below `lg` we show cards
+  unless the user picks Table/Map this session (`narrowLayout`).
+
 ### 2026-09-13 — Conversation drawer chrome
 - Lead info drawer no longer repeats the CRM stage pill above the name.
 - About sits under the two columns so the blurb can use the full width

@@ -93,6 +93,18 @@ token becomes the page color in light mode).
 </div>
 ```
 
+### Studio chrome (ADR 0037)
+- **`lg+` (1024px):** expandable left sidebar with labels.
+- **Below `lg`:** no in-flow rail. Top bar (hamburger, view name, board pill,
+  Settings) + labeled overlay sheet. Overlay: `role="dialog"`, focus trap,
+  Escape / backdrop / link close, focus return. Top-bar targets ≥ 44px.
+- **Kanban / multi-column queues** (Pipeline, Outreach): keep columns at `lg+`.
+  Below `lg`, use stage/bucket **tabs** + a single list. Do not put
+  `@dnd-kit` `useDraggable` on cards that render outside `DndContext`.
+- **Lead drawer:** edge-to-edge `h-dvh` sheet below `md`; centered modal at `md+`.
+- Fill-viewport views live in a `h-dvh` shell; page content is `h-full`, not a
+  second `h-dvh`.
+
 ### Section layout
 ```tsx
 <section className="mx-auto max-w-6xl px-6 pb-24">

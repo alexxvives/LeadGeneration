@@ -78,6 +78,7 @@ import {
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { TypeFilterMenu } from "./TypeFilterMenu";
+import { useMinBreakpoint } from "./use-min-breakpoint";
 import type { BoardSummary, ImportLeadRow } from "@/lib/types";
 
 const CRM_STAGE_FILTERS: CrmStage[] = [
@@ -212,9 +213,12 @@ export function Studio() {
   const [layout, setLayout] = useState<LeadsLayout>("table");
   /** Toggle highlight — updates urgently; `layout` (pane) may lag in a transition. */
   const [layoutTab, setLayoutTab] = useState<LeadsLayout>("table");
+  /** Explicit pick on narrow screens — does not overwrite the desktop-stored layout. */
+  const [narrowLayout, setNarrowLayout] = useState<LeadsLayout | null>(null);
+  const isLg = useMinBreakpoint("lg");
   /** Keep each layout mounted after first visit so switching stays instant. */
   const [visitedLayouts, setVisitedLayouts] = useState<Set<LeadsLayout>>(
-    () => new Set(["table"]),
+    () => new Set(["table", "cards"]),
   );
   /** Keep Pipeline / Outreach / Leads mounted so re-entering doesn’t rebuild. */
   const [visitedSticky, setVisitedSticky] = useState<Set<StickyView>>(
@@ -1911,6 +1915,7 @@ export function Studio() {
 
   /** Tab highlight updates immediately; pane mount/swap is deferred. */
   const selectLayout = (next: "table" | "cards" | "map") => {
+    if (!isLg) setNarrowLayout(next);
     setLayoutTab(next);
     if (next === layout && visitedLayouts.has(next)) return;
     startLayoutTransition(() => {
@@ -1924,9 +1929,16 @@ export function Studio() {
     });
   };
 
-  const tableLeads = useActiveLeads(layout === "table", filteredLeads);
-  const cardsLeads = useActiveLeads(layout === "cards", filteredLeads);
-  const mapLeads = useActiveLeads(layout === "map", filteredLeads);
+  const shownLayout: LeadsLayout = isLg
+    ? layout
+    : (narrowLayout ?? (layout === "table" ? "cards" : layout));
+  const shownLayoutTab: LeadsLayout = isLg
+    ? layoutTab
+    : (narrowLayout ?? (layoutTab === "table" ? "cards" : layoutTab));
+
+  const tableLeads = useActiveLeads(shownLayout === "table", filteredLeads);
+  const cardsLeads = useActiveLeads(shownLayout === "cards", filteredLeads);
+  const mapLeads = useActiveLeads(shownLayout === "map", filteredLeads);
 
   // Background geocode for the whole board — any studio page, not only Map.
   // Hash locations so CRM/status patches don’t cancel an in-flight prefetch.
@@ -1954,8 +1966,8 @@ export function Studio() {
   // Warm revisits (data + current layout already known) skip the blank frame.
   const [leadsBodyReady, setLeadsBodyReady] = useState(false);
   const [, startLeadsBodyTransition] = useTransition();
-  const layoutTabRef = useRef(layoutTab);
-  layoutTabRef.current = layoutTab;
+  const layoutTabRef = useRef(shownLayoutTab);
+  layoutTabRef.current = shownLayoutTab;
   const visitedLayoutsRef = useRef(visitedLayouts);
   visitedLayoutsRef.current = visitedLayouts;
   const boardLeadsLenRef = useRef(board?.leads.length ?? 0);
@@ -1999,7 +2011,7 @@ export function Studio() {
       view === "calendar");
 
   // Skeleton for hydrate / first body / first visit to a layout tab only.
-  const layoutPaneReady = visitedLayouts.has(layoutTab);
+  const layoutPaneReady = visitedLayouts.has(shownLayoutTab);
   const leadsContentPending =
     view === "leads" &&
     (loading ||
@@ -2129,11 +2141,11 @@ export function Studio() {
 
   return (
     <BoardLockUiProvider locked={editLocked} holder={lockHolder}>
-    <main className="mx-auto flex h-dvh max-w-[90rem] flex-col overflow-hidden px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-3 sm:pt-8">
-      <div className="mb-5 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+    <main className="mx-auto flex h-full max-w-[90rem] flex-col overflow-hidden px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-3 sm:pt-8 lg:pt-8">
+      <div className="mb-4 grid shrink-0 grid-cols-1 items-end gap-3 sm:mb-6 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            <h1 className="hidden font-display text-3xl font-semibold tracking-tight lg:block lg:text-4xl">
               {view === "dashboard"
                 ? "Dashboard"
                 : view === "boards"
@@ -2190,7 +2202,7 @@ export function Studio() {
               </span>
             ) : null}
           </div>
-          <p className="mt-0.5 text-sm text-mist-500">
+          <p className="mt-0.5 hidden text-sm text-mist-500 lg:block">
             {view === "dashboard"
               ? "Overview of leads and activity across your boards."
               : view === "boards"
@@ -2223,7 +2235,7 @@ export function Studio() {
         view !== "admin-users" &&
         board?.workspace &&
         meterCount > 0 ? (
-          <div className="flex min-w-0 max-w-md flex-col gap-1 justify-self-stretch sm:min-w-[16rem] sm:justify-self-center sm:min-w-[22rem]">
+          <div className="flex min-w-0 max-w-md flex-col gap-1 justify-self-stretch sm:justify-self-center">
             <div
               className={`grid gap-4 ${
                 meterCount > 1 ? "grid-cols-2" : "grid-cols-1"
@@ -2286,7 +2298,7 @@ export function Studio() {
             </label>
           ) : null}
           {showLeadSearch ? (
-            <div className="flex h-9 shrink-0 flex-nowrap items-center justify-end gap-2">
+            <div className="flex min-h-9 w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
               {view === "outreach" ? (
                 <TypeFilterMenu
                   value={outreachTypeFilter}
@@ -2294,7 +2306,7 @@ export function Studio() {
                   onChange={setOutreachTypeFilter}
                 />
               ) : null}
-              <label className="relative inline-flex h-full w-44 shrink-0 items-center sm:w-56">
+              <label className="relative inline-flex h-9 min-w-0 flex-1 items-center sm:w-56 sm:flex-none">
                 <span className="sr-only">Search leads</span>
                 <input
                   type="search"
@@ -2505,13 +2517,13 @@ export function Studio() {
               ) : null}
             </div>
             <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
-              <LayoutToggle active={layoutTab === "table"} onClick={() => selectLayout("table")}>
+              <LayoutToggle active={shownLayoutTab === "table"} onClick={() => selectLayout("table")}>
                 Table
               </LayoutToggle>
-              <LayoutToggle active={layoutTab === "cards"} onClick={() => selectLayout("cards")}>
+              <LayoutToggle active={shownLayoutTab === "cards"} onClick={() => selectLayout("cards")}>
                 Cards
               </LayoutToggle>
-              <LayoutToggle active={layoutTab === "map"} onClick={() => selectLayout("map")}>
+              <LayoutToggle active={shownLayoutTab === "map"} onClick={() => selectLayout("map")}>
                 Map
               </LayoutToggle>
             </div>
@@ -2523,7 +2535,7 @@ export function Studio() {
                     e.target.value === "all" ? "all" : (e.target.value as CrmStage),
                   )
                 }
-                className="min-w-[9rem] py-1.5 text-xs"
+                className="min-w-0 py-1.5 text-xs sm:min-w-[9rem]"
                 aria-label="Filter by pipeline stage"
               >
                 <option value="all">All stages</option>
@@ -2537,7 +2549,7 @@ export function Studio() {
           </div>
           <div className="relative min-h-0 flex-1 overflow-hidden">
             {loading || leadsHydrating || !board ? (
-              <LeadsLayoutSkeleton layout={layoutTab} />
+              <LeadsLayoutSkeleton layout={shownLayoutTab} />
             ) : !hasLeads ? (
               <EmptyState actionHref={searchHref} />
             ) : (
@@ -2546,11 +2558,11 @@ export function Studio() {
                 {leadsBodyReady && visitedLayouts.has("map") ? (
                   <div
                     className={
-                      layout === "map"
+                      shownLayout === "map"
                         ? "absolute inset-0"
                         : "pointer-events-none invisible absolute inset-0 -z-10"
                     }
-                    aria-hidden={layout !== "map"}
+                    aria-hidden={shownLayout !== "map"}
                   >
                     <LeadMap
                       leads={mapLeads}
@@ -2563,11 +2575,11 @@ export function Studio() {
                 {leadsBodyReady && visitedLayouts.has("cards") ? (
                   <div
                     className={
-                      layout === "cards"
+                      shownLayout === "cards"
                         ? "absolute inset-0 overflow-hidden"
                         : "pointer-events-none invisible absolute inset-0 -z-10 overflow-hidden"
                     }
-                    aria-hidden={layout !== "cards"}
+                    aria-hidden={shownLayout !== "cards"}
                   >
                     {cardsLeads.length === 0 ? (
                       <p className="py-12 text-center text-sm text-mist-500">
@@ -2591,11 +2603,11 @@ export function Studio() {
                 {leadsBodyReady && visitedLayouts.has("table") ? (
                   <div
                     className={
-                      layout === "table"
+                      shownLayout === "table"
                         ? "absolute inset-0 flex min-h-0 flex-col"
                         : "pointer-events-none invisible absolute inset-0 -z-10 overflow-hidden"
                     }
-                    aria-hidden={layout !== "table"}
+                    aria-hidden={shownLayout !== "table"}
                   >
                     <LeadTable
                       leads={tableLeads}
@@ -2616,7 +2628,7 @@ export function Studio() {
                     aria-busy="true"
                     aria-label="Loading leads"
                   >
-                  <LeadsLayoutSkeleton layout={layoutTab} />
+                  <LeadsLayoutSkeleton layout={shownLayoutTab} />
                 </div>
               ) : null}
               </>
@@ -3102,7 +3114,7 @@ export function Studio() {
       {toastHost
         ? createPortal(
             <div
-              className="pointer-events-none fixed bottom-6 left-6 z-[2000] flex flex-col gap-2"
+              className="pointer-events-none fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-4 right-4 z-[2000] flex flex-col gap-2 sm:left-6 sm:right-auto"
               role="status"
               aria-live="polite"
             >

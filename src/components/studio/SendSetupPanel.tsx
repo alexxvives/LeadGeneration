@@ -276,7 +276,7 @@ export function SendSetupPanel({
             }}
             placeholder="you@example.com"
             disabled={!canEdit || testBusy}
-            className="min-w-[14rem] flex-1 rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60 disabled:opacity-50"
+            className="min-w-0 flex-1 rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60 disabled:opacity-50"
           />
           <button
             type="button"

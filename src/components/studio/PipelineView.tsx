@@ -73,6 +73,8 @@ const PARKED_COLUMNS: {
   },
 ];
 
+const ALL_STAGE_TABS = [...MAIN_COLUMNS, ...PARKED_COLUMNS];
+
 // ─── Pipeline (CRM kanban with drag-and-drop) ─────────────────────────────────
 
 function compareColumnLeads(stage: CrmStage) {
@@ -194,6 +196,7 @@ export function PipelineView({
   const [parkedOpen, setParkedOpen] = useState<Record<string, boolean>>({
     not_interested: false,
   });
+  const [narrowStage, setNarrowStage] = useState<CrmStage>("new");
 
   // Distance for pointer; keyboard for a11y. Touch can scroll columns (no touch-none).
   const sensors = useSensors(
@@ -229,22 +232,106 @@ export function PipelineView({
     onOpen(id);
   };
 
+  const narrowCol =
+    ALL_STAGE_TABS.find((c) => c.stage === narrowStage) ?? MAIN_COLUMNS[0]!;
+  const narrowLeads = useStageLeads(leads, narrowCol.stage, backfilling);
+  const narrowCount = filterActive
+    ? narrowLeads.length
+    : (stageCounts?.[narrowCol.stage] ?? narrowLeads.length);
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
-        {leads.length === 1 ? "" : "s"} · click for info
+        {leads.length === 1 ? "" : "s"} · tap for info
         {editLocked
-          ? ` · ${holder ?? "Someone else"} is editing — take control to drag stages`
-          : " · drag to move stage"}
+          ? ` · ${holder ?? "Someone else"} is editing — take control to move stages`
+          : <span className="hidden lg:inline"> · drag to move stage</span>}
+        {editLocked ? null : (
+          <span className="lg:hidden"> · use Move to change stage</span>
+        )}
       </p>
 
+      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
+        <div
+          className="flex shrink-0 gap-1 overflow-x-auto pb-1"
+          role="tablist"
+          aria-label="Pipeline stage"
+        >
+          {ALL_STAGE_TABS.map((col) => {
+            const count = filterActive
+              ? leads.filter((l) => l.crmStage === col.stage).length
+              : (stageCounts?.[col.stage] ??
+                leads.filter((l) => l.crmStage === col.stage).length);
+            const active = narrowStage === col.stage;
+            return (
+              <button
+                key={col.stage}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setNarrowStage(col.stage)}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-aurora-400 text-on-accent"
+                    : "border border-white/10 bg-ink-900/60 text-mist-300 hover:text-mist-100"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${col.color} ${active ? "ring-1 ring-ink-950/40" : ""}`} />
+                {col.title}
+                <span className="tabular-nums opacity-80">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40">
+          {narrowLeads.length === 0 ? (
+            backfilling && !filterActive && narrowCount > 0 ? (
+              <div
+                className="flex flex-col gap-2 p-3"
+                role="status"
+                aria-busy="true"
+                aria-label={`Loading ${narrowCol.title} leads`}
+              >
+                {Array.from({ length: Math.min(3, narrowCount) }, (_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-xl border border-white/8 bg-ink-950/50 p-3"
+                  >
+                    <Bone className="h-4 w-3/4 max-w-[12rem]" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
+                {filterActive ? "No matching leads." : narrowCol.empty}
+              </p>
+            )
+          ) : (
+            <VirtualColumnList
+              items={narrowLeads}
+              estimateSize={96}
+              padding={12}
+              gap={8}
+              renderItem={(l) => (
+                <NarrowPipelineCard
+                  lead={l}
+                  onOpen={onOpen}
+                  onMoveStage={onMoveStage}
+                />
+              )}
+            />
+          )}
+        </div>
+      </div>
+
+      <div className="hidden min-h-0 flex-1 flex-col gap-3 lg:flex">
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           <div
             className="grid min-h-0 flex-1 gap-3 overflow-x-auto pb-1"
             style={{
-              gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(11rem, 1fr))`,
+              gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(9rem, 1fr))`,
             }}
           >
             {MAIN_COLUMNS.map((col) => (
@@ -292,6 +379,7 @@ export function PipelineView({
           ) : null}
         </DragOverlay>
       </DndContext>
+      </div>
     </div>
   );
 }
@@ -455,20 +543,48 @@ function MethodIcons({ methods }: { methods: ContactMethod[] }) {
   );
 }
 
-function DraggablePipelineCard({
+function NarrowPipelineCard({
   lead,
   onOpen,
-  isDragging,
+  onMoveStage,
 }: {
   lead: LeadWithOutreach;
   onOpen: (id: string) => void;
-  isDragging: boolean;
+  onMoveStage: (
+    leadId: string,
+    stage: CrmStage,
+    contactMethods?: ContactMethod[] | null,
+  ) => void;
 }) {
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
-  const { attributes, listeners, setNodeRef } = useDraggable({
-    id: lead.id,
-    disabled: editLocked,
-  });
+  return (
+    <div className="flex flex-col gap-1.5">
+      <PipelineCardFace lead={lead} onOpen={onOpen} />
+      <label className="px-1">
+        <span className="sr-only">Move {lead.company} to stage</span>
+        <select
+          value={lead.crmStage ?? "new"}
+          disabled={editLocked}
+          title={editLocked ? lockHint : "Move to stage"}
+          onChange={(e) => {
+            const next = e.target.value as CrmStage;
+            if (next === lead.crmStage) return;
+            onMoveStage(lead.id, next);
+          }}
+          className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-xs text-mist-100 outline-none focus:border-aurora-400/50 disabled:opacity-50"
+        >
+          {ALL_STAGE_TABS.map((col) => (
+            <option key={col.stage} value={col.stage}>
+              Move to {col.title}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
+function pipelineCardChrome(lead: LeadWithOutreach) {
   const pendingFollowUps =
     lead.followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
   const journalNotes =
@@ -482,23 +598,31 @@ function DraggablePipelineCard({
       ? [...methods, "phone"]
       : methods;
   const needsMethod = lead.crmStage === "contacted" && methods.length === 0;
+  return { pendingFollowUps, noteCount, replied, methods, missedCall, iconMethods, needsMethod };
+}
+
+function PipelineCardFace({
+  lead,
+  onOpen,
+  className = "",
+}: {
+  lead: LeadWithOutreach;
+  onOpen: (id: string) => void;
+  className?: string;
+}) {
+  const { pendingFollowUps, noteCount, replied, methods, missedCall, iconMethods, needsMethod } =
+    pipelineCardChrome(lead);
 
   return (
     <div
-      ref={setNodeRef}
-      {...attributes}
-      {...(editLocked ? {} : listeners)}
       onClick={() => onOpen(lead.id)}
-      title={editLocked ? lockHint : undefined}
-      className={`group flex h-auto items-start gap-1 rounded-xl px-3 py-2.5 transition-all ${
-        editLocked ? "cursor-not-allowed" : "cursor-grab touch-pan-y active:cursor-grabbing"
-      } ${
+      className={`group flex h-auto cursor-pointer items-start gap-1 rounded-xl px-3 py-2.5 transition-all ${
         replied
           ? "border border-sky-400/50 bg-sky-400/10 shadow-[0_0_0_1px_rgba(56,189,248,0.25)] ring-1 ring-sky-400/30 hover:bg-sky-400/15"
           : needsMethod
             ? "border border-amber-400/50 bg-amber-400/10 ring-1 ring-amber-400/30 hover:bg-amber-400/15"
             : "border border-white/5 bg-ink-900/60 hover:bg-white/[0.03]"
-      } ${isDragging ? "opacity-30" : ""}`}
+      } ${className}`}
     >
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1.5">
@@ -590,6 +714,36 @@ function DraggablePipelineCard({
       >
         <InfoIcon className="h-3.5 w-3.5" />
       </button>
+    </div>
+  );
+}
+
+function DraggablePipelineCard({
+  lead,
+  onOpen,
+  isDragging,
+}: {
+  lead: LeadWithOutreach;
+  onOpen: (id: string) => void;
+  isDragging: boolean;
+}) {
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: lead.id,
+    disabled: editLocked,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...(editLocked ? {} : listeners)}
+      title={editLocked ? lockHint : undefined}
+      className={`${
+        editLocked ? "cursor-not-allowed" : "cursor-grab touch-pan-y active:cursor-grabbing"
+      } ${isDragging ? "opacity-30" : ""}`}
+    >
+      <PipelineCardFace lead={lead} onOpen={onOpen} />
     </div>
   );
 }

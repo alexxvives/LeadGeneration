@@ -54,11 +54,13 @@ Search  →  Enrich  →  Draft  →  Send
   logged UUID). Magic link (SMTP/Resend) is **forgot password** (+ Turnstile
   when set). `/login` only redirects here (Auth.js `pages.signIn`). Unauth
   `/app` → `/?signin=1&callbackUrl=/app`.
-- **`/app` Studio** — the core app (behind login when auth is enforced). Sidebar
-  nav: **Dashboard · Search · Leads · Pipeline · Conversations · Outreach · Calendar · Contacts · Boards · Runs**.
-  Board filter (the active board) sits above the account card. Settings
-  opens from the **account card** at the bottom of the sidebar (not a Workspace
-  nav item). **Platform admins** get a slim ops nav (**Dashboard · Users**) and
+- **`/app` Studio** — the core app (behind login when auth is enforced). Nav
+  destinations: **Dashboard · Search · Leads · Pipeline · Conversations · Outreach · Calendar · Contacts · Boards · Runs**.
+  At **`lg+`** these live in the left sidebar; the board filter sits above the
+  account card. **Below `lg`** the sidebar is hidden — a top bar opens a
+  labeled overlay (ADR 0037) and the board pill sits in that bar. Settings
+  opens from the account card (or the top-bar gear), not a Workspace nav
+  item. **Platform admins** get a slim ops nav (**Dashboard · Users**) and
   an ops-only Settings page (no outreach/send profiles). Views use `?view=`:
 
   - **Dashboard** (`?view=dashboard`) — workspace-wide stats across all boards
@@ -79,9 +81,11 @@ Search  →  Enrich  →  Draft  →  Send
   - **Admin Users** (`?view=admin-users`) — tenant table: plan override, Find
     leads toggle, typed `DELETE` account wipe (cancels Stripe when configured).
 
-  - **Pipeline** (`?view=pipeline`) — CRM kanban for the active board filter
+  - **Pipeline** (`?view=pipeline`) — CRM for the active board filter
     (**All** = every board) across four active stages (*New · Contacted · In
-    Conversation · Closed*) plus *Not Interested*. Drag cards between columns.
+    Conversation · Closed*) plus *Not Interested*. At `lg+` this is a kanban
+    (drag cards between columns). Below `lg` it is one stage at a time
+    (tabs + Move select).
     Bulk draft lives on **Outreach** (Send stays per-lead).
     CRM **New** = needs human review (there is no separate “In review” tag).
     A **Missed call** stays in New but still shows the phone method icon
@@ -102,7 +106,8 @@ Search  →  Enrich  →  Draft  →  Send
     when available (or a Google search plan-B when no website). Map pins
     accumulate as the board hydrates; zoom/pan stay put until you change board.
 
-  - **Outreach** (`?view=outreach`) — send queue: **Contact Draft** (email
+  - **Outreach** (`?view=outreach`) — send queue at `lg+` as three columns;
+    below `lg` the same buckets are tabs (one list at a time): **Contact Draft** (email
     leads with no draft yet; **Draft all** writes them; **Re-draft all** rewrites
     Ready emails *and* drafts remaining Contact Draft leads) → **Ready** (has a
     draft, or phone-only; send or call as icons) → **Contacted**.
@@ -110,7 +115,7 @@ Search  →  Enrich  →  Draft  →  Send
     **Skip details** marks Contacted; **Missed call** journals the miss and
     stays in Ready.
     The same miss path exists from the lead’s **Notes**.
-    Closing the draft drawer does not send. The sidebar Board picker activates that
+    Closing the draft drawer does not send. The board picker activates that
     board’s linked outreach profile. Contacted **N sent today · ~Y/day suggest**
     is that board’s mailbox (boards that share an outreach profile share the
     cap) — not a workspace total. Send remains per-lead

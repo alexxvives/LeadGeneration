@@ -9,7 +9,7 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-13 (Conversation drawer polish)
+## ⏱️ Status — updated 2026-09-13 (Responsive studio UI)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0036** applied on prod D1 (`lodestar-prod`).  
@@ -17,15 +17,15 @@ first, and update the top block at the end of any session that changes state.**
 in the same release window as any schema-dependent code.
 
 ### This pass
-- Lead drawer: dropped header CRM pill; About spans full width; In
-  Conversation flags are title-only and side by side; no method chips on
-  that stage.
-- Conversation cards: waiting highlight only (no demo chip/toggle);
-  note preview skips follow-up reminders.
+- Studio chrome: overlay nav + top bar below `lg`; sidebar unchanged at `lg+`
+  (ADR 0037). Pipeline/Outreach are tabbed lists on narrow; Lead drawer is a
+  full-viewport sheet below `md`. Leads default to cards; Contacts use a Back
+  panel.
 
 ### Next
-1. Hard-refresh studio and check Conversations + an In Conversation drawer.
-2. Spot-check Contacts (still no method/demo chrome) and Calendar.
+1. Hard-refresh on a phone (or 390px) and walk overlay → Pipeline → lead
+   drawer → Send (still per-lead).
+2. Confirm `lg+` sidebar collapse and kanban drag still work.
 
 ---
 

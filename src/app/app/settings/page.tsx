@@ -69,7 +69,7 @@ export default async function SettingsPage() {
 
   if (isAdmin) {
     return (
-      <main className="relative mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8">
+      <main className="relative mx-auto h-full max-w-7xl overflow-y-auto px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-8">
         <div className="absolute right-3 top-3 z-20 sm:right-5 sm:top-4">
           <ThemeToggle />
         </div>
@@ -129,7 +129,7 @@ export default async function SettingsPage() {
   }
 
   return (
-    <main className="relative mx-auto min-h-dvh max-w-7xl px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-5 sm:pt-8">
+    <main className="relative mx-auto h-full max-w-7xl overflow-y-auto px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-8">
       <div className="absolute right-3 top-3 z-20 sm:right-5 sm:top-4">
         <ThemeToggle />
       </div>

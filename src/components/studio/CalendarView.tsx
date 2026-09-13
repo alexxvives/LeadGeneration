@@ -262,10 +262,10 @@ export function CalendarView({
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:flex-row lg:items-stretch lg:overflow-hidden">
       <section className="glass flex min-h-0 min-w-0 flex-1 flex-col rounded-xl2 p-4 sm:p-5">
-        <div className="relative mb-3 flex shrink-0 items-center justify-center">
+        <div className="relative mb-3 flex shrink-0 flex-col items-center gap-2 sm:flex-row sm:justify-center">
           <div className="flex items-center gap-2">
             <MonthChevron dir="prev" onClick={() => shiftMonth(-1)} />
-            <h2 className="min-w-[10rem] text-center font-display text-xl font-semibold text-mist-100">
+            <h2 className="min-w-0 text-center font-display text-lg font-semibold text-mist-100 sm:min-w-[10rem] sm:text-xl">
               {monthLabel(cursor.year, cursor.month)}
             </h2>
             <MonthChevron dir="next" onClick={() => shiftMonth(1)} />
@@ -273,7 +273,7 @@ export function CalendarView({
           <button
             type="button"
             onClick={goToday}
-            className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-mist-300 transition-colors hover:border-aurora-400/40 hover:text-mist-100"
+            className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-mist-300 transition-colors hover:border-aurora-400/40 hover:text-mist-100 sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2"
           >
             Today
           </button>
@@ -283,7 +283,7 @@ export function CalendarView({
           <div
             role="grid"
             aria-label={`Calendar for ${monthLabel(cursor.year, cursor.month)}`}
-            className="grid min-h-0 flex-1 grid-cols-7 gap-1"
+            className="grid min-h-0 min-w-0 flex-1 grid-cols-7 gap-0.5 sm:gap-1"
             style={{
               gridTemplateRows: `auto repeat(${weekRows}, minmax(0, 1fr))`,
             }}
@@ -292,9 +292,10 @@ export function CalendarView({
               <div
                 key={d}
                 role="columnheader"
-                className="px-1 py-1 text-center text-[11px] font-medium uppercase tracking-wider text-mist-500"
+                className="min-w-0 px-0.5 py-1 text-center text-[10px] font-medium uppercase tracking-wider text-mist-500 sm:px-1 sm:text-[11px]"
               >
-                {d}
+                  <span className="sm:hidden">{d[0]}</span>
+                  <span className="hidden sm:inline">{d}</span>
               </div>
             ))}
             {cells.map((cell) => {
@@ -325,7 +326,7 @@ export function CalendarView({
                     overdue ? ", overdue follow-up" : ""
                   }${missed ? `, ${missed} missed call${missed === 1 ? "" : "s"}` : ""}`}
                   onClick={() => setSelected(cell.iso)}
-                  className={`flex h-full min-h-0 flex-col items-start rounded-xl px-1.5 py-1.5 text-left transition-colors ${
+                  className={`flex h-full min-h-0 min-w-0 flex-col items-start rounded-lg px-1 py-1 text-left transition-colors sm:rounded-xl sm:px-1.5 sm:py-1.5 ${
                     isSelected
                       ? overdue
                         ? "bg-rose-400/20 ring-1 ring-rose-400/60"
@@ -376,7 +377,7 @@ export function CalendarView({
           </div>
         </div>
 
-        <ul className="relative mt-3 flex shrink-0 flex-wrap items-center justify-center gap-4 pr-24 text-[11px] text-mist-400">
+        <ul className="mt-3 flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] text-mist-400 sm:relative sm:pr-24">
           <LegendItem label="Follow up">
             <CalendarDaysIcon size={14} className="flex text-violet-300" aria-hidden />
           </LegendItem>
@@ -386,7 +387,7 @@ export function CalendarView({
           <LegendItem label="Phone call">
             <AnimatedPhoneIcon size={14} className="flex text-sky-400" aria-hidden />
           </LegendItem>
-          <li className="absolute right-0 top-1/2 inline-flex -translate-y-1/2 items-center gap-1.5">
+          <li className="inline-flex items-center gap-1.5 sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2">
             <span
               className="h-3.5 w-3.5 rounded-sm bg-rose-400/20 ring-1 ring-rose-400/50"
               aria-hidden

@@ -698,7 +698,7 @@ export function LeadDrawer(props: DrawerProps) {
 
   return (
     // Above Leaflet panes/controls (marker ~600, control ~1000).
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-[1100] flex items-stretch justify-center p-0 md:items-center md:p-4 lg:p-6">
       <div
         className="absolute inset-0 bg-ink-950/70 backdrop-blur-sm"
         onClick={requestClose}
@@ -710,15 +710,15 @@ export function LeadDrawer(props: DrawerProps) {
         aria-modal="true"
         aria-labelledby="lead-drawer-title"
         aria-busy={lead.detailLoaded !== true}
-        className={`animate-float-up relative flex w-full flex-col overflow-hidden border border-white/10 bg-ink-900 shadow-2xl ${
+        className={`relative flex w-full flex-col overflow-hidden border-white/10 bg-ink-900 shadow-2xl max-md:h-dvh max-md:border-0 md:animate-float-up md:border ${
           mode === "info"
-            ? "max-h-[min(90dvh,720px)] max-w-[67.1rem] rounded-xl2"
-            : "h-[min(92dvh,900px)] max-w-[56rem] rounded-xl2 sm:h-[min(90dvh,860px)]"
+            ? "max-md:max-h-none md:max-h-[min(90dvh,720px)] md:max-w-[67.1rem] md:rounded-xl2"
+            : "max-md:max-h-none md:h-[min(90dvh,860px)] md:max-w-[56rem] md:rounded-xl2"
         }`}
       >
 
         {/* Header */}
-        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-white/5 bg-ink-900/90 p-6 backdrop-blur-xl">
+        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-white/5 bg-ink-900/90 p-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl md:p-6 md:pt-6">
           <div className="min-w-0 flex-1 pr-2">
             {lead.detailLoaded !== true ? (
               <p className="sr-only" role="status">
@@ -860,7 +860,7 @@ export function LeadDrawer(props: DrawerProps) {
           {mode === "info" ? (
             <>
           <div className="grid min-h-0 flex-1 overflow-hidden sm:grid-cols-[minmax(0,1fr)_minmax(16rem,1fr)]">
-          <div className="min-h-0 space-y-6 overflow-y-auto p-6">
+          <div className="min-h-0 space-y-6 overflow-y-auto p-4 md:p-6">
           {/* CRM Stage picker */}
           <section>
             <SectionLabel>Sales stage</SectionLabel>
@@ -1407,7 +1407,7 @@ export function LeadDrawer(props: DrawerProps) {
             </div>
           </aside>
           </div>
-          <section className="shrink-0 border-t border-white/5 px-6 py-4">
+          <section className="shrink-0 border-t border-white/5 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
             <SectionLabel>About</SectionLabel>
             {lead.detailLoaded !== true ? (
               <LeadDrawerPendingSkeleton variant="about" />

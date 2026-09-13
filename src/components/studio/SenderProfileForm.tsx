@@ -521,7 +521,7 @@ export function SenderProfileForm() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <div ref={profileMenuRef} className="relative min-w-[14rem] flex-1">
+        <div ref={profileMenuRef} className="relative min-w-0 flex-1 sm:min-w-[14rem]">
           <div className="flex overflow-hidden rounded-lg border border-white/10 bg-ink-900/60 focus-within:border-aurora-400/60">
             <input
               value={profile.name}
@@ -657,7 +657,7 @@ export function SenderProfileForm() {
                   }}
                   placeholder="https://yourcompany.com"
                   autoFocus
-                  className="min-w-[12rem] flex-1 rounded-md border border-white/10 bg-ink-950/60 px-3 py-2 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
+                  className="min-w-0 flex-1 rounded-md border border-white/10 bg-ink-950/60 px-3 py-2 text-sm text-mist-100 outline-none placeholder:text-mist-500 focus:border-aurora-400/60"
                 />
                 <button
                   type="button"

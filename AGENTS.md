@@ -111,7 +111,8 @@ src/auth.ts          Full Auth.js: D1 adapter + workspace provisioning (server).
 src/app/             Routes. Pages + thin API handlers (api/*/route.ts).
   pricing/ login/    Public marketing + sign-in pages.
   api/{auth,billing,webhooks/stripe,turnstile}   Commercial endpoints.
-src/components/      UI. studio/* is the app; BrandMark / icons / ui are primitives.
+src/components/      UI. studio/* is the app (sidebar at lg+, overlay below);
+                     BrandMark / icons / ui are primitives.
 src/lib/
   types.ts           Domain models (Workspace/Board/Run/Lead/Contact/Outreach) — source of truth.
   lead-cache.ts      Client merge of slim poll/GET into cached leads (lastWriteAt / writePending).

@@ -248,6 +248,7 @@ export function OutreachView({
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const busySet = useMemo(() => new Set(busyIds), [busyIds]);
   const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
+  const [narrowBucket, setNarrowBucket] = useState<OutreachBucket>("ready");
   const skipReadyChannelPersist = useRef(true);
 
   // Keep Ready-column channel filter across tab switches / Settings (session only).
@@ -327,6 +328,168 @@ export function OutreachView({
 
   const columns: OutreachBucket[] = ["review", "ready", "contacted"];
 
+  const renderColumn = (key: OutreachBucket) => {
+    const meta = BUCKET_META[key];
+    const rows = groups[key];
+    return (
+      <section
+        key={key}
+        className="flex min-h-0 flex-1 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
+      >
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
+          <div className="min-w-0">
+            <h3 className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-mist-500">
+              {meta.title}
+              <span className="tabular-nums text-mist-400">{rows.length}</span>
+              {backfilling ? (
+                <span
+                  role="status"
+                  title="More leads are still loading"
+                  aria-label="More leads are still loading"
+                >
+                  <Spinner className="h-3 w-3 text-mist-400" />
+                </span>
+              ) : null}
+            </h3>
+            <p
+              className={`mt-0.5 text-[11px] ${
+                key === "contacted" && overSoftCap
+                  ? "text-amber-300/90"
+                  : "text-mist-600"
+              }`}
+              title={
+                key === "contacted"
+                  ? "Soft recommend for this board’s inbox (Settings → mailbox age). Warning only — not a hard block."
+                  : undefined
+              }
+            >
+              {key === "contacted"
+                ? contactedDayHint(sendsToday, softCap)
+                : meta.hint}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            {key === "ready" ? (
+              <div
+                className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-0.5"
+                role="group"
+                aria-label="Filter Ready by contact channel"
+              >
+                {(
+                  [
+                    ["all", "All"],
+                    ["email", "Email"],
+                    ["phone", "Phone"],
+                  ] as const
+                ).map(([id, label]) => {
+                  const active = readyChannel === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setReadyChannel(id)}
+                      className={`min-h-8 rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors ${
+                        active
+                          ? "bg-aurora-400 text-on-accent"
+                          : "text-mist-400 hover:text-mist-100"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+            {key === "review" && redraftAllAvailable ? (
+              <Lockable>
+                <button
+                  type="button"
+                  onClick={() => void onDraftAll({ redraft: true })}
+                  disabled={editLocked || busySet.has("draft-all")}
+                  title={
+                    editLocked
+                      ? lockHint
+                      : "Rewrite Ready emails and draft remaining Contact Draft leads"
+                  }
+                  className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
+                >
+                {busySet.has("draft-all") ? (
+                  <Spinner className="h-3 w-3" />
+                ) : (
+                  <PencilIcon className="h-3 w-3" />
+                )}
+                  Re-draft all
+                </button>
+              </Lockable>
+            ) : null}
+            {key === "review" && draftAllRemaining ? (
+              <Lockable>
+                <button
+                  type="button"
+                  onClick={() => void onDraftAll()}
+                  disabled={editLocked || busySet.has("draft-all")}
+                  title={
+                    editLocked
+                      ? lockHint
+                      : "Draft remaining email leads — they move to Ready to Contact"
+                  }
+                  className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
+                >
+                {busySet.has("draft-all") ? (
+                  <Spinner className="h-3 w-3" />
+                ) : (
+                  <CheckIcon className="h-3 w-3" />
+                )}
+                  Draft all
+                </button>
+              </Lockable>
+            ) : null}
+          </div>
+        </div>
+
+        {rows.length === 0 ? (
+          <div className="px-3 py-6 text-center text-[11px] text-mist-600">
+            {backfilling && key === "contacted"
+              ? "Loading contacted leads…"
+              : emptyCopy(key, leads, readyChannel)}
+          </div>
+        ) : (
+          <VirtualColumnList
+            items={rows}
+            estimateSize={52}
+            padding={0}
+            gap={0}
+            itemClassName=""
+            renderItem={(lead, i) => (
+              <OutreachRow
+                lead={lead}
+                bucket={key}
+                busy={
+                  busySet.has(lead.id) ||
+                  (!!lead.outreach?.id && busySet.has(lead.outreach.id))
+                }
+                canSendEmail={canSendEmail}
+                showDivider={i > 0}
+                onOpenInfo={() => onOpenInfo(lead.id)}
+                onOpenDraft={() => onOpenDraft(lead.id)}
+                onCreateDraft={() => onCreateDraft(lead.id)}
+                onSend={() =>
+                  lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
+                }
+                onMarkContacted={(method, opts) =>
+                  onMarkContacted(lead.id, method, opts)
+                }
+                onLogCall={
+                  onLogCall ? () => onLogCall(lead.id) : undefined
+                }
+              />
+            )}
+          />
+        )}
+      </section>
+    );
+  };
+
   return (
     <div data-tour="outreach-queue" className="flex h-full min-h-0 flex-col gap-3">
       {backfilling ? (
@@ -348,168 +511,37 @@ export function OutreachView({
           … top of each column first
         </p>
       ) : null}
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3 lg:items-stretch">
-        {columns.map((key) => {
-          const meta = BUCKET_META[key];
-          const rows = groups[key];
-          return (
-            <section
-              key={key}
-              className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
-            >
-              <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
-                <div className="min-w-0">
-                  <h3 className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-mist-500">
-                    {meta.title}
-                    <span className="tabular-nums text-mist-400">{rows.length}</span>
-                    {backfilling ? (
-                      <span
-                        role="status"
-                        title="More leads are still loading"
-                        aria-label="More leads are still loading"
-                      >
-                        <Spinner className="h-3 w-3 text-mist-400" />
-                      </span>
-                    ) : null}
-                  </h3>
-                  <p
-                    className={`mt-0.5 text-[11px] ${
-                      key === "contacted" && overSoftCap
-                        ? "text-amber-300/90"
-                        : "text-mist-600"
-                    }`}
-                    title={
-                      key === "contacted"
-                        ? "Soft recommend for this board’s inbox (Settings → mailbox age). Warning only — not a hard block."
-                        : undefined
-                    }
-                  >
-                    {key === "contacted"
-                      ? contactedDayHint(sendsToday, softCap)
-                      : meta.hint}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                  {key === "ready" ? (
-                    <div
-                      className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-0.5"
-                      role="group"
-                      aria-label="Filter Ready by contact channel"
-                    >
-                      {(
-                        [
-                          ["all", "All"],
-                          ["email", "Email"],
-                          ["phone", "Phone"],
-                        ] as const
-                      ).map(([id, label]) => {
-                        const active = readyChannel === id;
-                        return (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => setReadyChannel(id)}
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                              active
-                                ? "bg-aurora-400 text-on-accent"
-                                : "text-mist-400 hover:text-mist-100"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                  {key === "review" && redraftAllAvailable ? (
-                    <Lockable>
-                      <button
-                        type="button"
-                        onClick={() => void onDraftAll({ redraft: true })}
-                        disabled={editLocked || busySet.has("draft-all")}
-                        title={
-                          editLocked
-                            ? lockHint
-                            : "Rewrite Ready emails and draft remaining Contact Draft leads"
-                        }
-                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                      >
-                      {busySet.has("draft-all") ? (
-                        <Spinner className="h-3 w-3" />
-                      ) : (
-                        <PencilIcon className="h-3 w-3" />
-                      )}
-                        Re-draft all
-                      </button>
-                    </Lockable>
-                  ) : null}
-                  {key === "review" && draftAllRemaining ? (
-                    <Lockable>
-                      <button
-                        type="button"
-                        onClick={() => void onDraftAll()}
-                        disabled={editLocked || busySet.has("draft-all")}
-                        title={
-                          editLocked
-                            ? lockHint
-                            : "Draft remaining email leads — they move to Ready to Contact"
-                        }
-                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                      >
-                      {busySet.has("draft-all") ? (
-                        <Spinner className="h-3 w-3" />
-                      ) : (
-                        <CheckIcon className="h-3 w-3" />
-                      )}
-                        Draft all
-                      </button>
-                    </Lockable>
-                  ) : null}
-                </div>
-              </div>
-
-              {rows.length === 0 ? (
-                <div className="px-3 py-6 text-center text-[11px] text-mist-600">
-                  {backfilling && key === "contacted"
-                    ? "Loading contacted leads…"
-                    : emptyCopy(key, leads, readyChannel)}
-                </div>
-              ) : (
-                <VirtualColumnList
-                  items={rows}
-                  estimateSize={52}
-                  padding={0}
-                  gap={0}
-                  itemClassName=""
-                  renderItem={(lead, i) => (
-                    <OutreachRow
-                      lead={lead}
-                      bucket={key}
-                      busy={
-                        busySet.has(lead.id) ||
-                        (!!lead.outreach?.id && busySet.has(lead.outreach.id))
-                      }
-                      canSendEmail={canSendEmail}
-                      showDivider={i > 0}
-                      onOpenInfo={() => onOpenInfo(lead.id)}
-                      onOpenDraft={() => onOpenDraft(lead.id)}
-                      onCreateDraft={() => onCreateDraft(lead.id)}
-                      onSend={() =>
-                        lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
-                      }
-                      onMarkContacted={(method, opts) =>
-                        onMarkContacted(lead.id, method, opts)
-                      }
-                      onLogCall={
-                        onLogCall ? () => onLogCall(lead.id) : undefined
-                      }
-                    />
-                  )}
-                />
-              )}
-            </section>
-          );
-        })}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
+        <div
+          className="flex shrink-0 gap-1 overflow-x-auto pb-1"
+          role="tablist"
+          aria-label="Outreach queue"
+        >
+          {columns.map((key) => {
+            const active = narrowBucket === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setNarrowBucket(key)}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-aurora-400 text-on-accent"
+                    : "border border-white/10 bg-ink-900/60 text-mist-300 hover:text-mist-100"
+                }`}
+              >
+                {BUCKET_META[key].title}
+                <span className="tabular-nums opacity-80">{groups[key].length}</span>
+              </button>
+            );
+          })}
+        </div>
+        {renderColumn(narrowBucket)}
+      </div>
+      <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-cols-3 lg:items-stretch">
+        {columns.map((key) => renderColumn(key))}
       </div>
     </div>
   );
