@@ -18,14 +18,12 @@ const CRM_STAGES: readonly CrmStage[] = [
 export type LeadsLayout = "table" | "cards" | "map";
 
 export type StudioUiPrefs = {
-  leadSearch: string;
   pipelineFilter: CrmStage | "all";
   outreachTypeFilter: string;
   layout: LeadsLayout;
 };
 
 const DEFAULTS: StudioUiPrefs = {
-  leadSearch: "",
   pipelineFilter: "all",
   outreachTypeFilter: "all",
   layout: "table",
@@ -46,8 +44,6 @@ export function loadStudioUiPrefs(): StudioUiPrefs {
     if (!raw) return { ...DEFAULTS };
     const parsed = JSON.parse(raw) as Partial<StudioUiPrefs>;
     return {
-      leadSearch:
-        typeof parsed.leadSearch === "string" ? parsed.leadSearch : DEFAULTS.leadSearch,
       pipelineFilter: isStageFilter(parsed.pipelineFilter)
         ? parsed.pipelineFilter
         : DEFAULTS.pipelineFilter,

@@ -39,8 +39,8 @@ export function isEmailSentNote(note: string): boolean {
 
 export function isPhoneCallNote(note: string): boolean {
   const t = note.trim().toLowerCase();
-  if (t.startsWith("phone call by")) return true;
-  if (t.startsWith("missed call by")) return true;
+  if (t.startsWith("phone call")) return true;
+  if (t.startsWith("missed call")) return true;
   if (t.startsWith("contacted by phone")) return true;
   if (t.startsWith("called")) return true;
   if (t.startsWith("logged as called")) return true;
@@ -48,7 +48,7 @@ export function isPhoneCallNote(note: string): boolean {
 }
 
 export function isMissedCallNote(note: string): boolean {
-  return /^missed call by\b/i.test(note.trim());
+  return /^missed call\b/i.test(note.trim());
 }
 
 export function leadHasMissedCall(
@@ -66,21 +66,19 @@ export function isContactRegisteredNote(note: string): boolean {
   return /^contact registered(?:\s*[—–-].*)?$/i.test(note.trim());
 }
 
-export function callNoteActor(name?: string | null): string {
-  const t = name?.trim();
-  return t || "you";
+export function phoneCallNotePrefix(_name?: string | null): string {
+  void _name;
+  return "Phone call: ";
 }
 
-export function phoneCallNotePrefix(name?: string | null): string {
-  return `Phone call by ${callNoteActor(name)}: `;
+export function missedCallNotePrefix(_name?: string | null): string {
+  void _name;
+  return "Missed call";
 }
 
-export function missedCallNotePrefix(name?: string | null): string {
-  return `Missed call by ${callNoteActor(name)}`;
-}
-
-export function emailSentNotePrefix(name?: string | null): string {
-  return `Email sent by ${callNoteActor(name)}: `;
+export function emailSentNotePrefix(_name?: string | null): string {
+  void _name;
+  return "Email sent";
 }
 
 /** Drop a trailing colon when the missed-call line has no extra body. */
@@ -98,8 +96,8 @@ export function normalizeEmailSentNote(note: string): string {
 /** Strip a connected/missed call prefix so we can switch Connected ↔ Missed. */
 export function stripCallNotePrefix(note: string): string {
   return note
-    .replace(/^phone call by [^:]+:\s*/i, "")
-    .replace(/^missed call by [^:]+(?::\s*)?/i, "");
+    .replace(/^phone call(?:\s+by [^:]+)?(?::\s*)?/i, "")
+    .replace(/^missed call(?:\s+by [^:]+)?(?::\s*)?/i, "");
 }
 
 export function inferFollowUpKind(note: string): FollowUpKind {
@@ -151,7 +149,8 @@ const NOTE_PREVIEW_MAX = 140;
  * kinds keep a short preview so Conversations cards can show recent comments.
  */
 export function slimFollowUpsForList(followUps: FollowUp[]): FollowUp[] {
-  return followUps.map((f) => {
+  return followUps.map((raw) => {
+    const f = canonicalizeFollowUp(raw);
     const kind = resolveFollowUpKind(f);
     const missed = isMissedCallNote(f.note);
     const keepPreview =
@@ -210,16 +209,76 @@ export function authorInitials(name: string | null | undefined): string {
   return `${parts[0]![0] ?? ""}${parts[parts.length - 1]![0] ?? ""}`.toUpperCase();
 }
 
-/** Stored author, or a trailing "by {name}" on send/call lines. */
+/** Stored author, or a name peeled from legacy “by …” / “— name” copy. */
 export function followUpAuthorName(fu: FollowUp): string | null {
   const stored = fu.authorName?.trim();
-  if (stored) return stored;
-  const m = fu.note.match(
-    /^(?:email sent|phone call|missed call|contacted via [^ ]+) by\s+([^:]+?)(?::\s*|$)/i,
-  );
-  const parsed = m?.[1]?.trim();
-  if (!parsed || /^you$/i.test(parsed)) return null;
-  return parsed;
+  if (stored && !/^you$/i.test(stored)) return stored;
+  return peelActorFromNote(fu.note).authorName;
+}
+
+/**
+ * Pull a person off legacy journal copy and leave a name-free line.
+ * “Email sent by Alex” → { Email sent, Alex }; “Contacted via Organic / web — ana” → Organic.
+ */
+export function peelActorFromNote(note: string): {
+  note: string;
+  authorName: string | null;
+} {
+  const t = note.replace(/\s+/g, " ").trim();
+  if (!t) return { note: "", authorName: null };
+
+  const take = (name: string | undefined, rest: string) => {
+    const who = name?.trim() ?? "";
+    const authorName = who && !/^you$/i.test(who) ? who : null;
+    return { note: rest.replace(/:\s*$/, "").trim(), authorName };
+  };
+
+  let m = t.match(/^(email sent) by\s+([^:]+?)(?::\s*(.*))?$/i);
+  if (m) {
+    const rest = m[3]?.trim();
+    return take(m[2], rest ? `${m[1]}: ${rest}` : m[1]!);
+  }
+  m = t.match(/^(missed call) by\s+([^:]+?)(?::\s*(.*))?$/i);
+  if (m) {
+    const rest = m[3]?.trim();
+    return take(m[2], rest ? `${m[1]}: ${rest}` : m[1]!);
+  }
+  m = t.match(/^(phone call) by\s+([^:]+?)(?::\s*(.*))?$/i);
+  if (m) {
+    const rest = m[3]?.trim();
+    return take(m[2], rest ? `${m[1]}: ${rest}` : m[1]!);
+  }
+  m = t.match(/^(contacted via .+?)\s+[—–-]\s+(.+)$/i);
+  if (m) return take(m[2], m[1]!);
+
+  return { note: t.replace(/:\s*$/, ""), authorName: null };
+}
+
+function tidyChannelCopy(note: string): string {
+  return note
+    .replace(/\bOrganic\s*\/\s*web\b/gi, "Organic")
+    .replace(/:\s*$/, "")
+    .trim();
+}
+
+/** Name-free journal line + authorName. Safe to run on every read/write. */
+export function canonicalizeFollowUp(fu: FollowUp): FollowUp {
+  const peeled = peelActorFromNote(fu.note ?? "");
+  const note = tidyChannelCopy(peeled.note);
+  const stored = fu.authorName?.trim();
+  const authorName =
+    stored && !/^you$/i.test(stored) ? stored : peeled.authorName;
+  if (
+    note === (fu.note ?? "") &&
+    (authorName ?? null) === (fu.authorName?.trim() || null)
+  ) {
+    return fu;
+  }
+  return {
+    ...fu,
+    note,
+    ...(authorName ? { authorName } : { authorName: fu.authorName }),
+  };
 }
 
 export function withFollowUpAuthor(
@@ -268,14 +327,15 @@ export function calendarEventsFromLeads(
     for (const fu of lead.followUps ?? []) {
       const kind = resolveFollowUpKind(fu);
       if (kind === "note" || kind === "task") continue;
+      const canon = canonicalizeFollowUp(fu);
       out.push({
-        id: fu.id,
+        id: canon.id,
         source: "lead",
         leadId: lead.id,
         company: lead.company,
-        date: fu.date,
-        note: fu.note,
-        done: fu.done,
+        date: canon.date,
+        note: canon.note,
+        done: canon.done,
         kind,
       });
     }
@@ -289,15 +349,16 @@ export function calendarEventsFromContacts(contacts: Contact[]): CalendarEvent[]
     for (const fu of contact.followUps ?? []) {
       const kind = resolveFollowUpKind(fu);
       if (kind === "note" || kind === "task") continue;
+      const canon = canonicalizeFollowUp(fu);
       out.push({
-        id: fu.id,
+        id: canon.id,
         source: "contact",
         leadId: "",
         contactId: contact.id,
         company: contact.name,
-        date: fu.date,
-        note: fu.note,
-        done: fu.done,
+        date: canon.date,
+        note: canon.note,
+        done: canon.done,
         kind,
       });
     }
@@ -306,33 +367,21 @@ export function calendarEventsFromContacts(contacts: Contact[]): CalendarEvent[]
 }
 
 /**
- * Drop a bare "Email sent" when a named "Email sent by …" already exists
- * that day (drawer heal used to add a second row). Keep multiple named
- * sends on the same day — clicking Email again logs another one.
+ * Drop a second bare "Email sent" on the same day. Names live on authorName
+ * now — do not rewrite the line to “Email sent by …”.
  */
 export function collapseEmailSentFollowUps(
   followUps: FollowUp[],
   actorName?: string | null,
 ): FollowUp[] {
-  const name = actorName?.trim() || null;
-  const namedDates = new Set<string>();
-  for (const f of followUps) {
-    if (/^email sent by\b/i.test(f.note.trim())) namedDates.add(f.date);
-  }
   const seenBareDates = new Set<string>();
-  return followUps.flatMap((f) => {
+  return followUps.flatMap((raw) => {
+    const f = withFollowUpAuthor(canonicalizeFollowUp(raw), actorName);
     if (!isEmailSentNote(f.note)) return [f];
-    const trimmed = f.note.trim();
-    const isBare = /^email sent$/i.test(trimmed);
-    if (isBare) {
-      if (namedDates.has(f.date)) return [];
-      if (seenBareDates.has(f.date)) return [];
-      seenBareDates.add(f.date);
-      if (name) {
-        return [{ ...f, note: `Email sent by ${name}`, kind: "email" }];
-      }
-      return [{ ...f, kind: f.kind ?? "email" }];
-    }
+    const isBare = /^email sent$/i.test(f.note.trim());
+    if (!isBare) return [{ ...f, kind: f.kind ?? "email" }];
+    if (seenBareDates.has(f.date)) return [];
+    seenBareDates.add(f.date);
     return [{ ...f, kind: f.kind ?? "email" }];
   });
 }
@@ -351,14 +400,16 @@ export function mergeFollowUpLists(
 ): FollowUp[] {
   if (cached.length === 0 && incoming.length === 0) return incoming;
   if (incoming.length === 0) {
-    return droppedIds?.size
+    const kept = droppedIds?.size
       ? cached.filter((f) => !droppedIds.has(f.id))
       : cached;
+    return kept.map(canonicalizeFollowUp);
   }
   if (cached.length === 0) {
-    return droppedIds?.size
+    const kept = droppedIds?.size
       ? incoming.filter((f) => !droppedIds.has(f.id))
       : incoming;
+    return kept.map(canonicalizeFollowUp);
   }
   // Full drawer GET: restore note bodies. Keep cached-only ids (optimistic add).
   if (opts?.preferIncoming) {
@@ -367,11 +418,11 @@ export function mergeFollowUpLists(
     for (const f of incoming) {
       if (droppedIds?.has(f.id)) continue;
       incomingIds.add(f.id);
-      out.push(f);
+      out.push(canonicalizeFollowUp(f));
     }
     for (const f of cached) {
       if (droppedIds?.has(f.id) || incomingIds.has(f.id)) continue;
-      out.push(f);
+      out.push(canonicalizeFollowUp(f));
     }
     return out;
   }
@@ -384,26 +435,26 @@ export function mergeFollowUpLists(
     seen.add(f.id);
     const inc = patchExisting ? incomingById.get(f.id) : undefined;
     if (!inc) {
-      out.push(f);
+      out.push(canonicalizeFollowUp(f));
       continue;
     }
-    // Slim rows truncate notes — keep the longer body. Take done/kind/date
-    // from incoming so a Calendar tick hides the card chip.
+    const cf = canonicalizeFollowUp(f);
+    const ic = canonicalizeFollowUp(inc);
     const note =
-      f.note.trim().length >= inc.note.trim().length ? f.note : inc.note;
+      cf.note.trim().length >= ic.note.trim().length ? cf.note : ic.note;
     out.push({
-      ...f,
-      date: inc.date || f.date,
-      done: inc.done,
-      kind: inc.kind ?? f.kind,
+      ...cf,
+      date: ic.date || cf.date,
+      done: ic.done,
+      kind: ic.kind ?? cf.kind,
       note,
-      authorName: inc.authorName?.trim() || f.authorName,
+      authorName: ic.authorName?.trim() || cf.authorName,
     });
   }
   for (const f of incoming) {
     if (seen.has(f.id) || droppedIds?.has(f.id)) continue;
     seen.add(f.id);
-    out.push(f);
+    out.push(canonicalizeFollowUp(f));
   }
   return out;
 }

@@ -9,23 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-15 (studio hygiene)
+## ⏱️ Status — updated 2026-09-15 (journal bubbles)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0037** applied on prod D1 (`lodestar-prod`).  
 **Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
-- Invalid/placeholder To addresses (`your@email`) are stripped, not sent.
-- Conversation location drops `(despatx …, Planta 0.)` leftovers.
-- Notes show author initials; collaborator journal matches lead notes.
-- Done follow-ups hide the card chip (click the purple tag to complete).
-- Collaborator cards pack content top-left.
+- Journal lines are `Email sent` / `Missed call` / `Contacted via Organic`
+  — names live in the initials bubble (legacy “by …” copy is peeled).
+- Studio search clears when switching views.
+- Conversation location sits with the title, not below waiting/demo bubbles.
 
 ### Next
-1. Hard-refresh: send a lead with a junk To — address should disappear.
-2. Conversation card for Teknon-style addresses should show **Barcelona**.
-3. Complete a follow-up from notes; Pipeline/Conversations chips should go.
+1. Hard-refresh: old “Email sent by …” lines should read Email sent + bubble.
+2. Switch Pipeline → Conversations: search box should be empty.
 
 ---
 

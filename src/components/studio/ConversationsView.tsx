@@ -2,6 +2,7 @@
 
 import type { FollowUp, LeadWithOutreach } from "@/lib/types";
 import {
+  canonicalizeFollowUp,
   followUpAuthorName,
   pendingUserFollowUpCount,
   resolveFollowUpKind,
@@ -33,11 +34,14 @@ function recentComments(
       return (kind === "note" || kind === "task") && f.note.trim();
     })
     .slice(0, 2)
-    .map((f) => ({
-      id: f.id,
-      text: f.note.trim(),
-      author: followUpAuthorName(f),
-    }));
+    .map((f) => {
+      const canon = canonicalizeFollowUp(f);
+      return {
+        id: canon.id,
+        text: canon.note.trim(),
+        author: followUpAuthorName(canon),
+      };
+    });
 }
 
 export function ConversationsView({
@@ -83,9 +87,27 @@ export function ConversationsView({
               className="flex min-w-0 w-full flex-1 flex-col text-left"
             >
               <div className="flex min-w-0 items-start gap-2">
-                <h3 className="min-w-0 flex-1 font-display text-base font-semibold leading-tight">
-                  <MarqueeText>{name}</MarqueeText>
-                </h3>
+                <div className="min-w-0 flex-1">
+                  <h3 className="min-w-0 font-display text-base font-semibold leading-tight">
+                    <MarqueeText>{name}</MarqueeText>
+                  </h3>
+                  {lead.contactName && lead.company ? (
+                    <p className="mt-0.5 text-xs text-mist-400">
+                      <MarqueeText>{lead.company}</MarqueeText>
+                    </p>
+                  ) : null}
+                  {cityCountry ? (
+                    <span className="mt-1 flex min-w-0 items-center gap-1 text-xs text-mist-400">
+                      <PinIcon className="h-3 w-3 shrink-0" />
+                      <MarqueeText
+                        className="min-w-0 flex-1"
+                        title={lead.location ?? cityCountry}
+                      >
+                        {cityCountry}
+                      </MarqueeText>
+                    </span>
+                  ) : null}
+                </div>
                 {(lead.waitingOnUs || lead.demoDone) ? (
                   <span className="inline-flex shrink-0 items-center gap-1">
                     {lead.waitingOnUs ? (
@@ -109,22 +131,6 @@ export function ConversationsView({
                   </span>
                 ) : null}
               </div>
-              {lead.contactName && lead.company ? (
-                <p className="mt-0.5 text-xs text-mist-400">
-                  <MarqueeText>{lead.company}</MarqueeText>
-                </p>
-              ) : null}
-              {cityCountry ? (
-                <span className="mt-1 flex min-w-0 items-center gap-1 text-xs text-mist-400">
-                  <PinIcon className="h-3 w-3 shrink-0" />
-                  <MarqueeText
-                    className="min-w-0 flex-1"
-                    title={lead.location ?? cityCountry}
-                  >
-                    {cityCountry}
-                  </MarqueeText>
-                </span>
-              ) : null}
               {comments.length > 0 ? (
                 <ul className="mt-2 space-y-1.5">
                   {comments.map((c) => (

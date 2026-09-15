@@ -16,7 +16,7 @@ import {
   type Workspace,
 } from "@/lib/types";
 import { parseContactMethods } from "@/lib/contact-methods";
-import { isContactRegisteredNote, normalizeMissedCallNote } from "@/lib/follow-ups";
+import { isContactRegisteredNote, canonicalizeFollowUp } from "@/lib/follow-ups";
 import { leadHydrateLane } from "@/lib/lead-lanes";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
@@ -100,7 +100,7 @@ function normalizeLead(l: Lead): Lead {
     notes: (raw.notes as Lead["notes"] | undefined) ?? null,
     followUps: ((raw.followUps as Lead["followUps"] | undefined) ?? [])
       .filter((f) => !isContactRegisteredNote(f?.note ?? ""))
-      .map((f) => ({ ...f, note: normalizeMissedCallNote(f?.note ?? "") })),
+      .map((f) => canonicalizeFollowUp({ ...f, note: f?.note ?? "" })),
     customFields:
       raw.customFields && typeof raw.customFields === "object"
         ? (raw.customFields as Record<string, string>)
@@ -121,7 +121,7 @@ function normalizeContact(c: Contact): Contact {
     location: typeof raw.location === "string" ? raw.location : null,
     followUps: ((raw.followUps as Contact["followUps"] | undefined) ?? [])
       .filter((f) => !isContactRegisteredNote(f?.note ?? ""))
-      .map((f) => ({ ...f, note: normalizeMissedCallNote(f?.note ?? "") })),
+      .map((f) => canonicalizeFollowUp({ ...f, note: f?.note ?? "" })),
   };
 }
 

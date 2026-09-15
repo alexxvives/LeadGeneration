@@ -66,7 +66,7 @@ interface DrawerProps {
   mode?: "info" | "draft";
   /** Open the dated-note composer for a call log (connected or missed). */
   promptNote?: false | "call" | "missed";
-  /** Display name of the signed-in user — used in "Phone call by …" / "Email sent by …" prefixes. */
+  /** Display name of the signed-in user — stamped as journal authorName. */
   actorName?: string | null;
   /** Undo a mistaken Ready→Contacted mark (phone / form log). */
   onUndoMarkContacted?: () => Promise<void>;
@@ -131,7 +131,7 @@ const CONTACT_METHODS: { method: ContactMethod; label: string }[] = [
   { method: "contact_form", label: "Contact form" },
   { method: "instagram",    label: "Instagram" },
   { method: "whatsapp",     label: "WhatsApp" },
-  { method: "organic",      label: "Organic / web" },
+  { method: "organic",      label: "Organic" },
 ];
 
 // ─── Main drawer ──────────────────────────────────────────────────────────────
@@ -266,7 +266,8 @@ export function LeadDrawer(props: DrawerProps) {
           f.note === followUps[i]?.note &&
           f.date === followUps[i]?.date &&
           f.done === followUps[i]?.done &&
-          f.kind === followUps[i]?.kind,
+          f.kind === followUps[i]?.kind &&
+          (f.authorName ?? null) === (followUps[i]?.authorName ?? null),
       );
     if (!journalSame) setFollowUps(next);
     setConfirmDelete(false);
@@ -314,7 +315,7 @@ export function LeadDrawer(props: DrawerProps) {
   }, [lead.id, promptNote]);
 
   // Heal: older sends wrote status but skipped the dated journal. Never add a
-  // bare "Email sent" next to an existing "Email sent by …" line.
+  // second bare "Email sent" on the same day.
   useEffect(() => {
     if (outreach?.status !== "sent" || !outreach.sentAt) return;
     if (lead.detailLoaded !== true) return;
@@ -345,7 +346,7 @@ export function LeadDrawer(props: DrawerProps) {
       {
         id: newId("fu"),
         date: sentDay,
-        note: actor ? `Email sent by ${actor}` : "Email sent",
+        note: "Email sent",
         done: true,
         kind: "email",
       },

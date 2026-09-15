@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BoardSummary, Contact } from "@/lib/types";
 import {
+  canonicalizeFollowUp,
   followUpAuthorName,
   pendingUserFollowUpCount,
   sortFollowUpsNewestFirst,
@@ -236,9 +237,10 @@ export function ContactsView({
         <div className="grid items-start content-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((c) => {
             const pending = pendingUserFollowUpCount(c.followUps);
-            const latest = sortFollowUpsNewestFirst(c.followUps ?? []).find(
+            const latestRaw = sortFollowUpsNewestFirst(c.followUps ?? []).find(
               (f) => f.note.trim(),
             );
+            const latest = latestRaw ? canonicalizeFollowUp(latestRaw) : null;
             const cityCountry = shortLocation(c.location);
             return (
               <article

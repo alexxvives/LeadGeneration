@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-15 — Journal names → bubble; Organic; search per view
+- Journal copy is name-free: `Email sent`, `Missed call`, `Contacted via
+  Organic`. Who did it is `authorName` + a mist/ink initials bubble after
+  the date. `canonicalizeFollowUp` peels legacy “by …” / “— name” lines
+  on read (and PATCHes when the drawer heals).
+- Channel label is **Organic**, not “Organic / web”.
+- Lead search clears when the studio view changes; it is not restored from
+  sessionStorage.
+- Conversation cards put title + location in one column so waiting/demo
+  bubbles do not push the city down.
+
 ### 2026-09-15 — Invalid To, location parens, note authors, done follow-ups
 - Resend rejects `your@email` (no TLD) and unquoted `Dr. Name <addr>`.
   `parseRecipientEmail` / `isSendableEmail` drop placeholders on send and

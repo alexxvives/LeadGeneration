@@ -800,7 +800,7 @@ function OutreachRow({
                     ["contact_form", "Form"],
                     ["instagram", "Instagram"],
                     ["whatsapp", "WhatsApp"],
-                    ["organic", "Organic / web"],
+                    ["organic", "Organic"],
                   ] as const
                 ).map(([method, label]) => (
                   <button
@@ -881,8 +881,8 @@ function OutreachRow({
               {methods.includes("organic") ? (
                 <span
                   className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink-800/80 text-mist-300 ring-1 ring-ink-600/40"
-                  title="Organic / web"
-                  aria-label="Organic / web"
+                  title="Organic"
+                  aria-label="Organic"
                 >
                   <GlobeIcon className="h-3 w-3" />
                 </span>

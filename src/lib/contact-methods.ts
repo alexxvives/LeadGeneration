@@ -126,28 +126,24 @@ export function contactMethodLabel(method: ContactMethod): string {
   if (method === "phone") return "phone";
   if (method === "instagram") return "Instagram";
   if (method === "whatsapp") return "WhatsApp";
-  if (method === "organic") return "Organic / web";
+  if (method === "organic") return "Organic";
   return "contact form";
 }
 
 /** Note for a newly added channel. Phone/email are omitted — the drawer writes those logs. */
 export function contactMethodAddedNote(
   method: Exclude<ContactMethod, "phone" | "email">,
-  byName?: string | null,
+  _byName?: string | null,
 ): { note: string; kind: FollowUpKind } {
-  const who = byName?.trim();
+  void _byName;
   if (method === "instagram") {
-    const base = "Contacted via Instagram";
-    return { note: who ? `${base} — ${who}` : base, kind: "note" };
+    return { note: "Contacted via Instagram", kind: "note" };
   }
   if (method === "whatsapp") {
-    const base = "Contacted via WhatsApp";
-    return { note: who ? `${base} — ${who}` : base, kind: "note" };
+    return { note: "Contacted via WhatsApp", kind: "note" };
   }
   if (method === "organic") {
-    const base = "Contacted via Organic / web";
-    return { note: who ? `${base} — ${who}` : base, kind: "note" };
+    return { note: "Contacted via Organic", kind: "note" };
   }
-  const base = "Contacted via contact form";
-  return { note: who ? `${base} — ${who}` : base, kind: "note" };
+  return { note: "Contacted via contact form", kind: "note" };
 }

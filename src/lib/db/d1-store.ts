@@ -20,7 +20,7 @@ import {
   serializeContactMethods,
 } from "@/lib/contact-methods";
 import { hydrateLaneSql } from "@/lib/lead-lanes";
-import { isContactRegisteredNote, normalizeMissedCallNote } from "@/lib/follow-ups";
+import { isContactRegisteredNote, canonicalizeFollowUp } from "@/lib/follow-ups";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -363,7 +363,7 @@ const parseFollowUps = (s: string | null | undefined): FollowUp[] => {
     if (!Array.isArray(raw)) return [];
     return (raw as FollowUp[])
       .filter((f) => !isContactRegisteredNote(f?.note ?? ""))
-      .map((f) => ({ ...f, note: normalizeMissedCallNote(f?.note ?? "") }));
+      .map((f) => canonicalizeFollowUp({ ...f, note: f?.note ?? "" }));
   } catch {
     return [];
   }
@@ -1221,7 +1221,7 @@ export class D1Store implements LeadRepository {
           l.contactedByUserId ?? null,
           l.contactedByName ?? null,
           l.notes ?? null,
-          JSON.stringify(l.followUps ?? []),
+          JSON.stringify((l.followUps ?? []).map(canonicalizeFollowUp)),
           JSON.stringify(l.customFields ?? {}),
           l.waitingOnUs ? 1 : 0,
           l.demoDone ? 1 : 0,
@@ -1260,7 +1260,11 @@ export class D1Store implements LeadRepository {
       row.contacted_by_name = patch.contactedByName ?? null;
     }
     if ("notes" in patch) row.notes = patch.notes ?? null;
-    if ("followUps" in patch) row.follow_ups = JSON.stringify(patch.followUps ?? []);
+    if ("followUps" in patch) {
+      row.follow_ups = JSON.stringify(
+        (patch.followUps ?? []).map(canonicalizeFollowUp),
+      );
+    }
     if ("customFields" in patch) row.custom_fields = JSON.stringify(patch.customFields ?? {});
     if ("waitingOnUs" in patch) row.waiting_on_us = patch.waitingOnUs ? 1 : 0;
     if ("demoDone" in patch) row.demo_done = patch.demoDone ? 1 : 0;
@@ -1390,7 +1394,7 @@ export class D1Store implements LeadRepository {
         contact.email ?? null,
         contact.phone ?? null,
         contact.location ?? null,
-        JSON.stringify(contact.followUps ?? []),
+        JSON.stringify((contact.followUps ?? []).map(canonicalizeFollowUp)),
         contact.createdAt,
       )
       .run();
@@ -1409,7 +1413,9 @@ export class D1Store implements LeadRepository {
     if ("phone" in patch) row.phone = patch.phone ?? null;
     if ("location" in patch) row.location = patch.location ?? null;
     if ("followUps" in patch) {
-      row.follow_ups = JSON.stringify(patch.followUps ?? []);
+      row.follow_ups = JSON.stringify(
+        (patch.followUps ?? []).map(canonicalizeFollowUp),
+      );
     }
     if (Object.keys(row).length === 0) return this.getContact(id);
     const { clause, values } = buildSet(row);

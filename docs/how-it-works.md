@@ -91,7 +91,7 @@ Search  →  Enrich  →  Draft  →  Send
     CRM **New** = needs human review (there is no separate “In review” tag).
     A **Missed call** stays in New but still shows the phone method icon
     (it does not count as Contacted). Contact channels: email, phone, contact
-    form, Instagram, WhatsApp, Organic / web. Cards show an hourglass when
+    form, Instagram, WhatsApp, Organic. Cards show an hourglass when
     **Waiting on us** is on (in-conversation). Bounce is silent (address
     stripped; no Bounced chip).
 
@@ -100,7 +100,8 @@ Search  →  Enrich  →  Draft  →  Send
     and recent **notes** / **tasks** (follow-up reminders are omitted from
     the preview).
     An hourglass on the title row means **Waiting on us**; a monitor icon
-    means **Demo done**. Created date sits bottom-left; a **Follow-up** tag
+    means **Demo done**. Those bubbles sit beside the title **column**
+    (name + company + city), so they do not push location down. Created date sits bottom-left; a **Follow-up** tag
     sits bottom-right when one is pending. Overflowing name / company / city ping-pong like a
     now-playing title. Location on the card is city + country only
     (`shortLocation` drops street, floor, and venue names). Click opens
@@ -136,7 +137,8 @@ Search  →  Enrich  →  Draft  →  Send
     **emails sent**, and **phone calls** logged that day — shown as calendar /
     mail / phone icons **with counts** on the day cell. Sidebar group titles
     (Follow-ups / Emails sent / Phone calls) show the same totals. The
-    studio search bar filters calendar events by lead. Contact follow-ups
+    studio search bar filters calendar events by lead (clears when you leave
+    the view). Contact follow-ups
     appear on the same grid. An open follow-up whose date is at
     least one day past fills that day square in **red** (same selected-day
     treatment, rose instead of aurora) — the calendar icon stays violet.
@@ -183,23 +185,23 @@ Search  →  Enrich  →  Draft  →  Send
     (incl. full address), about blurb, CRM stage, dated notes journal
     (**Add Note** for a log line; **Follow up** pre-fills “Follow up” one week
     out and shows on Calendar; **Missed call** writes the journal line
-    immediately — no composer — as `Missed call by {name}`, no trailing colon). Journal lines are newest first
+    immediately — no composer — as `Missed call`). Journal lines are newest first
     with a kind tag (purple **Follow up**, amber **Note**, gray **Missed** —
-    tag only; the date/body use the same ink as other notes). Calendar cards
+    tag only; the date/body use the same ink as other notes). Who did it is a
+    high-contrast initials bubble after the date, before the text — not a
+    name in the sentence. Calendar cards
     do not repeat a “Missed” chip next to the company name — the journal line
     already says it.
     **Add Note** in the header matches the amber tag. Notes can be edited
-    or deleted; delete offers **Undo** for a few seconds. Each line shows a
-    small initials avatar for who wrote it. Click the purple **Follow up**
+    or deleted; delete offers **Undo** for a few seconds. Click the purple **Follow up**
     (or green **Task**) tag to mark it done — strikethrough stays in the
     journal; Pipeline / Conversations / collaborator **cards hide the
     Follow-up chip** once it is done. Calendar still lists it crossed out.
     Placeholder scrapes like `your@email` are not sendable (Resend needs
     `name@example.com`) — send and save drop them from the lead.
-    Toggling **Phone** opens a call log with the caret after
-    `Phone call by {name}:`. Clicking **Email** (again, even when it is
+    Toggling **Phone** opens a call log prefilled `Phone call:`. Clicking **Email** (again, even when it is
     already on) logs another send dated today and opens a note with
-    `Email sent by {name}:` so you can add details — it does not turn the
+    `Email sent` so you can add details — it does not turn the
     chip off.
     A bounce silently deletes that address (and may return the lead to New) —
     no Bounced chip, toast, or drawer button. The outreach composer

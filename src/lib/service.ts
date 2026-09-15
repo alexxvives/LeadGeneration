@@ -84,7 +84,7 @@ import {
   contactMethodsEqual,
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
 import { LEAD_HYDRATE_LANES } from "@/lib/lead-lanes";
 import {
   companyGuessFromEmail,
@@ -1398,7 +1398,7 @@ export async function setOutreachDecision(
 export interface SendOutcome {
   ok: boolean;
   outreach?: Outreach;
-  /** Updated journal after send (includes dated "Email sent by …" note). */
+  /** Updated journal after send (includes dated "Email sent" note). */
   followUps?: FollowUp[];
   error?: string;
   rateLimited?: boolean;
@@ -1700,9 +1700,7 @@ export async function sendApprovedOutreach(
         ctx.userName?.trim() ||
         ctx.userEmail?.trim() ||
         null;
-      const emailSentNote = actor
-        ? `Email sent by ${actor}`
-        : "Email sent";
+      const emailSentNote = "Email sent";
       // App send always journals its own line — chip logs can add more the
       // same day; collapse only drops a bare "Email sent" duplicate.
       const followUps = [
@@ -3475,6 +3473,9 @@ export async function updateContact(
   }
   if (next.location !== undefined) {
     next.location = next.location?.trim() || null;
+  }
+  if (next.followUps) {
+    next.followUps = next.followUps.map((f) => canonicalizeFollowUp(f));
   }
   return found.db.updateContact(contactId, next);
 }

@@ -316,6 +316,12 @@ export function Studio() {
   filterBoardIdRef.current = filterBoardId;
   const viewRef = useRef(view);
   viewRef.current = view;
+  const prevViewRef = useRef(view);
+  useEffect(() => {
+    if (prevViewRef.current === view) return;
+    prevViewRef.current = view;
+    setLeadSearch("");
+  }, [view]);
   const boardLiteRef = useRef(false);
   const boardRef = useRef<BoardResponse | null>(null);
   const leadsGenRef = useRef(0);
@@ -689,7 +695,6 @@ export function Studio() {
   // Restore filters / layout from this browser tab (no DB).
   useEffect(() => {
     const prefs = loadStudioUiPrefs();
-    setLeadSearch(prefs.leadSearch);
     setPipelineFilter(prefs.pipelineFilter);
     setOutreachTypeFilter(prefs.outreachTypeFilter);
     setLayout(prefs.layout);
@@ -709,12 +714,11 @@ export function Studio() {
       return;
     }
     saveStudioUiPrefs({
-      leadSearch,
       pipelineFilter,
       outreachTypeFilter,
       layout,
     });
-  }, [leadSearch, pipelineFilter, outreachTypeFilter, layout]);
+  }, [pipelineFilter, outreachTypeFilter, layout]);
 
   // Initial load + re-fetch when sidebar board filter changes (single effect).
   // Soft-refresh after first paint so adding `?board=` mid-tour doesn't flash

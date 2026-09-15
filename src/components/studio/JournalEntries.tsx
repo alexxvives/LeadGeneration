@@ -3,6 +3,7 @@
 import type { FollowUp } from "@/lib/types";
 import {
   authorInitials,
+  canonicalizeFollowUp,
   followUpAuthorName,
   formatNoteDate,
   isMissedCallNote,
@@ -22,12 +23,12 @@ export function AuthorAvatar({
 }) {
   const label = name?.trim();
   if (!label) return null;
-  const dim = size === "sm" ? "h-5 w-5 text-[8px]" : "h-6 w-6 text-[9px]";
+  const dim = size === "sm" ? "h-5 w-5 text-[8px]" : "h-[1.125rem] w-[1.125rem] text-[8px]";
   return (
     <span
       title={label}
       aria-label={label}
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-aurora-400/15 font-semibold tracking-wide text-aurora-200 ring-1 ring-aurora-400/30 ${dim}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-mist-100 font-semibold tracking-wide text-ink-950 ${dim}`}
     >
       {authorInitials(label)}
     </span>
@@ -66,11 +67,12 @@ export function JournalEntries({
   return (
     <ul className="space-y-2">
       {sortFollowUpsNewestFirst(followUps).map((fu) => {
-        const kind = resolveFollowUpKind(fu);
+        const canon = canonicalizeFollowUp(fu);
+        const kind = resolveFollowUpKind(canon);
         const isFollow = kind === "follow_up";
         const isTask = kind === "task";
-        const missed = isMissedCallNote(fu.note);
-        const author = followUpAuthorName(fu);
+        const missed = isMissedCallNote(canon.note);
+        const author = followUpAuthorName(canon);
         const tagClass =
           kind === "email"
             ? "bg-aurora-400/15 text-aurora-200"
@@ -107,7 +109,7 @@ export function JournalEntries({
                 <button
                   type="button"
                   disabled={disabled}
-                  onClick={() => onToggleDone(fu)}
+                  onClick={() => onToggleDone(canon)}
                   aria-pressed={fu.done}
                   title={
                     disabled
@@ -163,17 +165,15 @@ export function JournalEntries({
                 </div>
               </div>
             ) : (
-              <div className="flex min-w-0 flex-1 items-start gap-2">
-                <AuthorAvatar name={author} />
-                <p className="min-w-0 flex-1 text-sm leading-relaxed text-mist-300">
-                  <span className="font-semibold text-mist-100">
-                    {formatNoteDate(fu.date)}
-                  </span>
-                  {fu.note ? (
-                    <span className={lineClass}> · {fu.note}</span>
-                  ) : null}
-                </p>
-              </div>
+              <p className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm leading-relaxed text-mist-300">
+                <span className="font-semibold text-mist-100">
+                  {formatNoteDate(canon.date)}
+                </span>
+                <AuthorAvatar name={author} size="sm" />
+                {canon.note ? (
+                  <span className={lineClass}>{canon.note}</span>
+                ) : null}
+              </p>
             )}
             {editingId === fu.id ? null : (
               <div className="mt-0.5 flex shrink-0 items-center gap-1">
@@ -181,7 +181,7 @@ export function JournalEntries({
                   <button
                     type="button"
                     disabled={disabled}
-                    onClick={() => onStartEdit(fu)}
+                    onClick={() => onStartEdit(canon)}
                     className="text-mist-600 hover:text-mist-200 disabled:opacity-50"
                     aria-label={disabled ? lockHint : "Edit note"}
                     title={disabled ? lockHint : "Edit note"}
