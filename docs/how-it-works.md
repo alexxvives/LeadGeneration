@@ -97,7 +97,8 @@ Search  →  Enrich  →  Draft  →  Send
 
   - **Conversations** (`?view=conversations`) — in-conversation leads only.
     Cards show name, city + country (not the street), pending follow-up,
-    and recent **notes** (follow-up reminders are omitted from the preview).
+    and recent **notes** / **tasks** (follow-up reminders are omitted from
+    the preview).
     An hourglass on the title row means **Waiting on us**; a monitor icon
     means **Demo done**. Created date sits bottom-left; a **Follow-up** tag
     sits bottom-right when one is pending. Overflowing name / company / city ping-pong like a
@@ -154,10 +155,15 @@ Search  →  Enrich  →  Draft  →  Send
     drawer; a collaborator item opens Collaborators.
 
   - **Collaborators** (`?view=contacts`) — board-scoped people (not leads;
-    ADR 0036). Name, org, email, phone, location, plus the same notes /
-    follow-up journal. **Add collaborator** sits next to the desktop title
+    ADR 0036). Name, org, email, phone, location, plus the **same** notes /
+    follow-up journal as a lead (Add Note / Follow up links, tag + date ·
+    body, edit/delete, click the Follow up tag to mark done). **Add collaborator** sits next to the desktop title
     (and as a phone action under the top bar), same pattern as Create board.
-    Cards are name + org + contact lines (no avatar circle). Lives under
+    Cards pack name and details at the **top left** (article + inner button;
+    they do not stretch/center in the grid cell). Location on
+    the card is city + country only (`shortLocation` — same as Conversations;
+    door number, postal, and parenthetical floor/office like
+    `(despatx 128, Planta 0.)` stay in the drawer). Lives under
     Engage. Follow-ups show on Calendar. Does
     not consume lead quota. View subtitles stay desktop-only (`lg+`).
 
@@ -183,7 +189,13 @@ Search  →  Enrich  →  Draft  →  Send
     do not repeat a “Missed” chip next to the company name — the journal line
     already says it.
     **Add Note** in the header matches the amber tag. Notes can be edited
-    or deleted; delete offers **Undo** for a few seconds. Done-state for follow-ups is ticked on Calendar only.
+    or deleted; delete offers **Undo** for a few seconds. Each line shows a
+    small initials avatar for who wrote it. Click the purple **Follow up**
+    (or green **Task**) tag to mark it done — strikethrough stays in the
+    journal; Pipeline / Conversations / collaborator **cards hide the
+    Follow-up chip** once it is done. Calendar still lists it crossed out.
+    Placeholder scrapes like `your@email` are not sendable (Resend needs
+    `name@example.com`) — send and save drop them from the lead.
     Toggling **Phone** opens a call log with the caret after
     `Phone call by {name}:`. Clicking **Email** (again, even when it is
     already on) logs another send dated today and opens a note with
@@ -194,8 +206,9 @@ Search  →  Enrich  →  Draft  →  Send
     (draft → edit → send) is on the draft pane. In Conversation hides the
     “how did you reach them” chips and shows compact **Waiting on us** /
     **Demo done** toggles side by side (titles only). Turning **Waiting on
-    us** on opens the Follow-up composer (default “Follow up”, one week out)
-    and scrolls to Notes. About sits in the lead-info column under contact
+    us** on opens a green **Task** composer (“What they expect from us”)
+    and scrolls to Notes — not a Follow-up reminder. About sits in the
+    lead-info column under contact
     fields. Closed leads also get a **Documents** drop zone (PDF / Office /
     images, 4 MB — ADR 0038). Sales-stage chips scroll sideways on phone
     instead of wrapping. The header no longer repeats the CRM stage pill.

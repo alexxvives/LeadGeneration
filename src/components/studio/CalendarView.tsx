@@ -38,6 +38,7 @@ const KIND_DOT: Record<FollowUpKind, string> = {
   note: "bg-amber-400",
   email: "bg-aurora-400",
   phone: "bg-sky-400",
+  task: "bg-aurora-400",
 };
 
 const KIND_CHIP: Record<FollowUpKind, string> = {
@@ -45,6 +46,7 @@ const KIND_CHIP: Record<FollowUpKind, string> = {
   note: "bg-amber-400/15 text-amber-200",
   email: "bg-aurora-400/15 text-aurora-200",
   phone: "bg-sky-400/15 text-sky-200",
+  task: "bg-aurora-400/15 text-aurora-200",
 };
 
 function isoFromParts(year: number, month: number, day: number): string {
@@ -105,6 +107,7 @@ function kindCounts(events: CalendarEvent[]): Record<FollowUpKind, number> {
     email: 0,
     phone: 0,
     note: 0,
+    task: 0,
   };
   for (const ev of events) counts[ev.kind] += 1;
   return counts;
@@ -323,6 +326,7 @@ export function CalendarView({
           phone: 1,
           email: 2,
           note: 3,
+          task: 4,
         };
         const d = order[a.kind] - order[b.kind];
         if (d !== 0) return d;

@@ -5,6 +5,7 @@ import {
   richToPlain,
   toEmailHtmlDocument,
 } from "@/lib/outreach/rich-text";
+import { formatMailbox } from "@/lib/email/address";
 import {
   normalizeEasyEmailProvider,
   type EasyEmailProvider,
@@ -111,7 +112,7 @@ export async function sendEmail(
   const replyTo = ws?.replyTo || env.replyTo();
   const body = finalizeBody(input.body, replyTo || fromEmail);
   const { text, html } = bodyParts(body);
-  const from = `${fromName} <${fromEmail}>`;
+  const from = formatMailbox(fromEmail, fromName);
   const replyToHeader = replyTo || undefined;
   const tags = input.tags?.length ? input.tags : undefined;
 

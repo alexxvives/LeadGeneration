@@ -2959,6 +2959,7 @@ export function Studio() {
               (b) => b.id === selectedContact.boardId,
             )?.name ?? "Board"
           }
+          actorName={actorName}
           onClose={() => setSelectedContactId(null)}
           onUpdate={async (id, patch) => {
             setContacts((prev) =>

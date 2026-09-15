@@ -3,11 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BoardSummary, Contact } from "@/lib/types";
 import {
-  isUserFollowUp,
+  followUpAuthorName,
+  pendingUserFollowUpCount,
   sortFollowUpsNewestFirst,
 } from "@/lib/follow-ups";
+import { shortLocation } from "@/lib/format-location";
+import { parseRecipientEmail } from "@/lib/email/address";
 import { MailIcon, PhoneIcon, PinIcon } from "@/components/icons";
 import { Modal } from "@/components/ui/Modal";
+import { AuthorAvatar } from "@/components/studio/JournalEntries";
 
 function formatCreated(iso: string): string {
   const d = new Date(iso);
@@ -109,7 +113,7 @@ export function ContactsView({
         boardId,
         name,
         organization: form.organization.trim() || null,
-        email: form.email.trim() || null,
+        email: parseRecipientEmail(form.email.trim()) ?? null,
         phone: form.phone.trim() || null,
         location: form.location.trim() || null,
       });
@@ -229,71 +233,77 @@ export function ContactsView({
           <p className="text-sm text-mist-400">No matches for &ldquo;{query.trim()}&rdquo;</p>
         </div>
       ) : (
-        <div className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid items-start content-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((c) => {
-            const pending =
-              c.followUps?.filter((f) => isUserFollowUp(f) && !f.done)
-                .length ?? 0;
+            const pending = pendingUserFollowUpCount(c.followUps);
             const latest = sortFollowUpsNewestFirst(c.followUps ?? []).find(
               (f) => f.note.trim(),
             );
+            const cityCountry = shortLocation(c.location);
             return (
-              <button
+              <article
                 key={c.id}
-                type="button"
-                onClick={() => onSelect(c.id)}
-                className="glass card-hover rounded-xl2 p-4 text-left transition-transform"
+                className="glass card-hover flex w-full flex-col overflow-hidden rounded-xl2 p-4 text-left"
               >
-                <div className="min-w-0">
-                  <h3 className="truncate font-display text-base font-semibold">
-                    {c.name}
-                  </h3>
-                  {c.organization ? (
-                    <p className="mt-0.5 truncate text-xs text-mist-400">
-                      {c.organization}
+                <button
+                  type="button"
+                  onClick={() => onSelect(c.id)}
+                  className="flex w-full flex-col items-stretch text-left"
+                >
+                  <div className="w-full min-w-0">
+                    <h3 className="truncate font-display text-base font-semibold leading-tight">
+                      {c.name}
+                    </h3>
+                    {c.organization ? (
+                      <p className="mt-0.5 truncate text-xs text-mist-400">
+                        {c.organization}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="mt-3 w-full space-y-1 text-xs text-mist-500">
+                    {c.email ? (
+                      <p className="flex items-center gap-1.5 truncate">
+                        <MailIcon className="h-3 w-3 shrink-0 text-mist-600" />
+                        {c.email}
+                      </p>
+                    ) : null}
+                    {c.phone ? (
+                      <p className="flex items-center gap-1.5 truncate">
+                        <PhoneIcon className="h-3 w-3 shrink-0 text-mist-600" />
+                        {c.phone}
+                      </p>
+                    ) : null}
+                    {cityCountry ? (
+                      <p className="flex items-center gap-1.5 truncate">
+                        <PinIcon className="h-3 w-3 shrink-0 text-mist-600" />
+                        {cityCountry}
+                      </p>
+                    ) : null}
+                  </div>
+                  {latest ? (
+                    <p className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-mist-300">
+                      <AuthorAvatar name={followUpAuthorName(latest)} size="sm" />
+                      <span className="line-clamp-2 min-w-0 flex-1">
+                        {latest.note}
+                      </span>
                     </p>
                   ) : null}
-                </div>
-                <div className="mt-3 space-y-1 text-xs text-mist-500">
-                  {c.email ? (
-                    <p className="flex items-center gap-1.5 truncate">
-                      <MailIcon className="h-3 w-3 shrink-0 text-mist-600" />
-                      {c.email}
-                    </p>
-                  ) : null}
-                  {c.phone ? (
-                    <p className="flex items-center gap-1.5 truncate">
-                      <PhoneIcon className="h-3 w-3 shrink-0 text-mist-600" />
-                      {c.phone}
-                    </p>
-                  ) : null}
-                  {c.location ? (
-                    <p className="flex items-center gap-1.5 truncate">
-                      <PinIcon className="h-3 w-3 shrink-0 text-mist-600" />
-                      {c.location}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-mist-600">
-                  <span>{formatCreated(c.createdAt)}</span>
-                  {(!filterBoardId || filterBoardId === "all") ? (
-                    <>
-                      <span aria-hidden>·</span>
-                      <span className="truncate">{boardName(c.boardId)}</span>
-                    </>
-                  ) : null}
-                  {pending > 0 ? (
-                    <span className="rounded-full bg-violet-400/15 px-1.5 py-0.5 font-medium text-violet-200">
-                      {pending === 1 ? "Follow-up" : `${pending} follow-ups`}
-                    </span>
-                  ) : null}
-                </div>
-                {latest ? (
-                  <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-mist-300">
-                    {latest.note}
-                  </p>
-                ) : null}
-              </button>
+                  <div className="mt-3 flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-mist-600">
+                    <span>{formatCreated(c.createdAt)}</span>
+                    {(!filterBoardId || filterBoardId === "all") ? (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span className="truncate">{boardName(c.boardId)}</span>
+                      </>
+                    ) : null}
+                    {pending > 0 ? (
+                      <span className="rounded-full bg-violet-400/15 px-1.5 py-0.5 font-medium text-violet-200">
+                        {pending === 1 ? "Follow-up" : `${pending} follow-ups`}
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              </article>
             );
           })}
         </div>

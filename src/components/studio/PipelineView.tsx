@@ -17,8 +17,8 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, InfoIcon, CalendarIcon, WaitingIcon } from "@/components/icons";
 import {
-  isUserFollowUp,
   leadHasMissedCall,
+  pendingUserFollowUpCount,
   resolveFollowUpKind,
 } from "@/lib/follow-ups";
 import { Bone, useStableDuringLoad } from "./skeletons";
@@ -550,10 +550,12 @@ function MethodIcons({ methods }: { methods: ContactMethod[] }) {
 }
 
 function pipelineCardChrome(lead: LeadWithOutreach) {
-  const pendingFollowUps =
-    lead.followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
+  const pendingFollowUps = pendingUserFollowUpCount(lead.followUps);
   const journalNotes =
-    lead.followUps?.filter((f) => resolveFollowUpKind(f) === "note").length ?? 0;
+    lead.followUps?.filter((f) => {
+      const k = resolveFollowUpKind(f);
+      return k === "note" || k === "task";
+    }).length ?? 0;
   const noteCount = journalNotes > 0 ? journalNotes : lead.notes?.trim() ? 1 : 0;
   const replied = lead.outreach?.deliveryStatus === "replied";
   const methods = lead.contactMethods ?? [];

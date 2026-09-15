@@ -4,6 +4,38 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-15 — Invalid To, location parens, note authors, done follow-ups
+- Resend rejects `your@email` (no TLD) and unquoted `Dr. Name <addr>`.
+  `parseRecipientEmail` / `isSendableEmail` drop placeholders on send and
+  CRM save. Display names with dots are quoted in `formatMailbox`.
+- `shortLocation("… Barcelona (despatx 128, Planta 0.)")` was returning
+  `0.)` because the floor aside survived the comma split. Strip
+  parentheticals; treat office words and `0.)` fragments as non-geo.
+- Journal lines stamp `authorName` and show an initials circle. Collaborator
+  notes reuse the lead journal row (tag, date · body, edit/delete).
+- Clicking the Follow up tag marks it done. Card chips use
+  `pendingUserFollowUpCount` (undone only). Done reminders stay in the
+  journal, not on Pipeline / Conversations cards.
+- Collaborator cards are `article` + inner `button` with `items-start` so
+  name/details sit top-left instead of stretching in the grid.
+
+### 2026-09-13 — Waiting on us opens a Task, not Follow up
+- Flipping **Waiting on us** on used to open the purple Follow-up composer
+  (+7 days, “Follow up”). That is a reminder, not the work we owe.
+- Journal kind `task` (green **Task** tag). Composer title: “What they
+  expect from us”. Stays on the lead journal; Calendar still skips notes
+  and tasks. Conversations cards preview task text with notes.
+
+### 2026-09-13 — Card location: door + postal is not the city
+- `shortLocation` treated `12` in `12, 08022 Barcelona, Spain` (or the
+  no-comma form `12 08022 Barcelona`) as a geo part, so cards showed the
+  street number + postcode. Split on postcodes, drop 1–4 digit house
+  numbers, then city + country. Collaborator cards were using the raw
+  address — they now call `shortLocation` too.
+- Collaborator card name stays `items-start` / `text-left` at the top of
+  the card. Grid rows stretch; centering the title in the cell looked
+  like the name sat in the middle.
+
 ### 2026-09-13 — Drawer chrome + closed-lead docs
 - Conversation cards only need “Follow-up”, not “Follow-up needed”.
 - Phone Live is the pulse-dot + popover. Do not repeat “X is editing / Take

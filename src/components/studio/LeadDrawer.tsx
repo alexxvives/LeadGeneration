@@ -10,7 +10,6 @@ import {
   BuildingIcon,
   GlobeIcon,
   MailIcon,
-  PencilIcon,
   PhoneIcon,
   PinIcon,
   SparkIcon,
@@ -24,25 +23,25 @@ import {
   addDaysIso,
   collapseEmailSentFollowUps,
   mergeFollowUpLists,
-  formatNoteDate,
   inferFollowUpKind,
   emailSentNotePrefix,
   isBounceNote,
   isContactRegisteredNote,
-  isMissedCallNote,
   missedCallNotePrefix,
   normalizeEmailSentNote,
   normalizeMissedCallNote,
   phoneCallNotePrefix,
   resolveFollowUpKind,
-  sortFollowUpsNewestFirst,
   todayIsoDate,
+  withFollowUpAuthor,
 } from "@/lib/follow-ups";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
 import { Bone, LeadDrawerPendingSkeleton } from "@/components/studio/skeletons";
 import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 import { LeadDocuments } from "@/components/studio/LeadDocuments";
+import { JournalEntries } from "@/components/studio/JournalEntries";
+import { parseRecipientEmail, sanitizeEmailList } from "@/lib/email/address";
 import {
   toggleContactMethod,
   contactMethodsEqual,
@@ -166,7 +165,9 @@ export function LeadDrawer(props: DrawerProps) {
   );
   const [followUps, setFollowUps] = useState<FollowUp[]>(lead.followUps ?? []);
   const [showAddNote, setShowAddNote] = useState(Boolean(promptNote));
-  const [composerKind, setComposerKind] = useState<"note" | "follow_up">("note");
+  const [composerKind, setComposerKind] = useState<
+    "note" | "follow_up" | "task"
+  >("note");
   const [newNoteDate, setNewNoteDate] = useState(todayIsoDate);
   const [newNoteText, setNewNoteText] = useState(() =>
     promptNote === "missed"
@@ -340,13 +341,16 @@ export function LeadDrawer(props: DrawerProps) {
       return;
     }
     const actor = lead.contactedByName?.trim();
-    const inserted: FollowUp = {
-      id: newId("fu"),
-      date: sentDay,
-      note: actor ? `Email sent by ${actor}` : "Email sent",
-      done: true,
-      kind: "email",
-    };
+    const inserted: FollowUp = withFollowUpAuthor(
+      {
+        id: newId("fu"),
+        date: sentDay,
+        note: actor ? `Email sent by ${actor}` : "Email sent",
+        done: true,
+        kind: "email",
+      },
+      actor ?? actorName,
+    );
     const base = followUps.length ? followUps : collapsed;
     const updated = mergeFollowUpLists([inserted, ...base], collapsed);
     setFollowUps(updated);
@@ -535,7 +539,7 @@ export function LeadDrawer(props: DrawerProps) {
   const promptingEmail = callPrompt === "email";
   const promptingChannel = promptingCall || promptingEmail;
 
-  const openComposer = (kind: "note" | "follow_up") => {
+  const openComposer = (kind: "note" | "follow_up" | "task") => {
     if (editLocked) return;
     setShowAddNote(true);
     setCallPrompt(false);
@@ -589,14 +593,19 @@ export function LeadDrawer(props: DrawerProps) {
         ? "email"
         : composerKind === "follow_up"
           ? "follow_up"
-          : "note";
-    const fu: FollowUp = {
-      id: newId("fu"),
-      date: newNoteDate,
-      note: text,
-      done: isCall || isEmailLog || kind === "note",
-      kind,
-    };
+          : composerKind === "task"
+            ? "task"
+            : "note";
+    const fu = withFollowUpAuthor(
+      {
+        id: newId("fu"),
+        date: newNoteDate,
+        note: text,
+        done: isCall || isEmailLog || kind === "note",
+        kind,
+      },
+      actorName,
+    );
     const updated = [...followUps, fu];
     setFollowUps(updated);
     setShowAddNote(false);
@@ -670,6 +679,15 @@ export function LeadDrawer(props: DrawerProps) {
     }
   };
 
+  const toggleFollowUpDone = async (fu: FollowUp) => {
+    if (editLocked) return;
+    const updated = followUps.map((f) =>
+      f.id === fu.id ? { ...f, done: !f.done } : f,
+    );
+    setFollowUps(updated);
+    await props.onUpdateCrm(lead.id, { followUps: updated });
+  };
+
   const startEditFollowUp = (fu: FollowUp) => {
     if (editLocked) return;
     setEditingId(fu.id);
@@ -696,7 +714,7 @@ export function LeadDrawer(props: DrawerProps) {
   };
 
   /** Recipient required; Send is the per-lead human gate. */
-  const canSend = Boolean(toEmail.trim());
+  const canSend = Boolean(parseRecipientEmail(toEmail));
   const sent = outreach?.status === "sent";
 
   return (
@@ -944,7 +962,7 @@ export function LeadDrawer(props: DrawerProps) {
                   onToggle={(next) => {
                     void props.onUpdateCrm(lead.id, { waitingOnUs: next });
                     if (!next) return;
-                    openComposer("follow_up");
+                    openComposer("task");
                     notesPaneRef.current?.scrollIntoView({
                       behavior: "smooth",
                       block: "nearest",
@@ -1030,7 +1048,7 @@ export function LeadDrawer(props: DrawerProps) {
               disabled={editLocked}
               lockHint={lockHint}
               onSave={(raw) => {
-                const next = parseList(raw);
+                const next = sanitizeEmailList(parseList(raw));
                 if (next.join("\0") !== lead.emails.join("\0")) {
                   void props.onUpdateCrm(lead.id, { emails: next });
                 }
@@ -1182,7 +1200,18 @@ export function LeadDrawer(props: DrawerProps) {
               ) : null}
 
               {showAddNote && (
-                <div className="space-y-2 rounded-xl border border-white/10 bg-ink-900/60 p-3">
+                <div
+                  className={`space-y-2 rounded-xl border p-3 ${
+                    composerKind === "task"
+                      ? "border-aurora-400/35 bg-aurora-400/10"
+                      : "border-white/10 bg-ink-900/60"
+                  }`}
+                >
+                  {composerKind === "task" ? (
+                    <p className="text-xs font-medium text-aurora-200">
+                      What they expect from us
+                    </p>
+                  ) : null}
                   <DatePicker
                     label={
                       promptingCall
@@ -1191,7 +1220,9 @@ export function LeadDrawer(props: DrawerProps) {
                           ? "Email date"
                           : composerKind === "follow_up"
                             ? "Follow up on"
-                            : "Date"
+                            : composerKind === "task"
+                              ? "Due"
+                              : "Date"
                     }
                     value={newNoteDate}
                     onChange={setNewNoteDate}
@@ -1208,7 +1239,9 @@ export function LeadDrawer(props: DrawerProps) {
                           ? "what you sent…"
                           : composerKind === "follow_up"
                             ? "Follow up"
-                            : "What happened…"
+                            : composerKind === "task"
+                              ? "Proposal, callback, pricing…"
+                              : "What happened…"
                     }
                     className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60"
                   />
@@ -1319,121 +1352,21 @@ export function LeadDrawer(props: DrawerProps) {
                 </p>
                 )
               ) : (
-                <ul className="space-y-2">
-                  {sortFollowUpsNewestFirst(followUps)
-                    .map((fu) => {
-                      const kind = resolveFollowUpKind(fu);
-                      const isFollow = kind === "follow_up";
-                      const missed = isMissedCallNote(fu.note);
-                      const tagClass =
-                        kind === "email"
-                          ? "bg-aurora-400/15 text-aurora-200"
-                          : kind === "phone"
-                            ? missed
-                              ? "bg-white/10 text-mist-400"
-                              : "bg-sky-400/15 text-sky-200"
-                            : kind === "follow_up"
-                              ? "bg-violet-400/15 text-violet-200"
-                              : "bg-amber-400/15 text-amber-200";
-                      const tagText =
-                        kind === "email"
-                          ? "Email"
-                          : kind === "phone"
-                            ? missed
-                              ? "Missed"
-                              : "Call"
-                            : kind === "follow_up"
-                              ? "Follow up"
-                              : "Note";
-                      const lineClass =
-                        isFollow && fu.done
-                          ? "text-mist-500 line-through"
-                          : "text-mist-300";
-                      return (
-                        <li key={fu.id} className="flex items-start gap-2">
-                          <span
-                            className={`mt-0.5 inline-flex w-[5.25rem] shrink-0 justify-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tagClass}`}
-                          >
-                            {tagText}
-                          </span>
-                          {editingId === fu.id ? (
-                            <div className="min-w-0 flex-1 space-y-2">
-                              <DatePicker
-                                value={editDate}
-                                onChange={setEditDate}
-                                disabled={editLocked}
-                              />
-                              <textarea
-                                value={editText}
-                                onChange={(e) => setEditText(e.target.value)}
-                                rows={3}
-                                className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
-                              />
-                              <div className="flex flex-wrap gap-2">
-                                <Lockable>
-                                  <button
-                                    type="button"
-                                    onClick={() => void saveEditFollowUp()}
-                                    disabled={editLocked || !editDate}
-                                    title={editLocked ? lockHint : undefined}
-                                    className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent disabled:opacity-40"
-                                  >
-                                    Save
-                                  </button>
-                                </Lockable>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingId(null)}
-                                  className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <p
-                              className={`min-w-0 flex-1 text-sm leading-relaxed ${lineClass}`}
-                            >
-                              <span className="font-semibold text-mist-100">
-                                {formatNoteDate(fu.date)}
-                              </span>
-                              {fu.note ? <> · {fu.note}</> : null}
-                            </p>
-                          )}
-                          {editingId === fu.id ? null : (
-                            <div className="mt-0.5 flex shrink-0 items-center gap-1">
-                              <Lockable>
-                                <button
-                                  type="button"
-                                  disabled={editLocked}
-                                  onClick={() => startEditFollowUp(fu)}
-                                  className="text-mist-600 hover:text-mist-200 disabled:opacity-50"
-                                  aria-label={editLocked ? lockHint : "Edit note"}
-                                  title={editLocked ? lockHint : "Edit note"}
-                                >
-                                  <PencilIcon className="h-3 w-3" />
-                                </button>
-                              </Lockable>
-                              <Lockable>
-                                <button
-                                  type="button"
-                                  disabled={editLocked}
-                                  onClick={() => void deleteFollowUp(fu.id)}
-                                  className="text-mist-600 hover:text-rose-400 disabled:opacity-50"
-                                  aria-label={
-                                    editLocked ? lockHint : "Delete note"
-                                  }
-                                  title={editLocked ? lockHint : "Delete note"}
-                                >
-                                  <XIcon className="h-3 w-3" />
-                                </button>
-                              </Lockable>
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                </ul>
+                <JournalEntries
+                  followUps={followUps}
+                  editingId={editingId}
+                  editDate={editDate}
+                  editText={editText}
+                  onEditDate={setEditDate}
+                  onEditText={setEditText}
+                  onStartEdit={startEditFollowUp}
+                  onSaveEdit={() => void saveEditFollowUp()}
+                  onCancelEdit={() => setEditingId(null)}
+                  onDelete={(id) => void deleteFollowUp(id)}
+                  onToggleDone={(fu) => void toggleFollowUpDone(fu)}
+                  disabled={editLocked}
+                  lockHint={lockHint}
+                />
               )}
                 </>
               )}
@@ -1567,11 +1500,30 @@ export function LeadDrawer(props: DrawerProps) {
                   <input
                     value={toEmail}
                     onChange={(e) => setToEmail(e.target.value)}
+                    onBlur={() => {
+                      const next = parseRecipientEmail(toEmail);
+                      if (toEmail.trim() && !next) {
+                        setToEmail("");
+                        if (lead.emails.some((e) => e.trim())) {
+                          void props.onUpdateCrm(lead.id, {
+                            emails: sanitizeEmailList(lead.emails),
+                          });
+                        }
+                      } else if (next && next !== toEmail.trim()) {
+                        setToEmail(next);
+                      }
+                    }}
                     disabled={sent || editLocked}
                     title={editLocked ? lockHint : undefined}
                     placeholder="name@company.com"
                     className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none focus:border-aurora-400/60 disabled:opacity-60"
                   />
+                  {toEmail.trim() && !parseRecipientEmail(toEmail) ? (
+                    <p className="mt-1 text-[11px] text-rose-300">
+                      Not a real address (needs name@example.com). It will be
+                      removed.
+                    </p>
+                  ) : null}
                 </FieldMini>
                 <FieldMini label="Subject">
                   <input
@@ -1649,7 +1601,7 @@ export function LeadDrawer(props: DrawerProps) {
                   <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
                     {outreach.status === "failed" ? "Send failed: " : ""}
                     {outreach.error === "invalid_email_removed"
-                      ? "That address couldn't receive mail — we removed it from this lead."
+                      ? "That address isn't a real email (needs name@example.com). We removed it from this lead."
                       : outreach.error.startsWith("verify_blocked:")
                         ? `Verifier isn't sure ${toEmail || "this address"} can receive mail (${outreach.error.slice("verify_blocked:".length)}). Soft checks false-positive often — you can send anyway if you trust it.`
                         : outreach.error}

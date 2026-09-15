@@ -125,7 +125,12 @@ export function resolveFollowUpKind(fu: FollowUp): FollowUpKind {
   // call via Follow up used to save kind: follow_up (the checkbox).
   if (inferred === "phone" || inferred === "email") return inferred;
   if (isBounceNote(fu.note)) return "note";
-  if (fu.kind === "note" || fu.kind === "email" || fu.kind === "phone") {
+  if (
+    fu.kind === "note" ||
+    fu.kind === "email" ||
+    fu.kind === "phone" ||
+    fu.kind === "task"
+  ) {
     return fu.kind;
   }
   // Explicit Follow up control: default copy, or a future date (composer +7d).
@@ -149,7 +154,8 @@ export function slimFollowUpsForList(followUps: FollowUp[]): FollowUp[] {
   return followUps.map((f) => {
     const kind = resolveFollowUpKind(f);
     const missed = isMissedCallNote(f.note);
-    const keepPreview = kind === "note" || kind === "follow_up";
+    const keepPreview =
+      kind === "note" || kind === "follow_up" || kind === "task";
     const trimmed = f.note.trim();
     const note = missed
       ? trimmed.replace(/:[\s\S]*$/, "")
@@ -162,6 +168,7 @@ export function slimFollowUpsForList(followUps: FollowUp[]): FollowUp[] {
       done: f.done,
       kind,
       note,
+      ...(f.authorName?.trim() ? { authorName: f.authorName.trim() } : {}),
     };
   });
 }
@@ -180,10 +187,55 @@ export function isUserFollowUp(fu: FollowUp): boolean {
   return resolveFollowUpKind(fu) === "follow_up";
 }
 
+/** Card chips: only undone reminders. Done follow-ups stay in the journal. */
+export function pendingUserFollowUpCount(
+  followUps: FollowUp[] | undefined,
+): number {
+  return followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
+}
+
+const TITLE_RE = /^(dr|dra|mr|mrs|ms|miss|prof|sr|sra|srta)\.?$/i;
+
+/** Initials for the comment avatar (skip Dr./Mr. so Vicente Paloma → VP). */
+export function authorInitials(name: string | null | undefined): string {
+  const parts = (name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter((p) => p && !TITLE_RE.test(p));
+  if (parts.length === 0) {
+    const fallback = (name ?? "").trim();
+    return fallback ? fallback.slice(0, 2).toUpperCase() : "?";
+  }
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]![0] ?? ""}${parts[parts.length - 1]![0] ?? ""}`.toUpperCase();
+}
+
+/** Stored author, or a trailing "by {name}" on send/call lines. */
+export function followUpAuthorName(fu: FollowUp): string | null {
+  const stored = fu.authorName?.trim();
+  if (stored) return stored;
+  const m = fu.note.match(
+    /^(?:email sent|phone call|missed call|contacted via [^ ]+) by\s+([^:]+?)(?::\s*|$)/i,
+  );
+  const parsed = m?.[1]?.trim();
+  if (!parsed || /^you$/i.test(parsed)) return null;
+  return parsed;
+}
+
+export function withFollowUpAuthor(
+  fu: FollowUp,
+  actorName?: string | null,
+): FollowUp {
+  if (fu.authorName?.trim()) return fu;
+  const name = actorName?.trim();
+  return name ? { ...fu, authorName: name } : fu;
+}
+
 export function followUpKindLabel(kind: FollowUpKind): string {
   if (kind === "email") return "Email sent";
   if (kind === "phone") return "Phone call";
   if (kind === "note") return "Note";
+  if (kind === "task") return "Task";
   return "Follow up";
 }
 
@@ -215,7 +267,7 @@ export function calendarEventsFromLeads(
   for (const lead of leads) {
     for (const fu of lead.followUps ?? []) {
       const kind = resolveFollowUpKind(fu);
-      if (kind === "note") continue;
+      if (kind === "note" || kind === "task") continue;
       out.push({
         id: fu.id,
         source: "lead",
@@ -236,7 +288,7 @@ export function calendarEventsFromContacts(contacts: Contact[]): CalendarEvent[]
   for (const contact of contacts) {
     for (const fu of contact.followUps ?? []) {
       const kind = resolveFollowUpKind(fu);
-      if (kind === "note") continue;
+      if (kind === "note" || kind === "task") continue;
       out.push({
         id: fu.id,
         source: "contact",
@@ -295,7 +347,7 @@ export function mergeFollowUpLists(
   cached: FollowUp[],
   incoming: FollowUp[],
   droppedIds?: ReadonlySet<string> | null,
-  opts?: { preferIncoming?: boolean },
+  opts?: { preferIncoming?: boolean; patchExisting?: boolean },
 ): FollowUp[] {
   if (cached.length === 0 && incoming.length === 0) return incoming;
   if (incoming.length === 0) {
@@ -323,12 +375,30 @@ export function mergeFollowUpLists(
     }
     return out;
   }
+  const incomingById = new Map(incoming.map((f) => [f.id, f]));
   const seen = new Set<string>();
   const out: FollowUp[] = [];
+  const patchExisting = opts?.patchExisting === true;
   for (const f of cached) {
     if (droppedIds?.has(f.id)) continue;
     seen.add(f.id);
-    out.push(f);
+    const inc = patchExisting ? incomingById.get(f.id) : undefined;
+    if (!inc) {
+      out.push(f);
+      continue;
+    }
+    // Slim rows truncate notes — keep the longer body. Take done/kind/date
+    // from incoming so a Calendar tick hides the card chip.
+    const note =
+      f.note.trim().length >= inc.note.trim().length ? f.note : inc.note;
+    out.push({
+      ...f,
+      date: inc.date || f.date,
+      done: inc.done,
+      kind: inc.kind ?? f.kind,
+      note,
+      authorName: inc.authorName?.trim() || f.authorName,
+    });
   }
   for (const f of incoming) {
     if (seen.has(f.id) || droppedIds?.has(f.id)) continue;

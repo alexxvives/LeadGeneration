@@ -17,9 +17,18 @@ const STREET_RE =
 const VENUE_RE =
   /^(?:centro|centre|cl[ií]nica|clinic|hospital|farmacia|pharmacy|institut(?:o|e)?|medical|m[eé]dic[oa]|universit)/i;
 
+const HOUSE_NUMBER_RE = /^\d{1,4}[A-Za-z]?$/;
+const POSTAL_ONLY_RE = /^\d{4,6}(?:-\d{4})?$/;
+const OFFICE_PART_RE =
+  /^(?:despatx|despacho|consultori|consultorio|office|room|sala|box|unit)\b/i;
+/** Leftover after stripping "Planta 0.)" / "(despatx 128". */
+const FLOOR_FRAGMENT_RE = /^\d+[.)\]]*$/;
+
 function stripPostal(s: string): string {
   return s
-    .replace(/^\d{4,6}\s+/, "")
+    // "12 08022 Barcelona" — door number glued to postal + city (no comma).
+    .replace(/^\d{1,4}[A-Za-z]?\s+(?=\d{4,6}\b)/, "")
+    .replace(/^\d{4,6}(?:-\d{4})?\s+/, "")
     .replace(/\s+\d{4,6}(?:-\d{4})?$/, "")
     .trim();
 }
@@ -42,12 +51,27 @@ function isFloorOnly(s: string): boolean {
   return FLOOR_PART_RE.test(s) && FLOOR_PREFIX_RE.test(`${s} `);
 }
 
+function isHouseNumber(s: string): boolean {
+  return HOUSE_NUMBER_RE.test(s);
+}
+
 function isNonGeo(s: string): boolean {
   if (!s) return true;
-  if (isFloorOnly(s)) return true;
+  if (isHouseNumber(s) || POSTAL_ONLY_RE.test(s)) return true;
+  if (isFloorOnly(s) || FLOOR_FRAGMENT_RE.test(s)) return true;
+  if (OFFICE_PART_RE.test(s)) return true;
   if (STREET_RE.test(s)) return true;
   if (VENUE_RE.test(s) && s.split(/\s+/).length >= 2) return true;
   return false;
+}
+
+/** Drop office/floor asides so they never become the "city". */
+function stripParentheticals(s: string): string {
+  return s
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\([^)]*$/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function countryLabel(s: string): string {
@@ -59,16 +83,26 @@ function countryLabel(s: string): string {
   return t.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function explodePart(raw: string): string[] {
+  const trimmed = raw.replace(/\s+/g, " ").trim();
+  if (!trimmed) return [];
+  // Split before a postal so "12 08022 Barcelona" becomes door + city.
+  return trimmed
+    .split(/\s+(?=\d{4,6}(?:-\d{4})?(?:\s+|$))/)
+    .map((p) => cleanPart(p))
+    .filter(Boolean);
+}
+
 export function shortLocation(location: string | null | undefined): string | null {
   if (!location?.trim()) return null;
-  const parts = location
+  const parts = stripParentheticals(location)
     .split(",")
-    .map((p) => cleanPart(p))
+    .flatMap(explodePart)
     .filter(Boolean);
   const geo = parts.filter((p) => !isNonGeo(p));
   const pool = geo.length > 0 ? geo : parts.map(cleanPart).filter((p) => p && !isNonGeo(p));
   if (pool.length === 0) {
-    const fallback = cleanPart(location.replace(/,/g, " "));
+    const fallback = cleanPart(stripParentheticals(location).replace(/,/g, " "));
     if (!fallback || isNonGeo(fallback) || VENUE_RE.test(fallback)) return null;
     return fallback;
   }

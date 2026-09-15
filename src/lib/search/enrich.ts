@@ -1,6 +1,7 @@
 // Lightweight extraction helpers used to turn scraped page text/markdown into
 // contact hints. Intentionally conservative to avoid capturing junk.
 
+import { isSendableEmail } from "@/lib/email/address";
 import { sanitizeCompanyName, sanitizeContactName } from "@/lib/lead-text";
 
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
@@ -70,22 +71,6 @@ const DISPOSABLE_EMAIL_DOMAINS = new Set([
 // Local-parts that are auto/no-reply mailboxes — filtered out as un-contactable.
 const NOREPLY_LOCAL_RE = /^(no-?reply|do-?not-?reply|donotreply|mailer-daemon|postmaster|bounce)/i;
 
-// Conservative shape check on top of the loose scan regex: exactly one @, a dot
-// in the domain, a 2–24 alpha TLD, and no doubled/edge dots.
-function isPlausibleEmail(email: string): boolean {
-  const at = email.indexOf("@");
-  if (at <= 0 || email.indexOf("@", at + 1) !== -1) return false;
-  const local = email.slice(0, at);
-  const domain = email.slice(at + 1);
-  if (!local || local.startsWith(".") || local.endsWith(".") || local.includes("..")) {
-    return false;
-  }
-  if (domain.includes("..") || domain.startsWith(".") || domain.endsWith(".")) return false;
-  const tld = domain.split(".").pop() ?? "";
-  if (!/^[a-z]{2,24}$/.test(tld)) return false;
-  return domain.includes(".");
-}
-
 /** Pull a person name from Firecrawl JSON-extract lines (`Contact: Jane Doe`). */
 export function extractContactName(text: string): string | null {
   const m = text.match(
@@ -101,7 +86,7 @@ export function extractEmails(text: string): string[] {
   const clean = found
     .map((e) => e.toLowerCase().trim().replace(/[.,;:)]+$/, ""))
     .filter((e) => !JUNK_EMAIL_HINTS.some((j) => e.includes(j)))
-    .filter(isPlausibleEmail)
+    .filter(isSendableEmail)
     .filter((e) => {
       const [local, domain] = e.split("@");
       if (DISPOSABLE_EMAIL_DOMAINS.has(domain)) return false;

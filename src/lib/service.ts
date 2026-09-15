@@ -8,6 +8,7 @@ import {
   type OutreachLang,
 } from "@/lib/outreach/locale";
 import { sendEmail } from "@/lib/email/sender";
+import { parseRecipientEmail, sanitizeEmailList } from "@/lib/email/address";
 import {
   activeProfileIdFromJson,
   emptyProfileSendSettings,
@@ -83,7 +84,7 @@ import {
   contactMethodsEqual,
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor } from "@/lib/follow-ups";
 import { LEAD_HYDRATE_LANES } from "@/lib/lead-lanes";
 import {
   companyGuessFromEmail,
@@ -1472,6 +1473,34 @@ export async function sendApprovedOutreach(
     });
   }
 
+  const parsedTo = parseRecipientEmail(toEmail);
+  if (!parsedTo) {
+    const lead = await db.getLead(outreach.leadId);
+    if (lead) {
+      await db.updateLead(lead.id, { emails: sanitizeEmailList(lead.emails) });
+    }
+    await db.updateOutreach(outreachId, {
+      status: "rejected",
+      toEmail: null,
+      error: "invalid_email_removed",
+      updatedAt: nowIso(),
+    });
+    return {
+      ok: false,
+      undeliverableRemoved: true,
+      error:
+        "That address isn't a real email (needs name@example.com). We removed it from this lead.",
+    };
+  }
+  if (parsedTo !== toEmail) {
+    toEmail = parsedTo;
+    await db.updateOutreach(outreachId, {
+      toEmail,
+      error: null,
+      updatedAt: nowIso(),
+    });
+  }
+
   // List hygiene — verify at send only (not on enrich). Per-board flag (ADR 0025).
   const wsForVerify = await db.getWorkspace(ctx.workspaceId);
   const leadForVerify = await db.getLead(outreach.leadId);
@@ -1677,13 +1706,16 @@ export async function sendApprovedOutreach(
       // App send always journals its own line — chip logs can add more the
       // same day; collapse only drops a bare "Email sent" duplicate.
       const followUps = [
-        {
-          id: newId("fu"),
-          date: today,
-          note: emailSentNote,
-          done: true,
-          kind: "email" as const,
-        },
+        withFollowUpAuthor(
+          {
+            id: newId("fu"),
+            date: today,
+            note: emailSentNote,
+            done: true,
+            kind: "email" as const,
+          },
+          actor,
+        ),
         ...existing,
       ];
       crmPatch.followUps = collapseEmailSentFollowUps(followUps, actor);
@@ -1715,8 +1747,6 @@ export async function sendApprovedOutreach(
   };
 }
 
-const TEST_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /**
  * Send a one-off test message to verify workspace transport (Settings).
  * Explicit user action — not outreach, so no approved-outreach gate.
@@ -1731,8 +1761,8 @@ export async function sendTestEmail(
   error?: string;
   demo?: boolean;
 }> {
-  const to = toRaw.trim().toLowerCase();
-  if (!TEST_EMAIL_RE.test(to) || to.length > 254) {
+  const to = parseRecipientEmail(toRaw);
+  if (!to) {
     return { ok: false, error: "Enter a valid email address" };
   }
 
@@ -1953,13 +1983,16 @@ export async function setOutreachDeliveryStatus(
       );
       if (!hasReplyNote) {
         patch.followUps = [
-          {
-            id: newId("fu"),
-            date: today,
-            note: "Reply received",
-            done: false,
-            kind: "follow_up",
-          },
+          withFollowUpAuthor(
+            {
+              id: newId("fu"),
+              date: today,
+              note: "Reply received",
+              done: false,
+              kind: "follow_up",
+            },
+            ctx.userName?.trim() || ctx.userEmail?.trim() || null,
+          ),
           ...existingFu,
         ];
       }
@@ -2470,6 +2503,9 @@ export async function updateLeadCrm(
     contactedByUserId?: string | null;
     contactedByName?: string | null;
   } = { ...patch };
+  if (next.emails) {
+    next.emails = sanitizeEmailList(next.emails);
+  }
   if (next.company !== undefined) {
     next.company = sanitizeCompanyName(next.company);
   }
@@ -2520,13 +2556,16 @@ export async function updateLeadCrm(
       );
       if (already) continue;
       followUps = [
-        {
-          id: newId("fu"),
-          date: today,
-          note: entry.note,
-          done: true,
-          kind: entry.kind,
-        },
+        withFollowUpAuthor(
+          {
+            id: newId("fu"),
+            date: today,
+            note: entry.note,
+            done: true,
+            kind: entry.kind,
+          },
+          actorName,
+        ),
         ...followUps,
       ];
     }
@@ -3394,7 +3433,7 @@ export async function createContact(
     boardId: access.board.id,
     name,
     organization: input.organization?.trim() || null,
-    email: input.email?.trim() || null,
+    email: parseRecipientEmail(input.email?.trim() ?? "") ?? null,
     phone: input.phone?.trim() || null,
     location: input.location?.trim() || null,
     followUps: [],
@@ -3428,7 +3467,8 @@ export async function updateContact(
     next.organization = next.organization?.trim() || null;
   }
   if (next.email !== undefined) {
-    next.email = next.email?.trim() || null;
+    const raw = next.email?.trim() || null;
+    next.email = raw ? parseRecipientEmail(raw) : null;
   }
   if (next.phone !== undefined) {
     next.phone = next.phone?.trim() || null;

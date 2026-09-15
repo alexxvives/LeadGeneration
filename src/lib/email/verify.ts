@@ -10,6 +10,7 @@
  */
 
 import { env } from "@/lib/config";
+import { isSendableEmail } from "@/lib/email/address";
 
 export type EmailVerifyStatus =
   | "deliverable"
@@ -44,8 +45,7 @@ const CACHE = new Map<string, EmailVerifyResult>();
 
 function heuristic(email: string): EmailVerifyResult {
   const lower = email.toLowerCase().trim();
-  const at = lower.indexOf("@");
-  if (at <= 0 || !lower.includes(".", at)) {
+  if (!isSendableEmail(lower)) {
     return {
       email: lower,
       status: "undeliverable",
@@ -57,7 +57,7 @@ function heuristic(email: string): EmailVerifyResult {
       billed: false,
     };
   }
-  const local = lower.slice(0, at);
+  const local = lower.slice(0, lower.indexOf("@"));
   if (/^(no-?reply|do-?not-?reply|mailer-daemon|postmaster)/i.test(local)) {
     return {
       email: lower,

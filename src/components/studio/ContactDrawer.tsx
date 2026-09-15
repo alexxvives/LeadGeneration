@@ -5,12 +5,13 @@ import type { Contact, FollowUp } from "@/lib/types";
 import { newId } from "@/lib/id";
 import {
   addDaysIso,
-  formatNoteDate,
-  isUserFollowUp,
-  resolveFollowUpKind,
+  authorInitials,
+  pendingUserFollowUpCount,
   sortFollowUpsNewestFirst,
   todayIsoDate,
+  withFollowUpAuthor,
 } from "@/lib/follow-ups";
+import { parseRecipientEmail } from "@/lib/email/address";
 import {
   BuildingIcon,
   MailIcon,
@@ -21,6 +22,7 @@ import {
 } from "@/components/icons";
 import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { JournalEntries } from "@/components/studio/JournalEntries";
 
 function formatCreated(iso: string): string {
   const d = new Date(iso);
@@ -30,13 +32,6 @@ function formatCreated(iso: string): string {
     month: "short",
     year: "numeric",
   });
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
 }
 
 function EditableInfoRow({
@@ -95,12 +90,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export function ContactDrawer({
   contact,
   boardName,
+  actorName,
   onClose,
   onUpdate,
   onDelete,
 }: {
   contact: Contact;
   boardName: string;
+  actorName?: string | null;
   onClose: () => void;
   onUpdate: (
     id: string,
@@ -124,13 +121,15 @@ export function ContactDrawer({
   const [composer, setComposer] = useState<"note" | "follow_up" | null>(null);
   const [noteText, setNoteText] = useState("");
   const [noteDate, setNoteDate] = useState(todayIsoDate());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState(todayIsoDate());
+  const [editText, setEditText] = useState("");
 
   const followUps = useMemo(
     () => sortFollowUpsNewestFirst(contact.followUps ?? []),
     [contact.followUps],
   );
-  const pending =
-    contact.followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
+  const pending = pendingUserFollowUpCount(contact.followUps);
 
   useEffect(() => {
     prevFocus.current = document.activeElement as HTMLElement | null;
@@ -161,13 +160,16 @@ export function ContactDrawer({
   const addEntry = async (kind: "note" | "follow_up") => {
     const text = noteText.trim() || (kind === "follow_up" ? "Follow up" : "");
     if (!text || editLocked) return;
-    const fu: FollowUp = {
-      id: newId("fu"),
-      date: noteDate || todayIsoDate(),
-      note: text,
-      done: kind === "note",
-      kind,
-    };
+    const fu = withFollowUpAuthor(
+      {
+        id: newId("fu"),
+        date: noteDate || todayIsoDate(),
+        note: text,
+        done: kind === "note",
+        kind,
+      },
+      actorName,
+    );
     await onUpdate(contact.id, { followUps: [fu, ...(contact.followUps ?? [])] });
     setComposer(null);
     setNoteText("");
@@ -178,11 +180,45 @@ export function ContactDrawer({
     field: "organization" | "email" | "phone" | "location",
     raw: string,
   ) => {
-    const next = raw.trim() || null;
+    let next: string | null = raw.trim() || null;
+    if (field === "email") {
+      next = next ? parseRecipientEmail(next) : null;
+    }
     const cur = contact[field]?.trim() || null;
     if (next !== cur) {
       void onUpdate(contact.id, { [field]: next });
     }
+  };
+
+  const deleteFollowUp = async (fuId: string) => {
+    if (editLocked) return;
+    const updated = (contact.followUps ?? []).filter((f) => f.id !== fuId);
+    if (editingId === fuId) setEditingId(null);
+    await onUpdate(contact.id, { followUps: updated });
+  };
+
+  const toggleFollowUpDone = async (fu: FollowUp) => {
+    if (editLocked) return;
+    const updated = (contact.followUps ?? []).map((f) =>
+      f.id === fu.id ? { ...f, done: !f.done } : f,
+    );
+    await onUpdate(contact.id, { followUps: updated });
+  };
+
+  const startEditFollowUp = (fu: FollowUp) => {
+    if (editLocked) return;
+    setEditingId(fu.id);
+    setEditDate(fu.date);
+    setEditText(fu.note);
+  };
+
+  const saveEditFollowUp = async () => {
+    if (editLocked || !editingId || !editDate) return;
+    const updated = (contact.followUps ?? []).map((f) =>
+      f.id === editingId ? { ...f, date: editDate, note: editText.trim() } : f,
+    );
+    setEditingId(null);
+    await onUpdate(contact.id, { followUps: updated });
   };
 
   return (
@@ -205,7 +241,7 @@ export function ContactDrawer({
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-aurora-400/15 text-sm font-semibold text-aurora-200 ring-1 ring-aurora-400/30"
               aria-hidden
             >
-              {initials(contact.name)}
+              {authorInitials(contact.name)}
             </div>
             <div className="min-w-0 flex-1">
               <Lockable className="block min-w-0">
@@ -344,34 +380,34 @@ export function ContactDrawer({
 
           <section className="mt-6">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <SectionLabel>Journal</SectionLabel>
-              <div className="flex flex-wrap gap-2">
+              <SectionLabel>Notes</SectionLabel>
+              <div className="flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1">
                 <Lockable>
                   <button
                     type="button"
                     disabled={editLocked}
-                    title={editLocked ? lockHint : "Add note"}
+                    title={editLocked ? lockHint : undefined}
                     onClick={() => {
                       setComposer("note");
                       setNoteDate(todayIsoDate());
                       setNoteText("");
                     }}
-                    className="rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-mist-200 hover:bg-white/5 disabled:opacity-50"
+                    className="text-[11px] text-amber-300 hover:underline disabled:opacity-50"
                   >
-                    Add note
+                    Add Note
                   </button>
                 </Lockable>
                 <Lockable>
                   <button
                     type="button"
                     disabled={editLocked}
-                    title={editLocked ? lockHint : "Schedule follow-up"}
+                    title={editLocked ? lockHint : undefined}
                     onClick={() => {
                       setComposer("follow_up");
                       setNoteDate(addDaysIso(7));
                       setNoteText("Follow up");
                     }}
-                    className="rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-mist-200 hover:bg-white/5 disabled:opacity-50"
+                    className="text-[11px] text-violet-300 hover:underline disabled:opacity-50"
                   >
                     Follow up
                   </button>
@@ -380,8 +416,9 @@ export function ContactDrawer({
             </div>
 
             {composer ? (
-              <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-ink-950/40 p-3">
+              <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-ink-900/60 p-3">
                 <DatePicker
+                  label={composer === "follow_up" ? "Follow up on" : "Date"}
                   value={noteDate}
                   onChange={setNoteDate}
                   disabled={editLocked}
@@ -391,88 +428,51 @@ export function ContactDrawer({
                   onChange={(e) => setNoteText(e.target.value)}
                   rows={3}
                   disabled={editLocked}
-                  className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60 disabled:opacity-50"
-                  placeholder={composer === "follow_up" ? "Follow up" : "Note"}
+                  className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60 disabled:opacity-50"
+                  placeholder={composer === "follow_up" ? "Follow up" : "What happened…"}
                 />
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Lockable>
+                    <button
+                      type="button"
+                      disabled={editLocked || (composer === "note" && !noteText.trim())}
+                      onClick={() => void addEntry(composer)}
+                      title={editLocked ? lockHint : undefined}
+                      className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent disabled:opacity-40"
+                    >
+                      Save
+                    </button>
+                  </Lockable>
                   <button
                     type="button"
                     onClick={() => setComposer(null)}
-                    className="text-xs text-mist-400 hover:text-mist-200"
+                    className="rounded-full border border-white/10 px-3 py-1 text-xs text-mist-500 hover:text-mist-300"
                   >
                     Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={editLocked}
-                    onClick={() => void addEntry(composer)}
-                    className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent disabled:opacity-50"
-                  >
-                    Save
                   </button>
                 </div>
               </div>
             ) : null}
 
-            <ul className="space-y-2">
-              {followUps.length === 0 ? (
-                <li className="rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-mist-500">
-                  No notes yet — log calls, meetings, or follow-ups here.
-                </li>
-              ) : (
-                followUps.map((fu) => {
-                  const kind = resolveFollowUpKind(fu);
-                  return (
-                    <li
-                      key={fu.id}
-                      className="rounded-xl border border-white/5 bg-ink-950/40 px-3 py-2.5"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                            kind === "follow_up"
-                              ? "bg-violet-400/15 text-violet-200"
-                              : "bg-amber-400/15 text-amber-200"
-                          }`}
-                        >
-                          {kind === "follow_up" ? "Follow up" : "Note"}
-                        </span>
-                        <span className="text-[11px] text-mist-500">
-                          {formatNoteDate(fu.date)}
-                        </span>
-                      </div>
-                      <p
-                        className={`mt-1.5 text-sm leading-relaxed ${
-                          fu.done && kind === "follow_up"
-                            ? "text-mist-500 line-through"
-                            : "text-mist-200"
-                        }`}
-                      >
-                        {fu.note}
-                      </p>
-                      {kind === "follow_up" ? (
-                        <Lockable>
-                          <button
-                            type="button"
-                            disabled={editLocked}
-                            title={editLocked ? lockHint : undefined}
-                            onClick={() => {
-                              const next = (contact.followUps ?? []).map((f) =>
-                                f.id === fu.id ? { ...f, done: !f.done } : f,
-                              );
-                              void onUpdate(contact.id, { followUps: next });
-                            }}
-                            className="mt-1.5 text-xs text-aurora-300 hover:text-aurora-200 disabled:opacity-50"
-                          >
-                            {fu.done ? "Mark not done" : "Mark done"}
-                          </button>
-                        </Lockable>
-                      ) : null}
-                    </li>
-                  );
-                })
-              )}
-            </ul>
+            {followUps.length === 0 && !composer ? (
+              <p className="text-xs text-mist-600">No notes yet.</p>
+            ) : followUps.length > 0 ? (
+              <JournalEntries
+                followUps={followUps}
+                editingId={editingId}
+                editDate={editDate}
+                editText={editText}
+                onEditDate={setEditDate}
+                onEditText={setEditText}
+                onStartEdit={startEditFollowUp}
+                onSaveEdit={() => void saveEditFollowUp()}
+                onCancelEdit={() => setEditingId(null)}
+                onDelete={(id) => void deleteFollowUp(id)}
+                onToggleDone={(fu) => void toggleFollowUpDone(fu)}
+                disabled={editLocked}
+                lockHint={lockHint}
+              />
+            ) : null}
           </section>
         </div>
       </aside>

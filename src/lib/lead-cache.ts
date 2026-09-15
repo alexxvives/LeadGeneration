@@ -127,7 +127,7 @@ export function mergeSlimIntoCached(
     prev.followUps ?? [],
     incoming.followUps ?? [],
     droppedFollowUpIdSet(prev),
-    { preferIncoming: !incomingSlim && !stale },
+    { preferIncoming: !incomingSlim && !stale, patchExisting: !stale },
   );
   const contactMethods = mergeContactMethods(
     prev.contactMethods ?? [],

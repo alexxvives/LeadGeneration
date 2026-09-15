@@ -63,11 +63,12 @@ export type ContactMethod =
 
 /**
  * Calendar / journal kind. A **note** is a log line; a **follow_up** is a
- * dated reminder (Calendar + pipeline chip). Legacy rows omit this —
- * `resolveFollowUpKind` infers from the note text (never treat a comment
- * as a reminder unless it was created via Follow up).
+ * dated reminder (Calendar + pipeline chip). A **task** is what they expect
+ * from us (Waiting on us). Legacy rows omit this — `resolveFollowUpKind`
+ * infers from the note text (never treat a comment as a reminder unless it
+ * was created via Follow up).
  */
-export type FollowUpKind = "follow_up" | "note" | "email" | "phone";
+export type FollowUpKind = "follow_up" | "note" | "email" | "phone" | "task";
 
 /** A dated journal line: note, scheduled follow-up, email send, or phone call. */
 export interface FollowUp {
@@ -76,6 +77,8 @@ export interface FollowUp {
   note: string;
   done: boolean;
   kind?: FollowUpKind;
+  /** Who wrote this line — shown as initials on comments. */
+  authorName?: string | null;
 }
 
 export type OutreachStatus =

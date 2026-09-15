@@ -2,7 +2,8 @@
 
 import type { FollowUp, LeadWithOutreach } from "@/lib/types";
 import {
-  isUserFollowUp,
+  followUpAuthorName,
+  pendingUserFollowUpCount,
   resolveFollowUpKind,
   sortFollowUpsNewestFirst,
 } from "@/lib/follow-ups";
@@ -10,6 +11,7 @@ import { shortLocation } from "@/lib/format-location";
 import { CalendarIcon, DemoIcon, PinIcon, WaitingIcon } from "@/components/icons";
 import { EmptyState } from "@/components/studio/StudioHelpers";
 import { MarqueeText } from "@/components/studio/MarqueeText";
+import { AuthorAvatar } from "@/components/studio/JournalEntries";
 
 function formatCreated(iso: string): string {
   const d = new Date(iso);
@@ -21,11 +23,21 @@ function formatCreated(iso: string): string {
   });
 }
 
-function recentComments(followUps: FollowUp[] | undefined): string[] {
+function recentComments(
+  followUps: FollowUp[] | undefined,
+): Array<{ id: string; text: string; author: string | null }> {
   return sortFollowUpsNewestFirst(followUps ?? [])
-    .filter((f) => resolveFollowUpKind(f) === "note" && f.note.trim())
+    .filter((f) => {
+      if (f.kind === "follow_up") return false;
+      const kind = resolveFollowUpKind(f);
+      return (kind === "note" || kind === "task") && f.note.trim();
+    })
     .slice(0, 2)
-    .map((f) => f.note.trim());
+    .map((f) => ({
+      id: f.id,
+      text: f.note.trim(),
+      author: followUpAuthorName(f),
+    }));
 }
 
 export function ConversationsView({
@@ -56,8 +68,7 @@ export function ConversationsView({
   return (
     <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {rows.map((lead) => {
-        const pendingFollowUps =
-          lead.followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
+        const pendingFollowUps = pendingUserFollowUpCount(lead.followUps);
         const comments = recentComments(lead.followUps);
         const name = lead.contactName?.trim() || lead.company || "Untitled";
         const cityCountry = shortLocation(lead.location);
@@ -71,7 +82,7 @@ export function ConversationsView({
               onClick={() => onOpen(lead.id)}
               className="flex min-w-0 w-full flex-1 flex-col text-left"
             >
-              <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 items-start gap-2">
                 <h3 className="min-w-0 flex-1 font-display text-base font-semibold leading-tight">
                   <MarqueeText>{name}</MarqueeText>
                 </h3>
@@ -118,10 +129,11 @@ export function ConversationsView({
                 <ul className="mt-2 space-y-1.5">
                   {comments.map((c) => (
                     <li
-                      key={c}
-                      className="line-clamp-2 text-xs leading-relaxed text-mist-300"
+                      key={c.id}
+                      className="flex items-start gap-2 text-xs leading-relaxed text-mist-300"
                     >
-                      {c}
+                      <AuthorAvatar name={c.author} size="sm" />
+                      <span className="line-clamp-2 min-w-0 flex-1">{c.text}</span>
                     </li>
                   ))}
                 </ul>
