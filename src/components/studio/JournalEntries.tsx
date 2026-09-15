@@ -5,6 +5,7 @@ import {
   authorInitials,
   canonicalizeFollowUp,
   followUpAuthorName,
+  followUpIsDone,
   formatNoteDate,
   isMissedCallNote,
   resolveFollowUpKind,
@@ -101,7 +102,7 @@ export function JournalEntries({
                   ? "Task"
                   : "Note";
         const lineClass =
-          (isFollow || isTask) && fu.done
+          (isFollow || isTask) && followUpIsDone(canon.done)
             ? "text-mist-500 line-through"
             : "";
         const canToggle = isFollow || isTask;
@@ -113,11 +114,11 @@ export function JournalEntries({
                   type="button"
                   disabled={disabled}
                   onClick={() => onToggleDone(canon)}
-                  aria-pressed={fu.done}
+                  aria-pressed={followUpIsDone(canon.done)}
                   title={
                     disabled
                       ? lockHint
-                      : fu.done
+                      : followUpIsDone(canon.done)
                         ? "Mark not done"
                         : "Mark done"
                   }

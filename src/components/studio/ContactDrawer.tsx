@@ -6,6 +6,7 @@ import { newId } from "@/lib/id";
 import {
   addDaysIso,
   authorInitials,
+  followUpIsDone,
   pendingUserFollowUpCount,
   sortFollowUpsNewestFirst,
   todayIsoDate,
@@ -200,7 +201,7 @@ export function ContactDrawer({
   const toggleFollowUpDone = async (fu: FollowUp) => {
     if (editLocked) return;
     const updated = (contact.followUps ?? []).map((f) =>
-      f.id === fu.id ? { ...f, done: !f.done } : f,
+      f.id === fu.id ? { ...f, done: !followUpIsDone(f.done) } : f,
     );
     await onUpdate(contact.id, { followUps: updated });
   };

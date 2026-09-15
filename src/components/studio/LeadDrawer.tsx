@@ -22,6 +22,7 @@ import { displayWebsite, isUsableWebsite } from "@/lib/website";
 import {
   addDaysIso,
   collapseEmailSentFollowUps,
+  followUpIsDone,
   mergeFollowUpLists,
   inferFollowUpKind,
   emailSentNotePrefix,
@@ -726,7 +727,7 @@ export function LeadDrawer(props: DrawerProps) {
   const toggleFollowUpDone = async (fu: FollowUp) => {
     if (editLocked) return;
     const updated = followUps.map((f) =>
-      f.id === fu.id ? { ...f, done: !f.done } : f,
+      f.id === fu.id ? { ...f, done: !followUpIsDone(f.done) } : f,
     );
     setFollowUps(updated);
     await props.onUpdateCrm(lead.id, { followUps: updated });

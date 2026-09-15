@@ -9,20 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-15 (leads table/map)
+## ⏱️ Status — updated 2026-09-15 (hide done follow-up chips)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0037** applied on prod D1 (`lodestar-prod`).  
 **Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
-- Initials bubble is geometrically centered (no tracking / font strut).
-- Reached-via chips (Email … Organic) stay on one row.
-- Leads page is Table / Map only (Cards removed).
+- Crossing out a Follow up in the journal hides the Pipeline / Conversations
+  chip. Slim polls no longer revive `done: false` over a completed reminder.
 
 ### Next
-1. Hard-refresh if a Cards toggle is still cached.
-2. Open a contacted lead: all six channel chips should sit on one line.
+1. Hard-refresh, mark a follow-up done, close the drawer — chip should be gone.
 
 ---
 

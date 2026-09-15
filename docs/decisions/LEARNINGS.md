@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-15 — Done follow-ups kept showing on cards
+- Slim board polls lagged `done: false` and `mergeFollowUpLists` took incoming
+  over the optimistic tick. Completed reminders now stay done across slim
+  merges; Pipeline / Conversations chips use `followUpIsDone`.
+
 ### 2026-09-15 — Initials centering, channel row, drop Leads cards
 - Author bubble: `tracking-wide` plus the font strut pulled initials off-center.
   Parent `text-[0px]` + inner `leading-none` / no tracking.

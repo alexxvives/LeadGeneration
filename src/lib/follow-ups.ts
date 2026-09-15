@@ -164,7 +164,7 @@ export function slimFollowUpsForList(followUps: FollowUp[]): FollowUp[] {
     return {
       id: f.id,
       date: f.date,
-      done: f.done,
+      done: followUpIsDone(f.done),
       kind,
       note,
       ...(f.authorName?.trim() ? { authorName: f.authorName.trim() } : {}),
@@ -186,11 +186,19 @@ export function isUserFollowUp(fu: FollowUp): boolean {
   return resolveFollowUpKind(fu) === "follow_up";
 }
 
+/** SQLite / JSON may store 0/1; missing `done` is not completed. */
+export function followUpIsDone(done: unknown): boolean {
+  return done === true || done === 1;
+}
+
 /** Card chips: only undone reminders. Done follow-ups stay in the journal. */
 export function pendingUserFollowUpCount(
   followUps: FollowUp[] | undefined,
 ): number {
-  return followUps?.filter((f) => isUserFollowUp(f) && !f.done).length ?? 0;
+  return (
+    followUps?.filter((f) => isUserFollowUp(f) && !followUpIsDone(f.done))
+      .length ?? 0
+  );
 }
 
 const TITLE_RE = /^(dr|dra|mr|mrs|ms|miss|prof|sr|sra|srta)\.?$/i;
@@ -268,8 +276,10 @@ export function canonicalizeFollowUp(fu: FollowUp): FollowUp {
   const stored = fu.authorName?.trim();
   const authorName =
     stored && !/^you$/i.test(stored) ? stored : peeled.authorName;
+  const done = followUpIsDone(fu.done);
   if (
     note === (fu.note ?? "") &&
+    done === fu.done &&
     (authorName ?? null) === (fu.authorName?.trim() || null)
   ) {
     return fu;
@@ -277,6 +287,7 @@ export function canonicalizeFollowUp(fu: FollowUp): FollowUp {
   return {
     ...fu,
     note,
+    done,
     ...(authorName ? { authorName } : { authorName: fu.authorName }),
   };
 }
@@ -304,7 +315,7 @@ export function isOverdueFollowUp(
   done: boolean,
   today = todayIsoDate(),
 ): boolean {
-  return !done && date < today;
+  return !followUpIsDone(done) && date < today;
 }
 
 export interface CalendarEvent {
@@ -387,6 +398,15 @@ export function collapseEmailSentFollowUps(
 }
 
 /**
+ * Slim board polls can lag a tick after the user marks a reminder done.
+ * Keep completed=true unless a full GET is explicitly preferred *and* the
+ * cached row is still open.
+ */
+function mergeFollowUpDone(cached: FollowUp, incoming: FollowUp): boolean {
+  return followUpIsDone(cached.done) || followUpIsDone(incoming.done);
+}
+
+/**
  * Reconcile a cached journal with a server/slim snapshot.
  * Never drops rows the cache already has (optimistic create), and skips
  * `droppedIds` so a stale poll cannot resurrect a delete. Incoming-only
@@ -411,6 +431,7 @@ export function mergeFollowUpLists(
       : incoming;
     return kept.map(canonicalizeFollowUp);
   }
+  const cachedById = new Map(cached.map((f) => [f.id, f]));
   // Full drawer GET: restore note bodies. Keep cached-only ids (optimistic add).
   if (opts?.preferIncoming) {
     const incomingIds = new Set<string>();
@@ -418,7 +439,11 @@ export function mergeFollowUpLists(
     for (const f of incoming) {
       if (droppedIds?.has(f.id)) continue;
       incomingIds.add(f.id);
-      out.push(canonicalizeFollowUp(f));
+      const prev = cachedById.get(f.id);
+      const canon = canonicalizeFollowUp(f);
+      out.push(
+        prev ? { ...canon, done: mergeFollowUpDone(prev, canon) } : canon,
+      );
     }
     for (const f of cached) {
       if (droppedIds?.has(f.id) || incomingIds.has(f.id)) continue;
@@ -445,7 +470,7 @@ export function mergeFollowUpLists(
     out.push({
       ...cf,
       date: ic.date || cf.date,
-      done: ic.done,
+      done: mergeFollowUpDone(cf, ic),
       kind: ic.kind ?? cf.kind,
       note,
       authorName: ic.authorName?.trim() || cf.authorName,
