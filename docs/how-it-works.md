@@ -109,7 +109,7 @@ Search  →  Enrich  →  Draft  →  Send
     within the pane so they do not force a sideways scroll.
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
-    cards / map) with a shared **Pipeline** stage filter; Notes + Type columns
+    map) with a shared **Pipeline** stage filter; Notes + Type columns
     always on. Pipeline header menu sorts or filters by stage. **Export Excel**.
     Table shows a short city label; the drawer keeps the full scraped address
     when available (or a Google search plan-B when no website). Map pins

@@ -27,8 +27,6 @@ import {
   boardLockHint,
 } from "./board-lock";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
-import { LeadCard } from "./LeadCard";
-import { VirtualCardGrid } from "./virtual-list";
 import { LeadTable } from "./LeadTable";
 import { LeadMap } from "./LeadMap";
 import { prefetchLeadGeocodes } from "@/lib/geocode-client";
@@ -233,7 +231,7 @@ export function Studio() {
   const { setWarn: setQuotaWarn } = useQuotaHint();
   /** Keep each layout mounted after first visit so switching stays instant. */
   const [visitedLayouts, setVisitedLayouts] = useState<Set<LeadsLayout>>(
-    () => new Set(["table", "cards"]),
+    () => new Set(["table"]),
   );
   /** Keep Pipeline / Outreach / Leads mounted so re-entering doesn’t rebuild. */
   const [visitedSticky, setVisitedSticky] = useState<Set<StickyView>>(
@@ -2000,7 +1998,7 @@ export function Studio() {
     pipelineFilter !== deferredPipelineFilter;
 
   /** Tab highlight updates immediately; pane mount/swap is deferred. */
-  const selectLayout = (next: "table" | "cards" | "map") => {
+  const selectLayout = (next: LeadsLayout) => {
     if (!isLg) setNarrowLayout(next);
     setLayoutTab(next);
     if (next === layout && visitedLayouts.has(next)) return;
@@ -2015,15 +2013,12 @@ export function Studio() {
     });
   };
 
-  const shownLayout: LeadsLayout = isLg
-    ? layout
-    : (narrowLayout ?? (layout === "table" ? "cards" : layout));
+  const shownLayout: LeadsLayout = isLg ? layout : (narrowLayout ?? layout);
   const shownLayoutTab: LeadsLayout = isLg
     ? layoutTab
-    : (narrowLayout ?? (layoutTab === "table" ? "cards" : layoutTab));
+    : (narrowLayout ?? layoutTab);
 
   const tableLeads = useActiveLeads(shownLayout === "table", filteredLeads);
-  const cardsLeads = useActiveLeads(shownLayout === "cards", filteredLeads);
   const mapLeads = useActiveLeads(shownLayout === "map", filteredLeads);
 
   // Background geocode for the whole board — any studio page, not only Map.
@@ -2048,7 +2043,7 @@ export function Studio() {
     });
   }, [geocodePrefetchKey, board]);
 
-  // Yield one frame so Leads chrome paints before mounting heavy table/cards.
+  // Yield one frame so Leads chrome paints before mounting the table/map.
   // Warm revisits (data + current layout already known) skip the blank frame.
   const [leadsBodyReady, setLeadsBodyReady] = useState(false);
   const [, startLeadsBodyTransition] = useTransition();
@@ -2679,9 +2674,6 @@ export function Studio() {
               <LayoutToggle active={shownLayoutTab === "table"} onClick={() => selectLayout("table")}>
                 Table
               </LayoutToggle>
-              <LayoutToggle active={shownLayoutTab === "cards"} onClick={() => selectLayout("cards")}>
-                Cards
-              </LayoutToggle>
               <LayoutToggle active={shownLayoutTab === "map"} onClick={() => selectLayout("map")}>
                 Map
               </LayoutToggle>
@@ -2729,34 +2721,6 @@ export function Studio() {
                       boardId={board.activeBoardId}
                       onOpen={openInfo}
                     />
-                  </div>
-                ) : null}
-                {leadsBodyReady && visitedLayouts.has("cards") ? (
-                  <div
-                    className={
-                      shownLayout === "cards"
-                        ? "absolute inset-0 overflow-hidden"
-                        : "pointer-events-none invisible absolute inset-0 -z-10 overflow-hidden"
-                    }
-                    aria-hidden={shownLayout !== "cards"}
-                  >
-                    {cardsLeads.length === 0 ? (
-                      <p className="py-12 text-center text-sm text-mist-500">
-                        No leads match this filter.
-                      </p>
-                    ) : (
-                      <VirtualCardGrid
-                        items={cardsLeads}
-                        renderItem={(lead, i) => (
-                          <LeadCard
-                            key={lead.id}
-                            lead={lead}
-                            index={i}
-                            onOpen={() => openInfo(lead.id)}
-                          />
-                        )}
-                      />
-                    )}
                   </div>
                 ) : null}
                 {leadsBodyReady && visitedLayouts.has("table") ? (

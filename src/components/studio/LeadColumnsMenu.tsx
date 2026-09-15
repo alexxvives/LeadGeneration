@@ -46,7 +46,7 @@ export function useLeadColumnState(): {
   return { customCols, vis, refresh };
 }
 
-/** Columns picker — place on the same row as Table / Cards / Map. */
+/** Columns picker — place on the same row as Table / Map. */
 export function LeadColumnsMenu() {
   const [open, setOpen] = useState(false);
   const [customCols, setCustomCols] = useState<LeadColumnDef[]>([]);

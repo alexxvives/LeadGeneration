@@ -130,7 +130,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="leads-table"]',
       prefer: "above",
       title: "Browse all leads",
-      body: "The Leads tab holds the full list — table, cards, or map. Export if desired.",
+      body: "The Leads tab holds the full list — table or map. Export if desired.",
       scrollBlock: "center",
     },
     {

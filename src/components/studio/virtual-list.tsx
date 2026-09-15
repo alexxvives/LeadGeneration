@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 const measureEl =
@@ -61,93 +61,6 @@ export function VirtualColumnList<T extends { id: string }>({
               style={{ transform: `translateY(${vi.start}px)` }}
             >
               <div style={{ paddingBottom: gap }}>{renderItem(item, vi.index)}</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function cardColumnsForWidth(w: number): number {
-  if (w >= 1920) return 6;
-  if (w >= 1600) return 5;
-  if (w >= 1280) return 4;
-  if (w >= 1024) return 3;
-  if (w >= 640) return 2;
-  return 1;
-}
-
-/** Responsive card grid window for the Leads cards layout. */
-export function VirtualCardGrid<T extends { id: string }>({
-  items,
-  renderItem,
-}: {
-  items: T[];
-  renderItem: (item: T, index: number) => ReactNode;
-}) {
-  const parentRef = useRef<HTMLDivElement>(null);
-  const [cols, setCols] = useState(() => {
-    if (typeof window === "undefined") return 3;
-    const w = window.innerWidth;
-    return cardColumnsForWidth(w);
-  });
-
-  useEffect(() => {
-    const el = parentRef.current;
-    if (!el) return;
-    const apply = () => {
-      setCols(cardColumnsForWidth(el.clientWidth));
-    };
-    apply();
-    const ro = new ResizeObserver(apply);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const rowCount = Math.max(1, Math.ceil(items.length / cols));
-  const virtualizer = useVirtualizer({
-    count: items.length === 0 ? 0 : rowCount,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 148,
-    overscan: 4,
-    getItemKey: (index) => {
-      const first = items[index * cols];
-      return first?.id ?? index;
-    },
-    measureElement: measureEl,
-  });
-
-  if (items.length === 0) return null;
-
-  return (
-    <div
-      ref={parentRef}
-      className="h-full overflow-y-auto overscroll-contain"
-    >
-      <div
-        className="relative w-full"
-        style={{ height: virtualizer.getTotalSize() }}
-      >
-        {virtualizer.getVirtualItems().map((vi) => {
-          const start = vi.index * cols;
-          const row = items.slice(start, start + cols);
-          return (
-            <div
-              key={row[0]?.id ?? vi.index}
-              data-index={vi.index}
-              ref={virtualizer.measureElement}
-              className="absolute left-0 top-0 w-full"
-              style={{ transform: `translateY(${vi.start}px)` }}
-            >
-              <div
-                className="grid gap-3 pb-3"
-                style={{
-                  gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                }}
-              >
-                {row.map((item, i) => renderItem(item, start + i))}
-              </div>
             </div>
           );
         })}

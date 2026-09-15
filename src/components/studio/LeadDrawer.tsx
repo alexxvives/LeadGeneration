@@ -134,6 +134,49 @@ const CONTACT_METHODS: { method: ContactMethod; label: string }[] = [
   { method: "organic",      label: "Organic" },
 ];
 
+function ContactMethodChips({
+  selected,
+  onToggle,
+  disabled,
+  lockHint,
+  emphasize = false,
+}: {
+  selected: ContactMethod[];
+  onToggle: (method: ContactMethod) => void;
+  disabled: boolean;
+  lockHint: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <div className="flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {CONTACT_METHODS.map(({ method, label }) => {
+        const on = selected.includes(method);
+        return (
+          <Lockable key={method}>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onToggle(method)}
+              title={disabled ? lockHint : label}
+              className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-60 ${
+                on
+                  ? emphasize
+                    ? "bg-amber-400 text-on-accent"
+                    : "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40"
+                  : emphasize
+                    ? "border border-amber-400/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
+                    : "border border-white/15 text-mist-400 hover:bg-white/5"
+              }`}
+            >
+              {label}
+            </button>
+          </Lockable>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Main drawer ──────────────────────────────────────────────────────────────
 
 export function LeadDrawer(props: DrawerProps) {
@@ -881,7 +924,7 @@ export function LeadDrawer(props: DrawerProps) {
         >
           {mode === "info" ? (
             <>
-          <div className="grid min-h-0 flex-1 overflow-hidden sm:grid-cols-[minmax(0,1fr)_minmax(16rem,1fr)]">
+          <div className="grid min-h-0 flex-1 overflow-hidden sm:grid-cols-[minmax(0,1.25fr)_minmax(15rem,0.9fr)]">
           <div className="min-h-0 space-y-6 overflow-y-auto p-4 md:p-6">
           {/* CRM Stage picker */}
           <section>
@@ -915,40 +958,21 @@ export function LeadDrawer(props: DrawerProps) {
                     : "border border-white/10 bg-white/[0.03]"
                 }`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p
-                    className={`shrink-0 text-xs font-medium ${
-                      needsMethod ? "text-amber-300" : "text-mist-400"
-                    }`}
-                  >
-                    {needsMethod ? "How did you reach them?" : "Reached via"}
-                  </p>
-                  <div className="flex flex-wrap justify-end gap-1.5">
-                    {CONTACT_METHODS.map(({ method, label }) => {
-                      const on = contactMethods.includes(method);
-                      return (
-                        <Lockable key={method}>
-                          <button
-                            type="button"
-                            disabled={editLocked}
-                            onClick={() => void toggleMethod(method)}
-                            title={editLocked ? lockHint : undefined}
-                            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-60 ${
-                              on
-                                ? needsMethod
-                                  ? "bg-amber-400 text-on-accent"
-                                  : "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40"
-                                : needsMethod
-                                  ? "border border-amber-400/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
-                                  : "border border-white/15 text-mist-400 hover:bg-white/5"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        </Lockable>
-                      );
-                    })}
-                  </div>
+                <p
+                  className={`text-xs font-medium ${
+                    needsMethod ? "text-amber-300" : "text-mist-400"
+                  }`}
+                >
+                  {needsMethod ? "How did you reach them?" : "Reached via"}
+                </p>
+                <div className="mt-1.5">
+                  <ContactMethodChips
+                    selected={contactMethods}
+                    onToggle={(m) => void toggleMethod(m)}
+                    disabled={editLocked}
+                    lockHint={lockHint}
+                    emphasize={needsMethod}
+                  />
                 </div>
               </div>
             )}
@@ -1424,27 +1448,14 @@ export function LeadDrawer(props: DrawerProps) {
                       ? "Select how you reached them"
                       : "Contact channels"}
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {CONTACT_METHODS.map(({ method, label }) => {
-                      const on = contactMethods.includes(method);
-                      return (
-                        <Lockable key={method}>
-                          <button
-                            type="button"
-                            disabled={editLocked}
-                            onClick={() => void toggleMethod(method)}
-                            title={editLocked ? lockHint : undefined}
-                            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-60 ${
-                              on
-                                ? "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40"
-                                : "border border-white/15 text-mist-400 hover:bg-white/5"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        </Lockable>
-                      );
-                    })}
+                  <div className="mt-2">
+                    <ContactMethodChips
+                      selected={contactMethods}
+                      onToggle={(m) => void toggleMethod(m)}
+                      disabled={editLocked}
+                      lockHint={lockHint}
+                      emphasize={needsMethod}
+                    />
                   </div>
                 </div>
                 <p className="text-xs text-mist-500">

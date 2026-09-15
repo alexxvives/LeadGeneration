@@ -113,7 +113,7 @@ token becomes the page color in light mode).
   a `self-start` phone action — not a second toolbar that justify-betweens
   against an empty count.
 - **Phone Leads toolbar:** one row — count, layout+stage menu, Export, Add.
-  Search is the top-bar icon. Do not stack Export / Add / Table-Cards-Map /
+  Search is the top-bar icon. Do not stack Export / Add / Table-Map /
   stage as full-width rows. Desktop toolbar stays split.
 - **Kanban / multi-column queues** (Pipeline, Outreach): keep columns at `lg+`.
   Below `lg`, use stage/bucket **tabs** + a single list. Phone Pipeline

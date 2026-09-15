@@ -90,7 +90,7 @@ export function LeadsFilterMenu({
             Layout
           </p>
           <div className="flex flex-col gap-0.5">
-            {(["table", "cards", "map"] as const).map((key) => (
+            {(["table", "map"] as const).map((key) => (
               <button
                 key={key}
                 type="button"

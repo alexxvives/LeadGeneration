@@ -23,14 +23,17 @@ export function AuthorAvatar({
 }) {
   const label = name?.trim();
   if (!label) return null;
-  const dim = size === "sm" ? "h-5 w-5 text-[8px]" : "h-[1.125rem] w-[1.125rem] text-[8px]";
+  const dim = size === "sm" ? "h-5 w-5" : "h-[1.125rem] w-[1.125rem]";
   return (
     <span
       title={label}
       aria-label={label}
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-mist-100 font-semibold tracking-wide text-ink-950 ${dim}`}
+      className={`inline-flex ${dim} shrink-0 items-center justify-center rounded-full bg-mist-100 text-[0px] text-ink-950`}
     >
-      {authorInitials(label)}
+      {/* Parent text-[0] kills the font strut so two letters sit in the geometric center. */}
+      <span className="text-[8px] font-semibold leading-none tracking-normal">
+        {authorInitials(label)}
+      </span>
     </span>
   );
 }

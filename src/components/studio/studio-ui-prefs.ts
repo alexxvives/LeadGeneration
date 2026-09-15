@@ -15,7 +15,7 @@ const CRM_STAGES: readonly CrmStage[] = [
   "not_interested",
 ];
 
-export type LeadsLayout = "table" | "cards" | "map";
+export type LeadsLayout = "table" | "map";
 
 export type StudioUiPrefs = {
   pipelineFilter: CrmStage | "all";
@@ -30,7 +30,7 @@ const DEFAULTS: StudioUiPrefs = {
 };
 
 function isLayout(v: unknown): v is LeadsLayout {
-  return v === "table" || v === "cards" || v === "map";
+  return v === "table" || v === "map";
 }
 
 function isStageFilter(v: unknown): v is CrmStage | "all" {

@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-15 — Initials centering, channel row, drop Leads cards
+- Author bubble: `tracking-wide` plus the font strut pulled initials off-center.
+  Parent `text-[0px]` + inner `leading-none` / no tracking.
+- Contact-method chips sit on one nowrap row under the label (not beside it).
+- Leads layout is Table / Map only. Saved `cards` prefs fall back to table.
+
 ### 2026-09-15 — Journal names → bubble; Organic; search per view
 - Journal copy is name-free: `Email sent`, `Missed call`, `Contacted via
   Organic`. Who did it is `authorName` + a mist/ink initials bubble after
