@@ -9,18 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-17 (collaborator create focus)
+## ⏱️ Status — updated 2026-09-17 (collaborator drawer create)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0037** applied on prod D1 (`lodestar-prod`).  
 **Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
-- Fixed New collaborator modal jumping focus to the ✕ on every keystroke.
-- Contact drawer focuses the name field on open, not on parent re-renders.
+- Add collaborator opens the same drawer as an existing card (not a form modal).
+- Collaborator cards share row height. Entering the page no longer auto-opens create.
+- Contact drawer has Add Task (same as leads).
 
 ### Next
-1. Hard-refresh, Add collaborator, type in Name — cursor should stay put.
+1. Hard-refresh Collaborators: page should not prompt create. Add collaborator → drawer. Cards even height. Add Task on a saved collaborator.
 
 ---
 

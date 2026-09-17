@@ -307,7 +307,7 @@ export function Studio() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignMode, setAssignMode] = useState<"search" | "import">("search");
   const [boardCreateReq, setBoardCreateReq] = useState(0);
-  const [contactCreateReq, setContactCreateReq] = useState(0);
+  const [creatingContact, setCreatingContact] = useState(false);
   const activeRunIdRef = useRef<string | null>(null);
   const verifyLimitShownRef = useRef(false);
   const filterBoardIdRef = useRef<string | null>(filterBoardId);
@@ -319,6 +319,7 @@ export function Studio() {
     if (prevViewRef.current === view) return;
     prevViewRef.current = view;
     setLeadSearch("");
+    if (view !== "contacts") setCreatingContact(false);
   }, [view]);
   const boardLiteRef = useRef(false);
   const boardRef = useRef<BoardResponse | null>(null);
@@ -2275,7 +2276,10 @@ export function Studio() {
                         ? "Create a board first"
                         : "Add collaborator"
                   }
-                  onClick={() => setContactCreateReq((n) => n + 1)}
+                  onClick={() => {
+                    setSelectedContactId(null);
+                    setCreatingContact(true);
+                  }}
                   className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
                 >
                   Add collaborator
@@ -2363,7 +2367,10 @@ export function Studio() {
                         ? "Create a board first"
                         : "Add collaborator"
                   }
-                  onClick={() => setContactCreateReq((n) => n + 1)}
+                  onClick={() => {
+                    setSelectedContactId(null);
+                    setCreatingContact(true);
+                  }}
                   className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent disabled:opacity-50"
                 >
                   Add collaborator
@@ -2839,20 +2846,9 @@ export function Studio() {
             contacts={contacts}
             boards={board?.boards ?? boards}
             filterBoardId={filterBoardId}
-            createRequestId={contactCreateReq}
-            onSelect={setSelectedContactId}
-            onCreate={async (input) => {
-              try {
-                const { contact } = await api.createContact(input);
-                setContacts((prev) => [
-                  contact,
-                  ...prev.filter((c) => c.id !== contact.id),
-                ]);
-                setSelectedContactId(contact.id);
-              } catch (e) {
-                toast("err", (e as Error).message);
-                throw e;
-              }
+            onSelect={(id) => {
+              setCreatingContact(false);
+              setSelectedContactId(id);
             }}
           />
           )}
@@ -2930,16 +2926,41 @@ export function Studio() {
       )}
       </div>
 
-      {selectedContact ? (
+      {creatingContact || selectedContact ? (
         <ContactDrawer
           contact={selectedContact}
           boardName={
-            (board?.boards ?? boards).find(
-              (b) => b.id === selectedContact.boardId,
-            )?.name ?? "Board"
+            selectedContact
+              ? ((board?.boards ?? boards).find(
+                  (b) => b.id === selectedContact.boardId,
+                )?.name ?? "Board")
+              : filterBoardId && filterBoardId !== "all"
+                ? ((board?.boards ?? boards).find((b) => b.id === filterBoardId)
+                    ?.name ?? "Board")
+                : ((board?.boards ?? boards)[0]?.name ?? "Board")
           }
+          boards={board?.boards ?? boards}
+          filterBoardId={filterBoardId}
           actorName={actorName}
-          onClose={() => setSelectedContactId(null)}
+          onClose={() => {
+            setSelectedContactId(null);
+            setCreatingContact(false);
+          }}
+          onCreate={async (input) => {
+            try {
+              const { contact } = await api.createContact(input);
+              setContacts((prev) => [
+                contact,
+                ...prev.filter((c) => c.id !== contact.id),
+              ]);
+              setSelectedContactId(contact.id);
+              setCreatingContact(false);
+              return contact;
+            } catch (e) {
+              toast("err", (e as Error).message);
+              throw e;
+            }
+          }}
           onUpdate={async (id, patch) => {
             setContacts((prev) =>
               prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),

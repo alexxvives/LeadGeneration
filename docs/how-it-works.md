@@ -161,16 +161,14 @@ Search  →  Enrich  →  Draft  →  Send
 
   - **Collaborators** (`?view=contacts`) — board-scoped people (not leads;
     ADR 0036). Name, org, email, phone, location, plus the **same** notes /
-    follow-up journal as a lead (Add Note / Follow up links, tag + date ·
-    body, edit/delete, click the Follow up tag to mark done). **Add collaborator** sits next to the desktop title
-    (and as a phone action under the top bar), same pattern as Create board.
-    Cards pack name and details at the **top left** (article + inner button;
-    they do not stretch/center in the grid cell). Location on
-    the card is city + country only (`shortLocation` — same as Conversations;
-    door number, postal, and parenthetical floor/office like
-    `(despatx 128, Planta 0.)` stay in the drawer). Lives under
-    Engage. Follow-ups show on Calendar. Does
-    not consume lead quota. View subtitles stay desktop-only (`lg+`).
+    follow-up / task journal as a lead (Add Note / Follow up / **Add Task**,
+    tag + date · body, edit/delete, click Follow up or Task to mark done).
+    **Add collaborator** opens the same drawer used after save (not a separate
+    form). It does **not** auto-open when you enter the page — only the header
+    button. Cards share one grid-row height (`auto-rows-fr` + `h-full`, footer
+    pinned). Location on the card is city + country only (`shortLocation`).
+    Lives under Engage. Follow-ups show on Calendar. Does not consume lead
+    quota. View subtitles stay desktop-only (`lg+`).
 
   - **Runs** (`?view=runs`) — history of search runs (niche, location, provider,
     mode, lead count, status). Click a run to open its leads on **Leads**.

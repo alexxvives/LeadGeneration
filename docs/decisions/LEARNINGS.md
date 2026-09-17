@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-17 — Collaborator create is the same drawer
+- A separate create modal plus `createRequestId > 0` re-opened the form every
+  time ContactsView remounted (leaving and re-entering Collaborators).
+- Create now uses `ContactDrawer` with `contact === null`; Studio holds
+  `creatingContact` and clears it when leaving the view. Name blur/close with
+  a name persists; empty close discards. Add Task matches the lead journal.
+
 ### 2026-09-17 — Modal stole focus on every keystroke in create forms
 - `Modal` focus effect depended on `onClose`; inline lambdas from parents
   re-ran it on every controlled-input keystroke and jumped to the header ✕.
