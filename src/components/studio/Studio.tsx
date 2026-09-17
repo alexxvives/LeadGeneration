@@ -12,7 +12,7 @@ import {
   type BoardResponse,
 } from "@/lib/client-api";
 import type { Contact, ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId } from "@/lib/types";
-import { mergeFollowUpLists } from "@/lib/follow-ups";
+import { mergeFollowUpLists, markNewestPendingTaskDone } from "@/lib/follow-ups";
 import { contactMethodLabel, rememberDroppedContactMethods } from "@/lib/contact-methods";
 import {
   droppedFollowUpIdSet,
@@ -1743,6 +1743,15 @@ export function Studio() {
     }
   };
 
+  const onCompletePendingTask = (leadId: string) => {
+    if (editLockedRef.current) return;
+    const lead = boardRef.current?.leads.find((l) => l.id === leadId);
+    if (!lead) return;
+    const updated = markNewestPendingTaskDone(lead.followUps ?? []);
+    if (!updated) return;
+    void onUpdateLeadCrm(leadId, { followUps: updated });
+  };
+
   const clearNoteUndoTimer = () => {
     if (noteUndoTimerRef.current != null) {
       window.clearTimeout(noteUndoTimerRef.current);
@@ -2542,6 +2551,7 @@ export function Studio() {
                 backfilling={leadsBackfilling}
                 filterActive={Boolean(deferredLeadSearch.trim())}
                 onOpen={openInfo}
+                onCompleteTask={onCompletePendingTask}
                 onMoveStage={onMoveStage}
               />
             </>
@@ -2812,6 +2822,7 @@ export function Studio() {
               leads={searchFilteredLeads}
               emptyHref={`/app${queryForView("pipeline", filterBoardId)}`}
               onOpen={openInfo}
+              onCompleteTask={onCompletePendingTask}
             />
           )}
         </div>

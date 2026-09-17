@@ -16,7 +16,7 @@ import {
   type Workspace,
 } from "@/lib/types";
 import { parseContactMethods } from "@/lib/contact-methods";
-import { isContactRegisteredNote, canonicalizeFollowUp } from "@/lib/follow-ups";
+import { isContactRegisteredNote, canonicalizeFollowUp, hasPendingTask } from "@/lib/follow-ups";
 import { leadHydrateLane } from "@/lib/lead-lanes";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
@@ -82,6 +82,9 @@ function normalizeWorkspace(w: Workspace): Workspace {
 function normalizeLead(l: Lead): Lead {
   // Cast through unknown so TS doesn't treat these as always-defined on old JSON rows.
   const raw = l as unknown as Record<string, unknown>;
+  const followUps = ((raw.followUps as Lead["followUps"] | undefined) ?? [])
+    .filter((f) => !isContactRegisteredNote(f?.note ?? ""))
+    .map((f) => canonicalizeFollowUp({ ...f, note: f?.note ?? "" }));
   return {
     ...l,
     boardId: typeof raw.boardId === "string" ? raw.boardId : "",
@@ -98,14 +101,12 @@ function normalizeLead(l: Lead): Lead {
     contactedByName:
       typeof raw.contactedByName === "string" ? raw.contactedByName : null,
     notes: (raw.notes as Lead["notes"] | undefined) ?? null,
-    followUps: ((raw.followUps as Lead["followUps"] | undefined) ?? [])
-      .filter((f) => !isContactRegisteredNote(f?.note ?? ""))
-      .map((f) => canonicalizeFollowUp({ ...f, note: f?.note ?? "" })),
+    followUps,
     customFields:
       raw.customFields && typeof raw.customFields === "object"
         ? (raw.customFields as Record<string, string>)
         : {},
-    waitingOnUs: raw.waitingOnUs === true,
+    waitingOnUs: hasPendingTask(followUps),
     demoDone: raw.demoDone === true,
   };
 }

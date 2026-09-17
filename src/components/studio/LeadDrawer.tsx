@@ -14,7 +14,6 @@ import {
   PinIcon,
   SparkIcon,
   TrashIcon,
-  WaitingIcon,
   XIcon,
 } from "@/components/icons";
 import { newId } from "@/lib/id";
@@ -981,21 +980,6 @@ export function LeadDrawer(props: DrawerProps) {
             {crmStage === "in_conversation" ? (
               <div className="mt-3 flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
                 <FlagToggle
-                  label="Waiting on us"
-                  on={lead.waitingOnUs}
-                  disabled={editLocked}
-                  lockHint={lockHint}
-                  onToggle={(next) => {
-                    void props.onUpdateCrm(lead.id, { waitingOnUs: next });
-                    if (!next) return;
-                    openComposer("task");
-                    notesPaneRef.current?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "nearest",
-                    });
-                  }}
-                />
-                <FlagToggle
                   label="Demo done"
                   on={lead.demoDone}
                   disabled={editLocked}
@@ -1167,6 +1151,17 @@ export function LeadDrawer(props: DrawerProps) {
                     className="text-[11px] text-violet-300 hover:underline disabled:opacity-50"
                   >
                     Follow up
+                  </button>
+                </Lockable>
+                <Lockable>
+                  <button
+                    type="button"
+                    disabled={editLocked}
+                    onClick={() => openComposer("task")}
+                    title={editLocked ? lockHint : undefined}
+                    className="text-[11px] text-aurora-300 hover:underline disabled:opacity-50"
+                  >
+                    Add Task
                   </button>
                 </Lockable>
                 <Lockable>
@@ -1827,9 +1822,6 @@ function FlagToggle({
         className="flex w-full items-center justify-between gap-2 text-left disabled:opacity-60"
       >
         <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-mist-200">
-          {on && label === "Waiting on us" ? (
-            <WaitingIcon className="h-3 w-3 shrink-0 text-amber-300" />
-          ) : null}
           <span className="truncate">{label}</span>
         </span>
         <span

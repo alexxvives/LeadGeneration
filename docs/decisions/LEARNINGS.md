@@ -4,6 +4,14 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-17 — Waiting on us is an open Task
+- Removed the In-conversation **Waiting on us** switch. **Add Task** in
+  Notes opens the green Task composer; an undone task is the hourglass on
+  Pipeline / Conversations. Click the **Task** tag in the journal to mark
+  it done (strikethrough stays; the hourglass clears when none are open).
+- `waitingOnUs` is derived from `followUps` on read / CRM write — do not
+  PATCH the boolean by itself.
+
 ### 2026-09-15 — Done follow-ups kept showing on cards
 - Slim board polls lagged `done: false` and `mergeFollowUpLists` took incoming
   over the optimistic tick. Completed reminders now stay done across slim

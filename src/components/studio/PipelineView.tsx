@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -18,6 +18,7 @@ import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, InfoIcon, CalendarIcon, WaitingIcon } from "@/components/icons";
 import {
   leadHasMissedCall,
+  hasPendingTask,
   pendingUserFollowUpCount,
   resolveFollowUpKind,
 } from "@/lib/follow-ups";
@@ -82,6 +83,17 @@ const TAB_SHORT: Record<CrmStage, string> = {
   closed: "Closed",
   not_interested: "Not interested",
 };
+
+const PipelineCardActions = createContext<{
+  onOpen: (id: string) => void;
+  onCompleteTask: ((id: string) => void) | undefined;
+} | null>(null);
+
+function usePipelineCardActions() {
+  const ctx = useContext(PipelineCardActions);
+  if (!ctx) throw new Error("PipelineCardActions missing");
+  return ctx;
+}
 
 // ─── Pipeline (CRM kanban with drag-and-drop) ─────────────────────────────────
 
@@ -183,6 +195,7 @@ export function PipelineView({
   filterActive = false,
   onOpen,
   onMoveStage,
+  onCompleteTask,
 }: {
   leads: LeadWithOutreach[];
   /** DB totals — column badges stay honest while leads are still paging in. */
@@ -192,6 +205,7 @@ export function PipelineView({
   /** Search is filtering — don't treat empty columns as still paging. */
   filterActive?: boolean;
   onOpen: (id: string) => void;
+  onCompleteTask?: (leadId: string) => void;
   onMoveStage: (
     leadId: string,
     stage: CrmStage,
@@ -248,6 +262,7 @@ export function PipelineView({
     : (stageCounts?.[narrowCol.stage] ?? narrowLeads.length);
 
   return (
+    <PipelineCardActions.Provider value={{ onOpen: openIfClick, onCompleteTask }}>
     <div className="flex h-full min-h-0 flex-col gap-3">
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
@@ -387,6 +402,7 @@ export function PipelineView({
       </DndContext>
       </div>
     </div>
+    </PipelineCardActions.Provider>
   );
 }
 
@@ -551,10 +567,11 @@ function MethodIcons({ methods }: { methods: ContactMethod[] }) {
 
 function pipelineCardChrome(lead: LeadWithOutreach) {
   const pendingFollowUps = pendingUserFollowUpCount(lead.followUps);
+  const waitingOnUs = hasPendingTask(lead.followUps);
   const journalNotes =
     lead.followUps?.filter((f) => {
       const k = resolveFollowUpKind(f);
-      return k === "note" || k === "task";
+      return k === "note";
     }).length ?? 0;
   const noteCount = journalNotes > 0 ? journalNotes : lead.notes?.trim() ? 1 : 0;
   const replied = lead.outreach?.deliveryStatus === "replied";
@@ -565,7 +582,7 @@ function pipelineCardChrome(lead: LeadWithOutreach) {
       ? [...methods, "phone"]
       : methods;
   const needsMethod = lead.crmStage === "contacted" && methods.length === 0;
-  return { pendingFollowUps, noteCount, replied, methods, missedCall, iconMethods, needsMethod };
+  return { pendingFollowUps, waitingOnUs, noteCount, replied, methods, missedCall, iconMethods, needsMethod };
 }
 
 function PipelineCardFace({
@@ -581,8 +598,10 @@ function PipelineCardFace({
   extra?: ReactNode;
   hideInfo?: boolean;
 }) {
-  const { pendingFollowUps, noteCount, replied, methods, missedCall, iconMethods, needsMethod } =
+  const { pendingFollowUps, waitingOnUs, noteCount, replied, methods, missedCall, iconMethods, needsMethod } =
     pipelineCardChrome(lead);
+  const { onCompleteTask } = usePipelineCardActions();
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
 
   return (
     <div
@@ -612,7 +631,7 @@ function PipelineCardFace({
           <p className="truncate text-sm font-medium leading-snug text-mist-100">
             {lead.company}
           </p>
-          {lead.waitingOnUs ? (
+          {waitingOnUs ? (
             <WaitingIcon
               className="h-3 w-3 shrink-0 text-amber-300"
               aria-label="Waiting on us"
@@ -634,6 +653,27 @@ function PipelineCardFace({
                 ? "Follow-up"
                 : `${pendingFollowUps} follow-ups`}
             </span>
+          ) : null}
+          {waitingOnUs ? (
+            <button
+              type="button"
+              disabled={editLocked || !onCompleteTask}
+              title={
+                editLocked
+                  ? lockHint
+                  : "Mark task done"
+              }
+              aria-label="Mark task done"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (editLocked) return;
+                onCompleteTask?.(lead.id);
+              }}
+              className="inline-flex shrink-0 items-center rounded-full bg-aurora-400/20 px-1.5 py-0.5 text-[10px] font-medium text-aurora-200 ring-1 ring-aurora-400/35 hover:bg-aurora-400/30 disabled:opacity-50"
+            >
+              Task
+            </button>
           ) : null}
           {noteCount > 0 ? (
             <span className="shrink-0 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">

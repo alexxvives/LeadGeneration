@@ -119,8 +119,19 @@ export function JournalEntries({
                     disabled
                       ? lockHint
                       : followUpIsDone(canon.done)
-                        ? "Mark not done"
-                        : "Mark done"
+                        ? isTask
+                          ? "Mark task not done"
+                          : "Mark not done"
+                        : isTask
+                          ? "Mark task done"
+                          : "Mark done"
+                  }
+                  aria-label={
+                    isTask
+                      ? followUpIsDone(canon.done)
+                        ? "Mark task not done"
+                        : "Mark task done"
+                      : undefined
                   }
                   className={`mt-0.5 inline-flex w-[5.25rem] shrink-0 justify-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium disabled:opacity-50 ${tagClass}`}
                 >

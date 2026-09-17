@@ -84,7 +84,7 @@ import {
   contactMethodsEqual,
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, hasPendingTask, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
 import { LEAD_HYDRATE_LANES } from "@/lib/lead-lanes";
 import {
   companyGuessFromEmail,
@@ -2619,6 +2619,7 @@ export async function updateLeadCrm(
         };
       });
   }
+  next.waitingOnUs = hasPendingTask(next.followUps ?? lead.followUps);
 
   return db.updateLead(leadId, next);
 }

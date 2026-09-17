@@ -91,21 +91,24 @@ Search  →  Enrich  →  Draft  →  Send
     CRM **New** = needs human review (there is no separate “In review” tag).
     A **Missed call** stays in New but still shows the phone method icon
     (it does not count as Contacted). Contact channels: email, phone, contact
-    form, Instagram, WhatsApp, Organic. Cards show an hourglass when
-    **Waiting on us** is on (in-conversation). Bounce is silent (address
+    form, Instagram, WhatsApp, Organic. Cards show an hourglass when an
+    undone **Task** is open (**Waiting on us**). Click the green **Task**
+    chip on the card (or the **Task** tag in lead info) to mark it done. Bounce is silent (address
     stripped; no Bounced chip).
 
   - **Conversations** (`?view=conversations`) — in-conversation leads only.
     Cards show name, city + country (not the street), pending follow-up,
     and recent **notes** / **tasks** (follow-up reminders are omitted from
     the preview).
-    An hourglass on the title row means **Waiting on us**; a monitor icon
+    An hourglass on the title row means **Waiting on us** (an open task);
+    a monitor icon
     means **Demo done**. Those bubbles sit beside the title **column**
     (name + company + city), so they do not push location down. Created date sits bottom-left; a **Follow-up** tag
     sits bottom-right when one is pending. Overflowing name / company / city ping-pong like a
     now-playing title. Location on the card is city + country only
     (`shortLocation` drops street, floor, and venue names). Click opens
-    the lead drawer (waiting / demo toggles live there). Phone cards stay
+    the lead drawer (**Add Task** in Notes; **Demo done** toggle on the
+    info pane). Phone cards stay
     within the pane so they do not force a sideways scroll.
 
   - **Leads** (`?view=leads`) — full list for the active board filter (table /
@@ -184,9 +187,11 @@ Search  →  Enrich  →  Draft  →  Send
   - **Lead detail drawer** — opens from any lead card/row/pin. Contact info
     (incl. full address), about blurb, CRM stage, dated notes journal
     (**Add Note** for a log line; **Follow up** pre-fills “Follow up” one week
-    out and shows on Calendar; **Missed call** writes the journal line
+    out and shows on Calendar; **Add Task** logs work we owe them and shows
+    the Waiting on us hourglass until you click the green **Task** tag to
+    mark it done; **Missed call** writes the journal line
     immediately — no composer — as `Missed call`). Journal lines are newest first
-    with a kind tag (purple **Follow up**, amber **Note**, gray **Missed** —
+    with a kind tag (purple **Follow up**, green **Task**, amber **Note**, gray **Missed** —
     tag only; the date/body use the same ink as other notes). Who did it is a
     high-contrast initials bubble after the date, before the text — not a
     name in the sentence. Calendar cards
@@ -196,7 +201,8 @@ Search  →  Enrich  →  Draft  →  Send
     or deleted; delete offers **Undo** for a few seconds. Click the purple **Follow up**
     (or green **Task**) tag to mark it done — strikethrough stays in the
     journal; Pipeline / Conversations / collaborator **cards hide the
-    Follow-up chip** once it is done. Calendar still lists it crossed out.
+    Follow-up chip** once it is done, and the Waiting on us hourglass
+    hides when no task is still open. Calendar still lists follow-ups crossed out.
     Placeholder scrapes like `your@email` are not sendable (Resend needs
     `name@example.com`) — send and save drop them from the lead.
     Toggling **Phone** opens a call log prefilled `Phone call:`. Clicking **Email** (again, even when it is
@@ -206,10 +212,11 @@ Search  →  Enrich  →  Draft  →  Send
     A bounce silently deletes that address (and may return the lead to New) —
     no Bounced chip, toast, or drawer button. The outreach composer
     (draft → edit → send) is on the draft pane. In Conversation hides the
-    “how did you reach them” chips and shows compact **Waiting on us** /
-    **Demo done** toggles side by side (titles only). Turning **Waiting on
-    us** on opens a green **Task** composer (“What they expect from us”)
-    and scrolls to Notes — not a Follow-up reminder. About sits in the
+    “how did you reach them” chips and shows a **Demo done** toggle.
+    **Add Task** in Notes opens a green **Task** composer (“What they
+    expect from us”). An open task is **Waiting on us** (hourglass on
+    Pipeline / Conversations); click the **Task** tag in the journal to
+    mark it done. About sits in the
     lead-info column under contact
     fields. Closed leads also get a **Documents** drop zone (PDF / Office /
     images, 4 MB — ADR 0038). Sales-stage chips scroll sideways on phone

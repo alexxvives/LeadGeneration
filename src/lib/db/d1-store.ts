@@ -20,7 +20,7 @@ import {
   serializeContactMethods,
 } from "@/lib/contact-methods";
 import { hydrateLaneSql } from "@/lib/lead-lanes";
-import { isContactRegisteredNote, canonicalizeFollowUp } from "@/lib/follow-ups";
+import { isContactRegisteredNote, canonicalizeFollowUp, hasPendingTask } from "@/lib/follow-ups";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -385,6 +385,7 @@ const parseCustomFields = (s: string | null | undefined): Record<string, string>
 };
 
 function rowToLead(r: LeadRow): Lead {
+  const followUps = parseFollowUps(r.follow_ups);
   return {
     id: r.id,
     workspaceId: r.workspace_id ?? LOCAL_WORKSPACE_ID,
@@ -408,9 +409,9 @@ function rowToLead(r: LeadRow): Lead {
     contactedByUserId: r.contacted_by_user_id ?? null,
     contactedByName: r.contacted_by_name ?? null,
     notes: r.notes ?? null,
-    followUps: parseFollowUps(r.follow_ups),
+    followUps,
     customFields: parseCustomFields(r.custom_fields),
-    waitingOnUs: isSqliteOn(r.waiting_on_us),
+    waitingOnUs: hasPendingTask(followUps),
     demoDone: isSqliteOn(r.demo_done),
     createdAt: r.created_at,
   };

@@ -425,7 +425,10 @@ export interface Lead {
   followUps: FollowUp[]; // dated notes / follow-ups / send & call log (Calendar)
   /** User-defined table column values (column id → string). */
   customFields: Record<string, string>;
-  /** In-conversation: we owe them something (doc, tramit, …). */
+  /**
+   * True while an undone `task` exists in `followUps` (we owe them something).
+   * Derived on read / follow-up writes — not a separate switch.
+   */
   waitingOnUs: boolean;
   /** In-conversation: a demo has been given. */
   demoDone: boolean;

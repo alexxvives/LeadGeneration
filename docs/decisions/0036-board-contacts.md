@@ -20,7 +20,8 @@ contact does not consume lead quota. Deleting a board (or clearing its leads)
 cascades contacts.
 
 In-conversation leads also gained `waitingOnUs` and `demoDone` flags (same
-migration). Those stay on `Lead`, not on Contact.
+migration). `waitingOnUs` is derived from an open journal **task** (not a
+toggle); `demoDone` stays a lead flag. Neither lives on Contact.
 
 ## Alternatives considered
 

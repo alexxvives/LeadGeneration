@@ -1,5 +1,5 @@
 import type { ContactMethod, FollowUp, Lead, LeadWithOutreach, Outreach } from "@/lib/types";
-import { mergeFollowUpLists } from "@/lib/follow-ups";
+import { hasPendingTask, mergeFollowUpLists } from "@/lib/follow-ups";
 import { mergeContactMethods } from "@/lib/contact-methods";
 
 export function droppedFollowUpIdSet(
@@ -141,9 +141,7 @@ export function mergeSlimIntoCached(
   const phones = stale ? prev.phones : (incoming.phones ?? prev.phones);
 
   const crmStage = stale ? prev.crmStage : (incoming.crmStage ?? prev.crmStage);
-  const waitingOnUs = stale
-    ? prev.waitingOnUs
-    : (incoming.waitingOnUs ?? prev.waitingOnUs);
+  const waitingOnUs = hasPendingTask(followUps);
   const demoDone = stale ? prev.demoDone : (incoming.demoDone ?? prev.demoDone);
   const company = stale ? prev.company : incoming.company;
   const website = stale ? prev.website : incoming.website;

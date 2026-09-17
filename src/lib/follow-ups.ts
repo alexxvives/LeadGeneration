@@ -201,6 +201,35 @@ export function pendingUserFollowUpCount(
   );
 }
 
+/** Work we owe them — drives the Waiting on us hourglass, not a separate flag. */
+export function isUserTask(fu: FollowUp): boolean {
+  return resolveFollowUpKind(fu) === "task";
+}
+
+export function pendingTaskCount(followUps: FollowUp[] | undefined): number {
+  return (
+    followUps?.filter((f) => isUserTask(f) && !followUpIsDone(f.done)).length ??
+    0
+  );
+}
+
+export function hasPendingTask(followUps: FollowUp[] | undefined): boolean {
+  return pendingTaskCount(followUps) > 0;
+}
+
+/** Mark the newest open task done. `null` if none are pending. */
+export function markNewestPendingTaskDone(
+  followUps: FollowUp[],
+): FollowUp[] | null {
+  const open = sortFollowUpsNewestFirst(followUps).find(
+    (f) => isUserTask(f) && !followUpIsDone(f.done),
+  );
+  if (!open) return null;
+  return followUps.map((f) =>
+    f.id === open.id ? { ...f, done: true } : f,
+  );
+}
+
 const TITLE_RE = /^(dr|dra|mr|mrs|ms|miss|prof|sr|sra|srta)\.?$/i;
 
 /** Initials for the comment avatar (skip Dr./Mr. so Vicente Paloma → VP). */

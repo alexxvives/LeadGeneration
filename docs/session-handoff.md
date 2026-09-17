@@ -9,18 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-15 (hide done follow-up chips)
+## ⏱️ Status — updated 2026-09-17 (Waiting on us = open Task)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0037** applied on prod D1 (`lodestar-prod`).  
 **Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
-- Crossing out a Follow up in the journal hides the Pipeline / Conversations
-  chip. Slim polls no longer revive `done: false` over a completed reminder.
+- Dropped the Waiting on us switch. **Add Task** in Notes; an open task
+  shows the hourglass. Click the journal **Task** tag to mark it done.
 
 ### Next
-1. Hard-refresh, mark a follow-up done, close the drawer — chip should be gone.
+1. Hard-refresh, add a task on an in-conversation lead — hourglass should
+   appear. Click the Task tag — hourglass gone, line struck through.
 
 ---
 

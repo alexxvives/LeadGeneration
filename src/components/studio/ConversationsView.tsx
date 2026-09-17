@@ -4,6 +4,7 @@ import type { FollowUp, LeadWithOutreach } from "@/lib/types";
 import {
   canonicalizeFollowUp,
   followUpAuthorName,
+  hasPendingTask,
   pendingUserFollowUpCount,
   resolveFollowUpKind,
   sortFollowUpsNewestFirst,
@@ -48,15 +49,19 @@ export function ConversationsView({
   leads,
   emptyHref,
   onOpen,
+  onCompleteTask,
 }: {
   leads: LeadWithOutreach[];
   emptyHref: string;
   onOpen: (id: string) => void;
+  onCompleteTask?: (leadId: string) => void;
 }) {
   const rows = [...leads]
     .filter((l) => (l.crmStage ?? "new") === "in_conversation")
     .sort((a, b) => {
-      if (a.waitingOnUs !== b.waitingOnUs) return a.waitingOnUs ? -1 : 1;
+      const aWait = hasPendingTask(a.followUps);
+      const bWait = hasPendingTask(b.followUps);
+      if (aWait !== bWait) return aWait ? -1 : 1;
       return b.createdAt.localeCompare(a.createdAt);
     });
 
@@ -73,6 +78,7 @@ export function ConversationsView({
     <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {rows.map((lead) => {
         const pendingFollowUps = pendingUserFollowUpCount(lead.followUps);
+        const waitingOnUs = hasPendingTask(lead.followUps);
         const comments = recentComments(lead.followUps);
         const name = lead.contactName?.trim() || lead.company || "Untitled";
         const cityCountry = shortLocation(lead.location);
@@ -108,9 +114,9 @@ export function ConversationsView({
                     </span>
                   ) : null}
                 </div>
-                {(lead.waitingOnUs || lead.demoDone) ? (
+                {(waitingOnUs || lead.demoDone) ? (
                   <span className="inline-flex shrink-0 items-center gap-1">
-                    {lead.waitingOnUs ? (
+                    {waitingOnUs ? (
                       <span
                         className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 text-amber-300 shadow-[0_0_12px_rgba(247,185,85,0.35)] ring-1 ring-amber-400/45"
                         title="Waiting on us"
@@ -154,14 +160,28 @@ export function ConversationsView({
               >
                 {formatCreated(lead.createdAt)}
               </time>
-              {pendingFollowUps > 0 ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
-                  <CalendarIcon className="h-2.5 w-2.5" />
-                  {pendingFollowUps === 1
-                    ? "Follow-up"
-                    : `${pendingFollowUps} follow-ups`}
-                </span>
-              ) : null}
+              <span className="inline-flex items-center gap-1.5">
+                {waitingOnUs ? (
+                  <button
+                    type="button"
+                    onClick={() => onCompleteTask?.(lead.id)}
+                    disabled={!onCompleteTask}
+                    title="Mark task done"
+                    aria-label="Mark task done"
+                    className="inline-flex items-center rounded-full bg-aurora-400/20 px-2 py-0.5 text-[10px] font-medium text-aurora-200 ring-1 ring-aurora-400/35 hover:bg-aurora-400/30 disabled:opacity-50"
+                  >
+                    Task
+                  </button>
+                ) : null}
+                {pendingFollowUps > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                    <CalendarIcon className="h-2.5 w-2.5" />
+                    {pendingFollowUps === 1
+                      ? "Follow-up"
+                      : `${pendingFollowUps} follow-ups`}
+                  </span>
+                ) : null}
+              </span>
             </div>
           </article>
         );
