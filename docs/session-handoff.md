@@ -9,19 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-17 (Waiting on us = open Task)
+## ⏱️ Status — updated 2026-09-17 (collaborator create focus)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0037** applied on prod D1 (`lodestar-prod`).  
 **Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
-- Dropped the Waiting on us switch. **Add Task** in Notes; an open task
-  shows the hourglass. Click the journal **Task** tag to mark it done.
+- Fixed New collaborator modal jumping focus to the ✕ on every keystroke.
+- Contact drawer focuses the name field on open, not on parent re-renders.
 
 ### Next
-1. Hard-refresh, add a task on an in-conversation lead — hourglass should
-   appear. Click the Task tag — hourglass gone, line struck through.
+1. Hard-refresh, Add collaborator, type in Name — cursor should stay put.
 
 ---
 

@@ -31,6 +31,7 @@ export function Modal({
   const panelRef = useRef<HTMLDivElement>(null);
   const prevFocus = useRef<HTMLElement | null>(null);
 
+  // Focus once when opened — not when `onClose` identity changes (controlled forms re-render).
   useEffect(() => {
     if (!open) return;
     prevFocus.current = document.activeElement as HTMLElement | null;
@@ -43,9 +44,26 @@ export function Modal({
             ),
           ).filter((el) => !el.hasAttribute("disabled"))
         : [];
-    const first = focusables()[0];
-    first?.focus();
+    const field = panel?.querySelector<HTMLElement>(
+      "input:not([disabled]), select:not([disabled]), textarea:not([disabled])",
+    );
+    (field ?? focusables()[0])?.focus();
+    return () => {
+      prevFocus.current?.focus?.();
+    };
+  }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const panel = panelRef.current;
+    const focusables = () =>
+      panel
+        ? Array.from(
+            panel.querySelectorAll<HTMLElement>(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+            ),
+          ).filter((el) => !el.hasAttribute("disabled"))
+        : [];
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && dismissible) {
         e.preventDefault();
@@ -66,10 +84,7 @@ export function Modal({
       }
     };
     window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      prevFocus.current?.focus?.();
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [open, dismissible, onClose]);
 
   if (!open) return null;

@@ -134,17 +134,13 @@ export function ContactDrawer({
 
   useEffect(() => {
     prevFocus.current = document.activeElement as HTMLElement | null;
-    const panel = panelRef.current;
-    const focusables = () =>
-      panel
-        ? Array.from(
-            panel.querySelectorAll<HTMLElement>(
-              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-            ),
-          ).filter((el) => !el.hasAttribute("disabled"))
-        : [];
-    focusables()[0]?.focus();
+    nameInputRef.current?.focus();
+    return () => {
+      prevFocus.current?.focus?.();
+    };
+  }, [contact.id]);
 
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -152,10 +148,7 @@ export function ContactDrawer({
       }
     };
     window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      prevFocus.current?.focus?.();
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   const addEntry = async (kind: "note" | "follow_up") => {

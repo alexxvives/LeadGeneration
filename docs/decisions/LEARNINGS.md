@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-17 — Modal stole focus on every keystroke in create forms
+- `Modal` focus effect depended on `onClose`; inline lambdas from parents
+  re-ran it on every controlled-input keystroke and jumped to the header ✕.
+- Focus now runs once per `open`; tab trap stays separate. First field gets
+  focus when the dialog has inputs.
+
 ### 2026-09-17 — Waiting on us is an open Task
 - Removed the In-conversation **Waiting on us** switch. **Add Task** in
   Notes opens the green Task composer; an undone task is the hourglass on
