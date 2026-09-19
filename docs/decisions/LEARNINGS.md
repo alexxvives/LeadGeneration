@@ -4,6 +4,23 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-19 — First-class Tasks (ADR 0039)
+- `tasks` table mirrors journal `kind: "task"` via `journalFollowUpId`; backfill
+  on first `GET /api/tasks` from existing lead/contact follow-ups.
+- `hasPendingTask` / `waitingOnUs` use open `Task.status !== completed` plus
+  legacy undone journal lines until backfilled.
+- Calendar lists tasks by `deadline` (amber check); ONGOING skips rose overdue
+  on day cells. Studio `?view=tasks` kanban at lg+.
+
+### 2026-09-17 — Follow-up kind + Conversations sort
+- `resolveFollowUpKind` demoted stored `follow_up` rows with custom copy /
+  past dates to `note`, so journal tags lost strikethrough and card chips
+  flickered. Trust explicit `follow_up` / `task` kinds; merge keeps them
+  across slim polls.
+- Pipeline / Conversations **Follow-up** chips are clickable like **Task**
+  (`markNewestPendingFollowUpDone`). Conversations sort: open task first,
+  then last contact (journal or `sentAt`).
+
 ### 2026-09-17 — Collaborator create is the same drawer
 - A separate create modal plus `createRequestId > 0` re-opened the form every
   time ContactsView remounted (leaving and re-entering Collaborators).

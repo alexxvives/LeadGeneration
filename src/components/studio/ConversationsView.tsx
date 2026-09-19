@@ -1,10 +1,12 @@
 "use client";
 
-import type { FollowUp, LeadWithOutreach } from "@/lib/types";
+import type { FollowUp, LeadWithOutreach, Task } from "@/lib/types";
 import {
   canonicalizeFollowUp,
   followUpAuthorName,
+  formatLastContact,
   hasPendingTask,
+  lastContactTimestamp,
   pendingUserFollowUpCount,
   resolveFollowUpKind,
   sortFollowUpsNewestFirst,
@@ -14,16 +16,7 @@ import { CalendarIcon, DemoIcon, PinIcon, WaitingIcon } from "@/components/icons
 import { EmptyState } from "@/components/studio/StudioHelpers";
 import { MarqueeText } from "@/components/studio/MarqueeText";
 import { AuthorAvatar } from "@/components/studio/JournalEntries";
-
-function formatCreated(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+import { useBoardLockUi } from "@/components/studio/board-lock";
 
 function recentComments(
   followUps: FollowUp[] | undefined,
@@ -48,21 +41,30 @@ function recentComments(
 export function ConversationsView({
   leads,
   emptyHref,
+  tasksByLeadId,
   onOpen,
   onCompleteTask,
+  onCompleteFollowUp,
 }: {
   leads: LeadWithOutreach[];
   emptyHref: string;
+  tasksByLeadId?: Map<string, Task[]>;
   onOpen: (id: string) => void;
   onCompleteTask?: (leadId: string) => void;
+  onCompleteFollowUp?: (leadId: string) => void;
 }) {
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+
   const rows = [...leads]
     .filter((l) => (l.crmStage ?? "new") === "in_conversation")
     .sort((a, b) => {
-      const aWait = hasPendingTask(a.followUps);
-      const bWait = hasPendingTask(b.followUps);
-      if (aWait !== bWait) return aWait ? -1 : 1;
-      return b.createdAt.localeCompare(a.createdAt);
+      const aTask = hasPendingTask(a.followUps, tasksByLeadId?.get(a.id));
+      const bTask = hasPendingTask(b.followUps, tasksByLeadId?.get(b.id));
+      if (aTask !== bTask) return aTask ? -1 : 1;
+      const aAt = lastContactTimestamp(a).at;
+      const bAt = lastContactTimestamp(b).at;
+      if (aAt !== bAt) return bAt - aAt;
+      return b.company.localeCompare(a.company, undefined, { sensitivity: "base" });
     });
 
   if (rows.length === 0) {
@@ -78,10 +80,15 @@ export function ConversationsView({
     <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {rows.map((lead) => {
         const pendingFollowUps = pendingUserFollowUpCount(lead.followUps);
-        const waitingOnUs = hasPendingTask(lead.followUps);
+        const waitingOnUs = hasPendingTask(
+          lead.followUps,
+          tasksByLeadId?.get(lead.id),
+        );
         const comments = recentComments(lead.followUps);
         const name = lead.contactName?.trim() || lead.company || "Untitled";
         const cityCountry = shortLocation(lead.location);
+        const lastContact = formatLastContact(lead);
+        const lastContactAt = lastContactTimestamp(lead).at;
         return (
           <article
             key={lead.id}
@@ -154,19 +161,28 @@ export function ConversationsView({
               )}
             </button>
             <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-              <time
-                className="text-[11px] text-mist-500"
-                dateTime={lead.createdAt}
-              >
-                {formatCreated(lead.createdAt)}
-              </time>
+              {lastContact ? (
+                <time
+                  className="text-[11px] font-medium text-mist-400"
+                  dateTime={
+                    lastContactAt
+                      ? new Date(lastContactAt).toISOString()
+                      : undefined
+                  }
+                  title="Last contact"
+                >
+                  {lastContact}
+                </time>
+              ) : (
+                <span className="text-[11px] text-mist-600">No contact yet</span>
+              )}
               <span className="inline-flex items-center gap-1.5">
                 {waitingOnUs ? (
                   <button
                     type="button"
                     onClick={() => onCompleteTask?.(lead.id)}
-                    disabled={!onCompleteTask}
-                    title="Mark task done"
+                    disabled={editLocked || !onCompleteTask}
+                    title={editLocked ? lockHint : "Mark task done"}
                     aria-label="Mark task done"
                     className="inline-flex items-center rounded-full bg-aurora-400/20 px-2 py-0.5 text-[10px] font-medium text-aurora-200 ring-1 ring-aurora-400/35 hover:bg-aurora-400/30 disabled:opacity-50"
                   >
@@ -174,12 +190,19 @@ export function ConversationsView({
                   </button>
                 ) : null}
                 {pendingFollowUps > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                  <button
+                    type="button"
+                    onClick={() => onCompleteFollowUp?.(lead.id)}
+                    disabled={editLocked || !onCompleteFollowUp}
+                    title={editLocked ? lockHint : "Mark follow-up done"}
+                    aria-label="Mark follow-up done"
+                    className="inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300 ring-1 ring-violet-400/30 hover:bg-violet-400/25 disabled:opacity-50"
+                  >
                     <CalendarIcon className="h-2.5 w-2.5" />
                     {pendingFollowUps === 1
                       ? "Follow-up"
                       : `${pendingFollowUps} follow-ups`}
-                  </span>
+                  </button>
                 ) : null}
               </span>
             </div>

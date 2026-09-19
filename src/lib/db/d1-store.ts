@@ -13,6 +13,8 @@ import type {
   DeliveryStatus,
   Contact,
   LeadDocument,
+  Task,
+  TaskStatus,
 } from "@/lib/types";
 import { normalizeCrmStage, normalizeEasyEmailProvider } from "@/lib/types";
 import {
@@ -198,6 +200,52 @@ type LeadDocumentRow = {
   size: number;
   created_at: string;
 };
+
+type TaskRow = {
+  id: string;
+  workspace_id: string;
+  board_id: string | null;
+  title: string;
+  owner_user_id: string | null;
+  owner_name: string | null;
+  deadline: string | null;
+  status: string;
+  lead_id: string | null;
+  contact_id: string | null;
+  journal_follow_up_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function parseTaskStatus(raw: string): TaskStatus {
+  if (
+    raw === "todo" ||
+    raw === "in_progress" ||
+    raw === "ongoing" ||
+    raw === "completed"
+  ) {
+    return raw;
+  }
+  return "todo";
+}
+
+function rowToTask(r: TaskRow): Task {
+  return {
+    id: r.id,
+    workspaceId: r.workspace_id ?? LOCAL_WORKSPACE_ID,
+    boardId: r.board_id,
+    title: r.title,
+    ownerUserId: r.owner_user_id,
+    ownerName: r.owner_name,
+    deadline: r.deadline,
+    status: parseTaskStatus(r.status),
+    leadId: r.lead_id,
+    contactId: r.contact_id,
+    journalFollowUpId: r.journal_follow_up_id,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
 
 function rowToLeadDocument(r: LeadDocumentRow): LeadDocument {
   return {
@@ -781,6 +829,7 @@ export class D1Store implements LeadRepository {
         this.db.prepare(`DELETE FROM board_invites WHERE board_id = ?`).bind(id),
         this.db.prepare(`DELETE FROM board_locks WHERE board_id = ?`).bind(id),
         this.db.prepare(`DELETE FROM contacts WHERE board_id = ?`).bind(id),
+        this.db.prepare(`DELETE FROM tasks WHERE board_id = ?`).bind(id),
       ]);
     }
     return result.meta.changes > 0;
@@ -1321,6 +1370,10 @@ export class D1Store implements LeadRepository {
       .prepare(`DELETE FROM lead_documents WHERE lead_id = ? AND workspace_id = ?`)
       .bind(id, this.workspaceId)
       .run();
+    await this.db
+      .prepare(`DELETE FROM tasks WHERE lead_id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .run();
     const result = await this.db
       .prepare(`DELETE FROM leads WHERE id = ? AND workspace_id = ?`)
       .bind(id, this.workspaceId)
@@ -1346,6 +1399,12 @@ export class D1Store implements LeadRepository {
       await this.db
         .prepare(
           `DELETE FROM lead_documents WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
+        )
+        .bind(this.workspaceId, ...chunk)
+        .run();
+      await this.db
+        .prepare(
+          `DELETE FROM tasks WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
         )
         .bind(this.workspaceId, ...chunk)
         .run();
@@ -1428,11 +1487,116 @@ export class D1Store implements LeadRepository {
   }
 
   async deleteContact(id: string): Promise<boolean> {
+    await this.db
+      .prepare(`DELETE FROM tasks WHERE contact_id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .run();
     const result = await this.db
       .prepare(`DELETE FROM contacts WHERE id = ? AND workspace_id = ?`)
       .bind(id, this.workspaceId)
       .run();
     return (result.meta?.changes ?? 0) > 0;
+  }
+
+  async listTasks(boardId?: string): Promise<Task[]> {
+    const sql = boardId
+      ? `SELECT * FROM tasks WHERE workspace_id = ? AND board_id = ? ORDER BY updated_at DESC`
+      : `SELECT * FROM tasks WHERE workspace_id = ? ORDER BY updated_at DESC`;
+    const stmt = boardId
+      ? this.db.prepare(sql).bind(this.workspaceId, boardId)
+      : this.db.prepare(sql).bind(this.workspaceId);
+    const { results } = await stmt.all<TaskRow>();
+    return (results ?? []).map(rowToTask);
+  }
+
+  async getTask(id: string): Promise<Task | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM tasks WHERE id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .first<TaskRow>();
+    return row ? rowToTask(row) : null;
+  }
+
+  async createTask(task: Task): Promise<Task> {
+    await this.db
+      .prepare(
+        `INSERT INTO tasks
+         (id, workspace_id, board_id, title, owner_user_id, owner_name, deadline,
+          status, lead_id, contact_id, journal_follow_up_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        task.id,
+        this.workspaceId,
+        task.boardId,
+        task.title,
+        task.ownerUserId,
+        task.ownerName,
+        task.deadline,
+        task.status,
+        task.leadId,
+        task.contactId,
+        task.journalFollowUpId,
+        task.createdAt,
+        task.updatedAt,
+      )
+      .run();
+    return task;
+  }
+
+  async updateTask(id: string, patch: Partial<Task>): Promise<Task | null> {
+    const row: Record<string, unknown> = {};
+    if ("boardId" in patch) row.board_id = patch.boardId;
+    if ("title" in patch) row.title = patch.title;
+    if ("ownerUserId" in patch) row.owner_user_id = patch.ownerUserId ?? null;
+    if ("ownerName" in patch) row.owner_name = patch.ownerName ?? null;
+    if ("deadline" in patch) row.deadline = patch.deadline ?? null;
+    if ("status" in patch) row.status = patch.status;
+    if ("leadId" in patch) row.lead_id = patch.leadId ?? null;
+    if ("contactId" in patch) row.contact_id = patch.contactId ?? null;
+    if ("journalFollowUpId" in patch) {
+      row.journal_follow_up_id = patch.journalFollowUpId ?? null;
+    }
+    if ("updatedAt" in patch) row.updated_at = patch.updatedAt;
+    if (Object.keys(row).length === 0) return this.getTask(id);
+    const { clause, values } = buildSet(row);
+    await this.db
+      .prepare(`UPDATE tasks SET ${clause} WHERE id = ? AND workspace_id = ?`)
+      .bind(...values, id, this.workspaceId)
+      .run();
+    return this.getTask(id);
+  }
+
+  async deleteTask(id: string): Promise<boolean> {
+    const result = await this.db
+      .prepare(`DELETE FROM tasks WHERE id = ? AND workspace_id = ?`)
+      .bind(id, this.workspaceId)
+      .run();
+    return (result.meta?.changes ?? 0) > 0;
+  }
+
+  async deleteTasksByLead(leadId: string): Promise<number> {
+    const result = await this.db
+      .prepare(`DELETE FROM tasks WHERE lead_id = ? AND workspace_id = ?`)
+      .bind(leadId, this.workspaceId)
+      .run();
+    return result.meta?.changes ?? 0;
+  }
+
+  async deleteTasksByContact(contactId: string): Promise<number> {
+    const result = await this.db
+      .prepare(`DELETE FROM tasks WHERE contact_id = ? AND workspace_id = ?`)
+      .bind(contactId, this.workspaceId)
+      .run();
+    return result.meta?.changes ?? 0;
+  }
+
+  async deleteTasksByBoard(boardId: string): Promise<number> {
+    const result = await this.db
+      .prepare(`DELETE FROM tasks WHERE board_id = ? AND workspace_id = ?`)
+      .bind(boardId, this.workspaceId)
+      .run();
+    return result.meta?.changes ?? 0;
   }
 
   async listLeadDocuments(leadId: string): Promise<LeadDocument[]> {
@@ -1565,6 +1729,10 @@ export class D1Store implements LeadRepository {
       .run();
     await this.db
       .prepare(`DELETE FROM contacts WHERE workspace_id = ? AND board_id = ?`)
+      .bind(this.workspaceId, boardId)
+      .run();
+    await this.db
+      .prepare(`DELETE FROM tasks WHERE workspace_id = ? AND board_id = ?`)
       .bind(this.workspaceId, boardId)
       .run();
     return result.meta?.changes ?? 0;
@@ -2030,6 +2198,11 @@ export class D1Store implements LeadRepository {
     stmts.push(
       this.db
         .prepare(`DELETE FROM contacts WHERE workspace_id = ?`)
+        .bind(this.workspaceId),
+    );
+    stmts.push(
+      this.db
+        .prepare(`DELETE FROM tasks WHERE workspace_id = ?`)
         .bind(this.workspaceId),
     );
     stmts.push(

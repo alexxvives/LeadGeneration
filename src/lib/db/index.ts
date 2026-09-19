@@ -9,6 +9,7 @@ import type {
   LeadDocument,
   Outreach,
   Run,
+  Task,
   Workspace,
 } from "@/lib/types";
 import type { LeadHydrateLane } from "@/lib/lead-lanes";
@@ -186,6 +187,16 @@ export interface LeadRepository {
   createContact(contact: Contact): Promise<Contact>;
   updateContact(id: string, patch: Partial<Contact>): Promise<Contact | null>;
   deleteContact(id: string): Promise<boolean>;
+
+  // Tasks (workspace to-do — ADR 0039)
+  listTasks(boardId?: string): Promise<Task[]>;
+  getTask(id: string): Promise<Task | null>;
+  createTask(task: Task): Promise<Task>;
+  updateTask(id: string, patch: Partial<Task>): Promise<Task | null>;
+  deleteTask(id: string): Promise<boolean>;
+  deleteTasksByLead(leadId: string): Promise<number>;
+  deleteTasksByContact(contactId: string): Promise<number>;
+  deleteTasksByBoard(boardId: string): Promise<number>;
 
   // Closed-lead documents (ADR 0038)
   listLeadDocuments(leadId: string): Promise<LeadDocument[]>;

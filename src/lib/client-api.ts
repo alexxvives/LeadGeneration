@@ -21,6 +21,8 @@ import type {
   PlanId,
   Run,
   SearchStrategy,
+  Task,
+  TaskStatus,
   WorkspaceSummary,
 } from "@/lib/types";
 import type { LocationSuggestion } from "@/app/api/geocode/route";
@@ -543,6 +545,46 @@ export const api = {
 
   deleteContact: (id: string) =>
     jsonFetch<{ ok: boolean }>(`/api/contacts/${id}`, { method: "DELETE" }),
+
+  listTasks: (boardId?: string | null) => {
+    const q = boardId ? `?boardId=${encodeURIComponent(boardId)}` : "";
+    return jsonFetch<{ tasks: Task[] }>(`/api/tasks${q}`);
+  },
+
+  createTask: (input: {
+    boardId?: string | null;
+    title: string;
+    ownerUserId?: string | null;
+    ownerName?: string | null;
+    deadline?: string | null;
+    status?: TaskStatus;
+    leadId?: string | null;
+    contactId?: string | null;
+  }) =>
+    jsonFetch<{ task: Task }>("/api/tasks", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateTask: (
+    id: string,
+    patch: {
+      title?: string;
+      ownerUserId?: string | null;
+      ownerName?: string | null;
+      deadline?: string | null;
+      status?: TaskStatus;
+      leadId?: string | null;
+      contactId?: string | null;
+    },
+  ) =>
+    jsonFetch<{ task: Task }>(`/api/tasks/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+
+  deleteTask: (id: string) =>
+    jsonFetch<{ ok: boolean }>(`/api/tasks/${id}`, { method: "DELETE" }),
 
   listLeadDocuments: (leadId: string) =>
     jsonFetch<{ documents: LeadDocument[] }>(`/api/leads/${leadId}/documents`),

@@ -11,8 +11,12 @@ import {
   RateLimitedError,
   type BoardResponse,
 } from "@/lib/client-api";
-import type { Contact, ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId } from "@/lib/types";
-import { mergeFollowUpLists, markNewestPendingTaskDone } from "@/lib/follow-ups";
+import type { BoardMember, Contact, ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId, Task } from "@/lib/types";
+import {
+  mergeFollowUpLists,
+  markNewestPendingFollowUpDone,
+  markNewestPendingTaskDone,
+} from "@/lib/follow-ups";
 import { contactMethodLabel, rememberDroppedContactMethods } from "@/lib/contact-methods";
 import {
   droppedFollowUpIdSet,
@@ -46,6 +50,7 @@ import { CalendarView } from "./CalendarView";
 import { ConversationsView } from "./ConversationsView";
 import { ContactDrawer } from "./ContactDrawer";
 import { ContactsView } from "./ContactsView";
+import { TasksView } from "./TasksView";
 import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
 import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
@@ -115,6 +120,7 @@ type StudioView =
   | "outreach"
   | "conversations"
   | "contacts"
+  | "tasks"
   | "calendar"
   | "runs"
   | "dashboard"
@@ -148,6 +154,7 @@ function viewFromParams(view: string | null): StudioView {
   if (view === "outreach") return "outreach";
   if (view === "conversations") return "conversations";
   if (view === "contacts") return "contacts";
+  if (view === "tasks") return "tasks";
   if (view === "calendar") return "calendar";
   if (view === "runs") return "runs";
   if (view === "dashboard") return "dashboard";
@@ -174,6 +181,7 @@ function queryForView(next: StudioView, boardId?: string | null): string {
   else if (next === "outreach") params.set("view", "outreach");
   else if (next === "conversations") params.set("view", "conversations");
   else if (next === "contacts") params.set("view", "contacts");
+  else if (next === "tasks") params.set("view", "tasks");
   else if (next === "calendar") params.set("view", "calendar");
   else if (next === "runs") params.set("view", "runs");
   else if (next === "dashboard") params.set("view", "dashboard");
@@ -217,6 +225,10 @@ export function Studio() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsReady, setContactsReady] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasksReady, setTasksReady] = useState(false);
+  const [boardMembers, setBoardMembers] = useState<BoardMember[]>([]);
+  const [tasksAddOpen, setTasksAddOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
   const [drawerPromptNote, setDrawerPromptNote] = useState<
@@ -685,6 +697,40 @@ export function Studio() {
       cancelled = true;
     };
   }, [filterBoardId, view]);
+
+  const refreshTasks = useCallback(() => {
+    const boardId = filterBoardId;
+    void api
+      .listTasks(boardId)
+      .then(({ tasks: rows }) => setTasks(rows))
+      .catch(() => undefined)
+      .finally(() => setTasksReady(true));
+  }, [filterBoardId]);
+
+  useEffect(() => {
+    if (view !== "tasks" && view !== "calendar") return;
+    refreshTasks();
+  }, [view, refreshTasks]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const bid = filterBoardId ?? boards[0]?.id;
+    if (!bid) {
+      setBoardMembers([]);
+      return;
+    }
+    void api
+      .listBoardInvites(bid)
+      .then(({ members }) => {
+        if (!cancelled) setBoardMembers(members);
+      })
+      .catch(() => {
+        if (!cancelled) setBoardMembers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filterBoardId, boards]);
 
   // Hydrate drafting profiles from the workspace (localStorage write-through).
   useEffect(() => {
@@ -1737,6 +1783,7 @@ export function Studio() {
         }
         const { lead } = await api.updateLead(leadId, body);
         applyServerLead(leadId, lead, body, writeAt);
+        if (body.followUps) refreshTasks();
       });
     } catch (e) {
       await refresh();
@@ -1749,6 +1796,15 @@ export function Studio() {
     const lead = boardRef.current?.leads.find((l) => l.id === leadId);
     if (!lead) return;
     const updated = markNewestPendingTaskDone(lead.followUps ?? []);
+    if (!updated) return;
+    void onUpdateLeadCrm(leadId, { followUps: updated });
+  };
+
+  const onCompletePendingFollowUp = (leadId: string) => {
+    if (editLockedRef.current) return;
+    const lead = boardRef.current?.leads.find((l) => l.id === leadId);
+    if (!lead) return;
+    const updated = markNewestPendingFollowUpDone(lead.followUps ?? []);
     if (!updated) return;
     void onUpdateLeadCrm(leadId, { followUps: updated });
   };
@@ -1978,6 +2034,20 @@ export function Studio() {
     return all.filter((l) => leadMatchesSearch(l, deferredLeadSearch));
   }, [board?.leads, deferredLeadSearch, leadMatchesSearch]);
 
+  const tasksByLeadId = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const t of tasks) {
+      if (!t.leadId) continue;
+      const list = map.get(t.leadId) ?? [];
+      list.push(t);
+      map.set(t.leadId, list);
+    }
+    return map;
+  }, [tasks]);
+
+  const currentUserId =
+    (session?.user as { id?: string } | undefined)?.id ?? null;
+
   const outreachCompanyTypes = useMemo(() => {
     const set = new Set<string>();
     for (const l of board?.leads ?? []) {
@@ -2092,6 +2162,7 @@ export function Studio() {
     view === "leads" ||
     view === "conversations" ||
     view === "contacts" ||
+    view === "tasks" ||
     view === "calendar";
   const showLeadSearch =
     hasLeads &&
@@ -2099,8 +2170,10 @@ export function Studio() {
       view === "pipeline" ||
       view === "outreach" ||
       view === "conversations" ||
-      view === "calendar");
-  const phoneHeader = view === "boards" || view === "contacts";
+      view === "calendar" ||
+      view === "tasks");
+  const phoneHeader =
+    view === "boards" || view === "contacts" || view === "tasks";
 
   // Skeleton for hydrate / first body / first visit to a layout tab only.
   const layoutPaneReady = visitedLayouts.has(shownLayoutTab);
@@ -2121,6 +2194,7 @@ export function Studio() {
     view === "outreach" ||
     view === "conversations" ||
     view === "contacts" ||
+    view === "tasks" ||
     view === "calendar" ||
     view === "runs";
   if (loading && !board && needsBoardPayload) {
@@ -2245,6 +2319,8 @@ export function Studio() {
                           ? "Conversations"
                           : view === "contacts"
                             ? "Collaborators"
+                          : view === "tasks"
+                            ? "Tasks"
                         : view === "calendar"
                           ? "Calendar"
                         : view === "runs"
@@ -2286,6 +2362,25 @@ export function Studio() {
                 </button>
               </Lockable>
             ) : null}
+            {view === "tasks" ? (
+              <Lockable>
+                <button
+                  type="button"
+                  disabled={editLocked || boards.length === 0}
+                  title={
+                    editLocked
+                      ? lockHint
+                      : boards.length === 0
+                        ? "Create a board first"
+                        : "Add task"
+                  }
+                  onClick={() => setTasksAddOpen(true)}
+                  className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
+                >
+                  Add task
+                </button>
+              </Lockable>
+            ) : null}
             {view === "leads" && hasLeads ? (
               <span className="inline-flex">
                 <ExportButton />
@@ -2314,8 +2409,10 @@ export function Studio() {
                         ? "Active dialogues — demo, waiting, and follow-ups."
                         : view === "contacts"
                           ? "Collaborators on this board — notes and follow-ups land on Calendar."
+                        : view === "tasks"
+                          ? "Workspace to-dos — standalone or linked to leads and collaborators."
                       : view === "calendar"
-                        ? "Follow-ups, emails sent, and phone calls — day by day."
+                        ? "Follow-ups, tasks, emails sent, and phone calls — day by day."
                       : view === "runs"
                         ? "History of searches in this workspace."
                         : view === "admin"
@@ -2374,6 +2471,25 @@ export function Studio() {
                   className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent disabled:opacity-50"
                 >
                   Add collaborator
+                </button>
+              </Lockable>
+            ) : null}
+            {view === "tasks" ? (
+              <Lockable className="self-start">
+                <button
+                  type="button"
+                  disabled={editLocked || boards.length === 0}
+                  title={
+                    editLocked
+                      ? lockHint
+                      : boards.length === 0
+                        ? "Create a board first"
+                        : "Add task"
+                  }
+                  onClick={() => setTasksAddOpen(true)}
+                  className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent disabled:opacity-50"
+                >
+                  Add task
                 </button>
               </Lockable>
             ) : null}
@@ -2557,8 +2673,10 @@ export function Studio() {
                 stageCounts={board.crmStageCounts}
                 backfilling={leadsBackfilling}
                 filterActive={Boolean(deferredLeadSearch.trim())}
+                tasksByLeadId={tasksByLeadId}
                 onOpen={openInfo}
                 onCompleteTask={onCompletePendingTask}
+                onCompleteFollowUp={onCompletePendingFollowUp}
                 onMoveStage={onMoveStage}
               />
             </>
@@ -2828,8 +2946,35 @@ export function Studio() {
             <ConversationsView
               leads={searchFilteredLeads}
               emptyHref={`/app${queryForView("pipeline", filterBoardId)}`}
+              tasksByLeadId={tasksByLeadId}
               onOpen={openInfo}
               onCompleteTask={onCompletePendingTask}
+              onCompleteFollowUp={onCompletePendingFollowUp}
+            />
+          )}
+        </div>
+      )}
+
+      {view === "tasks" && (
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6">
+          {!tasksReady ? (
+            <div role="status" aria-busy="true" aria-label="Loading tasks">
+              <ContactsSkeleton />
+            </div>
+          ) : (
+            <TasksView
+              tasks={tasks}
+              leads={searchFilteredLeads}
+              boards={board?.boards ?? boards}
+              filterBoardId={filterBoardId}
+              currentUserId={currentUserId}
+              members={boardMembers}
+              searchQuery={deferredLeadSearch}
+              onRefresh={refreshTasks}
+              onOpenLead={openInfo}
+              onToast={toast}
+              addOpenSignal={tasksAddOpen}
+              onAddOpenConsumed={() => setTasksAddOpen(false)}
             />
           )}
         </div>
@@ -2868,13 +3013,46 @@ export function Studio() {
             <CalendarView
               leads={searchFilteredLeads}
               contacts={contacts}
+              tasks={tasks}
               onOpenEvent={(ev) => {
+                if (ev.source === "task" && ev.taskId) {
+                  if (ev.leadId) {
+                    openInfo(ev.leadId);
+                    return;
+                  }
+                  if (ev.contactId) {
+                    setSelectedContactId(ev.contactId);
+                    setView("contacts");
+                    return;
+                  }
+                  setView("tasks");
+                  return;
+                }
                 if (ev.source === "contact" && ev.contactId) {
                   setSelectedContactId(ev.contactId);
                   setView("contacts");
                   return;
                 }
                 if (ev.leadId) openInfo(ev.leadId);
+              }}
+              onToggleTask={(ev, done) => {
+                if (ev.taskId) {
+                  void api
+                    .updateTask(ev.taskId, {
+                      status: done ? "completed" : "todo",
+                    })
+                    .then(() => refreshTasks())
+                    .catch((e) => toast("err", (e as Error).message));
+                  return;
+                }
+                if (ev.leadId) {
+                  const lead = board.leads.find((l) => l.id === ev.leadId);
+                  if (!lead) return;
+                  const followUps = (lead.followUps ?? []).map((f) =>
+                    f.id === ev.id ? { ...f, done } : f,
+                  );
+                  void onUpdateLeadCrm(ev.leadId, { followUps });
+                }
               }}
               onToggleFollowUp={(ev, done) => {
                 if (ev.source === "contact" && ev.contactId) {

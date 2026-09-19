@@ -882,6 +882,7 @@ export function StudioViewSkeleton({
     | "calendar"
     | "conversations"
     | "contacts"
+    | "tasks"
     | "runs"
     | "dashboard"
     | "boards"
@@ -905,6 +906,8 @@ export function StudioViewSkeleton({
                   ? "Conversations"
                   : view === "contacts"
                     ? "Collaborators"
+                  : view === "tasks"
+                    ? "Tasks"
                 : view === "runs"
                   ? "Search runs"
                   : view === "admin"
@@ -936,6 +939,8 @@ export function StudioViewSkeleton({
       </div>
     ) : view === "conversations" ? (
       <ConversationsSkeleton />
+    ) : view === "tasks" ? (
+      <ContactsSkeleton />
     ) : view === "contacts" ? (
       <ContactsSkeleton />
     ) : view === "runs" ? (

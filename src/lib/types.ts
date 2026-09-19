@@ -466,6 +466,27 @@ export interface Contact {
   createdAt: string;
 }
 
+/** Workspace to-do status — mirrors journal `done` when linked via `journalFollowUpId`. */
+export type TaskStatus = "todo" | "in_progress" | "ongoing" | "completed";
+
+/** First-class task row — unified with journal `kind: "task"` (ADR 0039). */
+export interface Task {
+  id: string;
+  workspaceId: string;
+  boardId: string | null;
+  title: string;
+  ownerUserId: string | null;
+  ownerName: string | null;
+  deadline: string | null;
+  status: TaskStatus;
+  leadId: string | null;
+  contactId: string | null;
+  /** FollowUp.id when mirrored from lead/contact journal. */
+  journalFollowUpId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Custom lead-table column (defs live in the browser; values on Lead.customFields). */
 export type LeadColumnType = "text" | "number" | "select";
 

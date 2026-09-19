@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { Contact, FollowUpKind, LeadWithOutreach } from "@/lib/types";
+import type { Contact, FollowUpKind, LeadWithOutreach, Task } from "@/lib/types";
 import {
   calendarEventsFromContacts,
   calendarEventsFromLeads,
+  calendarEventsFromLegacyJournalTasks,
+  calendarEventsFromTasks,
   followUpKindLabel,
   formatNoteDate,
   isMissedCallNote,
@@ -29,7 +31,7 @@ import { PhoneMissedIcon } from "@/components/lucide-animated/phone-missed";
 import { useIconMotion } from "@/components/lucide-animated/hover";
 import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 
-const KIND_ORDER: FollowUpKind[] = ["follow_up", "email", "phone"];
+const KIND_ORDER: FollowUpKind[] = ["follow_up", "task", "email", "phone"];
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
@@ -94,6 +96,11 @@ function DayKindMark({ kind }: { kind: FollowUpKind }) {
   if (kind === "follow_up") {
     return (
       <CalendarIcon className="h-4 w-4 text-violet-300 drop-shadow-[0_0_6px_rgba(167,139,250,0.6)] sm:h-5 sm:w-5" aria-hidden />
+    );
+  }
+  if (kind === "task") {
+    return (
+      <CheckIcon className="h-4 w-4 text-amber-300 drop-shadow-[0_0_6px_rgba(247,185,85,0.45)] sm:h-5 sm:w-5" aria-hidden />
     );
   }
   return (
@@ -286,16 +293,26 @@ function LegendItem({
   );
 }
 
+function isTaskOverdue(ev: CalendarEvent, today: string): boolean {
+  if (ev.kind !== "task" || ev.done) return false;
+  if (ev.taskStatus === "ongoing") return false;
+  return ev.date < today;
+}
+
 export function CalendarView({
   leads,
   contacts = [],
+  tasks = [],
   onOpenEvent,
   onToggleFollowUp,
+  onToggleTask,
 }: {
   leads: LeadWithOutreach[];
   contacts?: Contact[];
+  tasks?: Task[];
   onOpenEvent: (ev: CalendarEvent) => void;
   onToggleFollowUp?: (ev: CalendarEvent, done: boolean) => void;
+  onToggleTask?: (ev: CalendarEvent, done: boolean) => void;
 }) {
   const today = todayIsoDate();
   const now = new Date();
@@ -305,13 +322,19 @@ export function CalendarView({
   });
   const [selected, setSelected] = useState(today);
 
-  const events = useMemo(
-    () => [
+  const events = useMemo(() => {
+    const leadLabels = new Map(leads.map((l) => [l.id, l.company]));
+    const contactLabels = new Map(contacts.map((c) => [c.id, c.name]));
+    const mirrored = new Set(
+      tasks.map((t) => t.journalFollowUpId).filter((id): id is string => !!id),
+    );
+    return [
       ...calendarEventsFromLeads(leads),
       ...calendarEventsFromContacts(contacts),
-    ],
-    [leads, contacts],
-  );
+      ...calendarEventsFromTasks(tasks, leadLabels, contactLabels, mirrored),
+      ...calendarEventsFromLegacyJournalTasks(leads, contacts, mirrored),
+    ];
+  }, [leads, contacts, tasks]);
   const byDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const ev of events) {
@@ -370,6 +393,7 @@ export function CalendarView({
 
   const dayEvents = byDate.get(selected) ?? [];
   const followUps = dayEvents.filter((e) => e.kind === "follow_up");
+  const taskEvents = dayEvents.filter((e) => e.kind === "task");
   const emails = dayEvents.filter((e) => e.kind === "email");
   const calls = dayEvents.filter((e) => e.kind === "phone");
   const weekRows = cells.length / 7;
@@ -477,8 +501,9 @@ export function CalendarView({
               ).length;
               const overdue = dayEvs.some(
                 (e) =>
-                  e.kind === "follow_up" &&
-                  isOverdueFollowUp(e.date, e.done, today),
+                  (e.kind === "follow_up" &&
+                    isOverdueFollowUp(e.date, e.done, today)) ||
+                  isTaskOverdue(e, today),
               );
               const summary = dayEvs.length
                 ? `${dayEvs.length} item${dayEvs.length === 1 ? "" : "s"}`
@@ -549,6 +574,9 @@ export function CalendarView({
           <LegendItem label="Follow up">
             <CalendarDaysIcon size={14} className="flex text-violet-300" aria-hidden />
           </LegendItem>
+          <LegendItem label="Tasks">
+            <CheckIcon className="h-3.5 w-3.5 text-amber-300" aria-hidden />
+          </LegendItem>
           <LegendItem label="Email sent">
             <MailCheckIcon size={14} className="flex text-aurora-400" aria-hidden />
           </LegendItem>
@@ -590,6 +618,13 @@ export function CalendarView({
                 onToggleFollowUp={onToggleFollowUp}
               />
               <DayGroup
+                title="Tasks"
+                kind="task"
+                events={taskEvents}
+                onOpenEvent={onOpenEvent}
+                onToggleTask={onToggleTask}
+              />
+              <DayGroup
                 title="Emails sent"
                 kind="email"
                 events={emails}
@@ -625,7 +660,9 @@ function GroupTitle({
       ? "text-aurora-400"
       : kind === "phone"
         ? "text-sky-400"
-        : "text-violet-300";
+        : kind === "task"
+          ? "text-amber-300"
+          : "text-violet-300";
   return (
     <h4 className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-mist-500">
       {kind === "email" ? (
@@ -636,6 +673,8 @@ function GroupTitle({
         ) : (
           <AnimatedPhoneIcon size={14} className={`flex ${color}`} aria-hidden />
         )
+      ) : kind === "task" ? (
+        <CheckIcon className={`h-3.5 w-3.5 ${color}`} aria-hidden />
       ) : (
         <CalendarDaysIcon size={14} className={`flex ${color}`} aria-hidden />
       )}
@@ -656,12 +695,14 @@ function DayGroup({
   events,
   onOpenEvent,
   onToggleFollowUp,
+  onToggleTask,
 }: {
   title: string;
   kind: FollowUpKind;
   events: CalendarEvent[];
   onOpenEvent: (ev: CalendarEvent) => void;
   onToggleFollowUp?: (ev: CalendarEvent, done: boolean) => void;
+  onToggleTask?: (ev: CalendarEvent, done: boolean) => void;
 }) {
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   if (events.length === 0) return null;
@@ -673,7 +714,8 @@ function DayGroup({
         {events.map((ev) => {
           const isMissed = ev.kind === "phone" && isMissedCallNote(ev.note);
           const overdue =
-            ev.kind === "follow_up" && isOverdueFollowUp(ev.date, ev.done);
+            (ev.kind === "follow_up" && isOverdueFollowUp(ev.date, ev.done)) ||
+            isTaskOverdue(ev, todayIsoDate());
           return (
           <li key={`${ev.source}-${ev.contactId ?? ev.leadId}-${ev.id}`}>
             <div
@@ -683,7 +725,37 @@ function DayGroup({
                   : "border-white/5 bg-ink-950/40"
               }`}
             >
-              {onToggleFollowUp && ev.kind === "follow_up" ? (
+              {onToggleTask && ev.kind === "task" ? (
+                <Lockable>
+                  <button
+                    type="button"
+                    disabled={editLocked}
+                    onClick={() => onToggleTask(ev, !ev.done)}
+                    aria-pressed={ev.done}
+                    aria-label={
+                      editLocked
+                        ? lockHint
+                        : ev.done
+                          ? "Reopen task"
+                          : "Complete task"
+                    }
+                    title={
+                      editLocked
+                        ? lockHint
+                        : ev.done
+                          ? "Reopen task"
+                          : "Complete task"
+                    }
+                    className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors disabled:opacity-50 ${
+                      ev.done
+                        ? "border-aurora-400/40 bg-aurora-400/20 text-aurora-200"
+                        : "border-amber-400/40 text-amber-300 hover:border-amber-400/70 hover:text-amber-200"
+                    }`}
+                  >
+                    {ev.done ? <CheckIcon className="h-3 w-3" /> : null}
+                  </button>
+                </Lockable>
+              ) : onToggleFollowUp && ev.kind === "follow_up" ? (
                 <Lockable>
                   <button
                     type="button"
@@ -735,7 +807,7 @@ function DayGroup({
                 <p className="flex min-w-0 items-baseline gap-1.5">
                   <span
                     className={`truncate text-sm font-medium ${
-                      ev.kind === "follow_up" && ev.done
+                      (ev.kind === "follow_up" || ev.kind === "task") && ev.done
                         ? "text-mist-400 line-through"
                         : "text-mist-100"
                     }`}

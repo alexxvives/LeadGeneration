@@ -725,8 +725,9 @@ export function LeadDrawer(props: DrawerProps) {
 
   const toggleFollowUpDone = async (fu: FollowUp) => {
     if (editLocked) return;
+    const nextDone = !followUpIsDone(fu.done);
     const updated = followUps.map((f) =>
-      f.id === fu.id ? { ...f, done: !followUpIsDone(f.done) } : f,
+      f.id === fu.id ? { ...f, done: nextDone } : f,
     );
     setFollowUps(updated);
     await props.onUpdateCrm(lead.id, { followUps: updated });

@@ -14,7 +14,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
+import type { ContactMethod, CrmStage, LeadWithOutreach, Task } from "@/lib/types";
 import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, InfoIcon, CalendarIcon, WaitingIcon } from "@/components/icons";
 import {
   leadHasMissedCall,
@@ -87,6 +87,8 @@ const TAB_SHORT: Record<CrmStage, string> = {
 const PipelineCardActions = createContext<{
   onOpen: (id: string) => void;
   onCompleteTask: ((id: string) => void) | undefined;
+  onCompleteFollowUp: ((id: string) => void) | undefined;
+  tasksByLeadId?: Map<string, Task[]>;
 } | null>(null);
 
 function usePipelineCardActions() {
@@ -193,9 +195,11 @@ export function PipelineView({
   stageCounts,
   backfilling = false,
   filterActive = false,
+  tasksByLeadId,
   onOpen,
   onMoveStage,
   onCompleteTask,
+  onCompleteFollowUp,
 }: {
   leads: LeadWithOutreach[];
   /** DB totals — column badges stay honest while leads are still paging in. */
@@ -204,8 +208,10 @@ export function PipelineView({
   backfilling?: boolean;
   /** Search is filtering — don't treat empty columns as still paging. */
   filterActive?: boolean;
+  tasksByLeadId?: Map<string, Task[]>;
   onOpen: (id: string) => void;
   onCompleteTask?: (leadId: string) => void;
+  onCompleteFollowUp?: (leadId: string) => void;
   onMoveStage: (
     leadId: string,
     stage: CrmStage,
@@ -262,7 +268,14 @@ export function PipelineView({
     : (stageCounts?.[narrowCol.stage] ?? narrowLeads.length);
 
   return (
-    <PipelineCardActions.Provider value={{ onOpen: openIfClick, onCompleteTask }}>
+    <PipelineCardActions.Provider
+      value={{
+        onOpen: openIfClick,
+        onCompleteTask,
+        onCompleteFollowUp,
+        tasksByLeadId,
+      }}
+    >
     <div className="flex h-full min-h-0 flex-col gap-3">
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
@@ -565,9 +578,15 @@ function MethodIcons({ methods }: { methods: ContactMethod[] }) {
   );
 }
 
-function pipelineCardChrome(lead: LeadWithOutreach) {
+function pipelineCardChrome(
+  lead: LeadWithOutreach,
+  tasksByLeadId?: Map<string, Task[]>,
+) {
   const pendingFollowUps = pendingUserFollowUpCount(lead.followUps);
-  const waitingOnUs = hasPendingTask(lead.followUps);
+  const waitingOnUs = hasPendingTask(
+    lead.followUps,
+    tasksByLeadId?.get(lead.id),
+  );
   const journalNotes =
     lead.followUps?.filter((f) => {
       const k = resolveFollowUpKind(f);
@@ -598,9 +617,10 @@ function PipelineCardFace({
   extra?: ReactNode;
   hideInfo?: boolean;
 }) {
+  const { onCompleteTask, onCompleteFollowUp, tasksByLeadId } =
+    usePipelineCardActions();
   const { pendingFollowUps, waitingOnUs, noteCount, replied, methods, missedCall, iconMethods, needsMethod } =
-    pipelineCardChrome(lead);
-  const { onCompleteTask } = usePipelineCardActions();
+    pipelineCardChrome(lead, tasksByLeadId);
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
 
   return (
@@ -640,19 +660,30 @@ function PipelineCardFace({
         </div>
         <div className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden">
           {pendingFollowUps > 0 ? (
-            <span
-              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-400/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300"
+            <button
+              type="button"
+              disabled={editLocked || !onCompleteFollowUp}
               title={
-                pendingFollowUps === 1
-                  ? "Pending follow-up"
-                  : `${pendingFollowUps} pending follow-ups`
+                editLocked
+                  ? lockHint
+                  : pendingFollowUps === 1
+                    ? "Mark follow-up done"
+                    : `Mark ${pendingFollowUps} follow-ups done`
               }
+              aria-label="Mark follow-up done"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (editLocked) return;
+                onCompleteFollowUp?.(lead.id);
+              }}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-400/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300 ring-1 ring-violet-400/30 hover:bg-violet-400/25 disabled:opacity-50"
             >
               <CalendarIcon className="h-2.5 w-2.5" />
               {pendingFollowUps === 1
                 ? "Follow-up"
                 : `${pendingFollowUps} follow-ups`}
-            </span>
+            </button>
           ) : null}
           {waitingOnUs ? (
             <button

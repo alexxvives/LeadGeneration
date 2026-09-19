@@ -9,19 +9,24 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-17 (collaborator drawer create)
+## ⏱️ Status — updated 2026-09-19 (Tasks manager)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0037** applied on prod D1 (`lodestar-prod`).  
+**Migrations:** 0021–**0038** (`0038_tasks.sql` — apply on prod D1 before deploy).  
 **Deploy:** push to master for CI / Workers deploy.
 
 ### This pass
-- Add collaborator opens the same drawer as an existing card (not a form modal).
-- Collaborator cards share row height. Entering the page no longer auto-opens create.
-- Contact drawer has Add Task (same as leads).
+- First-class **Tasks** view (`?view=tasks`) — kanban + filters; unified with
+  journal `kind: "task"` (ADR 0039).
+- API: `GET/POST /api/tasks`, `PATCH/DELETE /api/tasks/[id]`; backfill from
+  existing journal tasks on first list.
+- Calendar shows tasks by deadline; complete from Calendar syncs status + journal.
+- `waitingOnUs` / `hasPendingTask` include open `Task` rows + legacy journal.
 
 ### Next
-1. Hard-refresh Collaborators: page should not prompt create. Add collaborator → drawer. Cards even height. Add Task on a saved collaborator.
+1. Run `npm run cf:migrate` for `0038_tasks.sql` on prod D1.
+2. Hard-refresh: lead **Add Task** → appears in Tasks + Calendar; complete from
+   card/journal/calendar; delete + Undo; board All vs one board; phone tabs.
 
 ---
 

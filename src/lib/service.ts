@@ -69,6 +69,8 @@ import type {
   Outreach,
   PlanId,
   Run,
+  Task,
+  TaskStatus,
   ImportLeadRow,
   Workspace,
 } from "@/lib/types";
@@ -84,7 +86,16 @@ import {
   contactMethodsEqual,
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, hasPendingTask, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
+import {
+  appendJournalTaskLine,
+  backfillTasksFromJournal,
+  computeLeadWaitingOnUs,
+  patchFollowUpFromTask,
+  reconcileTasksForFollowUps,
+  removeFollowUpForTask,
+} from "@/lib/task-sync";
+import { leadWaitingOnUs } from "@/lib/tasks";
 import { LEAD_HYDRATE_LANES } from "@/lib/lead-lanes";
 import {
   companyGuessFromEmail,
@@ -2619,7 +2630,21 @@ export async function updateLeadCrm(
         };
       });
   }
-  next.waitingOnUs = hasPendingTask(next.followUps ?? lead.followUps);
+  const mergedFollowUps = next.followUps ?? lead.followUps;
+  if (fus) {
+    await reconcileTasksForFollowUps(
+      db,
+      { ...lead, followUps: mergedFollowUps },
+      mergedFollowUps,
+      { userId: ctx.userId, name: actorName },
+    );
+    const tasks = (await db.listTasks(lead.boardId)).filter(
+      (t) => t.leadId === leadId,
+    );
+    next.waitingOnUs = leadWaitingOnUs(mergedFollowUps, tasks);
+  } else if ("waitingOnUs" in patch) {
+    next.waitingOnUs = patch.waitingOnUs;
+  }
 
   return db.updateLead(leadId, next);
 }
@@ -3477,6 +3502,18 @@ export async function updateContact(
   }
   if (next.followUps) {
     next.followUps = next.followUps.map((f) => canonicalizeFollowUp(f));
+    await reconcileTasksForFollowUps(
+      found.db,
+      {
+        id: found.contact.id,
+        workspaceId: found.contact.workspaceId,
+        boardId: found.contact.boardId,
+        followUps: next.followUps,
+        contactId: found.contact.id,
+      },
+      next.followUps,
+      { userId: ctx.userId, name: ctx.userName },
+    );
   }
   return found.db.updateContact(contactId, next);
 }
@@ -3573,4 +3610,262 @@ export async function deleteLeadDocument(
   const doc = await found.db.getLeadDocument(docId);
   if (!doc || doc.leadId !== leadId) return false;
   return found.db.deleteLeadDocument(docId);
+}
+
+async function findTaskAccess(
+  ctx: Ctx,
+  taskId: string,
+): Promise<{ task: Task; db: LeadRepository } | null> {
+  const owned = await ctx.db.getTask(taskId);
+  if (owned) return { task: owned, db: ctx.db };
+  if (!ctx.userId) return null;
+  const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
+  for (const bid of sharedIds) {
+    const access = await resolveBoardAccess(ctx, bid);
+    if (!access) continue;
+    const found = await access.db.getTask(taskId);
+    if (found) return { task: found, db: access.db };
+  }
+  return null;
+}
+
+export async function listTasks(
+  ctx: Ctx,
+  boardId?: string | null,
+): Promise<Task[]> {
+  if (boardId && boardId !== "all") {
+    const access = await resolveBoardAccess(ctx, boardId);
+    if (!access) return [];
+    await backfillTasksFromJournal(access.db, boardId);
+    return access.db.listTasks(boardId);
+  }
+  await backfillTasksFromJournal(ctx.db);
+  const owned = await ctx.db.listTasks();
+  if (!ctx.userId) return owned;
+  const sharedIds = await ctx.db.listBoardIdsForMember(ctx.userId);
+  const extra: Task[] = [];
+  for (const bid of sharedIds) {
+    const access = await resolveBoardAccess(ctx, bid);
+    if (!access || access.board.workspaceId === ctx.workspaceId) continue;
+    await backfillTasksFromJournal(access.db, bid);
+    extra.push(...(await access.db.listTasks(bid)));
+  }
+  const byId = new Map<string, Task>();
+  for (const t of [...owned, ...extra]) byId.set(t.id, t);
+  return [...byId.values()].sort((a, b) => {
+    const byUpdated = b.updatedAt.localeCompare(a.updatedAt);
+    if (byUpdated !== 0) return byUpdated;
+    return b.id.localeCompare(a.id);
+  });
+}
+
+export async function createTask(
+  ctx: Ctx,
+  input: {
+    boardId: string | null;
+    title: string;
+    ownerUserId?: string | null;
+    ownerName?: string | null;
+    deadline?: string | null;
+    status?: TaskStatus;
+    leadId?: string | null;
+    contactId?: string | null;
+  },
+): Promise<Task> {
+  const title = input.title.trim();
+  if (!title) throw new Error("Title is required");
+
+  let db = ctx.db;
+  let workspaceId = ctx.workspaceId;
+  let boardId = input.boardId;
+
+  if (input.leadId) {
+    const leadAccess = await findLeadAccess(ctx, input.leadId);
+    if (!leadAccess) throw new NotFoundError("Lead not found");
+    await assertBoardEditable(ctx, leadAccess.lead.boardId);
+    db = leadAccess.db;
+    workspaceId = leadAccess.lead.workspaceId;
+    boardId = leadAccess.lead.boardId;
+  } else if (input.contactId) {
+    const contactAccess = await findContactAccess(ctx, input.contactId);
+    if (!contactAccess) throw new NotFoundError("Contact not found");
+    await assertBoardEditable(ctx, contactAccess.contact.boardId);
+    db = contactAccess.db;
+    workspaceId = contactAccess.contact.workspaceId;
+    boardId = contactAccess.contact.boardId;
+  } else if (boardId) {
+    const access = await resolveBoardAccess(ctx, boardId);
+    if (!access) throw new NotFoundError("Board not found");
+    await assertBoardEditable(ctx, access.board.id);
+    db = access.db;
+    workspaceId = access.board.workspaceId;
+  } else {
+    throw new Error("Pick a board or link a lead");
+  }
+
+  const now = nowIso();
+  const status = input.status ?? "todo";
+  const ownerName =
+    input.ownerName?.trim() ||
+    ctx.userName?.trim() ||
+    ctx.userEmail?.trim() ||
+    null;
+  const journalId = input.leadId || input.contactId ? newId("fu") : null;
+  const task: Task = {
+    id: newId("task"),
+    workspaceId,
+    boardId,
+    title,
+    ownerUserId: input.ownerUserId ?? ctx.userId ?? null,
+    ownerName,
+    deadline: input.deadline ?? null,
+    status,
+    leadId: input.leadId ?? null,
+    contactId: input.contactId ?? null,
+    journalFollowUpId: journalId,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const created = await db.createTask(task);
+
+  if (input.leadId) {
+    const lead = (await findLeadAccess(ctx, input.leadId))!.lead;
+    const followUps = appendJournalTaskLine(
+      lead.followUps ?? [],
+      created,
+      ownerName,
+    );
+    await updateLeadCrm(ctx, input.leadId, { followUps });
+    return (await findTaskAccess(ctx, created.id))?.task ?? created;
+  }
+  if (input.contactId) {
+    const contact = (await findContactAccess(ctx, input.contactId))!.contact;
+    const followUps = appendJournalTaskLine(
+      contact.followUps ?? [],
+      created,
+      ownerName,
+    );
+    await updateContact(ctx, input.contactId, { followUps });
+    return (await findTaskAccess(ctx, created.id))?.task ?? created;
+  }
+
+  return created;
+}
+
+export async function updateTask(
+  ctx: Ctx,
+  taskId: string,
+  patch: {
+    title?: string;
+    ownerUserId?: string | null;
+    ownerName?: string | null;
+    deadline?: string | null;
+    status?: TaskStatus;
+    leadId?: string | null;
+    contactId?: string | null;
+  },
+): Promise<Task | null> {
+  const found = await findTaskAccess(ctx, taskId);
+  if (!found) return null;
+  const boardId = found.task.boardId;
+  if (boardId) await assertBoardEditable(ctx, boardId);
+
+  const next: Partial<Task> = { ...patch, updatedAt: nowIso() };
+  if (next.title !== undefined) {
+    const title = next.title.trim();
+    if (!title) throw new Error("Title is required");
+    next.title = title;
+  }
+  if (next.ownerName !== undefined) {
+    next.ownerName = next.ownerName?.trim() || null;
+  }
+
+  const updated = await found.db.updateTask(taskId, next);
+  if (!updated) return null;
+
+  if (updated.leadId) {
+    const leadAccess = await findLeadAccess(ctx, updated.leadId);
+    if (leadAccess) {
+      const patched = patchFollowUpFromTask(
+        leadAccess.lead.followUps ?? [],
+        updated,
+      );
+      if (patched) {
+        const tasks = (await leadAccess.db.listTasks(leadAccess.lead.boardId)).filter(
+          (t) => t.leadId === updated.leadId,
+        );
+        await leadAccess.db.updateLead(updated.leadId, {
+          followUps: patched,
+          waitingOnUs: leadWaitingOnUs(patched, tasks),
+        });
+      } else {
+        const waiting = await computeLeadWaitingOnUs(leadAccess.db, {
+          id: updated.leadId,
+          followUps: leadAccess.lead.followUps,
+        });
+        await leadAccess.db.updateLead(updated.leadId, { waitingOnUs: waiting });
+      }
+    }
+  } else if (updated.contactId) {
+    const contactAccess = await findContactAccess(ctx, updated.contactId);
+    if (contactAccess) {
+      const patched = patchFollowUpFromTask(
+        contactAccess.contact.followUps ?? [],
+        updated,
+      );
+      if (patched) {
+        await contactAccess.db.updateContact(updated.contactId, {
+          followUps: patched,
+        });
+      }
+    }
+  }
+
+  return updated;
+}
+
+export async function deleteTask(
+  ctx: Ctx,
+  taskId: string,
+): Promise<boolean> {
+  const found = await findTaskAccess(ctx, taskId);
+  if (!found) return false;
+  if (found.task.boardId) {
+    await assertBoardEditable(ctx, found.task.boardId);
+  }
+
+  if (found.task.leadId) {
+    const leadAccess = await findLeadAccess(ctx, found.task.leadId);
+    if (leadAccess) {
+      const next = removeFollowUpForTask(
+        leadAccess.lead.followUps ?? [],
+        found.task,
+      );
+      if (next) {
+        const tasks = (await leadAccess.db.listTasks(leadAccess.lead.boardId)).filter(
+          (t) => t.leadId === found.task.leadId && t.id !== taskId,
+        );
+        await leadAccess.db.updateLead(found.task.leadId, {
+          followUps: next,
+          waitingOnUs: leadWaitingOnUs(next, tasks),
+        });
+      }
+    }
+  } else if (found.task.contactId) {
+    const contactAccess = await findContactAccess(ctx, found.task.contactId);
+    if (contactAccess) {
+      const next = removeFollowUpForTask(
+        contactAccess.contact.followUps ?? [],
+        found.task,
+      );
+      if (next) {
+        await contactAccess.db.updateContact(found.task.contactId, {
+          followUps: next,
+        });
+      }
+    }
+  }
+
+  return found.db.deleteTask(taskId);
 }

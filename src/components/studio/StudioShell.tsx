@@ -40,6 +40,7 @@ import { UsersIcon } from "@/components/lucide-animated/users";
 import { FolderKanbanIcon } from "@/components/lucide-animated/folder-kanban";
 import { MailboxIcon } from "@/components/lucide-animated/mailbox";
 import { CalendarDaysIcon } from "@/components/lucide-animated/calendar-days";
+import { ListChecksIcon } from "@/components/lucide-animated/list-checks";
 import { MessagesSquareIcon } from "@/components/lucide-animated/messages-square";
 import { ContactIcon } from "@/components/lucide-animated/contact";
 import { LayersIcon } from "@/components/lucide-animated/layers";
@@ -78,6 +79,8 @@ function studioViewTitle(settingsActive: boolean, displayView: string): string {
       return "Outreach";
     case "calendar":
       return "Calendar";
+    case "tasks":
+      return "Tasks";
     case "contacts":
       return "Collaborators";
     case "boards":
@@ -596,6 +599,12 @@ export function StudioShell({
           label: "Outreach",
           icon: MailboxIcon,
           active: onApp && displayView === "outreach",
+        },
+        {
+          href: "/app?view=tasks",
+          label: "Tasks",
+          icon: ListChecksIcon,
+          active: onApp && displayView === "tasks",
         },
         {
           href: "/app?view=calendar",

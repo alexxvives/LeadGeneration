@@ -55,7 +55,7 @@ Search  →  Enrich  →  Draft  →  Send
   when set). `/login` only redirects here (Auth.js `pages.signIn`). Unauth
   `/app` → `/?signin=1&callbackUrl=/app`.
 - **`/app` Studio** — the core app (behind login when auth is enforced). Nav
-  destinations: **Dashboard · Search · Leads · Pipeline · Conversations · Outreach · Calendar · Collaborators · Boards · Runs**.
+  destinations: **Dashboard · Search · Leads · Pipeline · Conversations · Outreach · Tasks · Calendar · Collaborators · Boards · Runs**.
   At **`lg+`** these live in the left sidebar; the board filter sits above the
   account card. **Below `lg`** the sidebar is hidden — a top bar opens a
   labeled overlay (ADR 0037) and the board pill sits in that bar. Settings
@@ -92,19 +92,26 @@ Search  →  Enrich  →  Draft  →  Send
     A **Missed call** stays in New but still shows the phone method icon
     (it does not count as Contacted). Contact channels: email, phone, contact
     form, Instagram, WhatsApp, Organic. Cards show an hourglass when an
-    undone **Task** is open (**Waiting on us**). Click the green **Task**
-    chip on the card (or the **Task** tag in lead info) to mark it done. Bounce is silent (address
+    open **Task** (`Task.status !== completed` or legacy undone journal task —
+    **Waiting on us**). Click the green **Task**
+    chip on the card (or the **Task** tag in lead info) to mark it done.
+    Click the violet **Follow-up** chip (or **Follow up** tag in the journal)
+    to mark a reminder done. Bounce is silent (address
     stripped; no Bounced chip).
 
-  - **Conversations** (`?view=conversations`) — in-conversation leads only.
-    Cards show name, city + country (not the street), pending follow-up,
-    and recent **notes** / **tasks** (follow-up reminders are omitted from
-    the preview).
+  - **Conversations** (`?view=conversations`) — in-conversation leads only,
+    sorted with open **Task** rows first, then **last contact** (newest on
+    top). Last contact is the latest journal touch or email send time and
+    shows bottom-left on the card (date, or date + time when a send
+    timestamp exists). Cards show name, city + country (not the street),
+    pending follow-up, and recent **notes** / **tasks** (follow-up
+    reminders are omitted from the preview).
     An hourglass on the title row means **Waiting on us** (an open task);
     a monitor icon
     means **Demo done**. Those bubbles sit beside the title **column**
-    (name + company + city), so they do not push location down. Created date sits bottom-left; a **Follow-up** tag
-    sits bottom-right when one is pending. Overflowing name / company / city ping-pong like a
+    (name + company + city), so they do not push location down. A clickable
+    **Follow-up** tag (like **Task**) sits bottom-right when one is pending.
+    Overflowing name / company / city ping-pong like a
     now-playing title. Location on the card is city + country only
     (`shortLocation` drops street, floor, and venue names). Click opens
     the lead drawer (**Add Task** in Notes; **Demo done** toggle on the
@@ -117,6 +124,15 @@ Search  →  Enrich  →  Draft  →  Send
     Table shows a short city label; the drawer keeps the full scraped address
     when available (or a Google search plan-B when no website). Map pins
     accumulate as the board hydrates; zoom/pan stay put until you change board.
+
+  - **Tasks** (`?view=tasks`) — workspace to-do list: standalone items or tasks
+    linked to a lead/collaborator. Four columns at `lg+` (TO DO · IN PROGRESS ·
+    ONGOING · COMPLETED); status tabs + one list below `lg`. **Add Task** in a
+    lead or collaborator drawer still writes the green journal line and creates
+    the matching `Task` row. Completing from the card, journal, Pipeline chip,
+    or Calendar stays in sync. Filters: All / Mine / Open / Overdue; studio
+    search filters by title, owner, or linked lead (clears when you leave the
+    view, like Calendar).
 
   - **Outreach** (`?view=outreach`) — send queue at `lg+` as three columns;
     below `lg` the same buckets are tabs (one list at a time): **Contact Draft** (email
@@ -136,12 +152,13 @@ Search  →  Enrich  →  Draft  →  Send
   - **Calendar** (`?view=calendar`) — month view of the active board filter.
     Month and year are custom glass menus (plus chevrons / Today). Note and
     follow-up dates use the same branded `DatePicker` — not the OS date
-    control. Each day lists **follow-ups** (dated reminders from **Follow up**),
-    **emails sent**, and **phone calls** logged that day — shown as calendar /
-    mail / phone icons **with counts** on the day cell. Sidebar group titles
-    (Follow-ups / Emails sent / Phone calls) show the same totals. The
-    studio search bar filters calendar events by lead (clears when you leave
-    the view). Contact follow-ups
+    control. Each day lists **follow-ups**, **tasks** (by deadline — amber
+    check mark), **emails sent**, and **phone calls** — icons **with counts**
+    on the day cell. Sidebar groups: Follow-ups / Tasks / Emails sent / Phone
+    calls. Task checkbox completes the row and syncs journal + `Task` status.
+    ONGOING tasks appear on the deadline day but do not paint the day rose when
+    overdue. The studio search bar filters events by lead/title (clears when
+    you leave the view). Contact follow-ups
     appear on the same grid. An open follow-up whose date is at
     least one day past fills that day square in **red** (same selected-day
     treatment, rose instead of aurora) — the calendar icon stays violet.

@@ -1,4 +1,4 @@
-import type { Contact, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
+import type { Contact, FollowUp, FollowUpKind, LeadWithOutreach, Task } from "@/lib/types";
 
 /** Local calendar day (YYYY-MM-DD), not UTC — follow-ups are “today” in the user’s timezone. */
 export function todayIsoDate(d = new Date()): string {
@@ -127,17 +127,13 @@ export function resolveFollowUpKind(fu: FollowUp): FollowUpKind {
     fu.kind === "note" ||
     fu.kind === "email" ||
     fu.kind === "phone" ||
-    fu.kind === "task"
+    fu.kind === "task" ||
+    fu.kind === "follow_up"
   ) {
     return fu.kind;
   }
-  // Explicit Follow up control: default copy, or a future date (composer +7d).
-  // Older drawer notes were stored as kind: follow_up — those are notes.
-  if (fu.kind === "follow_up") {
-    if (looksLikeFollowUpReminder(fu.note)) return "follow_up";
-    if (fu.date > todayIsoDate()) return "follow_up";
-    return "note";
-  }
+  if (looksLikeFollowUpReminder(fu.note)) return "follow_up";
+  if (fu.date > todayIsoDate()) return "follow_up";
   return "note";
 }
 
@@ -213,8 +209,24 @@ export function pendingTaskCount(followUps: FollowUp[] | undefined): number {
   );
 }
 
-export function hasPendingTask(followUps: FollowUp[] | undefined): boolean {
-  return pendingTaskCount(followUps) > 0;
+export function hasPendingTask(
+  followUps: FollowUp[] | undefined,
+  linkedTasks?: Task[],
+): boolean {
+  if (linkedTasks?.some((t) => t.status !== "completed")) return true;
+  const mirrored = new Set(
+    (linkedTasks ?? [])
+      .map((t) => t.journalFollowUpId)
+      .filter((id): id is string => !!id),
+  );
+  return (
+    followUps?.some(
+      (f) =>
+        isUserTask(f) &&
+        !followUpIsDone(f.done) &&
+        !mirrored.has(f.id),
+    ) ?? false
+  );
 }
 
 /** Mark the newest open task done. `null` if none are pending. */
@@ -228,6 +240,85 @@ export function markNewestPendingTaskDone(
   return followUps.map((f) =>
     f.id === open.id ? { ...f, done: true } : f,
   );
+}
+
+/** Mark the newest open follow-up reminder done. `null` if none are pending. */
+export function markNewestPendingFollowUpDone(
+  followUps: FollowUp[],
+): FollowUp[] | null {
+  const open = sortFollowUpsNewestFirst(followUps).find(
+    (f) => isUserFollowUp(f) && !followUpIsDone(f.done),
+  );
+  if (!open) return null;
+  return followUps.map((f) =>
+    f.id === open.id ? { ...f, done: true } : f,
+  );
+}
+
+function journalDateToMs(iso: string): number {
+  const d = new Date(`${iso}T23:59:59.999`);
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
+/** Sort key for “last touch” — journal lines + outbound send time. */
+export function lastContactTimestamp(
+  lead: Pick<LeadWithOutreach, "followUps" | "outreach" | "createdAt">,
+): { at: number; precision: "datetime" | "date" } {
+  let at = new Date(lead.createdAt).getTime();
+  let precision: "datetime" | "date" = Number.isNaN(at) ? "date" : "datetime";
+  if (Number.isNaN(at)) at = 0;
+
+  for (const fu of lead.followUps ?? []) {
+    const kind = resolveFollowUpKind(fu);
+    if (
+      kind !== "email" &&
+      kind !== "phone" &&
+      kind !== "note" &&
+      kind !== "follow_up" &&
+      kind !== "task"
+    ) {
+      continue;
+    }
+    const ms = journalDateToMs(fu.date);
+    if (ms > at) {
+      at = ms;
+      precision = "date";
+    }
+  }
+
+  const sent = lead.outreach?.sentAt;
+  if (sent) {
+    const ms = new Date(sent).getTime();
+    if (!Number.isNaN(ms) && ms > at) {
+      at = ms;
+      precision = "datetime";
+    }
+  }
+
+  return { at, precision };
+}
+
+/** Human label for the most recent contact on a conversation card. */
+export function formatLastContact(
+  lead: Pick<LeadWithOutreach, "followUps" | "outreach" | "createdAt">,
+): string {
+  const { at, precision } = lastContactTimestamp(lead);
+  if (!at) return "";
+  const d = new Date(at);
+  if (precision === "date") {
+    return d.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }
+  return d.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 const TITLE_RE = /^(dr|dra|mr|mrs|ms|miss|prof|sr|sra|srta)\.?$/i;
@@ -349,14 +440,17 @@ export function isOverdueFollowUp(
 
 export interface CalendarEvent {
   id: string;
-  source: "lead" | "contact";
+  source: "lead" | "contact" | "task";
   leadId: string;
   contactId?: string;
+  taskId?: string;
   company: string;
   date: string;
   note: string;
   done: boolean;
   kind: FollowUpKind;
+  /** Task row status when source === "task". */
+  taskStatus?: Task["status"];
 }
 
 export function calendarEventsFromLeads(
@@ -406,6 +500,89 @@ export function calendarEventsFromContacts(contacts: Contact[]): CalendarEvent[]
   return out;
 }
 
+export function calendarEventsFromTasks(
+  tasks: Task[],
+  leadLabels: Map<string, string>,
+  contactLabels: Map<string, string>,
+  mirroredJournalIds: ReadonlySet<string>,
+): CalendarEvent[] {
+  const out: CalendarEvent[] = [];
+  for (const task of tasks) {
+    if (!task.deadline) continue;
+    if (
+      task.journalFollowUpId &&
+      mirroredJournalIds.has(task.journalFollowUpId)
+    ) {
+      // Prefer Task entity — skip duplicate journal row.
+    }
+    const company =
+      (task.leadId && leadLabels.get(task.leadId)) ||
+      (task.contactId && contactLabels.get(task.contactId)) ||
+      "Task";
+    out.push({
+      id: task.id,
+      source: "task",
+      leadId: task.leadId ?? "",
+      contactId: task.contactId ?? undefined,
+      taskId: task.id,
+      company,
+      date: task.deadline,
+      note: task.title,
+      done: task.status === "completed",
+      kind: "task",
+      taskStatus: task.status,
+    });
+  }
+  return out;
+}
+
+/** Legacy journal tasks without a Task row — include once until backfilled. */
+export function calendarEventsFromLegacyJournalTasks(
+  leads: LeadWithOutreach[],
+  contacts: Contact[],
+  mirroredJournalIds: ReadonlySet<string>,
+): CalendarEvent[] {
+  const out: CalendarEvent[] = [];
+  for (const lead of leads) {
+    for (const fu of lead.followUps ?? []) {
+      const kind = resolveFollowUpKind(fu);
+      if (kind !== "task" || mirroredJournalIds.has(fu.id)) continue;
+      const canon = canonicalizeFollowUp(fu);
+      out.push({
+        id: canon.id,
+        source: "lead",
+        leadId: lead.id,
+        company: lead.company,
+        date: canon.date,
+        note: canon.note,
+        done: canon.done,
+        kind: "task",
+        taskStatus: canon.done ? "completed" : "todo",
+      });
+    }
+  }
+  for (const contact of contacts) {
+    for (const fu of contact.followUps ?? []) {
+      const kind = resolveFollowUpKind(fu);
+      if (kind !== "task" || mirroredJournalIds.has(fu.id)) continue;
+      const canon = canonicalizeFollowUp(fu);
+      out.push({
+        id: canon.id,
+        source: "contact",
+        leadId: "",
+        contactId: contact.id,
+        company: contact.name,
+        date: canon.date,
+        note: canon.note,
+        done: canon.done,
+        kind: "task",
+        taskStatus: canon.done ? "completed" : "todo",
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * Drop a second bare "Email sent" on the same day. Names live on authorName
  * now — do not rewrite the line to “Email sent by …”.
@@ -433,6 +610,14 @@ export function collapseEmailSentFollowUps(
  */
 function mergeFollowUpDone(cached: FollowUp, incoming: FollowUp): boolean {
   return followUpIsDone(cached.done) || followUpIsDone(incoming.done);
+}
+
+function mergeFollowUpKind(cached: FollowUp, incoming: FollowUp): FollowUpKind {
+  const ck = resolveFollowUpKind(cached);
+  const ik = resolveFollowUpKind(incoming);
+  if (ck === "follow_up" || ck === "task") return ck;
+  if (ik === "follow_up" || ik === "task") return ik;
+  return ik ?? ck;
 }
 
 /**
@@ -471,7 +656,13 @@ export function mergeFollowUpLists(
       const prev = cachedById.get(f.id);
       const canon = canonicalizeFollowUp(f);
       out.push(
-        prev ? { ...canon, done: mergeFollowUpDone(prev, canon) } : canon,
+        prev
+          ? {
+              ...canon,
+              done: mergeFollowUpDone(prev, canon),
+              kind: mergeFollowUpKind(prev, canon),
+            }
+          : canon,
       );
     }
     for (const f of cached) {
@@ -500,7 +691,7 @@ export function mergeFollowUpLists(
       ...cf,
       date: ic.date || cf.date,
       done: mergeFollowUpDone(cf, ic),
-      kind: ic.kind ?? cf.kind,
+      kind: mergeFollowUpKind(cf, ic),
       note,
       authorName: ic.authorName?.trim() || cf.authorName,
     });

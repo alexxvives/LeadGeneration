@@ -325,8 +325,9 @@ export function ContactDrawer({
 
   const toggleFollowUpDone = async (fu: FollowUp) => {
     if (!contact || editLocked) return;
+    const nextDone = !followUpIsDone(fu.done);
     const updated = (contact.followUps ?? []).map((f) =>
-      f.id === fu.id ? { ...f, done: !followUpIsDone(f.done) } : f,
+      f.id === fu.id ? { ...f, done: nextDone } : f,
     );
     await onUpdate(contact.id, { followUps: updated });
   };
