@@ -125,14 +125,14 @@ Search  →  Enrich  →  Draft  →  Send
     when available (or a Google search plan-B when no website). Map pins
     accumulate as the board hydrates; zoom/pan stay put until you change board.
 
-  - **Tasks** (`?view=tasks`) — workspace to-do list: standalone items or tasks
-    linked to a lead/collaborator. Four columns at `lg+` (TO DO · IN PROGRESS ·
-    ONGOING · COMPLETED); status tabs + one list below `lg`. **Add Task** in a
-    lead or collaborator drawer still writes the green journal line and creates
-    the matching `Task` row. Completing from the card, journal, Pipeline chip,
-    or Calendar stays in sync. Filters: All / Mine / Open / Overdue; studio
-    search filters by title, owner, or linked lead (clears when you leave the
-    view, like Calendar).
+  - **Tasks** (`?view=tasks`) — workspace to-do list. Four columns at `lg+`
+    (TO DO · IN PROGRESS · ONGOING · COMPLETED); status tabs + one list
+    below `lg`. **Add task** sits top-right of the studio header. Completing
+    from the card, journal, Pipeline chip, or Calendar stays in sync.
+    Filters (All / Mine / Open / Overdue) sit above the board. Studio search
+    filters by title or owner (clears when you leave the view, like Calendar).
+    **Add Task** in a lead or collaborator drawer still writes the green
+    journal line and creates the matching `Task` row.
 
   - **Outreach** (`?view=outreach`) — send queue at `lg+` as three columns;
     below `lg` the same buckets are tabs (one list at a time): **Contact Draft** (email

@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-20 — Tasks owner list includes you
+- Owner dropdown was built only from `board_members` (invited collaborators).
+  The workspace owner is not in that table, so alexx never appeared. Always
+  prepend the signed-in user (email local-part / session name). Tasks page
+  no longer shows or edits linked lead; Add task sits in the header top-right.
+
 ### 2026-09-19 — First-class Tasks (ADR 0039)
 - `tasks` table mirrors journal `kind: "task"` via `journalFollowUpId`; backfill
   on first `GET /api/tasks` from existing lead/contact follow-ups.

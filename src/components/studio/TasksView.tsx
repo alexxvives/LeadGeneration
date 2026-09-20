@@ -58,13 +58,11 @@ function StatusTabs({
 
 function TaskCard({
   task,
-  leadLabel,
   onOpen,
   onStatusChange,
   onDelete,
 }: {
   task: Task;
-  leadLabel?: string | null;
   onOpen: () => void;
   onStatusChange: (status: TaskStatus) => void;
   onDelete: () => void;
@@ -126,11 +124,6 @@ function TaskCard({
             {task.ownerName || "Unassigned"}
           </span>
         </div>
-        {leadLabel ? (
-          <span className="mt-2 inline-flex max-w-full truncate rounded-full border border-white/10 bg-ink-950/40 px-2 py-0.5 text-[11px] text-mist-400">
-            {leadLabel}
-          </span>
-        ) : null}
       </button>
       <div className="mt-3 flex items-center gap-2 border-t border-white/5 pt-3">
         <label className="sr-only" htmlFor={`task-status-${task.id}`}>
@@ -166,11 +159,18 @@ function TaskCard({
   );
 }
 
+function defaultOwnerKey(
+  owners: { userId: string | null; name: string }[],
+): string {
+  const me = owners[0];
+  if (!me) return "";
+  return me.userId ? `id:${me.userId}` : `name:${me.name}`;
+}
+
 function TaskEditSheet({
   open,
   task,
   owners,
-  leads,
   onClose,
   onSave,
   onDelete,
@@ -178,7 +178,6 @@ function TaskEditSheet({
   open: boolean;
   task: Partial<Task> | null;
   owners: { userId: string | null; name: string }[];
-  leads: LeadWithOutreach[];
   onClose: () => void;
   onSave: (input: {
     title: string;
@@ -186,7 +185,6 @@ function TaskEditSheet({
     ownerName: string | null;
     deadline: string | null;
     status: TaskStatus;
-    leadId: string | null;
   }) => Promise<void>;
   onDelete?: () => void;
 }) {
@@ -195,8 +193,6 @@ function TaskEditSheet({
   const [ownerKey, setOwnerKey] = useState("");
   const [deadline, setDeadline] = useState<string | null>(null);
   const [status, setStatus] = useState<TaskStatus>("todo");
-  const [leadId, setLeadId] = useState<string | null>(null);
-  const [leadQuery, setLeadQuery] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -204,23 +200,26 @@ function TaskEditSheet({
     setTitle(task?.title ?? "");
     const oid = task?.ownerUserId ?? "";
     const oname = task?.ownerName ?? "";
-    setOwnerKey(oid ? `id:${oid}` : oname ? `name:${oname}` : "");
+    if (task?.id) {
+      if (oid) {
+        const m = owners.find((o) => o.userId === oid);
+        setOwnerKey(m?.userId ? `id:${m.userId}` : `id:${oid}`);
+      } else if (oname) {
+        const m = owners.find(
+          (o) => o.name.toLowerCase() === oname.toLowerCase(),
+        );
+        setOwnerKey(
+          m ? (m.userId ? `id:${m.userId}` : `name:${m.name}`) : `name:${oname}`,
+        );
+      } else {
+        setOwnerKey("");
+      }
+    } else {
+      setOwnerKey(defaultOwnerKey(owners));
+    }
     setDeadline(task?.deadline ?? null);
     setStatus(task?.status ?? "todo");
-    setLeadId(task?.leadId ?? null);
-    setLeadQuery("");
-  }, [open, task]);
-
-  const leadOptions = useMemo(() => {
-    const q = leadQuery.trim().toLowerCase();
-    return leads
-      .filter((l) => {
-        if (!q) return true;
-        const blob = [l.company, l.contactName].filter(Boolean).join(" ").toLowerCase();
-        return blob.includes(q);
-      })
-      .slice(0, 8);
-  }, [leads, leadQuery]);
+  }, [open, task, owners]);
 
   if (!open) return null;
 
@@ -275,7 +274,6 @@ function TaskEditSheet({
               ...owner,
               deadline,
               status,
-              leadId,
             }).finally(() => setBusy(false));
           }}
         >
@@ -321,49 +319,6 @@ function TaskEditSheet({
             <span className="mb-2 block text-xs font-medium text-mist-400">Status</span>
             <StatusTabs value={status} onChange={setStatus} />
           </div>
-          <div>
-            <span className="text-xs font-medium text-mist-400">Linked lead</span>
-            <input
-              type="search"
-              value={leadQuery}
-              onChange={(e) => setLeadQuery(e.target.value)}
-              placeholder="Search company…"
-              className="mt-1 w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
-            />
-            {leadId ? (
-              <p className="mt-2 text-xs text-mist-400">
-                Linked:{" "}
-                {leads.find((l) => l.id === leadId)?.company ?? leadId}
-                <button
-                  type="button"
-                  className="ml-2 text-aurora-300 hover:underline"
-                  onClick={() => setLeadId(null)}
-                >
-                  Clear
-                </button>
-              </p>
-            ) : (
-              <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto">
-                {leadOptions.map((l) => (
-                  <li key={l.id}>
-                    <button
-                      type="button"
-                      className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-mist-200 hover:bg-white/5"
-                      onClick={() => {
-                        setLeadId(l.id);
-                        setLeadQuery("");
-                      }}
-                    >
-                      {l.company}
-                      {l.contactName ? (
-                        <span className="text-mist-500"> · {l.contactName}</span>
-                      ) : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
           <div className="mt-auto flex flex-wrap gap-2 border-t border-white/10 pt-4">
             {task?.id && onDelete ? (
               <Lockable>
@@ -399,10 +354,10 @@ export function TasksView({
   boards,
   filterBoardId,
   currentUserId,
+  currentUserName,
   members,
   searchQuery,
   onRefresh,
-  onOpenLead,
   onToast,
   addOpenSignal,
   onAddOpenConsumed,
@@ -412,10 +367,10 @@ export function TasksView({
   boards: BoardSummary[];
   filterBoardId: string | null;
   currentUserId: string | null;
+  currentUserName: string | null;
   members: BoardMember[];
   searchQuery: string;
   onRefresh: () => void;
-  onOpenLead: (leadId: string) => void;
   onToast: (
     kind: "ok" | "err",
     text: string,
@@ -431,29 +386,30 @@ export function TasksView({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
 
-  const leadLabel = (leadId: string | null) => {
-    if (!leadId) return null;
-    const l = leads.find((x) => x.id === leadId);
-    if (!l) return "Lead";
-    return l.contactName?.trim()
-      ? `${l.company} · ${l.contactName}`
-      : l.company;
-  };
-
   const owners = useMemo(() => {
     const seen = new Set<string>();
     const out: { userId: string | null; name: string }[] = [];
+    const push = (userId: string | null, name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const idKey = userId ? `id:${userId}` : "";
+      const nameKey = `name:${trimmed.toLowerCase()}`;
+      if (idKey && seen.has(idKey)) return;
+      if (seen.has(nameKey)) return;
+      if (idKey) seen.add(idKey);
+      seen.add(nameKey);
+      out.push({ userId, name: trimmed });
+    };
+    // Workspace owner is not in board_members — always include the signed-in user.
+    push(currentUserId, currentUserName?.trim() || "You");
     for (const m of members) {
-      const key = m.userId ?? m.email ?? "";
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      out.push({
-        userId: m.userId,
-        name: m.email?.split("@")[0] ?? "Member",
-      });
+      push(m.userId, m.email?.split("@")[0] ?? "Member");
+    }
+    for (const t of tasks) {
+      if (t.ownerName) push(t.ownerUserId, t.ownerName);
     }
     return out;
-  }, [members]);
+  }, [members, currentUserId, currentUserName, tasks]);
 
   const filtered = useMemo(() => {
     const labelFor = (leadId: string | null) => {
@@ -506,7 +462,6 @@ export function TasksView({
     ownerName: string | null;
     deadline: string | null;
     status: TaskStatus;
-    leadId: string | null;
   }) => {
     const { api } = await import("@/lib/client-api");
     try {
@@ -576,54 +531,40 @@ export function TasksView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <p className="text-sm text-mist-400">
-          {filtered.length === 0
-            ? "No tasks"
-            : `${filtered.length} task${filtered.length === 1 ? "" : "s"}`}
-        </p>
-        <div className="ml-auto flex flex-nowrap gap-1 overflow-x-auto rounded-full border border-white/10 bg-ink-900/40 p-1">
-          {filterTabs.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFilter(f.id)}
-              className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                filter === f.id
-                  ? "bg-aurora-400/20 text-aurora-200"
-                  : "text-mist-400 hover:text-mist-200"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <Lockable className="hidden lg:block">
-          <button
-            type="button"
-            onClick={openCreate}
-            className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
+      {tasks.length > 0 ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          <div
+            className="flex flex-nowrap gap-1 overflow-x-auto rounded-full border border-white/10 bg-ink-900/40 p-1"
+            role="group"
+            aria-label="Task filters"
           >
-            Add task
-          </button>
-        </Lockable>
-      </div>
+            {filterTabs.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                aria-pressed={filter === f.id}
+                onClick={() => setFilter(f.id)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
+                  filter === f.id
+                    ? "bg-aurora-400/20 text-aurora-200"
+                    : "text-mist-400 hover:text-mist-200"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm text-mist-400">
+            {filtered.length === 0
+              ? "No matches"
+              : `${filtered.length} task${filtered.length === 1 ? "" : "s"}`}
+          </p>
+        </div>
+      ) : null}
 
       {tasks.length === 0 ? (
         <div className="glass rounded-xl2 px-6 py-16 text-center">
           <p className="font-display text-xl font-semibold">No tasks yet</p>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-mist-400">
-            Track work across the workspace — standalone or linked to a lead.
-          </p>
-          <Lockable className="mt-6 inline-block">
-            <button
-              type="button"
-              onClick={openCreate}
-              className="rounded-full bg-aurora-400 px-6 py-2.5 text-sm font-medium text-on-accent disabled:opacity-50"
-            >
-              Add task
-            </button>
-          </Lockable>
         </div>
       ) : filtered.length === 0 ? (
         <div className="glass rounded-xl2 px-6 py-12 text-center">
@@ -648,11 +589,7 @@ export function TasksView({
                     <TaskCard
                       key={task.id}
                       task={task}
-                      leadLabel={leadLabel(task.leadId)}
-                      onOpen={() => {
-                        if (task.leadId) onOpenLead(task.leadId);
-                        else openEdit(task);
-                      }}
+                      onOpen={() => openEdit(task)}
                       onStatusChange={(s) => void patchStatus(task, s)}
                       onDelete={() => void handleDelete(task)}
                     />
@@ -687,11 +624,7 @@ export function TasksView({
                 <TaskCard
                   key={task.id}
                   task={task}
-                  leadLabel={leadLabel(task.leadId)}
-                  onOpen={() => {
-                    if (task.leadId) onOpenLead(task.leadId);
-                    else openEdit(task);
-                  }}
+                  onOpen={() => openEdit(task)}
                   onStatusChange={(s) => void patchStatus(task, s)}
                   onDelete={() => void handleDelete(task)}
                 />
@@ -705,7 +638,6 @@ export function TasksView({
         open={sheetOpen}
         task={editing}
         owners={owners}
-        leads={leads}
         onClose={() => setSheetOpen(false)}
         onSave={handleSave}
         onDelete={

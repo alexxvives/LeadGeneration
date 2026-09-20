@@ -2046,7 +2046,9 @@ export function Studio() {
   }, [tasks]);
 
   const currentUserId =
-    (session?.user as { id?: string } | undefined)?.id ?? null;
+    session?.userId ??
+    (session?.user as { id?: string } | undefined)?.id ??
+    null;
 
   const outreachCompanyTypes = useMemo(() => {
     const set = new Set<string>();
@@ -2173,7 +2175,7 @@ export function Studio() {
       view === "calendar" ||
       view === "tasks");
   const phoneHeader =
-    view === "boards" || view === "contacts" || view === "tasks";
+    view === "boards" || view === "contacts";
 
   // Skeleton for hydrate / first body / first visit to a layout tab only.
   const layoutPaneReady = visitedLayouts.has(shownLayoutTab);
@@ -2302,7 +2304,7 @@ export function Studio() {
           phoneHeader ? "mb-2 lg:mb-6" : "mb-0 lg:mb-6"
         }`}
       >
-        <div className="hidden min-w-0 lg:block">
+        <div className="hidden min-w-0 flex-1 lg:block">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-3xl font-semibold tracking-tight lg:text-4xl">
               {view === "dashboard"
@@ -2362,25 +2364,6 @@ export function Studio() {
                 </button>
               </Lockable>
             ) : null}
-            {view === "tasks" ? (
-              <Lockable>
-                <button
-                  type="button"
-                  disabled={editLocked || boards.length === 0}
-                  title={
-                    editLocked
-                      ? lockHint
-                      : boards.length === 0
-                        ? "Create a board first"
-                        : "Add task"
-                  }
-                  onClick={() => setTasksAddOpen(true)}
-                  className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
-                >
-                  Add task
-                </button>
-              </Lockable>
-            ) : null}
             {view === "leads" && hasLeads ? (
               <span className="inline-flex">
                 <ExportButton />
@@ -2410,7 +2393,7 @@ export function Studio() {
                         : view === "contacts"
                           ? "Collaborators on this board — notes and follow-ups land on Calendar."
                         : view === "tasks"
-                          ? "Workspace to-dos — standalone or linked to leads and collaborators."
+                          ? "Workspace to-dos — assign an owner and a deadline."
                       : view === "calendar"
                         ? "Follow-ups, tasks, emails sent, and phone calls — day by day."
                       : view === "runs"
@@ -2474,25 +2457,6 @@ export function Studio() {
                 </button>
               </Lockable>
             ) : null}
-            {view === "tasks" ? (
-              <Lockable className="self-start">
-                <button
-                  type="button"
-                  disabled={editLocked || boards.length === 0}
-                  title={
-                    editLocked
-                      ? lockHint
-                      : boards.length === 0
-                        ? "Create a board first"
-                        : "Add task"
-                  }
-                  onClick={() => setTasksAddOpen(true)}
-                  className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent disabled:opacity-50"
-                >
-                  Add task
-                </button>
-              </Lockable>
-            ) : null}
           </div>
         ) : null}
 
@@ -2552,6 +2516,25 @@ export function Studio() {
                 onChange={setOutreachTypeFilter}
               />
             </div>
+          ) : null}
+          {view === "tasks" ? (
+            <Lockable>
+              <button
+                type="button"
+                disabled={editLocked || boards.length === 0}
+                title={
+                  editLocked
+                    ? lockHint
+                    : boards.length === 0
+                      ? "Create a board first"
+                      : "Add task"
+                }
+                onClick={() => setTasksAddOpen(true)}
+                className="rounded-full bg-aurora-400 px-4 py-1.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] disabled:opacity-50"
+              >
+                Add task
+              </button>
+            </Lockable>
           ) : null}
         </div>
       </div>
@@ -2968,10 +2951,13 @@ export function Studio() {
               boards={board?.boards ?? boards}
               filterBoardId={filterBoardId}
               currentUserId={currentUserId}
+              currentUserName={
+                (session?.user?.email as string | undefined)?.split("@")[0] ||
+                actorName
+              }
               members={boardMembers}
               searchQuery={deferredLeadSearch}
               onRefresh={refreshTasks}
-              onOpenLead={openInfo}
               onToast={toast}
               addOpenSignal={tasksAddOpen}
               onAddOpenConsumed={() => setTasksAddOpen(false)}
