@@ -22,6 +22,7 @@ import type {
   Run,
   SearchStrategy,
   Task,
+  TaskAssignee,
   TaskStatus,
   WorkspaceSummary,
 } from "@/lib/types";
@@ -556,6 +557,7 @@ export const api = {
     title: string;
     ownerUserId?: string | null;
     ownerName?: string | null;
+    assignees?: TaskAssignee[];
     deadline?: string | null;
     status?: TaskStatus;
     leadId?: string | null;
@@ -572,6 +574,7 @@ export const api = {
       title?: string;
       ownerUserId?: string | null;
       ownerName?: string | null;
+      assignees?: TaskAssignee[];
       deadline?: string | null;
       status?: TaskStatus;
       leadId?: string | null;

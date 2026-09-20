@@ -18,6 +18,11 @@ import {
 } from "@/lib/types";
 import { parseContactMethods } from "@/lib/contact-methods";
 import { isContactRegisteredNote, canonicalizeFollowUp, hasPendingTask } from "@/lib/follow-ups";
+import {
+  parseAssigneesJson,
+  sanitizeAssignees,
+  syncOwnerFromAssignees,
+} from "@/lib/tasks";
 import { leadHydrateLane } from "@/lib/lead-lanes";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
@@ -123,13 +128,27 @@ function normalizeTask(t: Task): Task {
     status === "completed"
       ? status
       : "todo";
+  const assigneesRaw = Array.isArray(raw.assignees)
+    ? sanitizeAssignees(raw.assignees as Task["assignees"])
+    : parseAssigneesJson(
+        typeof raw.assigneesJson === "string" ? raw.assigneesJson : null,
+      );
+  const ownerUserId =
+    typeof raw.ownerUserId === "string" ? raw.ownerUserId : null;
+  const ownerName = typeof raw.ownerName === "string" ? raw.ownerName : null;
+  const assignees = assigneesRaw.length
+    ? assigneesRaw
+    : ownerName?.trim()
+      ? [{ userId: ownerUserId, name: ownerName.trim() }]
+      : [];
+  const owner = syncOwnerFromAssignees(assignees);
   return {
     ...t,
     boardId: typeof raw.boardId === "string" ? raw.boardId : null,
     title: typeof raw.title === "string" ? raw.title.trim() || "Task" : "Task",
-    ownerUserId:
-      typeof raw.ownerUserId === "string" ? raw.ownerUserId : null,
-    ownerName: typeof raw.ownerName === "string" ? raw.ownerName : null,
+    ownerUserId: owner.ownerUserId ?? ownerUserId,
+    ownerName: owner.ownerName ?? ownerName,
+    assignees,
     deadline: typeof raw.deadline === "string" ? raw.deadline : null,
     status: validStatus,
     leadId: typeof raw.leadId === "string" ? raw.leadId : null,

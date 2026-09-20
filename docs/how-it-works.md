@@ -126,13 +126,14 @@ Search  →  Enrich  →  Draft  →  Send
     accumulate as the board hydrates; zoom/pan stay put until you change board.
 
   - **Tasks** (`?view=tasks`) — workspace to-do list. Four columns at `lg+`
-    (TO DO · IN PROGRESS · ONGOING · COMPLETED); status tabs + one list
-    below `lg`. **Add task** sits top-right of the studio header. Completing
-    from the card, journal, Pipeline chip, or Calendar stays in sync.
-    Filters (All / Mine / Open / Overdue) sit above the board. Studio search
-    filters by title or owner (clears when you leave the view, like Calendar).
-    **Add Task** in a lead or collaborator drawer still writes the green
-    journal line and creates the matching `Task` row.
+    (TO DO · IN PROGRESS · ONGOING · COMPLETED); **drag** cards between columns
+    to change status. Status tabs + one list below `lg`. **Add task** sits
+    top-right of the studio header. Assign **multiple people** per task (default
+    Unassigned). Completing from the card, journal, Pipeline chip, or Calendar
+    stays in sync. Filters (All / Mine / Open / Overdue) sit above the board.
+    Studio search filters by title or assignee (clears when you leave the view,
+    like Calendar). **Add Task** in a lead or collaborator drawer still writes
+    the green journal line and creates the matching `Task` row.
 
   - **Outreach** (`?view=outreach`) — send queue at `lg+` as three columns;
     below `lg` the same buckets are tabs (one list at a time): **Contact Draft** (email

@@ -1,4 +1,4 @@
-import type { FollowUp, Task, TaskStatus } from "@/lib/types";
+import type { FollowUp, Task, TaskAssignee, TaskStatus } from "@/lib/types";
 import {
   followUpIsDone,
   isUserTask,
@@ -18,6 +18,86 @@ export function taskStatusLabel(status: TaskStatus): string {
   if (status === "in_progress") return "IN PROGRESS";
   if (status === "ongoing") return "ONGOING";
   return "COMPLETED";
+}
+
+export function assigneeKey(a: Pick<TaskAssignee, "userId" | "name">): string {
+  return a.userId ? `id:${a.userId}` : `name:${a.name}`;
+}
+
+export function sanitizeAssignees(raw: TaskAssignee[] | undefined): TaskAssignee[] {
+  if (!raw?.length) return [];
+  const seen = new Set<string>();
+  const out: TaskAssignee[] = [];
+  for (const a of raw) {
+    const name = a.name?.trim();
+    if (!name) continue;
+    const key = assigneeKey({ userId: a.userId ?? null, name });
+    const nameKey = `name:${name.toLowerCase()}`;
+    if (seen.has(key) || seen.has(nameKey)) continue;
+    seen.add(key);
+    seen.add(nameKey);
+    out.push({ userId: a.userId ?? null, name });
+  }
+  return out;
+}
+
+/** Resolve assignees from row fields (legacy single owner → one-item array). */
+export function taskAssignees(
+  task: Pick<Task, "assignees" | "ownerUserId" | "ownerName">,
+): TaskAssignee[] {
+  const fromArray = sanitizeAssignees(task.assignees);
+  if (fromArray.length) return fromArray;
+  const name = task.ownerName?.trim();
+  if (!name) return [];
+  return [{ userId: task.ownerUserId ?? null, name }];
+}
+
+export function syncOwnerFromAssignees(
+  assignees: TaskAssignee[],
+): { ownerUserId: string | null; ownerName: string | null } {
+  const first = assignees[0];
+  if (!first) return { ownerUserId: null, ownerName: null };
+  return { ownerUserId: first.userId, ownerName: first.name };
+}
+
+export function taskAssigneeSummary(
+  task: Pick<Task, "assignees" | "ownerUserId" | "ownerName">,
+): string {
+  const list = taskAssignees(task);
+  if (!list.length) return "Unassigned";
+  if (list.length === 1) return list[0]!.name;
+  return list.map((a) => a.name).join(", ");
+}
+
+export function taskAssignedToUser(
+  task: Pick<Task, "assignees" | "ownerUserId" | "ownerName">,
+  userId: string | null | undefined,
+): boolean {
+  if (!userId) return false;
+  return taskAssignees(task).some((a) => a.userId === userId);
+}
+
+export function parseAssigneesJson(raw: string | null | undefined): TaskAssignee[] {
+  if (!raw?.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return sanitizeAssignees(
+      parsed.map((item) => {
+        const row = item as Record<string, unknown>;
+        return {
+          userId: typeof row.userId === "string" ? row.userId : null,
+          name: typeof row.name === "string" ? row.name : "",
+        };
+      }),
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function assigneesToJson(assignees: TaskAssignee[]): string {
+  return JSON.stringify(sanitizeAssignees(assignees));
 }
 
 export function taskStatusFromFollowUp(fu: FollowUp): TaskStatus {
@@ -72,7 +152,7 @@ export function taskMatchesFilter(
   today = todayIsoDate(),
 ): boolean {
   if (filter === "mine") {
-    if (!currentUserId || task.ownerUserId !== currentUserId) return false;
+    if (!taskAssignedToUser(task, currentUserId)) return false;
   }
   if (filter === "open" && task.status === "completed") return false;
   if (
@@ -96,7 +176,7 @@ export function taskMatchesSearch(
   if (!q) return true;
   const blob = [
     task.title,
-    task.ownerName,
+    ...taskAssignees(task).map((a) => a.name),
     leadLabel,
   ]
     .filter(Boolean)

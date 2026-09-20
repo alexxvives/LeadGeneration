@@ -4,6 +4,18 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-20 — Multi-assignee tasks + kanban drag
+- `Task.assignees[]` stored as `assignees_json` on D1 (migration 0039); legacy
+  `owner_*` mirrors first assignee for journal sync.
+- New standalone tasks default to **Unassigned** until assignees are picked.
+- Desktop Tasks kanban uses `@dnd-kit` drag between status columns (Pipeline pattern).
+
+### 2026-09-20 — Tasks D1 migration + unassigned default
+- Prod D1 was missing `0038_tasks.sql` → `D1_ERROR: no such table: tasks` on
+  create. Applied via `npm run cf:migrate`.
+- `createTask` was auto-filling `ctx.userId`/email even when UI sent null owner;
+  standalone tasks now stay unassigned unless picked.
+
 ### 2026-09-20 — Tasks owner list includes you
 - Owner dropdown was built only from `board_members` (invited collaborators).
   The workspace owner is not in that table, so alexx never appeared. Always

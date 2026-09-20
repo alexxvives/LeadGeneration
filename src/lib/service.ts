@@ -70,6 +70,7 @@ import type {
   PlanId,
   Run,
   Task,
+  TaskAssignee,
   TaskStatus,
   ImportLeadRow,
   Workspace,
@@ -95,7 +96,7 @@ import {
   reconcileTasksForFollowUps,
   removeFollowUpForTask,
 } from "@/lib/task-sync";
-import { leadWaitingOnUs } from "@/lib/tasks";
+import { leadWaitingOnUs, sanitizeAssignees, syncOwnerFromAssignees } from "@/lib/tasks";
 import { LEAD_HYDRATE_LANES } from "@/lib/lead-lanes";
 import {
   companyGuessFromEmail,
@@ -3666,6 +3667,7 @@ export async function createTask(
     title: string;
     ownerUserId?: string | null;
     ownerName?: string | null;
+    assignees?: TaskAssignee[];
     deadline?: string | null;
     status?: TaskStatus;
     leadId?: string | null;
@@ -3705,19 +3707,18 @@ export async function createTask(
 
   const now = nowIso();
   const status = input.status ?? "todo";
-  const ownerName =
-    input.ownerName?.trim() ||
-    ctx.userName?.trim() ||
-    ctx.userEmail?.trim() ||
-    null;
+  const fromJournal = !!(input.leadId || input.contactId);
+  const assignees = resolveTaskAssignees(input, ctx, fromJournal);
+  const { ownerUserId, ownerName } = syncOwnerFromAssignees(assignees);
   const journalId = input.leadId || input.contactId ? newId("fu") : null;
   const task: Task = {
     id: newId("task"),
     workspaceId,
     boardId,
     title,
-    ownerUserId: input.ownerUserId ?? ctx.userId ?? null,
+    ownerUserId,
     ownerName,
+    assignees,
     deadline: input.deadline ?? null,
     status,
     leadId: input.leadId ?? null,
@@ -3753,6 +3754,32 @@ export async function createTask(
   return created;
 }
 
+function resolveTaskAssignees(
+  input: {
+    assignees?: TaskAssignee[];
+    ownerUserId?: string | null;
+    ownerName?: string | null;
+  },
+  ctx: Ctx,
+  fromJournal: boolean,
+): TaskAssignee[] {
+  if (input.assignees !== undefined) {
+    return sanitizeAssignees(input.assignees);
+  }
+  if (input.ownerUserId !== undefined || input.ownerName !== undefined) {
+    const name = input.ownerName?.trim();
+    if (!name && !input.ownerUserId) return [];
+    return [{ userId: input.ownerUserId ?? null, name: name || "Member" }];
+  }
+  if (fromJournal) {
+    const name =
+      ctx.userName?.trim() || ctx.userEmail?.split("@")[0]?.trim() || null;
+    if (!name && !ctx.userId) return [];
+    return [{ userId: ctx.userId ?? null, name: name || "You" }];
+  }
+  return [];
+}
+
 export async function updateTask(
   ctx: Ctx,
   taskId: string,
@@ -3760,6 +3787,7 @@ export async function updateTask(
     title?: string;
     ownerUserId?: string | null;
     ownerName?: string | null;
+    assignees?: TaskAssignee[];
     deadline?: string | null;
     status?: TaskStatus;
     leadId?: string | null;
@@ -3777,8 +3805,22 @@ export async function updateTask(
     if (!title) throw new Error("Title is required");
     next.title = title;
   }
-  if (next.ownerName !== undefined) {
+  if (next.assignees !== undefined) {
+    next.assignees = sanitizeAssignees(next.assignees);
+    const synced = syncOwnerFromAssignees(next.assignees);
+    next.ownerUserId = synced.ownerUserId;
+    next.ownerName = synced.ownerName;
+  } else if (next.ownerName !== undefined || next.ownerUserId !== undefined) {
     next.ownerName = next.ownerName?.trim() || null;
+    if (next.ownerName || next.ownerUserId) {
+      next.assignees = [
+        { userId: next.ownerUserId ?? null, name: next.ownerName || "Member" },
+      ];
+    } else {
+      next.assignees = [];
+      next.ownerUserId = null;
+      next.ownerName = null;
+    }
   }
 
   const updated = await found.db.updateTask(taskId, next);

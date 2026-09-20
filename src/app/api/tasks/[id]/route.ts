@@ -7,10 +7,16 @@ import { isBoardLockedError, isNotFoundError } from "@/lib/errors";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const AssigneeSchema = z.object({
+  userId: z.string().max(80).nullable(),
+  name: z.string().min(1).max(120),
+});
+
 const PatchSchema = z.object({
   title: z.string().min(1).max(300).optional(),
   ownerUserId: z.string().max(80).nullable().optional(),
   ownerName: z.string().max(120).nullable().optional(),
+  assignees: z.array(AssigneeSchema).max(20).optional(),
   deadline: z.string().max(20).nullable().optional(),
   status: z
     .enum(["todo", "in_progress", "ongoing", "completed"])

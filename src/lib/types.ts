@@ -469,14 +469,22 @@ export interface Contact {
 /** Workspace to-do status — mirrors journal `done` when linked via `journalFollowUpId`. */
 export type TaskStatus = "todo" | "in_progress" | "ongoing" | "completed";
 
+/** Person assigned to a task (workspace owner or invited collaborator). */
+export interface TaskAssignee {
+  userId: string | null;
+  name: string;
+}
+
 /** First-class task row — unified with journal `kind: "task"` (ADR 0039). */
 export interface Task {
   id: string;
   workspaceId: string;
   boardId: string | null;
   title: string;
+  /** First assignee — kept for journal mirror + legacy reads. */
   ownerUserId: string | null;
   ownerName: string | null;
+  assignees: TaskAssignee[];
   deadline: string | null;
   status: TaskStatus;
   leadId: string | null;

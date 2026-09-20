@@ -9,21 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-20 (Tasks owner + chrome)
+## ⏱️ Status — updated 2026-09-20 (Multi-assignee tasks + DnD)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0038** (`0038_tasks.sql` — apply on prod D1 before deploy).  
-**Deploy:** push to master for CI / Workers deploy.
+**Migrations:** 0021–**0039** (`0039_task_assignees.sql` applied on prod D1).  
+**Deploy:** push to master for CI / Workers deploy (code still needs deploy).
 
 ### This pass
-- Tasks owner dropdown always includes the signed-in user (workspace owner is
-  not in `board_members`).
-- Removed linked-lead field/chip from the Tasks page; Add task is header
-  top-right; filters sit above the board (no duplicate Add in the toolbar).
+- Tasks support **multiple assignees** (`assignees_json` on D1); default is
+  **Unassigned** for new standalone tasks.
+- Desktop kanban: **drag cards** between status columns to update status.
 
 ### Next
-1. Run `npm run cf:migrate` for `0038_tasks.sql` on prod D1 if not yet applied.
-2. Hard-refresh: Add task → you appear in Owner; filters left, count right.
+1. Deploy latest master so multi-assignee + DnD code is live on Workers.
+2. Hard-refresh Tasks → Add task (Unassigned default) → pick multiple assignees;
+   drag card TO DO → IN PROGRESS on desktop.
 
 ---
 

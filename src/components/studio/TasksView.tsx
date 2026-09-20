@@ -1,16 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type {
   BoardMember,
   BoardSummary,
   LeadWithOutreach,
   Task,
+  TaskAssignee,
   TaskStatus,
 } from "@/lib/types";
 import {
   TASK_STATUSES,
+  assigneeKey,
   formatTaskDeadline,
+  taskAssigneeSummary,
+  taskAssignees,
   taskMatchesFilter,
   taskMatchesSearch,
   taskStatusLabel,
@@ -56,7 +73,36 @@ function StatusTabs({
   );
 }
 
-function TaskCard({
+function AssigneeRow({ task }: { task: Task }) {
+  const list = taskAssignees(task);
+  if (!list.length) {
+    return (
+      <div className="mt-3 flex items-center gap-2">
+        <span
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/5 text-[10px] text-mist-500"
+          aria-hidden
+        >
+          —
+        </span>
+        <span className="truncate text-xs text-mist-500">Unassigned</span>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 flex items-center gap-2">
+      <div className="flex shrink-0 -space-x-1.5">
+        {list.slice(0, 3).map((a) => (
+          <AuthorAvatar key={assigneeKey(a)} name={a.name} size="sm" />
+        ))}
+      </div>
+      <span className="truncate text-xs text-mist-500">
+        {taskAssigneeSummary(task)}
+      </span>
+    </div>
+  );
+}
+
+function TaskCardFace({
   task,
   onOpen,
   onStatusChange,
@@ -109,21 +155,7 @@ function TaskCard({
         >
           {task.title}
         </h3>
-        <div className="mt-3 flex items-center gap-2">
-          {task.ownerName ? (
-            <AuthorAvatar name={task.ownerName} size="sm" />
-          ) : (
-            <span
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/5 text-[10px] text-mist-500"
-              aria-hidden
-            >
-              —
-            </span>
-          )}
-          <span className="truncate text-xs text-mist-500">
-            {task.ownerName || "Unassigned"}
-          </span>
-        </div>
+        <AssigneeRow task={task} />
       </button>
       <div className="mt-3 flex items-center gap-2 border-t border-white/5 pt-3">
         <label className="sr-only" htmlFor={`task-status-${task.id}`}>
@@ -139,7 +171,9 @@ function TaskCard({
             className="select-glass min-w-0 flex-1 rounded-lg border border-white/10 bg-ink-900/60 px-2 py-1.5 text-xs text-mist-100 disabled:opacity-50"
           >
             {TASK_STATUSES.map((s) => (
-              <option key={s} value={s}>{taskStatusLabel(s)}</option>
+              <option key={s} value={s}>
+                {taskStatusLabel(s)}
+              </option>
             ))}
           </select>
         </Lockable>
@@ -159,12 +193,91 @@ function TaskCard({
   );
 }
 
-function defaultOwnerKey(
-  owners: { userId: string | null; name: string }[],
-): string {
-  const me = owners[0];
-  if (!me) return "";
-  return me.userId ? `id:${me.userId}` : `name:${me.name}`;
+function DraggableTaskCard({
+  task,
+  onOpen,
+  onStatusChange,
+  onDelete,
+  isDragging,
+}: {
+  task: Task;
+  onOpen: () => void;
+  onStatusChange: (status: TaskStatus) => void;
+  onDelete: () => void;
+  isDragging: boolean;
+}) {
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: task.id,
+    disabled: editLocked,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...(editLocked ? {} : listeners)}
+      title={editLocked ? lockHint : undefined}
+      className={`${
+        editLocked
+          ? "cursor-not-allowed"
+          : "cursor-grab touch-pan-y active:cursor-grabbing"
+      } ${isDragging ? "opacity-30" : ""}`}
+    >
+      <TaskCardFace
+        task={task}
+        onOpen={onOpen}
+        onStatusChange={onStatusChange}
+        onDelete={onDelete}
+      />
+    </div>
+  );
+}
+
+function TaskStatusColumn({
+  status,
+  tasks,
+  activeId,
+  onOpen,
+  onStatusChange,
+  onDelete,
+}: {
+  status: TaskStatus;
+  tasks: Task[];
+  activeId: string | null;
+  onOpen: (task: Task) => void;
+  onStatusChange: (task: Task, status: TaskStatus) => void;
+  onDelete: (task: Task) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
+
+  return (
+    <section
+      ref={setNodeRef}
+      className={`flex min-h-0 flex-col rounded-xl2 border transition-colors ${
+        isOver
+          ? "border-aurora-400/40 bg-aurora-400/5"
+          : "border-white/5 bg-ink-950/30"
+      }`}
+    >
+      <h3 className="shrink-0 border-b border-white/5 px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-mist-500">
+        {taskStatusLabel(status)}
+        <span className="ml-1 tabular-nums text-mist-400">{tasks.length}</span>
+      </h3>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+        {tasks.map((task) => (
+          <DraggableTaskCard
+            key={task.id}
+            task={task}
+            isDragging={activeId === task.id}
+            onOpen={() => onOpen(task)}
+            onStatusChange={(s) => onStatusChange(task, s)}
+            onDelete={() => onDelete(task)}
+          />
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function TaskEditSheet({
@@ -181,8 +294,7 @@ function TaskEditSheet({
   onClose: () => void;
   onSave: (input: {
     title: string;
-    ownerUserId: string | null;
-    ownerName: string | null;
+    assignees: TaskAssignee[];
     deadline: string | null;
     status: TaskStatus;
   }) => Promise<void>;
@@ -190,7 +302,7 @@ function TaskEditSheet({
 }) {
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const [title, setTitle] = useState("");
-  const [ownerKey, setOwnerKey] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [deadline, setDeadline] = useState<string | null>(null);
   const [status, setStatus] = useState<TaskStatus>("todo");
   const [busy, setBusy] = useState(false);
@@ -198,43 +310,32 @@ function TaskEditSheet({
   useEffect(() => {
     if (!open) return;
     setTitle(task?.title ?? "");
-    const oid = task?.ownerUserId ?? "";
-    const oname = task?.ownerName ?? "";
     if (task?.id) {
-      if (oid) {
-        const m = owners.find((o) => o.userId === oid);
-        setOwnerKey(m?.userId ? `id:${m.userId}` : `id:${oid}`);
-      } else if (oname) {
-        const m = owners.find(
-          (o) => o.name.toLowerCase() === oname.toLowerCase(),
-        );
-        setOwnerKey(
-          m ? (m.userId ? `id:${m.userId}` : `name:${m.name}`) : `name:${oname}`,
-        );
-      } else {
-        setOwnerKey("");
-      }
+      setSelectedKeys(
+        new Set(taskAssignees(task as Task).map((a) => assigneeKey(a))),
+      );
     } else {
-      setOwnerKey(defaultOwnerKey(owners));
+      setSelectedKeys(new Set());
     }
     setDeadline(task?.deadline ?? null);
     setStatus(task?.status ?? "todo");
-  }, [open, task, owners]);
+  }, [open, task]);
 
   if (!open) return null;
 
-  const ownerFromKey = () => {
-    if (!ownerKey) return { ownerUserId: null, ownerName: null };
-    if (ownerKey.startsWith("id:")) {
-      const id = ownerKey.slice(3);
-      const m = owners.find((o) => o.userId === id);
-      return { ownerUserId: id, ownerName: m?.name ?? null };
-    }
-    if (ownerKey.startsWith("name:")) {
-      return { ownerUserId: null, ownerName: ownerKey.slice(5) };
-    }
-    return { ownerUserId: null, ownerName: null };
+  const toggleAssignee = (key: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
+
+  const assigneesFromSelection = (): TaskAssignee[] =>
+    owners
+      .filter((o) => selectedKeys.has(assigneeKey(o)))
+      .map((o) => ({ userId: o.userId, name: o.name }));
 
   return (
     <div className="fixed inset-0 z-[200] flex items-stretch justify-end bg-ink-950/70 backdrop-blur-sm md:items-center md:justify-center md:p-6">
@@ -268,10 +369,9 @@ function TaskEditSheet({
             e.preventDefault();
             if (editLocked || !title.trim()) return;
             setBusy(true);
-            const owner = ownerFromKey();
             void onSave({
               title: title.trim(),
-              ...owner,
+              assignees: assigneesFromSelection(),
               deadline,
               status,
             }).finally(() => setBusy(false));
@@ -288,24 +388,37 @@ function TaskEditSheet({
               placeholder="What needs doing?"
             />
           </label>
-          <label className="block">
-            <span className="text-xs font-medium text-mist-400">Owner</span>
-            <select
-              value={ownerKey}
-              onChange={(e) => setOwnerKey(e.target.value)}
-              className="select-glass mt-1 w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2.5 text-sm text-mist-100"
-            >
-              <option value="">Unassigned</option>
-              {owners.map((o) => (
-                <option
-                  key={o.userId ?? o.name}
-                  value={o.userId ? `id:${o.userId}` : `name:${o.name}`}
-                >
-                  {o.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <fieldset>
+            <legend className="text-xs font-medium text-mist-400">
+              Assignees
+            </legend>
+            <p className="mt-0.5 text-[11px] text-mist-500">
+              {selectedKeys.size === 0
+                ? "Unassigned — pick one or more people."
+                : `${selectedKeys.size} selected`}
+            </p>
+            <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-ink-900/60 p-2">
+              {owners.map((o) => {
+                const key = assigneeKey(o);
+                const checked = selectedKeys.has(key);
+                return (
+                  <label
+                    key={key}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleAssignee(key)}
+                      className="rounded border-white/20 bg-ink-950 text-aurora-400"
+                    />
+                    <AuthorAvatar name={o.name} size="sm" />
+                    <span className="text-sm text-mist-200">{o.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
           <div>
             <span className="text-xs font-medium text-mist-400">Deadline</span>
             <div className="mt-1">
@@ -381,10 +494,18 @@ export function TasksView({
   addOpenSignal?: boolean;
   onAddOpenConsumed?: () => void;
 }) {
+  const { locked: editLocked } = useBoardLockUi();
   const [filter, setFilter] = useState<TaskFilter>("all");
   const [mobileStatus, setMobileStatus] = useState<TaskStatus>("todo");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const dragStartedRef = useRef(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const owners = useMemo(() => {
     const seen = new Set<string>();
@@ -400,13 +521,14 @@ export function TasksView({
       seen.add(nameKey);
       out.push({ userId, name: trimmed });
     };
-    // Workspace owner is not in board_members — always include the signed-in user.
     push(currentUserId, currentUserName?.trim() || "You");
     for (const m of members) {
       push(m.userId, m.email?.split("@")[0] ?? "Member");
     }
     for (const t of tasks) {
-      if (t.ownerName) push(t.ownerUserId, t.ownerName);
+      for (const a of taskAssignees(t)) {
+        push(a.userId, a.name);
+      }
     }
     return out;
   }, [members, currentUserId, currentUserName, tasks]);
@@ -437,6 +559,8 @@ export function TasksView({
     return map;
   }, [filtered]);
 
+  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
+
   const openCreate = () => {
     setEditing(null);
     setSheetOpen(true);
@@ -449,17 +573,16 @@ export function TasksView({
   }, [addOpenSignal, onAddOpenConsumed]);
 
   const openEdit = (task: Task) => {
+    if (dragStartedRef.current) return;
     setEditing(task);
     setSheetOpen(true);
   };
 
-  const defaultBoardId =
-    filterBoardId ?? boards[0]?.id ?? null;
+  const defaultBoardId = filterBoardId ?? boards[0]?.id ?? null;
 
   const handleSave = async (input: {
     title: string;
-    ownerUserId: string | null;
-    ownerName: string | null;
+    assignees: TaskAssignee[];
     deadline: string | null;
     status: TaskStatus;
   }) => {
@@ -495,8 +618,7 @@ export function TasksView({
             .createTask({
               boardId: snapshot.boardId,
               title: snapshot.title,
-              ownerUserId: snapshot.ownerUserId,
-              ownerName: snapshot.ownerName,
+              assignees: taskAssignees(snapshot),
               deadline: snapshot.deadline,
               status: snapshot.status,
               leadId: snapshot.leadId,
@@ -513,6 +635,7 @@ export function TasksView({
   };
 
   const patchStatus = async (task: Task, status: TaskStatus) => {
+    if (task.status === status) return;
     const { api } = await import("@/lib/client-api");
     try {
       await api.updateTask(task.id, { status });
@@ -520,6 +643,28 @@ export function TasksView({
     } catch (e) {
       onToast("err", (e as Error).message);
     }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    if (editLocked) return;
+    dragStartedRef.current = true;
+    setActiveId(String(event.active.id));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
+    window.setTimeout(() => {
+      dragStartedRef.current = false;
+    }, 0);
+    if (editLocked) return;
+    const { active, over } = event;
+    if (!over) return;
+    const task = tasks.find((t) => t.id === active.id);
+    const newStatus = String(over.id) as TaskStatus;
+    if (!task || !TASK_STATUSES.includes(newStatus) || task.status === newStatus) {
+      return;
+    }
+    void patchStatus(task, newStatus);
   };
 
   const filterTabs: { id: TaskFilter; label: string }[] = [
@@ -558,6 +703,12 @@ export function TasksView({
             {filtered.length === 0
               ? "No matches"
               : `${filtered.length} task${filtered.length === 1 ? "" : "s"}`}
+            {editLocked ? null : (
+              <span className="hidden lg:inline text-mist-500">
+                {" "}
+                · drag to change status
+              </span>
+            )}
           </p>
         </div>
       ) : null}
@@ -572,32 +723,37 @@ export function TasksView({
         </div>
       ) : (
         <>
-          <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-cols-4 lg:overflow-hidden">
-            {TASK_STATUSES.map((status) => (
-              <section
-                key={status}
-                className="flex min-h-0 flex-col rounded-xl2 border border-white/5 bg-ink-950/30"
-              >
-                <h3 className="shrink-0 border-b border-white/5 px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-mist-500">
-                  {taskStatusLabel(status)}
-                  <span className="ml-1 tabular-nums text-mist-400">
-                    {byStatus[status].length}
-                  </span>
-                </h3>
-                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-                  {byStatus[status].map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onOpen={() => openEdit(task)}
-                      onStatusChange={(s) => void patchStatus(task, s)}
-                      onDelete={() => void handleDelete(task)}
-                    />
-                  ))}
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-cols-4 lg:overflow-hidden">
+              {TASK_STATUSES.map((status) => (
+                <TaskStatusColumn
+                  key={status}
+                  status={status}
+                  tasks={byStatus[status]}
+                  activeId={activeId}
+                  onOpen={openEdit}
+                  onStatusChange={(task, s) => void patchStatus(task, s)}
+                  onDelete={(task) => void handleDelete(task)}
+                />
+              ))}
+            </div>
+            <DragOverlay>
+              {activeTask ? (
+                <div className="w-64 rotate-2 cursor-grabbing opacity-95">
+                  <TaskCardFace
+                    task={activeTask}
+                    onOpen={() => undefined}
+                    onStatusChange={() => undefined}
+                    onDelete={() => undefined}
+                  />
                 </div>
-              </section>
-            ))}
-          </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
 
           <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
             <div className="flex flex-nowrap gap-1 overflow-x-auto pb-1">
@@ -621,7 +777,7 @@ export function TasksView({
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-4">
               {byStatus[mobileStatus].map((task) => (
-                <TaskCard
+                <TaskCardFace
                   key={task.id}
                   task={task}
                   onOpen={() => openEdit(task)}
@@ -641,9 +797,7 @@ export function TasksView({
         onClose={() => setSheetOpen(false)}
         onSave={handleSave}
         onDelete={
-          editing?.id
-            ? () => void handleDelete(editing)
-            : undefined
+          editing?.id ? () => void handleDelete(editing) : undefined
         }
       />
     </div>

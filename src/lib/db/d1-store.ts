@@ -23,6 +23,11 @@ import {
 } from "@/lib/contact-methods";
 import { hydrateLaneSql } from "@/lib/lead-lanes";
 import { isContactRegisteredNote, canonicalizeFollowUp, hasPendingTask } from "@/lib/follow-ups";
+import {
+  assigneesToJson,
+  parseAssigneesJson,
+  syncOwnerFromAssignees,
+} from "@/lib/tasks";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
 
@@ -208,6 +213,7 @@ type TaskRow = {
   title: string;
   owner_user_id: string | null;
   owner_name: string | null;
+  assignees_json: string | null;
   deadline: string | null;
   status: string;
   lead_id: string | null;
@@ -230,13 +236,19 @@ function parseTaskStatus(raw: string): TaskStatus {
 }
 
 function rowToTask(r: TaskRow): Task {
+  let assignees = parseAssigneesJson(r.assignees_json);
+  if (!assignees.length && r.owner_name?.trim()) {
+    assignees = [{ userId: r.owner_user_id, name: r.owner_name.trim() }];
+  }
+  const owner = syncOwnerFromAssignees(assignees);
   return {
     id: r.id,
     workspaceId: r.workspace_id ?? LOCAL_WORKSPACE_ID,
     boardId: r.board_id,
     title: r.title,
-    ownerUserId: r.owner_user_id,
-    ownerName: r.owner_name,
+    ownerUserId: owner.ownerUserId ?? r.owner_user_id,
+    ownerName: owner.ownerName ?? r.owner_name,
+    assignees,
     deadline: r.deadline,
     status: parseTaskStatus(r.status),
     leadId: r.lead_id,
@@ -1518,12 +1530,13 @@ export class D1Store implements LeadRepository {
   }
 
   async createTask(task: Task): Promise<Task> {
+    const assigneesJson = assigneesToJson(task.assignees ?? []);
     await this.db
       .prepare(
         `INSERT INTO tasks
-         (id, workspace_id, board_id, title, owner_user_id, owner_name, deadline,
-          status, lead_id, contact_id, journal_follow_up_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, workspace_id, board_id, title, owner_user_id, owner_name, assignees_json,
+          deadline, status, lead_id, contact_id, journal_follow_up_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         task.id,
@@ -1532,6 +1545,7 @@ export class D1Store implements LeadRepository {
         task.title,
         task.ownerUserId,
         task.ownerName,
+        assigneesJson,
         task.deadline,
         task.status,
         task.leadId,
@@ -1550,6 +1564,9 @@ export class D1Store implements LeadRepository {
     if ("title" in patch) row.title = patch.title;
     if ("ownerUserId" in patch) row.owner_user_id = patch.ownerUserId ?? null;
     if ("ownerName" in patch) row.owner_name = patch.ownerName ?? null;
+    if ("assignees" in patch) {
+      row.assignees_json = assigneesToJson(patch.assignees ?? []);
+    }
     if ("deadline" in patch) row.deadline = patch.deadline ?? null;
     if ("status" in patch) row.status = patch.status;
     if ("leadId" in patch) row.lead_id = patch.leadId ?? null;

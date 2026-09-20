@@ -1,6 +1,6 @@
 import type { LeadRepository } from "@/lib/db";
 import { newId, nowIso } from "@/lib/id";
-import type { Contact, FollowUp, Lead, Task, TaskStatus } from "@/lib/types";
+import type { Contact, FollowUp, Lead, Task, TaskAssignee, TaskStatus } from "@/lib/types";
 import {
   canonicalizeFollowUp,
   followUpIsDone,
@@ -12,6 +12,7 @@ import {
   followUpDoneFromTaskStatus,
   leadWaitingOnUs,
   taskStatusFromFollowUp,
+  syncOwnerFromAssignees,
 } from "@/lib/tasks";
 
 export function taskFromFollowUp(
@@ -26,13 +27,20 @@ export function taskFromFollowUp(
   },
 ): Task {
   const now = nowIso();
+  const name = fu.authorName?.trim() || ctx.ownerName?.trim() || null;
+  const assignees: TaskAssignee[] =
+    name || ctx.ownerUserId
+      ? [{ userId: ctx.ownerUserId ?? null, name: name || "Member" }]
+      : [];
+  const owner = syncOwnerFromAssignees(assignees);
   return {
     id: newId("task"),
     workspaceId: ctx.workspaceId,
     boardId: ctx.boardId,
     title: fu.note.trim() || "Task",
-    ownerUserId: ctx.ownerUserId ?? null,
-    ownerName: fu.authorName?.trim() || ctx.ownerName || null,
+    ownerUserId: owner.ownerUserId,
+    ownerName: owner.ownerName,
+    assignees,
     deadline: fu.date || null,
     status: taskStatusFromFollowUp(fu),
     leadId: ctx.leadId,
