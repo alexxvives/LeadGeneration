@@ -287,6 +287,13 @@ export interface BoardMember {
   createdAt: string;
 }
 
+/** Owner + invited collaborators on a board — for assignee pickers. */
+export interface BoardPerson {
+  userId: string;
+  email: string | null;
+  name: string;
+}
+
 /** Client-safe board row with aggregate counts for sidebar / Boards view. */
 export interface BoardSummary extends Board {
   leadCount: number;

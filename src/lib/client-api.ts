@@ -6,6 +6,7 @@ import type {
   BoardInvite,
   BoardLock,
   BoardMember,
+  BoardPerson,
   BoardSummary,
   Contact,
   ContactMethod,
@@ -224,7 +225,7 @@ export const api = {
     ),
 
   listBoardInvites: (boardId: string) =>
-    jsonFetch<{ invites: BoardInvite[]; members: BoardMember[] }>(
+    jsonFetch<{ invites: BoardInvite[]; members: BoardMember[]; people: BoardPerson[] }>(
       `/api/boards/${boardId}/invites`,
     ),
 

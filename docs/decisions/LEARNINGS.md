@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-21 — Task assignee list = board owner + collaborators
+- Assignee picker only showed the signed-in user because it built the list from
+  `currentUser` + `board_members` via the wrong DB on shared boards, and the
+  owner is never in `board_members`. Added `listBoardPeopleForUi` (owner +
+  accepted members with auth names) on `GET /api/boards/:id/invites`.
+
 ### 2026-09-20 — Multi-assignee tasks + kanban drag
 - `Task.assignees[]` stored as `assignees_json` on D1 (migration 0039); legacy
   `owner_*` mirrors first assignee for journal sync.

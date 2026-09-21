@@ -52,6 +52,7 @@ import type {
   BoardLock,
   BoardMember,
   BoardMemberRole,
+  BoardPerson,
   BoardSummary,
   ContactMethod,
   CrmStage,
@@ -550,7 +551,58 @@ export async function listBoardMembersForUi(
 ): Promise<BoardMember[]> {
   const access = await resolveBoardAccess(ctx, boardId);
   if (!access) throw new NotFoundError("Board not found");
-  return ctx.db.listBoardMembers(boardId);
+  return access.db.listBoardMembers(boardId);
+}
+
+function personDisplayName(
+  auth: { email: string | null; name: string | null } | undefined,
+  fallbackEmail: string | null,
+): string {
+  return (
+    auth?.name?.trim() ||
+    auth?.email?.split("@")[0] ||
+    fallbackEmail?.split("@")[0] ||
+    "Member"
+  );
+}
+
+/** Board owner + accepted collaborators — for task assignee pickers. */
+export async function listBoardPeopleForUi(
+  ctx: Ctx,
+  boardId: string,
+): Promise<BoardPerson[]> {
+  const access = await resolveBoardAccess(ctx, boardId);
+  if (!access) throw new NotFoundError("Board not found");
+
+  const ws = await access.db.getWorkspace(access.board.workspaceId);
+  const authUsers = await ctx.db.listAuthUsers();
+  const byId = new Map(authUsers.map((u) => [u.id, u]));
+
+  const people: BoardPerson[] = [];
+  const seen = new Set<string>();
+
+  const push = (userId: string, email: string | null) => {
+    if (!userId || seen.has(userId)) return;
+    seen.add(userId);
+    const auth = byId.get(userId);
+    people.push({
+      userId,
+      email: auth?.email ?? email,
+      name: personDisplayName(auth, email),
+    });
+  };
+
+  if (ws?.ownerUserId) {
+    const ownerAuth = byId.get(ws.ownerUserId);
+    push(ws.ownerUserId, ownerAuth?.email ?? null);
+  }
+
+  const members = await access.db.listBoardMembers(boardId);
+  for (const m of members) {
+    push(m.userId, m.email);
+  }
+
+  return people;
 }
 
 /**

@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type {
-  BoardMember,
+  BoardPerson,
   BoardSummary,
   LeadWithOutreach,
   Task,
@@ -398,7 +398,12 @@ function TaskEditSheet({
                 : `${selectedKeys.size} selected`}
             </p>
             <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-ink-900/60 p-2">
-              {owners.map((o) => {
+              {owners.length === 0 ? (
+                <p className="px-2 py-1.5 text-sm text-mist-500">
+                  No people on this board yet — invite collaborators from Boards.
+                </p>
+              ) : (
+                owners.map((o) => {
                 const key = assigneeKey(o);
                 const checked = selectedKeys.has(key);
                 return (
@@ -416,7 +421,8 @@ function TaskEditSheet({
                     <span className="text-sm text-mist-200">{o.name}</span>
                   </label>
                 );
-              })}
+              })
+              )}
             </div>
           </fieldset>
           <div>
@@ -467,8 +473,7 @@ export function TasksView({
   boards,
   filterBoardId,
   currentUserId,
-  currentUserName,
-  members,
+  people,
   searchQuery,
   onRefresh,
   onToast,
@@ -480,8 +485,7 @@ export function TasksView({
   boards: BoardSummary[];
   filterBoardId: string | null;
   currentUserId: string | null;
-  currentUserName: string | null;
-  members: BoardMember[];
+  people: BoardPerson[];
   searchQuery: string;
   onRefresh: () => void;
   onToast: (
@@ -515,15 +519,14 @@ export function TasksView({
       if (!trimmed) return;
       const idKey = userId ? `id:${userId}` : "";
       const nameKey = `name:${trimmed.toLowerCase()}`;
-      if (idKey && seen.has(idKey)) return;
+      if (userId && seen.has(userId)) return;
       if (seen.has(nameKey)) return;
-      if (idKey) seen.add(idKey);
+      if (userId) seen.add(userId);
       seen.add(nameKey);
       out.push({ userId, name: trimmed });
     };
-    push(currentUserId, currentUserName?.trim() || "You");
-    for (const m of members) {
-      push(m.userId, m.email?.split("@")[0] ?? "Member");
+    for (const p of people) {
+      push(p.userId, p.name);
     }
     for (const t of tasks) {
       for (const a of taskAssignees(t)) {
@@ -531,7 +534,7 @@ export function TasksView({
       }
     }
     return out;
-  }, [members, currentUserId, currentUserName, tasks]);
+  }, [people, tasks]);
 
   const filtered = useMemo(() => {
     const labelFor = (leadId: string | null) => {

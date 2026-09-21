@@ -5,6 +5,7 @@ import {
   inviteToBoard,
   listBoardInvites,
   listBoardMembersForUi,
+  listBoardPeopleForUi,
 } from "@/lib/service";
 import { isNotFoundError } from "@/lib/errors";
 
@@ -22,11 +23,12 @@ export async function GET(
   const { id } = await params;
   try {
     const ctx = await getCtx();
-    const [invites, members] = await Promise.all([
+    const [invites, members, people] = await Promise.all([
       listBoardInvites(ctx, id),
       listBoardMembersForUi(ctx, id),
+      listBoardPeopleForUi(ctx, id),
     ]);
-    return NextResponse.json({ invites, members });
+    return NextResponse.json({ invites, members, people });
   } catch (err) {
     if (isNotFoundError(err)) {
       return NextResponse.json({ error: err.message }, { status: 404 });

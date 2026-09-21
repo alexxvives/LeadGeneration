@@ -11,7 +11,7 @@ import {
   RateLimitedError,
   type BoardResponse,
 } from "@/lib/client-api";
-import type { BoardMember, Contact, ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId, Task } from "@/lib/types";
+import type { BoardPerson, Contact, ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId, Task } from "@/lib/types";
 import {
   mergeFollowUpLists,
   markNewestPendingFollowUpDone,
@@ -227,7 +227,7 @@ export function Studio() {
   const [contactsReady, setContactsReady] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksReady, setTasksReady] = useState(false);
-  const [boardMembers, setBoardMembers] = useState<BoardMember[]>([]);
+  const [boardPeople, setBoardPeople] = useState<BoardPerson[]>([]);
   const [tasksAddOpen, setTasksAddOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<"info" | "draft">("info");
@@ -716,16 +716,16 @@ export function Studio() {
     let cancelled = false;
     const bid = filterBoardId ?? boards[0]?.id;
     if (!bid) {
-      setBoardMembers([]);
+      setBoardPeople([]);
       return;
     }
     void api
       .listBoardInvites(bid)
-      .then(({ members }) => {
-        if (!cancelled) setBoardMembers(members);
+      .then(({ people }) => {
+        if (!cancelled) setBoardPeople(people);
       })
       .catch(() => {
-        if (!cancelled) setBoardMembers([]);
+        if (!cancelled) setBoardPeople([]);
       });
     return () => {
       cancelled = true;
@@ -2951,11 +2951,7 @@ export function Studio() {
               boards={board?.boards ?? boards}
               filterBoardId={filterBoardId}
               currentUserId={currentUserId}
-              currentUserName={
-                (session?.user?.email as string | undefined)?.split("@")[0] ||
-                actorName
-              }
-              members={boardMembers}
+              people={boardPeople}
               searchQuery={deferredLeadSearch}
               onRefresh={refreshTasks}
               onToast={toast}
