@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, CrmStage, LeadWithOutreach, Task } from "@/lib/types";
-import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, InfoIcon, CalendarIcon, WaitingIcon } from "@/components/icons";
+import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, CalendarIcon, WaitingIcon } from "@/components/icons";
 import {
   leadHasMissedCall,
   hasPendingTask,
@@ -276,7 +276,7 @@ export function PipelineView({
         tasksByLeadId,
       }}
     >
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{leads.length}</span> lead
         {leads.length === 1 ? "" : "s"}
@@ -351,7 +351,6 @@ export function PipelineView({
                 <PipelineCardFace
                   lead={l}
                   onOpen={onOpen}
-                  hideInfo
                 />
               )}
             />
@@ -363,9 +362,9 @@ export function PipelineView({
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           <div
-            className="grid min-h-0 flex-1 gap-3 overflow-x-auto pb-1"
+            className="grid min-h-0 min-w-0 flex-1 gap-3 overflow-x-auto pb-1"
             style={{
-              gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(9rem, 1fr))`,
+              gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(0, 1fr))`,
             }}
           >
             {MAIN_COLUMNS.map((col) => (
@@ -608,14 +607,10 @@ function PipelineCardFace({
   lead,
   onOpen,
   className = "",
-  extra,
-  hideInfo = false,
 }: {
   lead: LeadWithOutreach;
   onOpen: (id: string) => void;
   className?: string;
-  extra?: ReactNode;
-  hideInfo?: boolean;
 }) {
   const { onCompleteTask, onCompleteFollowUp, tasksByLeadId } =
     usePipelineCardActions();
@@ -626,7 +621,7 @@ function PipelineCardFace({
   return (
     <div
       onClick={() => onOpen(lead.id)}
-      data-testid={hideInfo ? "pipeline-lead-card" : undefined}
+      data-testid="pipeline-lead-card"
       className={`group flex h-auto cursor-pointer items-start gap-1 rounded-xl px-3 py-2.5 transition-all ${
         replied
           ? "border border-sky-400/50 bg-sky-400/10 shadow-[0_0_0_1px_rgba(56,189,248,0.25)] ring-1 ring-sky-400/30 hover:bg-sky-400/15"
@@ -735,35 +730,6 @@ function PipelineCardFace({
           ) : null}
         </div>
       </div>
-
-      {extra || !hideInfo ? (
-        <div className="flex shrink-0 items-center gap-1">
-          {extra}
-          {hideInfo ? null : (
-            <button
-              type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpen(lead.id);
-              }}
-              aria-label={
-                needsMethod
-                  ? `Set how you contacted ${lead.company}`
-                  : `Lead info for ${lead.company}`
-              }
-              title={needsMethod ? "How contacted? Open to set method" : "Lead info"}
-              className={`rounded-md p-1 transition-colors ${
-                needsMethod
-                  ? "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40 hover:bg-amber-400/30"
-                  : "text-mist-500 hover:bg-white/10 hover:text-mist-100"
-              }`}
-            >
-              <InfoIcon className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }

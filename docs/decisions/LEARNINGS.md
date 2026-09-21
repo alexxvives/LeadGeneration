@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-21 — Task cards, lead info icon, calendar density
+- Removed the on-card task status `<select>` (drag between columns / edit sheet).
+- Removed the (i) icon on pipeline lead cards; the whole card already opens info.
+  Outreach rows open info on the row; company/email still open the composer.
+- Studio/calendar/settings chrome: drop absolute-positioned Today/theme controls
+  that overlapped at mid widths; keep `min-w-0` + `overflow-x-hidden` on fill views.
+- Calendar day cells: filled today badge, selected ring, weekend/event fills;
+  sm+ lists event chips in the remaining cell instead of tiny bottom-left icons.
+  Dated journal notes now appear on the month.
+
 ### 2026-09-21 — LUMIA assignee picker still showed only Alex
 - Prod D1 already had 3 people on LUMIA (owner + j.d.h.jharo + onaparadell).
   Studio loaded people from `filterBoardId ?? boards[0]`. Missing URL `board`

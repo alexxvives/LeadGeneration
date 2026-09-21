@@ -460,7 +460,7 @@ export function calendarEventsFromLeads(
   for (const lead of leads) {
     for (const fu of lead.followUps ?? []) {
       const kind = resolveFollowUpKind(fu);
-      if (kind === "note" || kind === "task") continue;
+      if (kind === "task") continue;
       const canon = canonicalizeFollowUp(fu);
       out.push({
         id: canon.id,
@@ -482,7 +482,7 @@ export function calendarEventsFromContacts(contacts: Contact[]): CalendarEvent[]
   for (const contact of contacts) {
     for (const fu of contact.followUps ?? []) {
       const kind = resolveFollowUpKind(fu);
-      if (kind === "note" || kind === "task") continue;
+      if (kind === "task") continue;
       const canon = canonicalizeFollowUp(fu);
       out.push({
         id: canon.id,

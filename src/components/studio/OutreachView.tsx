@@ -8,7 +8,6 @@ import {
   CheckIcon,
   EyeIcon,
   FormIcon,
-  InfoIcon,
   GlobeIcon,
   InstagramIcon,
   MailIcon,
@@ -491,7 +490,7 @@ export function OutreachView({
   };
 
   return (
-    <div data-tour="outreach-queue" className="flex h-full min-h-0 flex-col gap-3">
+    <div data-tour="outreach-queue" className="flex h-full min-h-0 min-w-0 flex-col gap-3">
       {backfilling ? (
         <p
           className="shrink-0 text-[11px] text-mist-500"
@@ -614,41 +613,31 @@ function OutreachRow({
 
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03] ${
+      className={`flex min-w-0 cursor-pointer items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03] ${
         showDivider ? "border-t border-white/10" : ""
       } ${needsMethod ? "bg-amber-400/[0.06]" : ""}`}
+      onClick={onOpenInfo}
     >
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 items-center gap-1">
           <button
             type="button"
-            onClick={openComposer}
+            onClick={(e) => {
+              e.stopPropagation();
+              openComposer();
+            }}
             className="min-w-0 truncate rounded-md text-left text-sm font-medium text-mist-100 outline-none hover:text-aurora-200 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
           >
             {lead.company}
-          </button>
-          <button
-            type="button"
-            onClick={onOpenInfo}
-            className={`shrink-0 rounded p-0.5 outline-none focus-visible:ring-1 focus-visible:ring-aurora-400/50 ${
-              needsMethod
-                ? "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40 hover:bg-amber-400/30"
-                : "text-mist-500 hover:bg-white/10 hover:text-mist-100"
-            }`}
-            aria-label={
-              needsMethod
-                ? `Register how you contacted ${lead.company}`
-                : `Lead info for ${lead.company}`
-            }
-            title={needsMethod ? "How contacted?" : "Lead info"}
-          >
-            <InfoIcon className="h-3 w-3" />
           </button>
         </div>
         {email ? (
           <button
             type="button"
-            onClick={openComposer}
+            onClick={(e) => {
+              e.stopPropagation();
+              openComposer();
+            }}
             className="mt-0.5 flex w-full min-w-0 items-center gap-1 truncate rounded-md text-left text-[11px] text-mist-500 outline-none hover:text-mist-300 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
           >
             <MailIcon className="h-3 w-3 shrink-0" />
@@ -671,7 +660,10 @@ function OutreachRow({
           <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
         ) : null}
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
+      <div
+        className="flex shrink-0 flex-col items-end gap-1"
+        onClick={(e) => e.stopPropagation()}
+      >
         {bucket === "review" && (
           <div className="flex items-center justify-end gap-1">
             {hasDraft ? (

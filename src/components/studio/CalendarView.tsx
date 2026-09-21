@@ -31,7 +31,7 @@ import { PhoneMissedIcon } from "@/components/lucide-animated/phone-missed";
 import { useIconMotion } from "@/components/lucide-animated/hover";
 import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 
-const KIND_ORDER: FollowUpKind[] = ["follow_up", "task", "email", "phone"];
+const KIND_ORDER: FollowUpKind[] = ["follow_up", "task", "note", "email", "phone"];
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
@@ -48,7 +48,7 @@ const KIND_CHIP: Record<FollowUpKind, string> = {
   note: "bg-amber-400/15 text-amber-200",
   email: "bg-aurora-400/15 text-aurora-200",
   phone: "bg-sky-400/15 text-sky-200",
-  task: "bg-aurora-400/15 text-aurora-200",
+  task: "bg-amber-400/15 text-amber-200",
 };
 
 function isoFromParts(year: number, month: number, day: number): string {
@@ -299,6 +299,79 @@ function isTaskOverdue(ev: CalendarEvent, today: string): boolean {
   return ev.date < today;
 }
 
+function isWeekendIso(iso: string): boolean {
+  const day = new Date(`${iso}T12:00:00`).getDay();
+  return day === 0 || day === 6;
+}
+
+function eventChipLabel(ev: CalendarEvent): string {
+  const note = ev.note.replace(/\s+/g, " ").trim();
+  if (
+    (ev.kind === "task" || ev.kind === "follow_up" || ev.kind === "note") &&
+    note
+  ) {
+    return note;
+  }
+  if (note && note.length <= 42) return note;
+  return ev.company;
+}
+
+function DayEventStack({
+  events,
+  today,
+}: {
+  events: CalendarEvent[];
+  today: string;
+}) {
+  if (events.length === 0) return null;
+  const counts = kindCounts(events);
+  return (
+    <>
+      <span className="mt-auto flex flex-wrap items-center gap-1 pt-1 sm:hidden">
+        {KIND_ORDER.map((k) => {
+          const n = counts[k];
+          if (n === 0) return null;
+          return (
+            <span key={k} className="inline-flex items-center gap-0.5">
+              <DayKindMark kind={k} />
+              <span className="text-[11px] font-medium tabular-nums text-mist-200">
+                {n}
+              </span>
+            </span>
+          );
+        })}
+      </span>
+      <span className="mt-1 hidden min-h-0 w-full min-w-0 flex-1 flex-col justify-start gap-0.5 overflow-hidden [mask-image:linear-gradient(to_bottom,#000_0%,#000_78%,transparent_100%)] sm:flex lg:gap-1">
+        {events.map((ev) => {
+          const overdue =
+            (ev.kind === "follow_up" &&
+              isOverdueFollowUp(ev.date, ev.done, today)) ||
+            isTaskOverdue(ev, today);
+          const done =
+            (ev.kind === "follow_up" || ev.kind === "task") && ev.done;
+          return (
+            <span
+              key={`${ev.source}-${ev.id}`}
+              className={`flex min-h-[1.35rem] min-w-0 items-center gap-1 rounded-md px-1 py-0.5 text-left lg:min-h-[1.6rem] lg:px-1.5 lg:py-1 ${
+                overdue ? "bg-rose-400/20 text-rose-100" : KIND_CHIP[ev.kind]
+              } ${done ? "opacity-55" : ""}`}
+            >
+              <KindMark kind={ev.kind} />
+              <span
+                className={`min-w-0 flex-1 truncate text-[10px] font-medium leading-tight lg:text-[11px] xl:text-xs ${
+                  done ? "line-through" : ""
+                }`}
+              >
+                {eventChipLabel(ev)}
+              </span>
+            </span>
+          );
+        })}
+      </span>
+    </>
+  );
+}
+
 export function CalendarView({
   leads,
   contacts = [],
@@ -346,10 +419,10 @@ export function CalendarView({
       list.sort((a, b) => {
         const order: Record<FollowUpKind, number> = {
           follow_up: 0,
-          phone: 1,
-          email: 2,
-          note: 3,
-          task: 4,
+          task: 1,
+          note: 2,
+          phone: 3,
+          email: 4,
         };
         const d = order[a.kind] - order[b.kind];
         if (d !== 0) return d;
@@ -394,6 +467,7 @@ export function CalendarView({
   const dayEvents = byDate.get(selected) ?? [];
   const followUps = dayEvents.filter((e) => e.kind === "follow_up");
   const taskEvents = dayEvents.filter((e) => e.kind === "task");
+  const noteEvents = dayEvents.filter((e) => e.kind === "note");
   const emails = dayEvents.filter((e) => e.kind === "email");
   const calls = dayEvents.filter((e) => e.kind === "phone");
   const weekRows = cells.length / 7;
@@ -436,9 +510,9 @@ export function CalendarView({
   }, [cursor.year, thisYear]);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto sm:gap-4 lg:flex-row lg:items-stretch lg:overflow-hidden">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto sm:gap-4 lg:flex-row lg:items-stretch lg:overflow-hidden">
       <section className="glass flex w-full min-w-0 shrink-0 flex-col rounded-xl2 p-3 sm:p-5 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
-        <div className="relative mb-2 flex shrink-0 items-center justify-between gap-2 sm:mb-3 sm:justify-center">
+        <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 sm:mb-3">
           <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
             <MonthChevron dir="prev" onClick={() => shiftMonth(-1)} />
             <div className="flex min-w-0 items-center gap-0.5">
@@ -465,7 +539,7 @@ export function CalendarView({
           <button
             type="button"
             onClick={goToday}
-            className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-mist-300 transition-colors hover:border-aurora-400/40 hover:text-mist-100 sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2"
+            className="shrink-0 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-mist-300 transition-colors hover:border-aurora-400/40 hover:text-mist-100"
           >
             Today
           </button>
@@ -477,7 +551,7 @@ export function CalendarView({
             aria-label={`Calendar for ${monthLabel(cursor.year, cursor.month)}`}
             className="grid min-w-0 grid-cols-7 gap-px sm:gap-1 lg:min-h-0 lg:flex-1"
             style={{
-              gridTemplateRows: `auto repeat(${weekRows}, minmax(4.25rem, 1fr))`,
+              gridTemplateRows: `auto repeat(${weekRows}, minmax(4.75rem, 1fr))`,
             }}
           >
             {WEEKDAYS.map((d) => (
@@ -492,10 +566,11 @@ export function CalendarView({
             ))}
             {cells.map((cell) => {
               const dayEvs = byDate.get(cell.iso) ?? [];
-              const counts = kindCounts(dayEvs);
               const missed = missedCallCount(dayEvs);
               const isToday = cell.iso === today;
               const isSelected = cell.iso === selected;
+              const weekend = isWeekendIso(cell.iso);
+              const hasEvents = dayEvs.length > 0;
               const pending = dayEvs.filter(
                 (e) => e.kind === "follow_up" && !e.done,
               ).length;
@@ -519,49 +594,41 @@ export function CalendarView({
                     overdue ? ", overdue follow-up" : ""
                   }${missed ? `, ${missed} missed call${missed === 1 ? "" : "s"}` : ""}`}
                   onClick={() => setSelected(cell.iso)}
-                  className={`flex min-h-[4.25rem] min-w-0 flex-col items-start overflow-hidden rounded-md px-1 py-1 text-left transition-colors sm:min-h-[5.5rem] sm:rounded-xl sm:px-1.5 sm:py-1.5 lg:h-full lg:min-h-0 ${
+                  className={`flex min-h-[4.75rem] min-w-0 flex-col items-start overflow-hidden rounded-md px-1 py-1 text-left transition-colors sm:min-h-[6.5rem] sm:rounded-xl sm:px-1.5 sm:py-1.5 md:min-h-[7.25rem] lg:h-full lg:min-h-0 ${
                     isSelected
                       ? overdue
-                        ? "bg-rose-400/20 ring-1 ring-rose-400/60"
-                        : "bg-aurora-400/15 ring-1 ring-aurora-400/50"
+                        ? "bg-rose-400/20 ring-2 ring-rose-400/70"
+                        : isToday
+                          ? "bg-aurora-400/20 ring-2 ring-aurora-400/80"
+                          : "bg-white/[0.08] ring-2 ring-aurora-400/45"
                       : overdue
                         ? "bg-rose-400/15 ring-1 ring-rose-400/50"
                         : isToday
-                          ? "bg-white/[0.04] ring-1 ring-white/15"
-                          : "hover:bg-white/[0.04]"
+                          ? "bg-aurora-400/12 ring-2 ring-aurora-400/55"
+                          : hasEvents
+                            ? "bg-white/[0.045] hover:bg-white/[0.07]"
+                            : weekend && cell.inMonth
+                              ? "bg-ink-950/45 hover:bg-white/[0.04]"
+                              : "hover:bg-white/[0.04]"
                   } ${cell.inMonth ? "" : "opacity-40"}`}
                 >
                   <span
-                    className={`text-xs tabular-nums sm:text-sm ${
-                      isToday && !overdue
-                        ? "font-semibold text-aurora-300"
-                        : "text-mist-200"
+                    className={`inline-flex h-6 w-6 shrink-0 items-center justify-center text-xs tabular-nums sm:h-7 sm:w-7 sm:text-sm ${
+                      isToday
+                        ? "rounded-full bg-aurora-400 font-semibold text-on-accent"
+                        : isSelected
+                          ? "rounded-full bg-white/10 font-semibold text-mist-100"
+                          : weekend
+                            ? "text-mist-400"
+                            : "text-mist-200"
                     }`}
                   >
                     {cell.day}
                   </span>
-                  {KIND_ORDER.some((k) => counts[k] > 0) ? (
-                    <span className="mt-auto flex flex-wrap items-center gap-1 pt-1 sm:gap-1.5">
-                      {KIND_ORDER.map((k) => {
-                        const n = counts[k];
-                        if (n === 0) return null;
-                        return (
-                          <span
-                            key={k}
-                            className="inline-flex items-center gap-0.5"
-                          >
-                            <DayKindMark kind={k} />
-                            <span className="text-[11px] font-medium tabular-nums text-mist-300 sm:text-xs">
-                              {n}
-                            </span>
-                          </span>
-                        );
-                      })}
-                      {pending > 0 ? (
-                        <span className="sr-only">
-                          {pending} open follow-up{pending === 1 ? "" : "s"}
-                        </span>
-                      ) : null}
+                  <DayEventStack events={dayEvs} today={today} />
+                  {pending > 0 ? (
+                    <span className="sr-only">
+                      {pending} open follow-up{pending === 1 ? "" : "s"}
                     </span>
                   ) : null}
                 </button>
@@ -570,12 +637,15 @@ export function CalendarView({
           </div>
         </div>
 
-        <ul className="mt-2 flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[10px] text-mist-400 sm:relative sm:mt-3 sm:gap-x-4 sm:gap-y-2 sm:pr-24 sm:text-[11px]">
+        <ul className="mt-2 flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[10px] text-mist-400 sm:mt-3 sm:gap-x-4 sm:gap-y-2 sm:text-[11px]">
           <LegendItem label="Follow up">
             <CalendarDaysIcon size={14} className="flex text-violet-300" aria-hidden />
           </LegendItem>
           <LegendItem label="Tasks">
             <CheckIcon className="h-3.5 w-3.5 text-amber-300" aria-hidden />
+          </LegendItem>
+          <LegendItem label="Notes">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" aria-hidden />
           </LegendItem>
           <LegendItem label="Email sent">
             <MailCheckIcon size={14} className="flex text-aurora-400" aria-hidden />
@@ -583,17 +653,22 @@ export function CalendarView({
           <LegendItem label="Phone call">
             <AnimatedPhoneIcon size={14} className="flex text-sky-400" aria-hidden />
           </LegendItem>
-          <li className="inline-flex items-center gap-1.5 sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2">
+          <LegendItem label="Today">
+            <span
+              className="h-4 w-4 rounded-full bg-aurora-400"
+              aria-hidden
+            />
+          </LegendItem>
+          <LegendItem label="Overdue">
             <span
               className="h-3.5 w-3.5 rounded-sm bg-rose-400/20 ring-1 ring-rose-400/50"
               aria-hidden
             />
-            Overdue
-          </li>
+          </LegendItem>
         </ul>
       </section>
 
-      <aside className="glass flex min-h-0 w-full shrink-0 flex-col self-stretch rounded-xl2 p-3 sm:p-5 lg:w-[22rem] lg:overflow-hidden">
+      <aside className="glass flex min-h-0 w-full shrink-0 flex-col self-stretch rounded-xl2 p-3 sm:p-5 lg:w-[min(22rem,36%)] lg:min-w-[16rem] lg:max-w-sm lg:overflow-hidden">
         <p className="text-[11px] uppercase tracking-wider text-mist-500">
           {selected === today ? "Today" : formatNoteDate(selected)}
         </p>
@@ -623,6 +698,12 @@ export function CalendarView({
                 events={taskEvents}
                 onOpenEvent={onOpenEvent}
                 onToggleTask={onToggleTask}
+              />
+              <DayGroup
+                title="Notes"
+                kind="note"
+                events={noteEvents}
+                onOpenEvent={onOpenEvent}
               />
               <DayGroup
                 title="Emails sent"
@@ -662,7 +743,9 @@ function GroupTitle({
         ? "text-sky-400"
         : kind === "task"
           ? "text-amber-300"
-          : "text-violet-300";
+          : kind === "note"
+            ? "text-amber-200"
+            : "text-violet-300";
   return (
     <h4 className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-mist-500">
       {kind === "email" ? (
@@ -675,6 +758,8 @@ function GroupTitle({
         )
       ) : kind === "task" ? (
         <CheckIcon className={`h-3.5 w-3.5 ${color}`} aria-hidden />
+      ) : kind === "note" ? (
+        <span className={`h-2.5 w-2.5 rounded-full ${KIND_DOT.note}`} aria-hidden />
       ) : (
         <CalendarDaysIcon size={14} className={`flex ${color}`} aria-hidden />
       )}

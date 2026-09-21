@@ -2301,7 +2301,7 @@ export function Studio() {
     <BoardLockUiProvider locked={editLocked} holder={lockHolder}>
     <main className="flex h-full min-w-0 w-full flex-col overflow-hidden px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-4 sm:pt-8 lg:px-6 lg:pt-8">
       <div
-        className={`flex shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between lg:gap-3 ${
+        className={`flex min-w-0 shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between lg:gap-3 ${
           phoneHeader ? "mb-2 lg:mb-6" : "mb-0 lg:mb-6"
         }`}
       >
@@ -2461,7 +2461,7 @@ export function Studio() {
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
           {view === "dashboard" && boards.length > 0 ? (
             <label className="inline-flex items-center">
               <span className="sr-only">Filter by board</span>
@@ -2543,8 +2543,8 @@ export function Studio() {
       <div
         className={
           fillViewport
-            ? "flex min-h-0 flex-1 flex-col"
-            : "min-h-0 flex-1 overflow-y-auto overscroll-contain"
+            ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden"
+            : "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
         }
       >
       {/* Dashboard */}

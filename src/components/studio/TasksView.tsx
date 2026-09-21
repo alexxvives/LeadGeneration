@@ -105,12 +105,10 @@ function AssigneeRow({ task }: { task: Task }) {
 function TaskCardFace({
   task,
   onOpen,
-  onStatusChange,
   onDelete,
 }: {
   task: Task;
   onOpen: () => void;
-  onStatusChange: (status: TaskStatus) => void;
   onDelete: () => void;
 }) {
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
@@ -123,16 +121,31 @@ function TaskCardFace({
 
   return (
     <article
-      className={`glass card-hover group relative flex flex-col rounded-xl2 p-4 ${
+      className={`glass card-hover group relative flex min-w-0 flex-col rounded-xl2 p-4 ${
         completed ? "opacity-80" : ""
       }`}
     >
+      <Lockable>
+        <button
+          type="button"
+          disabled={editLocked}
+          title={editLocked ? lockHint : "Delete task"}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg text-mist-500 opacity-100 transition-opacity hover:bg-white/5 hover:text-rose-300 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 disabled:opacity-50"
+        >
+          <TrashIcon className="h-4 w-4" />
+        </button>
+      </Lockable>
       <button
         type="button"
         onClick={onOpen}
         className="flex min-w-0 flex-1 flex-col items-stretch text-left"
       >
-        <div className="flex items-start gap-2">
+        <div className="flex min-w-0 items-start gap-2 pr-8">
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${STATUS_CHIP[task.status]}`}
           >
@@ -140,7 +153,7 @@ function TaskCardFace({
           </span>
           {deadline.label ? (
             <span
-              className={`ml-auto text-[11px] font-medium ${
+              className={`ml-auto truncate text-[11px] font-medium ${
                 softOverdue ? "text-rose-300" : "text-mist-500"
               }`}
             >
@@ -149,7 +162,7 @@ function TaskCardFace({
           ) : null}
         </div>
         <h3
-          className={`mt-2 font-display text-base font-semibold leading-snug ${
+          className={`mt-2 break-words font-display text-base font-semibold leading-snug ${
             completed ? "text-mist-500 line-through" : "text-mist-100"
           }`}
         >
@@ -157,38 +170,6 @@ function TaskCardFace({
         </h3>
         <AssigneeRow task={task} />
       </button>
-      <div className="mt-3 flex items-center gap-2 border-t border-white/5 pt-3">
-        <label className="sr-only" htmlFor={`task-status-${task.id}`}>
-          Status
-        </label>
-        <Lockable>
-          <select
-            id={`task-status-${task.id}`}
-            value={task.status}
-            disabled={editLocked}
-            title={editLocked ? lockHint : undefined}
-            onChange={(e) => onStatusChange(e.target.value as TaskStatus)}
-            className="select-glass min-w-0 flex-1 rounded-lg border border-white/10 bg-ink-900/60 px-2 py-1.5 text-xs text-mist-100 disabled:opacity-50"
-          >
-            {TASK_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {taskStatusLabel(s)}
-              </option>
-            ))}
-          </select>
-        </Lockable>
-        <Lockable>
-          <button
-            type="button"
-            disabled={editLocked}
-            title={editLocked ? lockHint : "Delete task"}
-            onClick={onDelete}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-mist-500 opacity-0 transition-opacity hover:bg-white/5 hover:text-rose-300 group-hover:opacity-100 group-focus-within:opacity-100 disabled:opacity-50"
-          >
-            <TrashIcon className="h-4 w-4" />
-          </button>
-        </Lockable>
-      </div>
     </article>
   );
 }
@@ -196,13 +177,11 @@ function TaskCardFace({
 function DraggableTaskCard({
   task,
   onOpen,
-  onStatusChange,
   onDelete,
   isDragging,
 }: {
   task: Task;
   onOpen: () => void;
-  onStatusChange: (status: TaskStatus) => void;
   onDelete: () => void;
   isDragging: boolean;
 }) {
@@ -224,12 +203,7 @@ function DraggableTaskCard({
           : "cursor-grab touch-pan-y active:cursor-grabbing"
       } ${isDragging ? "opacity-30" : ""}`}
     >
-      <TaskCardFace
-        task={task}
-        onOpen={onOpen}
-        onStatusChange={onStatusChange}
-        onDelete={onDelete}
-      />
+      <TaskCardFace task={task} onOpen={onOpen} onDelete={onDelete} />
     </div>
   );
 }
@@ -239,14 +213,12 @@ function TaskStatusColumn({
   tasks,
   activeId,
   onOpen,
-  onStatusChange,
   onDelete,
 }: {
   status: TaskStatus;
   tasks: Task[];
   activeId: string | null;
   onOpen: (task: Task) => void;
-  onStatusChange: (task: Task, status: TaskStatus) => void;
   onDelete: (task: Task) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
@@ -254,7 +226,7 @@ function TaskStatusColumn({
   return (
     <section
       ref={setNodeRef}
-      className={`flex min-h-0 flex-col rounded-xl2 border transition-colors ${
+      className={`flex min-h-0 min-w-0 flex-col rounded-xl2 border transition-colors ${
         isOver
           ? "border-aurora-400/40 bg-aurora-400/5"
           : "border-white/5 bg-ink-950/30"
@@ -271,7 +243,6 @@ function TaskStatusColumn({
             task={task}
             isDragging={activeId === task.id}
             onOpen={() => onOpen(task)}
-            onStatusChange={(s) => onStatusChange(task, s)}
             onDelete={() => onDelete(task)}
           />
         ))}
@@ -517,7 +488,6 @@ export function TasksView({
     const push = (userId: string | null, name: string) => {
       const trimmed = name.trim();
       if (!trimmed) return;
-      const idKey = userId ? `id:${userId}` : "";
       const nameKey = `name:${trimmed.toLowerCase()}`;
       if (userId && seen.has(userId)) return;
       if (seen.has(nameKey)) return;
@@ -678,7 +648,7 @@ export function TasksView({
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
       {tasks.length > 0 ? (
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           <div
@@ -731,7 +701,7 @@ export function TasksView({
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-cols-4 lg:overflow-hidden">
+            <div className="hidden min-h-0 min-w-0 flex-1 grid-cols-2 gap-3 overflow-hidden lg:grid xl:grid-cols-4">
               {TASK_STATUSES.map((status) => (
                 <TaskStatusColumn
                   key={status}
@@ -739,7 +709,6 @@ export function TasksView({
                   tasks={byStatus[status]}
                   activeId={activeId}
                   onOpen={openEdit}
-                  onStatusChange={(task, s) => void patchStatus(task, s)}
                   onDelete={(task) => void handleDelete(task)}
                 />
               ))}
@@ -750,7 +719,6 @@ export function TasksView({
                   <TaskCardFace
                     task={activeTask}
                     onOpen={() => undefined}
-                    onStatusChange={() => undefined}
                     onDelete={() => undefined}
                   />
                 </div>
@@ -784,7 +752,6 @@ export function TasksView({
                   key={task.id}
                   task={task}
                   onOpen={() => openEdit(task)}
-                  onStatusChange={(s) => void patchStatus(task, s)}
                   onDelete={() => void handleDelete(task)}
                 />
               ))}

@@ -726,14 +726,14 @@ export function StudioShell({
             </span>
           )}
         </button>
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
-          <p className="mr-auto flex min-w-0 items-center gap-0.5 font-display text-lg font-semibold text-mist-100">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <p className="flex min-w-0 flex-1 items-center gap-0.5 font-display text-lg font-semibold text-mist-100">
             <span className="truncate">{viewTitle}</span>
             <span id="studio-phone-live" className="inline-flex shrink-0" />
           </p>
           <div
             id="studio-phone-search"
-            className="flex min-w-0 flex-1 items-center justify-end"
+            className="flex shrink-0 items-center justify-end"
           />
         </div>
       </header>

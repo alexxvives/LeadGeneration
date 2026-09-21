@@ -1456,7 +1456,7 @@ export function LeadDrawer(props: DrawerProps) {
                   </div>
                 </div>
                 <p className="text-xs text-mist-500">
-                  Use Lead info (i) to add dated notes anytime.
+                  Use the lead card to add dated notes anytime.
                 </p>
               </div>
             ) : !outreach ? (

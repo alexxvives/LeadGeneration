@@ -69,16 +69,20 @@ export default async function SettingsPage() {
 
   if (isAdmin) {
     return (
-      <main className="relative mx-auto h-full max-w-7xl overflow-y-auto px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-8">
-        <div className="absolute right-3 top-3 z-20 sm:right-5 sm:top-4">
-          <ThemeToggle />
+      <main className="relative mx-auto h-full min-w-0 max-w-7xl overflow-x-hidden overflow-y-auto px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-8">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              Admin settings
+            </h1>
+            <p className="mt-0.5 text-sm text-mist-500">
+              Platform tools for operators — not a personal lead studio.
+            </p>
+          </div>
+          <div className="shrink-0">
+            <ThemeToggle />
+          </div>
         </div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-          Admin settings
-        </h1>
-        <p className="mt-0.5 text-sm text-mist-500">
-          Platform tools for operators — not a personal lead studio.
-        </p>
 
         <section className="mt-8">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
@@ -129,14 +133,18 @@ export default async function SettingsPage() {
   }
 
   return (
-    <main className="relative mx-auto h-full max-w-7xl overflow-y-auto px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-8">
-      <div className="absolute right-3 top-3 z-20 sm:right-5 sm:top-4">
-        <ThemeToggle />
+    <main className="relative mx-auto h-full min-w-0 max-w-7xl overflow-x-hidden overflow-y-auto px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-8">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
+          <p className="mt-0.5 text-sm text-mist-500">
+            Profiles, sending setup, and workspace preferences.
+          </p>
+        </div>
+        <div className="shrink-0">
+          <ThemeToggle />
+        </div>
       </div>
-      <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
-      <p className="mt-0.5 text-sm text-mist-500">
-        Profiles, sending setup, and workspace preferences.
-      </p>
 
       <section className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">

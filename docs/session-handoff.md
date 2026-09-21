@@ -9,20 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-21 (LUMIA assignee picker live)
+## ⏱️ Status — updated 2026-09-21 (Tasks / calendar / layout polish)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0039** (applied on prod D1).  
-**Deploy:** Worker `33141cd5-2302-433e-b95b-f30e0d63dfc1` (Windows: `cf:build` + `wrangler deploy`).
+**Deploy:** Worker `33141cd5` still live; this pass is local until `cf:build` + `wrangler deploy`.
 
 ### This pass
-- LUMIA people fetch now uses the same `filterBoardId` as tasks (no `boards[0]` /
-  AKADEMO fallback). Invites GET no longer fails the whole request when invite
-  listing throws. Deployed to prod.
+- Task cards: no on-card status `<select>` (drag / edit sheet instead).
+- Pipeline/outreach lead cards: removed the redundant info (i) icon.
+- Layout: min-w-0 / overflow-x-hidden on studio shells; calendar/settings headers no longer use overlapping absolute chrome.
+- Calendar: stronger today + selected + weekend/event fills; larger event chips on sm+; dated notes show on the month.
 
 ### Next
-1. Hard-refresh Tasks on LUMIA → Add task → expect alexxvives, j.d.h.jharo, onaparadell.
-2. Pending invite `adriviveslliset@gmail.com` is not in the picker until accepted.
+1. Deploy when ready (`npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`).
 
 ---
 

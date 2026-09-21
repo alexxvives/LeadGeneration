@@ -58,7 +58,7 @@ function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="glass rounded-xl2 p-5">
+    <div className="glass rounded-xl2 p-5 min-w-0">
       <p className="text-[11px] uppercase tracking-wider text-mist-500">{label}</p>
       <p className="mt-2 font-display text-3xl font-semibold text-mist-100">{value}</p>
       {hint ? <p className="mt-1 text-xs text-mist-500">{hint}</p> : null}
@@ -163,8 +163,8 @@ function DashboardLoaded({
       : (boardOptions.find((b) => b.id === filter)?.name ?? "Board");
 
   return (
-    <div className="animate-float-up space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="animate-float-up min-w-0 space-y-6">
+      <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total leads" value={data.totalLeads} />
         <StatCard label="Emails sent" value={data.sentCount} />
         <StatCard label="Drafts ready" value={data.draftedCount} />
@@ -179,7 +179,7 @@ function DashboardLoaded({
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
         <div className="glass rounded-xl2 p-6">
           <h2 className="font-display text-lg font-semibold text-mist-100">
             Pipeline stages
@@ -211,11 +211,11 @@ function DashboardLoaded({
                 b.leadCount > 0 ? Math.round((b.closedCount / b.leadCount) * 100) : 0;
               return (
                 <li key={b.id}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="truncate font-medium text-mist-100">
+                  <div className="flex min-w-0 items-center justify-between gap-3 text-sm">
+                    <span className="min-w-0 truncate font-medium text-mist-100">
                       {b.name}
                     </span>
-                    <span className="text-mist-400">
+                    <span className="shrink-0 text-mist-400">
                       {b.leadCount} · {b.sentCount} sent
                     </span>
                   </div>
