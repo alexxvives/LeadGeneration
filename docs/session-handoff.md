@@ -9,18 +9,23 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-21 (Board people in assignee picker)
+## ⏱️ Status — updated 2026-09-21 (LUMIA assignee picker)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0039** (applied on prod D1).  
-**Deploy:** push to master for CI / Workers deploy.
+**Deploy:** Windows — `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
 
 ### This pass
-- Task assignee options now come from **board owner + all accepted
-  collaborators** (`listBoardPeopleForUi`), not just the signed-in user.
+- **Root cause:** LUMIA has 3 people in prod D1 (you + j.d.h.jharo + onaparadell), but the
+  Tasks UI was loading assignee options from `boards[0]` when the URL board param was
+  missing — that board is **AKADEMO** (owner only). Alex also appeared from a legacy
+  task row (`owner_user_id` fallback) even when the people list was wrong.
+- **Fix (local, needs deploy):** people fetch uses the same `filterBoardId` as tasks;
+  invites route no longer fails the whole request when invite listing throws.
 
 ### Next
-1. Hard-refresh Tasks → Add task → see everyone on the active board.
+1. Run `npm run cf:deploy`, hard-refresh Tasks on LUMIA → Add task → expect 3 names.
+2. Pending invite `adriviveslliset@gmail.com` is not in the picker (not an accepted member yet).
 
 ---
 

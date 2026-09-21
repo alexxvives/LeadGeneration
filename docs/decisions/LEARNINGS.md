@@ -4,6 +4,15 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-21 — LUMIA assignee picker still showed only Alex
+- Prod D1 already had 3 people on LUMIA (owner + j.d.h.jharo + onaparadell).
+  Studio loaded people from `filterBoardId ?? boards[0]`. Missing URL `board`
+  fell back to **AKADEMO** (owner-only). Existing task `owner_user_id` still
+  injected Alex. People fetch now uses the same `filterBoardId` as tasks;
+  invites GET no longer fails the whole request when invite listing throws.
+- Windows deploy: `npm run cf:deploy` still hits miniflare `spawn UNKNOWN`.
+  Use `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
+
 ### 2026-09-21 — Task assignee list = board owner + collaborators
 - Assignee picker only showed the signed-in user because it built the list from
   `currentUser` + `board_members` via the wrong DB on shared boards, and the

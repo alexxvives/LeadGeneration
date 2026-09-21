@@ -23,9 +23,10 @@ export async function GET(
   const { id } = await params;
   try {
     const ctx = await getCtx();
+    // People must load even when pending-invite listing is owner-only or fails.
     const [invites, members, people] = await Promise.all([
-      listBoardInvites(ctx, id),
-      listBoardMembersForUi(ctx, id),
+      listBoardInvites(ctx, id).catch(() => []),
+      listBoardMembersForUi(ctx, id).catch(() => []),
       listBoardPeopleForUi(ctx, id),
     ]);
     return NextResponse.json({ invites, members, people });

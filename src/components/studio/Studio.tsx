@@ -713,8 +713,9 @@ export function Studio() {
   }, [view, refreshTasks]);
 
   useEffect(() => {
+    if (view !== "tasks" && view !== "calendar") return;
     let cancelled = false;
-    const bid = filterBoardId ?? boards[0]?.id;
+    const bid = filterBoardId;
     if (!bid) {
       setBoardPeople([]);
       return;
@@ -722,7 +723,7 @@ export function Studio() {
     void api
       .listBoardInvites(bid)
       .then(({ people }) => {
-        if (!cancelled) setBoardPeople(people);
+        if (!cancelled) setBoardPeople(people ?? []);
       })
       .catch(() => {
         if (!cancelled) setBoardPeople([]);
@@ -730,7 +731,7 @@ export function Studio() {
     return () => {
       cancelled = true;
     };
-  }, [filterBoardId, boards]);
+  }, [filterBoardId, view]);
 
   // Hydrate drafting profiles from the workspace (localStorage write-through).
   useEffect(() => {
