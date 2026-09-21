@@ -9,23 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-21 (LUMIA assignee picker)
+## ⏱️ Status — updated 2026-09-21 (LUMIA assignee picker live)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0039** (applied on prod D1).  
-**Deploy:** Windows — `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
+**Deploy:** Worker `33141cd5-2302-433e-b95b-f30e0d63dfc1` (Windows: `cf:build` + `wrangler deploy`).
 
 ### This pass
-- **Root cause:** LUMIA has 3 people in prod D1 (you + j.d.h.jharo + onaparadell), but the
-  Tasks UI was loading assignee options from `boards[0]` when the URL board param was
-  missing — that board is **AKADEMO** (owner only). Alex also appeared from a legacy
-  task row (`owner_user_id` fallback) even when the people list was wrong.
-- **Fix (local, needs deploy):** people fetch uses the same `filterBoardId` as tasks;
-  invites route no longer fails the whole request when invite listing throws.
+- LUMIA people fetch now uses the same `filterBoardId` as tasks (no `boards[0]` /
+  AKADEMO fallback). Invites GET no longer fails the whole request when invite
+  listing throws. Deployed to prod.
 
 ### Next
-1. Run `npm run cf:deploy`, hard-refresh Tasks on LUMIA → Add task → expect 3 names.
-2. Pending invite `adriviveslliset@gmail.com` is not in the picker (not an accepted member yet).
+1. Hard-refresh Tasks on LUMIA → Add task → expect alexxvives, j.d.h.jharo, onaparadell.
+2. Pending invite `adriviveslliset@gmail.com` is not in the picker until accepted.
 
 ---
 
