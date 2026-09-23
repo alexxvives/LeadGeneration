@@ -9,7 +9,6 @@ import type {
 import { normalizeConversationStep } from "@/lib/types";
 import {
   addDaysIso,
-  followUpIsDone,
   hasPendingTask,
   resolveFollowUpKind,
   todayIsoDate,
@@ -75,8 +74,9 @@ export function isConversationStep(raw: string): raw is ConversationStep {
 }
 
 /**
- * Newest journal day that counts as a touch. Open follow-up reminders are
- * excluded — they are a plan, not contact. Future dates are ignored.
+ * Newest journal day that counts as a touch: a note, call, send, or task.
+ * Follow-up reminders never count, done or not — they are a plan, not contact.
+ * Future dates are ignored.
  */
 export function latestConversationTouchDate(
   followUps: FollowUp[] | undefined,
@@ -84,8 +84,7 @@ export function latestConversationTouchDate(
 ): string | null {
   let best: string | null = null;
   for (const fu of followUps ?? []) {
-    const kind = resolveFollowUpKind(fu);
-    if (kind === "follow_up" && !followUpIsDone(fu.done)) continue;
+    if (resolveFollowUpKind(fu) === "follow_up") continue;
     if (!fu.date || fu.date > today) continue;
     if (!best || fu.date > best) best = fu.date;
   }
@@ -93,9 +92,11 @@ export function latestConversationTouchDate(
 }
 
 /**
- * Quiet lead: no journal touch, send, or step placement in 14 days, and no
- * open task. New leads are untouched, not unresponsive. A lead with no
- * history at all is unresponsive only once they are In Conversation.
+ * Quiet lead: no note, call, send, or task in 14 days, and no open task.
+ * Follow-up reminders do not count. Moving the card into a step does not
+ * erase an older note — the step date only fills in when there is no contact
+ * history, so a card filed today does not flash unresponsive. New leads are
+ * untouched, not unresponsive.
  */
 export function isConversationUnresponsive(
   lead: Pick<Lead, "crmStage" | "followUps" | "conversationStepAt"> & {
@@ -107,14 +108,15 @@ export function isConversationUnresponsive(
   const stage = lead.crmStage ?? "new";
   if (stage === "new") return false;
   if (hasPendingTask(lead.followUps, tasks)) return false;
-  const cutoff = addDaysIso(-UNRESPONSIVE_AFTER_DAYS);
+  const cutoff = addDaysIso(-UNRESPONSIVE_AFTER_DAYS, new Date(`${today}T12:00:00`));
   const touch = latestConversationTouchDate(lead.followUps, today);
-  const placed = lead.conversationStepAt?.slice(0, 10) || null;
   const sent = lead.outreach?.sentAt?.slice(0, 10) || null;
-  const latest =
-    [touch, placed, sent].filter((d): d is string => !!d).sort().at(-1) ?? null;
-  if (!latest) return stage === "in_conversation";
-  return latest < cutoff;
+  const contact =
+    [touch, sent].filter((d): d is string => !!d).sort().at(-1) ?? null;
+  if (contact) return contact < cutoff;
+  const placed = lead.conversationStepAt?.slice(0, 10) || null;
+  if (placed) return placed < cutoff;
+  return stage === "in_conversation";
 }
 
 /** Column this in-conversation lead belongs in. */
@@ -126,8 +128,8 @@ export function conversationBucket(
 
 /**
  * Entering In Conversation without a step lands in Evaluating · pre-demo.
- * Setting a step refreshes `conversationStepAt` so the card does not look
- * unresponsive the same day.
+ * Setting a step refreshes `conversationStepAt` so a card with no contact
+ * history does not look unresponsive the same day. An older note still wins.
  */
 export function conversationStepPatch(
   lead: Pick<Lead, "crmStage" | "conversationStep" | "conversationStepAt">,

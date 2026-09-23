@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-23 — Follow-up reminders are not a touch
+- A done follow-up dated after the last note reset the 14-day clock. So did
+  dragging the card into a step, because `conversationStepAt` was mixed in
+  with real contact. A 6 Sep note stayed quiet after either of those.
+- Reminders are excluded in every state. The step date only applies when
+  there is no note, call, send, or task. An open task still hides the clock.
+
 ### 2026-09-23 — Where they are is tags, not a dropdown
 - In Conversation in the lead drawer uses the same chip row as Contacted’s
   “Reached via”. One step stays selected; clicking another moves the lead.

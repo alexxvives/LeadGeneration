@@ -9,20 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-23 (Conversation steps revised)
+## ⏱️ Status — updated 2026-09-23 (Lead info chips + unresponsive clock)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0040** applied on prod D1. No new migration for the step rename (free-text column; legacy ids map on read).  
-**Deploy:** This pass is local until `cf:build` + `wrangler deploy`.
+**Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
+**Deploy:** Local until `cf:build` + `wrangler deploy`. Prod still uses the old touch rule until then.
 
 ### This pass
-- Dropped Pending delivery and the Unresponsive column (ADR 0041).
-- Steps: Evaluating · pre-demo → Waiting on demo → Evaluating · post-demo → Reviewing contract → Onboarding.
-- Unresponsive is a red clock on the lead’s current stage (Pipeline and Conversations).
-- Lead info: “Where they are” is tags, same style as Contacted’s channel chips.
+- Lead info stage chips and “Where they are” stay on one scrolling row.
+- Pipeline unresponsive clock is a solid rose badge at the start of the card title.
+- Follow-up reminders no longer count as a touch. Moving a card into a step no longer overrides an older note. An open task still hides the clock.
 
 ### Next
-1. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches this step list.
+1. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches the step list and this touch rule.
 
 ---
 

@@ -152,7 +152,7 @@ function ConversationStepChips({
   lockHint: string;
 }) {
   return (
-    <div className="flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
+    <div className="flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
       {CONVERSATION_STEPS.map((step) => {
         const on = selected === step.id;
         return (
@@ -192,7 +192,7 @@ function ContactMethodChips({
   emphasize?: boolean;
 }) {
   return (
-    <div className="flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
       {CONTACT_METHODS.map(({ method, label }) => {
         const on = selected.includes(method);
         return (
@@ -982,11 +982,11 @@ export function LeadDrawer(props: DrawerProps) {
           {mode === "info" ? (
             <>
           <div className="grid min-h-0 flex-1 overflow-hidden sm:grid-cols-[minmax(0,1.25fr)_minmax(15rem,0.9fr)]">
-          <div className="min-h-0 space-y-6 overflow-y-auto p-4 md:p-6">
+          <div className="min-h-0 min-w-0 space-y-6 overflow-y-auto p-4 md:p-6">
           {/* CRM Stage picker */}
-          <section>
+          <section className="min-w-0">
             <SectionLabel>Sales stage</SectionLabel>
-            <div className="flex flex-nowrap gap-1.5 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
               {CRM_STAGES.map(({ stage, label, color }) => (
                 <Lockable key={stage} className="shrink-0">
                   <button

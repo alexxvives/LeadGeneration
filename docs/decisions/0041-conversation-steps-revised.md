@@ -22,11 +22,14 @@ Legacy `pending_delivery` reads as onboarding. No new migration — the column
 is already free text.
 
 Unresponsive is not a column and not a drop target. It is true for any lead
-except New when there is no open task and the latest of journal touch, send
-date, or step placement is more than 14 days ago. An In Conversation lead
-with no history at all is unresponsive. Pipeline cards show a red clock;
-conversation cards show that clock beside the step mark. The lead stays in
-its step.
+except New when there is no open task and the latest real touch (note, call,
+email, or completed task) or send date is more than 14 days ago. Follow-up
+reminders never count, open or done. Filing the card into a step does not
+erase that date — `conversation_step_at` only stands in when the lead has no
+contact history, so a card just filed does not flash the clock. An In
+Conversation lead with neither contact history nor a step date is
+unresponsive. Pipeline cards show a red clock; conversation cards show that clock beside the step mark.
+The lead stays in its step.
 
 ## Alternatives considered
 - A sixth stored step between demo and contract, plus a single Evaluating.
@@ -37,5 +40,6 @@ its step.
 
 ## Consequences
 - `ConversationBucket` is gone. The column id is the stored step.
-- Setting a step still refreshes `conversation_step_at` so the clock restarts.
+- Setting a step still stores `conversation_step_at`, but that date does not
+  override an older note, call, or send.
 - Prod already has migration 0040. This change is a deploy of worker code.
