@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ContactMethod, CrmStage, DeliveryStatus, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
+import type { ContactMethod, ConversationStep, CrmStage, DeliveryStatus, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
 import { Spinner } from "@/components/ui";
+import { Select } from "@/components/ui/Select";
 import { DatePicker } from "@/components/ui/DatePicker";
 import {
   ArrowIcon,
@@ -16,12 +17,16 @@ import {
   TrashIcon,
   XIcon,
 } from "@/components/icons";
+import { CONVERSATION_STEPS, isConversationUnresponsive } from "@/lib/conversation-steps";
 import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
 import {
   addDaysIso,
   collapseEmailSentFollowUps,
+  emailSentFollowUpId,
   followUpIsDone,
+  hasEmailSentOn,
+  isEmailSentNote,
   mergeFollowUpLists,
   inferFollowUpKind,
   emailSentNotePrefix,
@@ -98,6 +103,8 @@ interface DrawerProps {
       followUps?: FollowUp[];
       waitingOnUs?: boolean;
       demoDone?: boolean;
+      conversationStep?: ConversationStep | null;
+      conversationStepAt?: string | null;
     },
   ) => Promise<void>;
   /** Parent-owned note-delete undo (survives drawer remounts). */
@@ -203,6 +210,9 @@ export function LeadDrawer(props: DrawerProps) {
 
   // CRM state (local, synced on changes)
   const [crmStage, setCrmStage] = useState<CrmStage>(lead.crmStage ?? "new");
+  const [conversationStep, setConversationStep] = useState<ConversationStep>(
+    lead.conversationStep ?? "evaluating",
+  );
   const [contactMethods, setContactMethods] = useState<ContactMethod[]>(
     lead.contactMethods ?? [],
   );
@@ -233,6 +243,7 @@ export function LeadDrawer(props: DrawerProps) {
   const [editDate, setEditDate] = useState("");
   const [editText, setEditText] = useState("");
   const followUpsLeadIdRef = useRef(lead.id);
+  const healedEmailKeyRef = useRef<string | null>(null);
   const deletedNote = props.deletedNote ?? null;
 
   const dirty = useMemo(
@@ -266,6 +277,8 @@ export function LeadDrawer(props: DrawerProps) {
       ? incomingMethods
       : mergeContactMethods(contactMethods, incomingMethods, droppedMethods);
     if (leadChanged || crmStage !== nextStage) setCrmStage(nextStage);
+    const nextStep = lead.conversationStep ?? "evaluating";
+    if (leadChanged || conversationStep !== nextStep) setConversationStep(nextStep);
     if (leadChanged || !contactMethodsEqual(contactMethods, nextMethods)) {
       setContactMethods(nextMethods);
     }
@@ -325,12 +338,18 @@ export function LeadDrawer(props: DrawerProps) {
     // Heal kinds on the merged list — never PATCH a stale subset that would
     // delete a note the user just added, and wait for full detail so we don't
     // race the in-flight GET with a slim payload.
+    const removed = raw.filter((f) => !next.some((n) => n.id === f.id));
+    const removedOnlyEmailDupes =
+      removed.length > 0 &&
+      removed.every(
+        (f) => isEmailSentNote(f.note) || (!f.note.trim() && f.kind === "email"),
+      );
     if (
       changed &&
       !deletedNote &&
       lead.detailLoaded === true &&
-      next.length >= raw.length &&
-      next.length >= followUps.length
+      (removedOnlyEmailDupes ||
+        (next.length >= raw.length && next.length >= followUps.length))
     ) {
       void props.onUpdateCrm(lead.id, { followUps: next });
     }
@@ -357,37 +376,31 @@ export function LeadDrawer(props: DrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id, promptNote]);
 
-  // Heal: older sends wrote status but skipped the dated journal. Never add a
-  // second bare "Email sent" on the same day.
+  // Heal: older sends wrote status but skipped the dated journal. One line
+  // per lead per day — merge used to put a collapsed duplicate back.
   useEffect(() => {
     if (outreach?.status !== "sent" || !outreach.sentAt) return;
     if (lead.detailLoaded !== true) return;
     const sentDay = outreach.sentAt.slice(0, 10);
-    const existing = followUps.length ? followUps : (lead.followUps ?? []);
+    const key = `${lead.id}:${sentDay}`;
+    if (healedEmailKeyRef.current === key) return;
+    healedEmailKeyRef.current = key;
+    const existing = lead.followUps ?? [];
     const collapsed = collapseEmailSentFollowUps(
       existing,
       lead.contactedByName,
     );
-    const has = collapsed.some(
-      (f) =>
-        f.date === sentDay &&
-        f.note.trim().toLowerCase().startsWith("email sent"),
-    );
-    const notesChanged =
-      collapsed.length !== existing.length ||
-      collapsed.some((f, i) => f.note !== existing[i]?.note || f.id !== existing[i]?.id);
-    if (has) {
-      if (notesChanged) {
-        const updated = mergeFollowUpLists(followUps, collapsed);
-        setFollowUps(updated);
-        void props.onUpdateCrm(lead.id, { followUps: updated });
+    if (hasEmailSentOn(collapsed, sentDay)) {
+      if (collapsed.length !== existing.length) {
+        setFollowUps(collapsed);
+        void props.onUpdateCrm(lead.id, { followUps: collapsed });
       }
       return;
     }
     const actor = lead.contactedByName?.trim();
     const inserted: FollowUp = withFollowUpAuthor(
       {
-        id: newId("fu"),
+        id: emailSentFollowUpId(lead.id, sentDay),
         date: sentDay,
         note: "Email sent",
         done: true,
@@ -395,11 +408,13 @@ export function LeadDrawer(props: DrawerProps) {
       },
       actor ?? actorName,
     );
-    const base = followUps.length ? followUps : collapsed;
-    const updated = mergeFollowUpLists([inserted, ...base], collapsed);
+    const updated = collapseEmailSentFollowUps(
+      [inserted, ...collapsed],
+      lead.contactedByName,
+    );
     setFollowUps(updated);
     void props.onUpdateCrm(lead.id, { followUps: updated });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot heal per lead/sentAt
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot heal per lead/sent day
   }, [lead.id, outreach?.status, outreach?.sentAt, lead.detailLoaded]);
 
   useEffect(() => {
@@ -640,9 +655,10 @@ export function LeadDrawer(props: DrawerProps) {
           : composerKind === "task"
             ? "task"
             : "note";
+    const bareEmail = isEmailLog && /^email sent$/i.test(text);
     const fu = withFollowUpAuthor(
       {
-        id: newId("fu"),
+        id: bareEmail ? emailSentFollowUpId(lead.id, newNoteDate) : newId("fu"),
         date: newNoteDate,
         note: text,
         done: isCall || isEmailLog || kind === "note",
@@ -650,7 +666,10 @@ export function LeadDrawer(props: DrawerProps) {
       },
       actorName,
     );
-    const updated = [...followUps, fu];
+    const withoutSame = bareEmail
+      ? followUps.filter((f) => f.id !== fu.id)
+      : followUps;
+    const updated = collapseEmailSentFollowUps([...withoutSame, fu], actorName);
     setFollowUps(updated);
     setShowAddNote(false);
     setCallPrompt(false);
@@ -979,16 +998,37 @@ export function LeadDrawer(props: DrawerProps) {
             )}
 
             {crmStage === "in_conversation" ? (
-              <div className="mt-3 flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                <FlagToggle
-                  label="Demo done"
-                  on={lead.demoDone}
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                <label className="block text-xs font-medium text-mist-400" htmlFor={`conv-step-${lead.id}`}>
+                  Where they are
+                </label>
+                <Select
+                  id={`conv-step-${lead.id}`}
+                  className="mt-1.5 w-full"
                   disabled={editLocked}
-                  lockHint={lockHint}
-                  onToggle={(next) =>
-                    void props.onUpdateCrm(lead.id, { demoDone: next })
-                  }
-                />
+                  title={editLocked ? lockHint : "Conversation step"}
+                  value={conversationStep}
+                  onChange={(e) => {
+                    const next = e.target.value as ConversationStep;
+                    setConversationStep(next);
+                    void props.onUpdateCrm(lead.id, {
+                      crmStage: "in_conversation",
+                      conversationStep: next,
+                      conversationStepAt: todayIsoDate(),
+                    });
+                  }}
+                >
+                  {CONVERSATION_STEPS.map((step) => (
+                    <option key={step.id} value={step.id}>
+                      {step.label}
+                    </option>
+                  ))}
+                </Select>
+                {isConversationUnresponsive(lead) ? (
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-rose-200/90">
+                    Unresponsive — the latest note is more than two weeks old and there is no open task.
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </section>
@@ -1796,48 +1836,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-mist-500">
       {children}
     </h4>
-  );
-}
-
-function FlagToggle({
-  label,
-  on,
-  disabled,
-  lockHint,
-  onToggle,
-}: {
-  label: string;
-  on: boolean;
-  disabled: boolean;
-  lockHint: string;
-  onToggle: (next: boolean) => void;
-}) {
-  return (
-    <Lockable className="min-w-0 flex-1">
-      <button
-        type="button"
-        disabled={disabled}
-        title={disabled ? lockHint : label}
-        aria-pressed={on}
-        onClick={() => onToggle(!on)}
-        className="flex w-full items-center justify-between gap-2 text-left disabled:opacity-60"
-      >
-        <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-mist-200">
-          <span className="truncate">{label}</span>
-        </span>
-        <span
-          className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
-            on ? "bg-aurora-400" : "bg-ink-700"
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 h-4 w-4 rounded-full bg-ink-950 transition-[left] ${
-              on ? "left-[1.125rem]" : "left-0.5"
-            }`}
-          />
-        </span>
-      </button>
-    </Lockable>
   );
 }
 

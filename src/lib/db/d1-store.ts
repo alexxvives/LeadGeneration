@@ -16,13 +16,13 @@ import type {
   Task,
   TaskStatus,
 } from "@/lib/types";
-import { normalizeCrmStage, normalizeEasyEmailProvider } from "@/lib/types";
+import { normalizeConversationStep, normalizeCrmStage, normalizeEasyEmailProvider } from "@/lib/types";
 import {
   parseContactMethods,
   serializeContactMethods,
 } from "@/lib/contact-methods";
 import { hydrateLaneSql } from "@/lib/lead-lanes";
-import { isContactRegisteredNote, canonicalizeFollowUp, hasPendingTask } from "@/lib/follow-ups";
+import { canonicalizeFollowUp, hasPendingTask, parseStoredFollowUps } from "@/lib/follow-ups";
 import {
   assigneesToJson,
   parseAssigneesJson,
@@ -180,6 +180,8 @@ type LeadRow = {
   custom_fields: string | null; // JSON-encoded Record<string, string>
   waiting_on_us: number | boolean | string | null;
   demo_done: number | boolean | string | null;
+  conversation_step: string | null;
+  conversation_step_at: string | null;
   created_at: string;
 };
 
@@ -288,7 +290,7 @@ const CARD_LEAD_SELECT = `l.id, l.workspace_id, l.run_id, l.board_id, l.company,
          l.emails, l.phones, l.contact_name, l.location, l.company_type,
          l.status, l.crm_stage, l.contact_method, l.contacted_by_user_id,
          l.contacted_by_name, l.created_at, l.custom_fields, l.follow_ups,
-         l.waiting_on_us, l.demo_done`;
+         l.waiting_on_us, l.demo_done, l.conversation_step, l.conversation_step_at`;
 
 type OutreachRow = {
   id: string;
@@ -419,15 +421,39 @@ function rowToRun(r: RunRow): Run {
 
 const parseFollowUps = (s: string | null | undefined): FollowUp[] => {
   try {
-    const raw = JSON.parse(s ?? "[]") as unknown;
-    if (!Array.isArray(raw)) return [];
-    return (raw as FollowUp[])
-      .filter((f) => !isContactRegisteredNote(f?.note ?? ""))
-      .map((f) => canonicalizeFollowUp({ ...f, note: f?.note ?? "" }));
+    return parseStoredFollowUps(JSON.parse(s ?? "[]")).followUps;
   } catch {
     return [];
   }
 };
+
+/** Compare-and-swap so a concurrent journal edit is not overwritten. */
+function emailDedupeUpdate(
+  db: D1Database,
+  workspaceId: string,
+  id: string,
+  prevJson: string | null | undefined,
+): D1PreparedStatement | null {
+  if (prevJson == null) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(prevJson);
+  } catch {
+    return null;
+  }
+  const { followUps, deduped } = parseStoredFollowUps(raw);
+  if (!deduped) return null;
+  return db
+    .prepare(
+      `UPDATE leads SET follow_ups = ? WHERE id = ? AND workspace_id = ? AND follow_ups = ?`,
+    )
+    .bind(
+      JSON.stringify(followUps.map(canonicalizeFollowUp)),
+      id,
+      workspaceId,
+      prevJson,
+    );
+}
 
 const parseCustomFields = (s: string | null | undefined): Record<string, string> => {
   try {
@@ -473,6 +499,8 @@ function rowToLead(r: LeadRow): Lead {
     customFields: parseCustomFields(r.custom_fields),
     waitingOnUs: hasPendingTask(followUps),
     demoDone: isSqliteOn(r.demo_done),
+    conversationStep: normalizeConversationStep(r.conversation_step),
+    conversationStepAt: r.conversation_step_at?.slice(0, 10) || null,
     createdAt: r.created_at,
   };
 }
@@ -1257,8 +1285,9 @@ export class D1Store implements LeadRepository {
            (id, workspace_id, run_id, board_id, company, website, emails, phones, contact_name,
             location, about_blurb, company_type, tags, fit_score, fit_reasons, source_url,
             status, crm_stage, contact_method, contacted_by_user_id, contacted_by_name,
-            notes, follow_ups, custom_fields, waiting_on_us, demo_done, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            notes, follow_ups, custom_fields, waiting_on_us, demo_done,
+            conversation_step, conversation_step_at, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           l.id,
@@ -1287,6 +1316,8 @@ export class D1Store implements LeadRepository {
           JSON.stringify(l.customFields ?? {}),
           l.waitingOnUs ? 1 : 0,
           l.demoDone ? 1 : 0,
+          l.conversationStep,
+          l.conversationStepAt,
           l.createdAt,
         ),
     );
@@ -1330,6 +1361,12 @@ export class D1Store implements LeadRepository {
     if ("customFields" in patch) row.custom_fields = JSON.stringify(patch.customFields ?? {});
     if ("waitingOnUs" in patch) row.waiting_on_us = patch.waitingOnUs ? 1 : 0;
     if ("demoDone" in patch) row.demo_done = patch.demoDone ? 1 : 0;
+    if ("conversationStep" in patch) {
+      row.conversation_step = patch.conversationStep ?? null;
+    }
+    if ("conversationStepAt" in patch) {
+      row.conversation_step_at = patch.conversationStepAt ?? null;
+    }
     if ("createdAt" in patch) row.created_at = patch.createdAt;
     return row;
   }
@@ -1370,7 +1407,10 @@ export class D1Store implements LeadRepository {
       .prepare(`SELECT * FROM leads WHERE id = ? AND workspace_id = ?`)
       .bind(id, this.workspaceId)
       .first<LeadRow>();
-    return row ? rowToLead(row) : null;
+    if (!row) return null;
+    const dedupe = emailDedupeUpdate(this.db, this.workspaceId, row.id, row.follow_ups);
+    if (dedupe) await dedupe.run();
+    return rowToLead(row);
   }
 
   async deleteLead(id: string): Promise<boolean> {
@@ -1788,6 +1828,10 @@ export class D1Store implements LeadRepository {
       )
       .bind(...bind, ...pageBind)
       .all<LeadRow>();
+    const dedupes = results
+      .map((row) => emailDedupeUpdate(this.db, this.workspaceId, row.id, row.follow_ups))
+      .filter((stmt): stmt is D1PreparedStatement => stmt != null);
+    if (dedupes.length > 0) await this.db.batch(dedupes);
     return results.map(rowToLead);
   }
 

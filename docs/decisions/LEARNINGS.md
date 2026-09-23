@@ -4,6 +4,16 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-23 — Double “Email sent” notes
+- Two identical journal lines (same day, same “Email sent”, same initials)
+  were not two sends. The drawer heal inserted a second row when the slim
+  board payload had stripped the note body, and `mergeFollowUpLists` keeps
+  every cached id — so collapsing the duplicate on the server put it back
+  in the UI and the next save stored both.
+- Collapse now runs on read, on merge, and on write. Bare same-day lines
+  share `fu-email-{leadId}-{date}`. Opening a board or a lead compare-and-swaps
+  the stored JSON when a duplicate was actually dropped.
+
 ### 2026-09-21 — Task cards, lead info icon, calendar density
 - Removed the on-card task status `<select>` (drag between columns / edit sheet).
 - Removed the (i) icon on pipeline lead cards; the whole card already opens info.

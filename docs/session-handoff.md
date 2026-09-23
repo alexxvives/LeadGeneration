@@ -9,20 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-21 (Tasks / calendar / layout polish)
+## ⏱️ Status — updated 2026-09-23 (Conversation steps + email-note dedupe)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0039** (applied on prod D1).  
+**Migrations:** 0021–**0040** (0040 is local until `cf:migrate` on prod).  
 **Deploy:** Worker `33141cd5` still live; this pass is local until `cf:build` + `wrangler deploy`.
 
 ### This pass
-- Task cards: no on-card status `<select>` (drag / edit sheet instead).
-- Pipeline/outreach lead cards: removed the redundant info (i) icon.
-- Layout: min-w-0 / overflow-x-hidden on studio shells; calendar/settings headers no longer use overlapping absolute chrome.
-- Calendar: stronger today + selected + weekend/event fills; larger event chips on sm+; dated notes show on the month.
+- Pipeline title toggle: Stages vs In conversation buckets (Evaluating → Pending delivery, plus automatic Unresponsive).
+- Conversations cards: step mark instead of Demo done; Follow-up chip removed. Drawer uses a “Where they are” dropdown.
+- Duplicate bare “Email sent” notes collapsed on read/merge/write (ADR 0040).
 
 ### Next
-1. Deploy when ready (`npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`).
+1. Apply migration 0040 on prod D1 before deploy (`npm run cf:migrate`), then `npm run cf:build` and `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
 
 ---
 

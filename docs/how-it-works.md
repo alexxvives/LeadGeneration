@@ -87,6 +87,13 @@ Search  →  Enrich  →  Draft  →  Send
     Conversation · Closed*) plus *Not Interested*. At `lg+` this is a kanban
     (drag cards between columns). Below `lg` it is one stage at a time
     (a single scrolling row of tabs — no on-card stage select).
+    A **Stages / In conversation** toggle beside the title switches the board
+    to in-conversation buckets only: *Evaluating · Waiting on demo ·
+    Reviewing contract · Onboarding (Excel / invoice) · Pending delivery ·
+    Unresponsive*. Unresponsive is automatic when the latest journal touch
+    is more than 14 days old and no task is open. Dragging to another
+    bucket sets `conversationStep` and refreshes that clock. Unresponsive
+    is not a drop target.
     Bulk draft lives on **Outreach** (Send stays per-lead).
     CRM **New** = needs human review (there is no separate “In review” tag).
     A **Missed call** stays in New but still shows the phone method icon
@@ -104,17 +111,18 @@ Search  →  Enrich  →  Draft  →  Send
     top). Last contact is the latest journal touch or email send time and
     shows bottom-left on the card (date, or date + time when a send
     timestamp exists). Cards show name, city + country (not the street),
-    pending follow-up, and recent **notes** / **tasks** (follow-up
+    and recent **notes** / **tasks** (follow-up
     reminders are omitted from the preview).
-    An hourglass on the title row means **Waiting on us** (an open task);
-    a monitor icon
-    means **Demo done**. Those bubbles sit beside the title **column**
-    (name + company + city), so they do not push location down. A clickable
-    **Follow-up** tag (like **Task**) sits bottom-right when one is pending.
+    An hourglass on the title row means **Waiting on us** (an open task).
+    A colored mark beside it is the conversation step (or Unresponsive).
+    Those bubbles sit beside the title **column**
+    (name + company + city), so they do not push location down.
+    The **Task** tag sits bottom-right when one is open. Follow-up chips
+    stay on Pipeline cards, not here.
     Overflowing name / company / city ping-pong like a
     now-playing title. Location on the card is city + country only
     (`shortLocation` drops street, floor, and venue names). Click opens
-    the lead drawer (**Add Task** in Notes; **Demo done** toggle on the
+    the lead drawer (**Add Task** in Notes; **Where they are** on the
     info pane). Phone cards stay
     within the pane so they do not force a sideways scroll.
 
@@ -228,7 +236,10 @@ Search  →  Enrich  →  Draft  →  Send
     A bounce silently deletes that address (and may return the lead to New) —
     no Bounced chip, toast, or drawer button. The outreach composer
     (draft → edit → send) is on the draft pane. In Conversation hides the
-    “how did you reach them” chips and shows a **Demo done** toggle.
+    “how did you reach them” chips and shows a **Where they are** dropdown
+    (same idea as Contacted’s channel chips). A second bare “Email sent”
+    on the same day is collapsed — send and the drawer used to each insert
+    one, and the journal merge put the dropped copy back.
     **Add Task** in Notes opens a green **Task** composer (“What they
     expect from us”). An open task is **Waiting on us** (hourglass on
     Pipeline / Conversations); click the **Task** tag in the journal to

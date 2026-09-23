@@ -14,7 +14,13 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import type { ContactMethod, CrmStage, LeadWithOutreach, Task } from "@/lib/types";
+import type { ContactMethod, ConversationStep, CrmStage, LeadWithOutreach, Task } from "@/lib/types";
+import {
+  CONVERSATION_STEPS,
+  UNRESPONSIVE_BUCKET,
+  conversationBucket,
+  isConversationStep,
+} from "@/lib/conversation-steps";
 import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, CalendarIcon, WaitingIcon } from "@/components/icons";
 import {
   leadHasMissedCall,
@@ -29,30 +35,35 @@ import { useBoardLockUi } from "./board-lock";
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
 
 const MAIN_COLUMNS: {
+  id: string;
   stage: CrmStage;
   title: string;
   empty: string;
   color: string;
 }[] = [
   {
+    id: "new",
     stage: "new",
     title: "New",
     empty: "No untouched leads — run a search to add more.",
     color: "bg-mist-500",
   },
   {
+    id: "contacted",
     stage: "contacted",
     title: "Contacted",
     empty: "Send an email or drag a card here.",
     color: "bg-amber-400",
   },
   {
+    id: "in_conversation",
     stage: "in_conversation",
     title: "In Conversation",
     empty: "Replies land here from email webhooks.",
     color: "bg-sky-400",
   },
   {
+    id: "closed",
     stage: "closed",
     title: "Closed",
     empty: "Move here when you close the deal.",
@@ -61,16 +72,41 @@ const MAIN_COLUMNS: {
 ];
 
 const PARKED_COLUMNS: {
+  id: string;
   stage: CrmStage;
   title: string;
   empty: string;
   color: string;
 }[] = [
   {
+    id: "not_interested",
     stage: "not_interested",
     title: "Not Interested",
     empty: "Move here when they decline.",
     color: "bg-rose-400",
+  },
+];
+
+const CONVERSATION_COLUMNS: {
+  id: string;
+  title: string;
+  empty: string;
+  color: string;
+  acceptsDrop: boolean;
+}[] = [
+  ...CONVERSATION_STEPS.map((step) => ({
+    id: step.id,
+    title: step.label,
+    empty: step.hint,
+    color: step.dotClass,
+    acceptsDrop: true,
+  })),
+  {
+    id: UNRESPONSIVE_BUCKET.id,
+    title: UNRESPONSIVE_BUCKET.label,
+    empty: "No note in over two weeks, and no open task.",
+    color: UNRESPONSIVE_BUCKET.dotClass,
+    acceptsDrop: false,
   },
 ];
 
@@ -190,14 +226,59 @@ function ParkedStageColumn({
   );
 }
 
+export function PipelineFocusToggle({
+  value,
+  onChange,
+  className = "",
+}: {
+  value: "stages" | "conversation";
+  onChange: (next: "stages" | "conversation") => void;
+  className?: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Pipeline focus"
+      className={`inline-flex rounded-full border border-white/10 bg-ink-900/60 p-0.5 ${className}`}
+    >
+      {(
+        [
+          ["stages", "Stages"],
+          ["conversation", "In conversation"],
+        ] as const
+      ).map(([id, label]) => {
+        const on = value === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(id)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              on
+                ? "bg-aurora-400 text-on-accent"
+                : "text-mist-300 hover:text-mist-100"
+            }`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function PipelineView({
   leads,
   stageCounts,
   backfilling = false,
   filterActive = false,
+  focus = "stages",
+  onFocusChange,
   tasksByLeadId,
   onOpen,
   onMoveStage,
+  onSetConversationStep,
   onCompleteTask,
   onCompleteFollowUp,
 }: {
@@ -208,6 +289,10 @@ export function PipelineView({
   backfilling?: boolean;
   /** Search is filtering — don't treat empty columns as still paging. */
   filterActive?: boolean;
+  /** Stages = CRM kanban. Conversation = in-conversation buckets only. */
+  focus?: "stages" | "conversation";
+  /** Phone title row is hidden — the toggle sits on the board instead. */
+  onFocusChange?: (next: "stages" | "conversation") => void;
   tasksByLeadId?: Map<string, Task[]>;
   onOpen: (id: string) => void;
   onCompleteTask?: (leadId: string) => void;
@@ -217,6 +302,7 @@ export function PipelineView({
     stage: CrmStage,
     contactMethods?: ContactMethod[] | null,
   ) => void;
+  onSetConversationStep?: (leadId: string, step: ConversationStep) => void;
 }) {
   const { locked: editLocked } = useBoardLockUi();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -225,6 +311,7 @@ export function PipelineView({
     not_interested: false,
   });
   const [narrowStage, setNarrowStage] = useState<CrmStage>("new");
+  const [narrowBucket, setNarrowBucket] = useState<string>(CONVERSATION_STEPS[0]!.id);
 
   // Distance for pointer; keyboard for a11y. Touch can scroll columns (no touch-none).
   const sensors = useSensors(
@@ -250,8 +337,17 @@ export function PipelineView({
     const { active, over } = event;
     if (!over) return;
     const lead = leads.find((l) => l.id === active.id);
+    if (!lead) return;
+    if (focus === "conversation") {
+      const bucket = String(over.id);
+      if (!isConversationStep(bucket) || !onSetConversationStep) return;
+      const current = conversationBucket(lead, tasksByLeadId?.get(lead.id));
+      if (current === bucket) return;
+      onSetConversationStep(lead.id, bucket);
+      return;
+    }
     const newStage = over.id as CrmStage;
-    if (!lead || lead.crmStage === newStage) return;
+    if (lead.crmStage === newStage) return;
     onMoveStage(String(active.id), newStage);
   }
 
@@ -267,6 +363,37 @@ export function PipelineView({
     ? narrowLeads.length
     : (stageCounts?.[narrowCol.stage] ?? narrowLeads.length);
 
+  const inConversation = useMemo(
+    () => leads.filter((l) => (l.crmStage ?? "new") === "in_conversation"),
+    [leads],
+  );
+  const byBucket = useMemo(() => {
+    const groups = new Map<string, LeadWithOutreach[]>();
+    for (const col of CONVERSATION_COLUMNS) groups.set(col.id, []);
+    for (const lead of inConversation) {
+      const bucket = conversationBucket(lead, tasksByLeadId?.get(lead.id));
+      groups.get(bucket)?.push(lead);
+    }
+    for (const list of groups.values()) {
+      list.sort((a, b) =>
+        a.company.localeCompare(b.company, undefined, { sensitivity: "base" }),
+      );
+    }
+    return groups;
+  }, [inConversation, tasksByLeadId]);
+  const narrowBucketCol =
+    CONVERSATION_COLUMNS.find((c) => c.id === narrowBucket) ??
+    CONVERSATION_COLUMNS[0]!;
+  const narrowBucketLeads = byBucket.get(narrowBucketCol.id) ?? [];
+  const headCount = focus === "conversation" ? inConversation.length : leads.length;
+  const mobileLeads = focus === "conversation" ? narrowBucketLeads : narrowLeads;
+  const mobileTitle =
+    focus === "conversation" ? narrowBucketCol.title : narrowCol.title;
+  const mobileEmpty =
+    focus === "conversation" ? narrowBucketCol.empty : narrowCol.empty;
+  const mobileCount =
+    focus === "conversation" ? narrowBucketLeads.length : narrowCount;
+
   return (
     <PipelineCardActions.Provider
       value={{
@@ -277,11 +404,24 @@ export function PipelineView({
       }}
     >
     <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
+      {onFocusChange ? (
+        <PipelineFocusToggle
+          value={focus}
+          onChange={onFocusChange}
+          className="self-start lg:hidden"
+        />
+      ) : null}
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
-        <span className="font-semibold text-mist-200">{leads.length}</span> lead
-        {leads.length === 1 ? "" : "s"}
+        <span className="font-semibold text-mist-200">{headCount}</span>{" "}
+        {focus === "conversation"
+          ? `conversation${headCount === 1 ? "" : "s"}`
+          : `lead${headCount === 1 ? "" : "s"}`}
         {editLocked ? null : (
-          <span className="hidden lg:inline"> · drag to change stage</span>
+          <span className="hidden lg:inline">
+            {focus === "conversation"
+              ? " · drag to change where they are"
+              : " · drag to change stage"}
+          </span>
         )}
       </p>
 
@@ -289,10 +429,33 @@ export function PipelineView({
         <div
           className="flex shrink-0 flex-nowrap gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
-          aria-label="Pipeline stage"
+          aria-label={focus === "conversation" ? "Conversation step" : "Pipeline stage"}
           data-testid="pipeline-stage-tabs"
         >
-          {ALL_STAGE_TABS.map((col) => {
+          {focus === "conversation"
+            ? CONVERSATION_COLUMNS.map((col) => {
+                const count = byBucket.get(col.id)?.length ?? 0;
+                const active = narrowBucket === col.id;
+                return (
+                  <button
+                    key={col.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setNarrowBucket(col.id)}
+                    className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-aurora-400 text-on-accent"
+                        : "border border-white/10 bg-ink-900/60 text-mist-300 hover:text-mist-100"
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${col.color} ${active ? "ring-1 ring-ink-950/40" : ""}`} />
+                    {col.title}
+                    <span className="tabular-nums opacity-80">{count}</span>
+                  </button>
+                );
+              })
+            : ALL_STAGE_TABS.map((col) => {
             const count = filterActive
               ? leads.filter((l) => l.crmStage === col.stage).length
               : (stageCounts?.[col.stage] ??
@@ -319,15 +482,15 @@ export function PipelineView({
           })}
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40">
-          {narrowLeads.length === 0 ? (
-            backfilling && !filterActive && narrowCount > 0 ? (
+          {mobileLeads.length === 0 ? (
+            backfilling && !filterActive && focus !== "conversation" && mobileCount > 0 ? (
               <div
                 className="flex flex-col gap-2 p-3"
                 role="status"
                 aria-busy="true"
-                aria-label={`Loading ${narrowCol.title} leads`}
+                aria-label={`Loading ${mobileTitle} leads`}
               >
-                {Array.from({ length: Math.min(3, narrowCount) }, (_, i) => (
+                {Array.from({ length: Math.min(3, mobileCount) }, (_, i) => (
                   <div
                     key={i}
                     className="rounded-xl border border-white/8 bg-ink-950/50 p-3"
@@ -338,12 +501,12 @@ export function PipelineView({
               </div>
             ) : (
               <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
-                {filterActive ? "No matching leads." : narrowCol.empty}
+                {filterActive ? "No matching leads." : mobileEmpty}
               </p>
             )
           ) : (
             <VirtualColumnList
-              items={narrowLeads}
+              items={mobileLeads}
               estimateSize={72}
               padding={12}
               gap={8}
@@ -364,10 +527,26 @@ export function PipelineView({
           <div
             className="grid min-h-0 min-w-0 flex-1 gap-3 overflow-x-auto pb-1"
             style={{
-              gridTemplateColumns: `repeat(${MAIN_COLUMNS.length}, minmax(0, 1fr))`,
+              gridTemplateColumns:
+                focus === "conversation"
+                  ? `repeat(${CONVERSATION_COLUMNS.length}, minmax(12rem, 1fr))`
+                  : `repeat(${MAIN_COLUMNS.length}, minmax(0, 1fr))`,
             }}
           >
-            {MAIN_COLUMNS.map((col) => (
+            {focus === "conversation"
+              ? CONVERSATION_COLUMNS.map((col) => (
+                  <PipelineColumn
+                    key={col.id}
+                    col={col}
+                    leads={byBucket.get(col.id) ?? []}
+                    count={(byBucket.get(col.id) ?? []).length}
+                    backfilling={false}
+                    filterActive={filterActive}
+                    onOpen={openIfClick}
+                    activeId={activeId}
+                  />
+                ))
+              : MAIN_COLUMNS.map((col) => (
               <MainStageColumn
                 key={col.stage}
                 col={col}
@@ -381,6 +560,7 @@ export function PipelineView({
             ))}
           </div>
 
+          {focus === "conversation" ? null : (
           <div className="grid shrink-0 gap-2 sm:grid-cols-1">
             {PARKED_COLUMNS.map((col) => (
               <ParkedStageColumn
@@ -402,6 +582,7 @@ export function PipelineView({
               />
             ))}
           </div>
+          )}
         </div>
 
         <DragOverlay>
@@ -437,7 +618,7 @@ function ParkedStage({
   onOpen: (id: string) => void;
   activeId: string | null;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: col.stage });
+  const { setNodeRef, isOver } = useDroppable({ id: col.id });
   return (
     <div
       ref={setNodeRef}
@@ -500,7 +681,13 @@ function PipelineColumn({
   onOpen,
   activeId,
 }: {
-  col: (typeof MAIN_COLUMNS)[number] | (typeof PARKED_COLUMNS)[number];
+  col: {
+    id: string;
+    title: string;
+    empty: string;
+    color: string;
+    acceptsDrop?: boolean;
+  };
   leads: LeadWithOutreach[];
   count: number;
   backfilling: boolean;
@@ -508,7 +695,10 @@ function PipelineColumn({
   onOpen: (id: string) => void;
   activeId: string | null;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: col.stage });
+  const { setNodeRef, isOver } = useDroppable({
+    id: col.id,
+    disabled: col.acceptsDrop === false,
+  });
   return (
     <div
       ref={setNodeRef}

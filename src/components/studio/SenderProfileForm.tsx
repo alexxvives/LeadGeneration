@@ -80,6 +80,8 @@ const PREVIEW_LEAD: Lead = {
   customFields: {},
   waitingOnUs: false,
   demoDone: false,
+  conversationStep: null,
+  conversationStepAt: null,
   createdAt: new Date(0).toISOString(),
 };
 

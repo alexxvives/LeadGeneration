@@ -35,6 +35,38 @@ export type CrmStage =
   | "closed"         // won — became a client
   | "not_interested"; // lost — prospect declined
 
+/**
+ * Where an in-conversation lead sits. Unresponsive is not stored — it is
+ * derived when the latest journal touch is more than 14 days old and no
+ * task is open (see `conversationBucket`).
+ */
+export type ConversationStep =
+  | "evaluating"
+  | "waiting_on_demo"
+  | "reviewing_contract"
+  | "onboarding"
+  | "pending_delivery";
+
+export type ConversationBucket = ConversationStep | "unresponsive";
+
+const CONVERSATION_STEPS: readonly ConversationStep[] = [
+  "evaluating",
+  "waiting_on_demo",
+  "reviewing_contract",
+  "onboarding",
+  "pending_delivery",
+] as const;
+
+export function normalizeConversationStep(raw: unknown): ConversationStep | null {
+  if (
+    typeof raw === "string" &&
+    (CONVERSATION_STEPS as readonly string[]).includes(raw)
+  ) {
+    return raw as ConversationStep;
+  }
+  return null;
+}
+
 const CRM_STAGES: readonly CrmStage[] = [
   "new",
   "contacted",
@@ -437,8 +469,18 @@ export interface Lead {
    * Derived on read / follow-up writes — not a separate switch.
    */
   waitingOnUs: boolean;
-  /** In-conversation: a demo has been given. */
+  /**
+   * Legacy in-conversation flag. The pipeline uses `conversationStep` now;
+   * this stays so older rows still load.
+   */
   demoDone: boolean;
+  /** Manual place inside In Conversation. Null until someone sets one. */
+  conversationStep: ConversationStep | null;
+  /**
+   * Local date (YYYY-MM-DD) the step was last set. Counts as a touch so a
+   * drag out of Unresponsive does not snap back the same day.
+   */
+  conversationStepAt: string | null;
   createdAt: string;
 }
 

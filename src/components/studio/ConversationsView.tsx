@@ -7,12 +7,13 @@ import {
   formatLastContact,
   hasPendingTask,
   lastContactTimestamp,
-  pendingUserFollowUpCount,
   resolveFollowUpKind,
   sortFollowUpsNewestFirst,
 } from "@/lib/follow-ups";
+import { conversationBucket } from "@/lib/conversation-steps";
 import { shortLocation } from "@/lib/format-location";
-import { CalendarIcon, DemoIcon, PinIcon, WaitingIcon } from "@/components/icons";
+import { PinIcon, WaitingIcon } from "@/components/icons";
+import { ConversationStepBadge } from "@/components/studio/ConversationStepBadge";
 import { EmptyState } from "@/components/studio/StudioHelpers";
 import { MarqueeText } from "@/components/studio/MarqueeText";
 import { AuthorAvatar } from "@/components/studio/JournalEntries";
@@ -44,14 +45,12 @@ export function ConversationsView({
   tasksByLeadId,
   onOpen,
   onCompleteTask,
-  onCompleteFollowUp,
 }: {
   leads: LeadWithOutreach[];
   emptyHref: string;
   tasksByLeadId?: Map<string, Task[]>;
   onOpen: (id: string) => void;
   onCompleteTask?: (leadId: string) => void;
-  onCompleteFollowUp?: (leadId: string) => void;
 }) {
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
 
@@ -79,11 +78,11 @@ export function ConversationsView({
   return (
     <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {rows.map((lead) => {
-        const pendingFollowUps = pendingUserFollowUpCount(lead.followUps);
         const waitingOnUs = hasPendingTask(
           lead.followUps,
           tasksByLeadId?.get(lead.id),
         );
+        const bucket = conversationBucket(lead, tasksByLeadId?.get(lead.id));
         const comments = recentComments(lead.followUps);
         const name = lead.contactName?.trim() || lead.company || "Untitled";
         const cityCountry = shortLocation(lead.location);
@@ -121,28 +120,18 @@ export function ConversationsView({
                     </span>
                   ) : null}
                 </div>
-                {(waitingOnUs || lead.demoDone) ? (
-                  <span className="inline-flex shrink-0 items-center gap-1">
-                    {waitingOnUs ? (
-                      <span
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 text-amber-300 shadow-[0_0_12px_rgba(247,185,85,0.35)] ring-1 ring-amber-400/45"
-                        title="Waiting on us"
-                        aria-label="Waiting on us"
-                      >
-                        <WaitingIcon className="h-3.5 w-3.5" />
-                      </span>
-                    ) : null}
-                    {lead.demoDone ? (
-                      <span
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-aurora-400/20 text-aurora-300 ring-1 ring-aurora-400/40"
-                        title="Demo done"
-                        aria-label="Demo done"
-                      >
-                        <DemoIcon className="h-3.5 w-3.5" />
-                      </span>
-                    ) : null}
-                  </span>
-                ) : null}
+                <span className="inline-flex shrink-0 items-center gap-1">
+                  {waitingOnUs ? (
+                    <span
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 text-amber-300 shadow-[0_0_12px_rgba(247,185,85,0.35)] ring-1 ring-amber-400/45"
+                      title="Waiting on us"
+                      aria-label="Waiting on us"
+                    >
+                      <WaitingIcon className="h-3.5 w-3.5" />
+                    </span>
+                  ) : null}
+                  <ConversationStepBadge bucket={bucket} />
+                </span>
               </div>
               {comments.length > 0 ? (
                 <ul className="mt-2 space-y-1.5">
@@ -187,21 +176,6 @@ export function ConversationsView({
                     className="inline-flex items-center rounded-full bg-aurora-400/20 px-2 py-0.5 text-[10px] font-medium text-aurora-200 ring-1 ring-aurora-400/35 hover:bg-aurora-400/30 disabled:opacity-50"
                   >
                     Task
-                  </button>
-                ) : null}
-                {pendingFollowUps > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => onCompleteFollowUp?.(lead.id)}
-                    disabled={editLocked || !onCompleteFollowUp}
-                    title={editLocked ? lockHint : "Mark follow-up done"}
-                    aria-label="Mark follow-up done"
-                    className="inline-flex items-center gap-1 rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-300 ring-1 ring-violet-400/30 hover:bg-violet-400/25 disabled:opacity-50"
-                  >
-                    <CalendarIcon className="h-2.5 w-2.5" />
-                    {pendingFollowUps === 1
-                      ? "Follow-up"
-                      : `${pendingFollowUps} follow-ups`}
                   </button>
                 ) : null}
               </span>

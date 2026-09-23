@@ -143,6 +143,12 @@ export function mergeSlimIntoCached(
   const crmStage = stale ? prev.crmStage : (incoming.crmStage ?? prev.crmStage);
   const waitingOnUs = hasPendingTask(followUps);
   const demoDone = stale ? prev.demoDone : (incoming.demoDone ?? prev.demoDone);
+  const conversationStep = stale
+    ? prev.conversationStep
+    : (incoming.conversationStep ?? prev.conversationStep);
+  const conversationStepAt = stale
+    ? prev.conversationStepAt
+    : (incoming.conversationStepAt ?? prev.conversationStepAt);
   const company = stale ? prev.company : incoming.company;
   const website = stale ? prev.website : incoming.website;
   const location = stale ? prev.location : incoming.location;
@@ -176,6 +182,8 @@ export function mergeSlimIntoCached(
     crmStage,
     waitingOnUs,
     demoDone,
+    conversationStep,
+    conversationStepAt,
     contactMethods,
     emails,
     phones,

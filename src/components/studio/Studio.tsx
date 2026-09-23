@@ -11,11 +11,12 @@ import {
   RateLimitedError,
   type BoardResponse,
 } from "@/lib/client-api";
-import type { BoardPerson, Contact, ContactMethod, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId, Task } from "@/lib/types";
+import type { BoardPerson, Contact, ContactMethod, ConversationStep, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId, Task } from "@/lib/types";
 import {
   mergeFollowUpLists,
   markNewestPendingFollowUpDone,
   markNewestPendingTaskDone,
+  todayIsoDate,
 } from "@/lib/follow-ups";
 import { contactMethodLabel, rememberDroppedContactMethods } from "@/lib/contact-methods";
 import {
@@ -40,7 +41,7 @@ import { VerifyLimitModal } from "./VerifyLimitModal";
 import { crmStageLabel, Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
-import { PipelineView } from "./PipelineView";
+import { PipelineFocusToggle, PipelineView } from "./PipelineView";
 import {
   OutreachView,
   canRedraftOutreach,
@@ -219,6 +220,9 @@ export function Studio() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pipelineFocus, setPipelineFocus] = useState<"stages" | "conversation">(
+    "stages",
+  );
   const hasLoadedRef = useRef(false);
 
   const [running, setRunning] = useState(false);
@@ -1684,6 +1688,41 @@ export function Studio() {
     }
   };
 
+  const onSetConversationStep = async (
+    leadId: string,
+    step: ConversationStep,
+  ) => {
+    if (editLockedRef.current) return;
+    const conversationStepAt = todayIsoDate();
+    const writeAt = patchLeadLocal(
+      leadId,
+      {
+        crmStage: "in_conversation",
+        conversationStep: step,
+        conversationStepAt,
+      },
+      { pending: true },
+    );
+    try {
+      await enqueueLeadWrite(leadId, async () => {
+        const { lead } = await api.updateLead(leadId, {
+          crmStage: "in_conversation",
+          conversationStep: step,
+          conversationStepAt,
+        });
+        applyServerLead(
+          leadId,
+          lead,
+          { crmStage: "in_conversation", conversationStep: step, conversationStepAt },
+          writeAt,
+        );
+      });
+    } catch (e) {
+      await refresh();
+      toast("err", (e as Error).message);
+    }
+  };
+
   const onMarkContacted = async (
     leadId: string,
     method: ContactMethod,
@@ -1779,6 +1818,10 @@ export function Studio() {
               body.waitingOnUs = latest.waitingOnUs;
             } else if (key === "demoDone") {
               body.demoDone = latest.demoDone;
+            } else if (key === "conversationStep") {
+              body.conversationStep = latest.conversationStep;
+            } else if (key === "conversationStepAt") {
+              body.conversationStepAt = latest.conversationStepAt;
             }
           }
         }
@@ -2334,6 +2377,12 @@ export function Studio() {
                               ? "Users"
                               : "Search"}
             </h1>
+            {view === "pipeline" ? (
+              <PipelineFocusToggle
+                value={pipelineFocus}
+                onChange={setPipelineFocus}
+              />
+            ) : null}
             {view === "boards" ? (
               <button
                 type="button"
@@ -2384,13 +2433,15 @@ export function Studio() {
               : view === "boards"
                 ? "Named lists for campaigns or niches. Invite collaborators; take control if someone else is live."
                 : view === "pipeline"
-                  ? "Drag leads between stages as conversations progress."
+                  ? pipelineFocus === "conversation"
+                    ? "In-conversation leads, from evaluating through delivery. Unresponsive is automatic."
+                    : "Drag leads between stages as conversations progress."
                   : view === "leads"
                     ? "All prospects on this board — filter, edit, and export."
                     : view === "outreach"
                       ? "Draft and send outreach one lead at a time."
                       : view === "conversations"
-                        ? "Active dialogues — demo, waiting, and follow-ups."
+                        ? "Active dialogues — step, waiting, and recent notes."
                         : view === "contacts"
                           ? "Collaborators on this board — notes and follow-ups land on Calendar."
                         : view === "tasks"
@@ -2662,6 +2713,9 @@ export function Studio() {
                 onCompleteTask={onCompletePendingTask}
                 onCompleteFollowUp={onCompletePendingFollowUp}
                 onMoveStage={onMoveStage}
+                focus={pipelineFocus}
+                onFocusChange={setPipelineFocus}
+                onSetConversationStep={onSetConversationStep}
               />
             </>
           )}
@@ -2933,7 +2987,6 @@ export function Studio() {
               tasksByLeadId={tasksByLeadId}
               onOpen={openInfo}
               onCompleteTask={onCompletePendingTask}
-              onCompleteFollowUp={onCompletePendingFollowUp}
             />
           )}
         </div>

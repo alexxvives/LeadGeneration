@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import {
+  normalizeConversationStep,
   normalizeCrmStage,
   normalizeEasyEmailProvider,
   type Board,
@@ -17,7 +18,12 @@ import {
   type Workspace,
 } from "@/lib/types";
 import { parseContactMethods } from "@/lib/contact-methods";
-import { isContactRegisteredNote, canonicalizeFollowUp, hasPendingTask } from "@/lib/follow-ups";
+import {
+  canonicalizeFollowUp,
+  hasPendingTask,
+  isContactRegisteredNote,
+  parseStoredFollowUps,
+} from "@/lib/follow-ups";
 import {
   parseAssigneesJson,
   sanitizeAssignees,
@@ -89,9 +95,8 @@ function normalizeWorkspace(w: Workspace): Workspace {
 function normalizeLead(l: Lead): Lead {
   // Cast through unknown so TS doesn't treat these as always-defined on old JSON rows.
   const raw = l as unknown as Record<string, unknown>;
-  const followUps = ((raw.followUps as Lead["followUps"] | undefined) ?? [])
-    .filter((f) => !isContactRegisteredNote(f?.note ?? ""))
-    .map((f) => canonicalizeFollowUp({ ...f, note: f?.note ?? "" }));
+  const stored = parseStoredFollowUps(raw.followUps);
+  const followUps = stored.followUps;
   return {
     ...l,
     boardId: typeof raw.boardId === "string" ? raw.boardId : "",
@@ -115,6 +120,11 @@ function normalizeLead(l: Lead): Lead {
         : {},
     waitingOnUs: hasPendingTask(followUps),
     demoDone: raw.demoDone === true,
+    conversationStep: normalizeConversationStep(raw.conversationStep),
+    conversationStepAt:
+      typeof raw.conversationStepAt === "string"
+        ? raw.conversationStepAt.slice(0, 10)
+        : null,
   };
 }
 
@@ -705,7 +715,17 @@ export class JsonStore implements LeadRepository {
     const data = await this.read();
     const l = data.leads.find((l) => l.id === id && this.inScope(l));
     if (!l) return null;
-    return normalizeLead(l);
+    const lead = normalizeLead(l);
+    if (parseStoredFollowUps(l.followUps).deduped) {
+      await this.mutate((fresh) => {
+        const row = fresh.leads.find((x) => x.id === id && this.inScope(x));
+        if (row && parseStoredFollowUps(row.followUps).deduped) {
+          row.followUps = normalizeLead(row).followUps;
+        }
+        return { data: fresh, result: undefined };
+      });
+    }
+    return lead;
   }
 
   async listContacts(boardId?: string): Promise<Contact[]> {
@@ -919,6 +939,18 @@ export class JsonStore implements LeadRepository {
           return leadHydrateLane(l, o) === filter.lane;
         })
       : sorted;
+    const dirty = leads.filter((l) => parseStoredFollowUps(l.followUps).deduped);
+    if (dirty.length > 0) {
+      const dirtyIds = new Set(dirty.map((l) => l.id));
+      await this.mutate((fresh) => {
+        for (const row of fresh.leads) {
+          if (!dirtyIds.has(row.id) || !this.inScope(row)) continue;
+          if (!parseStoredFollowUps(row.followUps).deduped) continue;
+          row.followUps = normalizeLead(row).followUps;
+        }
+        return { data: fresh, result: undefined };
+      });
+    }
     const offset = Math.max(0, filter?.offset ?? 0);
     if (filter?.limit != null && filter.limit >= 0) {
       return byLane.slice(offset, offset + filter.limit);

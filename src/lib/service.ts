@@ -55,6 +55,7 @@ import type {
   BoardPerson,
   BoardSummary,
   ContactMethod,
+  ConversationStep,
   CrmStage,
   EasyEmailProvider,
   CreateRunInput,
@@ -88,7 +89,8 @@ import {
   contactMethodsEqual,
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, emailSentFollowUpId, hasEmailSentOn, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
+import { conversationStepPatch } from "@/lib/conversation-steps";
 import {
   appendJournalTaskLine,
   backfillTasksFromJournal,
@@ -903,6 +905,8 @@ export async function createAndRunSearch(
       customFields: {},
       waitingOnUs: false,
       demoDone: false,
+      conversationStep: null,
+      conversationStepAt: null,
       createdAt: nowIso(),
     }));
     await db.createLeads(leads);
@@ -1765,21 +1769,24 @@ export async function sendApprovedOutreach(
         ctx.userEmail?.trim() ||
         null;
       const emailSentNote = "Email sent";
-      // App send always journals its own line — chip logs can add more the
-      // same day; collapse only drops a bare "Email sent" duplicate.
-      const followUps = [
-        withFollowUpAuthor(
-          {
-            id: newId("fu"),
-            date: today,
-            note: emailSentNote,
-            done: true,
-            kind: "email" as const,
-          },
-          actor,
-        ),
-        ...existing,
-      ];
+      // One automatic line per lead per day. The drawer heal uses the same id
+      // so the two writers cannot leave a pair of "Email sent" notes.
+      const alreadyLogged = hasEmailSentOn(existing, today);
+      const followUps = alreadyLogged
+        ? existing
+        : [
+            withFollowUpAuthor(
+              {
+                id: emailSentFollowUpId(lead.id, today),
+                date: today,
+                note: emailSentNote,
+                done: true,
+                kind: "email" as const,
+              },
+              actor,
+            ),
+            ...existing,
+          ];
       crmPatch.followUps = collapseEmailSentFollowUps(followUps, actor);
     }
     await db.updateLead(outreach.leadId, crmPatch);
@@ -2058,6 +2065,10 @@ export async function setOutreachDeliveryStatus(
           ...existingFu,
         ];
       }
+      Object.assign(
+        patch,
+        conversationStepPatch(lead, patch, today),
+      );
       if (Object.keys(patch).length > 0) {
         await ctx.db.updateLead(outreach.leadId, patch);
       }
@@ -2552,6 +2563,8 @@ export async function updateLeadCrm(
     customFields?: Record<string, string>;
     waitingOnUs?: boolean;
     demoDone?: boolean;
+    conversationStep?: ConversationStep | null;
+    conversationStepAt?: string | null;
   },
 ): Promise<Lead | null> {
   const found = await findLeadAccess(ctx, leadId);
@@ -2699,6 +2712,19 @@ export async function updateLeadCrm(
     next.waitingOnUs = patch.waitingOnUs;
   }
 
+  Object.assign(
+    next,
+    conversationStepPatch(
+      lead,
+      {
+        crmStage: next.crmStage,
+        conversationStep: patch.conversationStep,
+        conversationStepAt: patch.conversationStepAt,
+      },
+      nowIso().slice(0, 10),
+    ),
+  );
+
   return db.updateLead(leadId, next);
 }
 
@@ -2778,6 +2804,8 @@ export async function createManualLead(
     customFields: {},
     waitingOnUs: false,
     demoDone: false,
+    conversationStep: null,
+    conversationStepAt: null,
     createdAt: nowIso(),
   };
 
@@ -3148,6 +3176,8 @@ export async function importLeads(
         customFields: {},
         waitingOnUs: false,
         demoDone: false,
+        conversationStep: null,
+        conversationStepAt: null,
         createdAt: nowIso(),
       };
     });

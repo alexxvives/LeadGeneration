@@ -584,23 +584,79 @@ export function calendarEventsFromLegacyJournalTasks(
 }
 
 /**
+ * Stable id for the automatic “Email sent” line. Send and the drawer heal
+ * share it so a race cannot insert two rows for the same lead and day.
+ */
+export function emailSentFollowUpId(leadId: string, date: string): string {
+  return `fu-email-${leadId}-${date}`;
+}
+
+/**
+ * Bare “Email sent” (or a slim board row whose body was stripped) on this day.
+ * A line with extra detail (“Email sent: pricing”) is kept.
+ */
+function bareEmailSentDate(f: FollowUp): string | null {
+  const note = f.note.trim();
+  if (/^email sent$/i.test(note)) return f.date;
+  if (!note && f.kind === "email") return f.date;
+  return null;
+}
+
+/** True when this day already has the automatic send line (including a slim shell). */
+export function hasEmailSentOn(followUps: FollowUp[], date: string): boolean {
+  return followUps.some((raw) => {
+    const f = canonicalizeFollowUp(raw);
+    return bareEmailSentDate(f) === date || (
+      f.date === date && isEmailSentNote(f.note)
+    );
+  });
+}
+
+/**
  * Drop a second bare "Email sent" on the same day. Names live on authorName
  * now — do not rewrite the line to “Email sent by …”.
+ * Prefer a row that still has body text over a slim empty shell.
  */
 export function collapseEmailSentFollowUps(
   followUps: FollowUp[],
   actorName?: string | null,
 ): FollowUp[] {
-  const seenBareDates = new Set<string>();
-  return followUps.flatMap((raw) => {
+  const keptByDate = new Map<string, FollowUp>();
+  const out: FollowUp[] = [];
+  for (const raw of followUps) {
     const f = withFollowUpAuthor(canonicalizeFollowUp(raw), actorName);
-    if (!isEmailSentNote(f.note)) return [f];
-    const isBare = /^email sent$/i.test(f.note.trim());
-    if (!isBare) return [{ ...f, kind: f.kind ?? "email" }];
-    if (seenBareDates.has(f.date)) return [];
-    seenBareDates.add(f.date);
-    return [{ ...f, kind: f.kind ?? "email" }];
-  });
+    const day = bareEmailSentDate(f);
+    if (!day) {
+      out.push(f.kind === "email" || isEmailSentNote(f.note) ? { ...f, kind: f.kind ?? "email" } : f);
+      continue;
+    }
+    const tagged = { ...f, kind: f.kind ?? "email" as const };
+    const prev = keptByDate.get(day);
+    if (!prev) {
+      keptByDate.set(day, tagged);
+      out.push(tagged);
+      continue;
+    }
+    if (!prev.note.trim() && tagged.note.trim()) {
+      const idx = out.findIndex((row) => row.id === prev.id);
+      if (idx >= 0) out[idx] = tagged;
+      keptByDate.set(day, tagged);
+    }
+  }
+  return out;
+}
+
+/** Journal JSON from the DB, with registered-contact noise and email dupes gone. */
+export function parseStoredFollowUps(raw: unknown): {
+  followUps: FollowUp[];
+  deduped: boolean;
+} {
+  const list = Array.isArray(raw) ? (raw as FollowUp[]) : [];
+  const mapped = list
+    .filter((f) => f && !isContactRegisteredNote(f.note ?? ""))
+    .map((f) => canonicalizeFollowUp({ ...f, note: f.note ?? "" }));
+  const followUps = collapseEmailSentFollowUps(mapped);
+  return { followUps, deduped: followUps.length < mapped.length };
 }
 
 /**
@@ -632,18 +688,19 @@ export function mergeFollowUpLists(
   droppedIds?: ReadonlySet<string> | null,
   opts?: { preferIncoming?: boolean; patchExisting?: boolean },
 ): FollowUp[] {
-  if (cached.length === 0 && incoming.length === 0) return incoming;
+  const finish = (rows: FollowUp[]) => collapseEmailSentFollowUps(rows);
+  if (cached.length === 0 && incoming.length === 0) return finish(incoming);
   if (incoming.length === 0) {
     const kept = droppedIds?.size
       ? cached.filter((f) => !droppedIds.has(f.id))
       : cached;
-    return kept.map(canonicalizeFollowUp);
+    return finish(kept.map(canonicalizeFollowUp));
   }
   if (cached.length === 0) {
     const kept = droppedIds?.size
       ? incoming.filter((f) => !droppedIds.has(f.id))
       : incoming;
-    return kept.map(canonicalizeFollowUp);
+    return finish(kept.map(canonicalizeFollowUp));
   }
   const cachedById = new Map(cached.map((f) => [f.id, f]));
   // Full drawer GET: restore note bodies. Keep cached-only ids (optimistic add).
@@ -669,7 +726,7 @@ export function mergeFollowUpLists(
       if (droppedIds?.has(f.id) || incomingIds.has(f.id)) continue;
       out.push(canonicalizeFollowUp(f));
     }
-    return out;
+    return finish(out);
   }
   const incomingById = new Map(incoming.map((f) => [f.id, f]));
   const seen = new Set<string>();
@@ -701,5 +758,5 @@ export function mergeFollowUpLists(
     seen.add(f.id);
     out.push(canonicalizeFollowUp(f));
   }
-  return out;
+  return finish(out);
 }

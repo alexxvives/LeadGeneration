@@ -10,6 +10,7 @@ import type {
   BoardSummary,
   Contact,
   ContactMethod,
+  ConversationStep,
   CrmStage,
   AdminPlatformStats,
   AdminUserRow,
@@ -421,6 +422,8 @@ export const api = {
       customFields?: Record<string, string>;
       waitingOnUs?: boolean;
       demoDone?: boolean;
+      conversationStep?: ConversationStep | null;
+      conversationStepAt?: string | null;
     },
   ) => jsonFetch<{ lead: Lead }>(`/api/leads/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 
