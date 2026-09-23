@@ -17,7 +17,7 @@ import {
   TrashIcon,
   XIcon,
 } from "@/components/icons";
-import { CONVERSATION_STEPS, isConversationUnresponsive } from "@/lib/conversation-steps";
+import { CONVERSATION_STEPS } from "@/lib/conversation-steps";
 import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
 import {
@@ -1006,11 +1006,6 @@ export function LeadDrawer(props: DrawerProps) {
                 </Lockable>
               ))}
             </div>
-            {isConversationUnresponsive(lead) ? (
-              <p className="mt-2 text-[11px] leading-relaxed text-rose-200/90">
-                Unresponsive — no touch in over two weeks, and no open task.
-              </p>
-            ) : null}
 
             {/* How contacted — skip In Conversation (collaborators already reached). */}
             {crmStage !== "new" && crmStage !== "in_conversation" && (

@@ -124,7 +124,7 @@ export function ConversationsView({
                     </span>
                   ) : null}
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1">
+                <span className="inline-flex shrink-0 items-center gap-1.5">
                   {waitingOnUs ? (
                     <span
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 text-amber-300 shadow-[0_0_12px_rgba(247,185,85,0.35)] ring-1 ring-amber-400/45"
@@ -134,16 +134,19 @@ export function ConversationsView({
                       <WaitingIcon className="h-3.5 w-3.5" />
                     </span>
                   ) : null}
+                  <ConversationStepBadge step={step} />
                   {unresponsive ? (
                     <span
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-rose-400/15 text-rose-200 ring-1 ring-rose-400/40"
-                      title="Unresponsive — no touch in over two weeks"
-                      aria-label="Unresponsive"
+                      className="inline-flex text-rose-400"
+                      title="Unresponsive"
                     >
-                      <UnresponsiveIcon className="h-3.5 w-3.5" />
+                      <UnresponsiveIcon
+                        className="h-3.5 w-3.5"
+                        aria-label="Unresponsive"
+                        role="img"
+                      />
                     </span>
                   ) : null}
-                  <ConversationStepBadge step={step} />
                 </span>
               </div>
               {comments.length > 0 ? (

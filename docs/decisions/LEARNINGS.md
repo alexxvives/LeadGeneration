@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-23 — Quiet the stall mark and the calendar cell
+- The unresponsive sentence in the lead drawer is gone. The rose wash on a pipeline card is gone too: a small rose clock sits at the card’s top right, on Pipeline and Conversations.
+- Calendar day cells write notes and tasks as text. Follow-ups, calls, and sent emails are an icon plus a count in the top right. Month and year are centered.
+- Collaborator cards do not show a follow-up chip.
+
 ### 2026-09-23 — Dev may not be on :3000
 - `npm run dev` bound to http://localhost:3002 because 3000/3001 were already taken.
 - Close-the-loop still means click the *running* studio, not a stale tab on another port.

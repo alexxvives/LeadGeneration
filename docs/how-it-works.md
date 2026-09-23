@@ -92,8 +92,9 @@ Search  →  Enrich  →  Draft  →  Send
     Evaluating · post-demo · Reviewing contract · Onboarding (Excel / invoice)*.
     Dragging to a step sets `conversationStep` and refreshes that clock.
     **Unresponsive** is not a column. Any lead except New with no open task
-    and no touch (journal, send, or step placement) in 14 days shows a red
-    clock on the card and stays in its stage.
+    and no touch (journal, send, or step placement) in 14 days shows a small
+    rose clock at the card’s top right and stays in its stage. The card
+    surface does not turn rose, and the drawer does not repeat the rule.
     Bulk draft lives on **Outreach** (Send stays per-lead).
     CRM **New** = needs human review (there is no separate “In review” tag).
     A **Missed call** stays in New but still shows the phone method icon
@@ -114,8 +115,8 @@ Search  →  Enrich  →  Draft  →  Send
     and recent **notes** / **tasks** (follow-up
     reminders are omitted from the preview).
     An hourglass on the title row means **Waiting on us** (an open task).
-    A colored mark beside it is the conversation step. A red clock beside
-    that mark means **Unresponsive** (same 14-day rule as Pipeline).
+    A colored mark beside it is the conversation step. A small rose clock
+    at the top right means **Unresponsive** (same 14-day rule as Pipeline).
     Those bubbles sit beside the title **column**
     (name + company + city), so they do not push location down.
     The **Task** tag sits bottom-right when one is open. Follow-up chips
@@ -160,11 +161,12 @@ Search  →  Enrich  →  Draft  →  Send
     (constitution Art. I.1 / ADR 0029).
 
   - **Calendar** (`?view=calendar`) — month view of the active board filter.
-    Month and year are custom glass menus (plus chevrons / Today). Note and
+    Month and year sit centered (glass menus, chevrons beside them, Today on
+    the right). Note and
     follow-up dates use the same branded `DatePicker` — not the OS date
-    control. Each day lists **follow-ups**, **tasks** (by deadline — amber
-    check mark), **emails sent**, and **phone calls** — icons **with counts**
-    on the day cell. Sidebar groups: Follow-ups / Tasks / Emails sent / Phone
+    control. A day cell writes **notes** and **tasks** as text. Follow-ups,
+    calls, and emails sent are a small icon plus a count in the top right.
+    Sidebar groups: Follow-ups / Tasks / Notes / Emails sent / Phone
     calls. Task checkbox completes the row and syncs journal + `Task` status.
     ONGOING tasks appear on the deadline day but do not paint the day rose when
     overdue. The studio search bar filters events by lead/title (clears when
@@ -179,8 +181,8 @@ Search  →  Enrich  →  Draft  →  Send
     pill beside the title. Below `lg` a pulsating dot sits next to the
     phone top-bar title (tap to see who and take control). Search is the
     top-bar icon; the board picker lives in the overlay menu.
-    Day cells show the same icons + counts on phone and desktop (larger
-    marks — the cell is otherwise empty).
+    Day cells use that same split on phone and desktop: text for notes and
+    tasks, icon plus count for the rest.
     The lead drawer
     shows a purple **Follow up** tag, no checkbox. Plain notes stay on the
     lead only and never count as follow-ups. Click a lead item to open the

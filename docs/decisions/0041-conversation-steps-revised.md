@@ -28,7 +28,7 @@ reminders never count, open or done. Filing the card into a step does not
 erase that date — `conversation_step_at` only stands in when the lead has no
 contact history, so a card just filed does not flash the clock. An In
 Conversation lead with neither contact history nor a step date is
-unresponsive. Pipeline cards show a red clock; conversation cards show that clock beside the step mark.
+unresponsive. Pipeline and conversation cards show a small rose clock at the top right — the card itself stays the normal surface.
 The lead stays in its step.
 
 ## Alternatives considered

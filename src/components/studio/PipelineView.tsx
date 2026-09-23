@@ -810,30 +810,28 @@ function PipelineCardFace({
     <div
       onClick={() => onOpen(lead.id)}
       data-testid="pipeline-lead-card"
-      className={`group flex h-auto cursor-pointer items-start gap-1 rounded-xl px-3 py-2.5 transition-all ${
+      className={`group relative flex h-auto cursor-pointer items-start gap-1 rounded-xl px-3 py-2.5 transition-all ${
         replied
           ? "border border-sky-400/50 bg-sky-400/10 shadow-[0_0_0_1px_rgba(56,189,248,0.25)] ring-1 ring-sky-400/30 hover:bg-sky-400/15"
           : needsMethod
             ? "border border-amber-400/50 bg-amber-400/10 ring-1 ring-amber-400/30 hover:bg-amber-400/15"
-            : unresponsive
-              ? "border border-rose-400/55 bg-rose-400/10 ring-1 ring-rose-400/35 hover:bg-rose-400/15"
-              : "border border-white/5 bg-ink-900/60 hover:bg-white/[0.03]"
+            : "border border-white/5 bg-ink-900/60 hover:bg-white/[0.03]"
       } ${className}`}
     >
-      <div className="min-w-0 flex-1">
+      {unresponsive ? (
+        <span
+          className="absolute right-1.5 top-1.5 text-rose-400"
+          title="Unresponsive"
+        >
+          <UnresponsiveIcon
+            className="h-3.5 w-3.5"
+            aria-label="Unresponsive"
+            role="img"
+          />
+        </span>
+      ) : null}
+      <div className={`min-w-0 flex-1 ${unresponsive ? "pr-4" : ""}`}>
         <div className="flex min-w-0 items-center gap-1.5">
-          {unresponsive ? (
-            <span
-              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.65)] ring-2 ring-rose-300/80"
-              title="Unresponsive — no touch in over two weeks"
-            >
-              <UnresponsiveIcon
-                className="h-3.5 w-3.5"
-                aria-label="Unresponsive"
-                role="img"
-              />
-            </span>
-          ) : null}
           {replied ? (
             <span
               className="pulse-ring relative inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400"

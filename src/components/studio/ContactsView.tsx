@@ -5,7 +5,6 @@ import type { BoardSummary, Contact } from "@/lib/types";
 import {
   canonicalizeFollowUp,
   followUpAuthorName,
-  pendingUserFollowUpCount,
   sortFollowUpsNewestFirst,
 } from "@/lib/follow-ups";
 import { shortLocation } from "@/lib/format-location";
@@ -98,7 +97,6 @@ export function ContactsView({
       ) : (
         <div className="grid auto-rows-fr items-stretch content-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((c) => {
-            const pending = pendingUserFollowUpCount(c.followUps);
             const latestRaw = sortFollowUpsNewestFirst(c.followUps ?? []).find(
               (f) => f.note.trim(),
             );
@@ -164,11 +162,6 @@ export function ContactsView({
                         <span aria-hidden>·</span>
                         <span className="truncate">{boardName(c.boardId)}</span>
                       </>
-                    ) : null}
-                    {pending > 0 ? (
-                      <span className="shrink-0 whitespace-nowrap rounded-full bg-violet-400/15 px-1.5 py-0.5 font-medium text-violet-200">
-                        {pending === 1 ? "Follow-up" : `${pending} follow-ups`}
-                      </span>
                     ) : null}
                   </div>
                 </button>
