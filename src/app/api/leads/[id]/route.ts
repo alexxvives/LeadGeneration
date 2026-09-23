@@ -45,11 +45,11 @@ const PatchSchema = z.object({
   demoDone: z.boolean().optional(),
   conversationStep: z
     .enum([
-      "evaluating",
+      "evaluating_pre_demo",
       "waiting_on_demo",
+      "evaluating_post_demo",
       "reviewing_contract",
       "onboarding",
-      "pending_delivery",
     ])
     .nullable()
     .optional(),

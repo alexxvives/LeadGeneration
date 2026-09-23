@@ -36,35 +36,36 @@ export type CrmStage =
   | "not_interested"; // lost — prospect declined
 
 /**
- * Where an in-conversation lead sits. Unresponsive is not stored — it is
- * derived when the latest journal touch is more than 14 days old and no
- * task is open (see `conversationBucket`).
+ * Where an in-conversation lead sits. Unresponsive is not a step — it is a
+ * flag when the latest touch is more than 14 days old and no task is open.
  */
 export type ConversationStep =
-  | "evaluating"
+  | "evaluating_pre_demo"
   | "waiting_on_demo"
+  | "evaluating_post_demo"
   | "reviewing_contract"
-  | "onboarding"
-  | "pending_delivery";
-
-export type ConversationBucket = ConversationStep | "unresponsive";
+  | "onboarding";
 
 const CONVERSATION_STEPS: readonly ConversationStep[] = [
-  "evaluating",
+  "evaluating_pre_demo",
   "waiting_on_demo",
+  "evaluating_post_demo",
   "reviewing_contract",
   "onboarding",
-  "pending_delivery",
 ] as const;
 
+/** Older stored ids, read as the closest current step. */
+const LEGACY_CONVERSATION_STEPS: Readonly<Record<string, ConversationStep>> = {
+  evaluating: "evaluating_pre_demo",
+  pending_delivery: "onboarding",
+};
+
 export function normalizeConversationStep(raw: unknown): ConversationStep | null {
-  if (
-    typeof raw === "string" &&
-    (CONVERSATION_STEPS as readonly string[]).includes(raw)
-  ) {
+  if (typeof raw !== "string") return null;
+  if ((CONVERSATION_STEPS as readonly string[]).includes(raw)) {
     return raw as ConversationStep;
   }
-  return null;
+  return LEGACY_CONVERSATION_STEPS[raw] ?? null;
 }
 
 const CRM_STAGES: readonly CrmStage[] = [
@@ -477,8 +478,8 @@ export interface Lead {
   /** Manual place inside In Conversation. Null until someone sets one. */
   conversationStep: ConversationStep | null;
   /**
-   * Local date (YYYY-MM-DD) the step was last set. Counts as a touch so a
-   * drag out of Unresponsive does not snap back the same day.
+   * Local date (YYYY-MM-DD) the step was last set. Counts as a touch so
+   * moving the card does not look unresponsive the same day.
    */
   conversationStepAt: string | null;
   createdAt: string;

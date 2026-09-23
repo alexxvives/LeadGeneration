@@ -9,17 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-23 (Prod board 500 — migration 0040)
+## ⏱️ Status — updated 2026-09-23 (Conversation steps revised)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0040** applied on prod D1.  
-**Deploy:** Worker already selects `conversation_step` (board GET 500’d until 0040). Local UI pass may still need `cf:build` + `wrangler deploy` if it is not this worker.
+**Migrations:** 0021–**0040** applied on prod D1. No new migration for the step rename (free-text column; legacy ids map on read).  
+**Deploy:** This pass is local until `cf:build` + `wrangler deploy`.
 
 ### This pass
-- `GET /api/board` 500 on prod: `listLeads` selected `conversation_step` / `conversation_step_at` and D1 had no such columns. Applied `0040_conversation_step.sql` on `lodestar-prod`. Reload the studio.
+- Dropped Pending delivery and the Unresponsive column (ADR 0041).
+- Steps: Evaluating · pre-demo → Waiting on demo → Evaluating · post-demo → Reviewing contract → Onboarding.
+- Unresponsive is a red clock on the lead’s current stage (Pipeline and Conversations).
 
 ### Next
-1. If the live worker is still behind the local conversation-step UI, `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
+1. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches this step list.
 
 ---
 

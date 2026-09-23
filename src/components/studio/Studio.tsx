@@ -2434,7 +2434,7 @@ export function Studio() {
                 ? "Named lists for campaigns or niches. Invite collaborators; take control if someone else is live."
                 : view === "pipeline"
                   ? pipelineFocus === "conversation"
-                    ? "In-conversation leads, from evaluating through delivery. Unresponsive is automatic."
+                    ? "In-conversation leads, from pre-demo through onboarding. A red clock means unresponsive."
                     : "Drag leads between stages as conversations progress."
                   : view === "leads"
                     ? "All prospects on this board — filter, edit, and export."

@@ -17,11 +17,11 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ContactMethod, ConversationStep, CrmStage, LeadWithOutreach, Task } from "@/lib/types";
 import {
   CONVERSATION_STEPS,
-  UNRESPONSIVE_BUCKET,
   conversationBucket,
   isConversationStep,
+  isConversationUnresponsive,
 } from "@/lib/conversation-steps";
-import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, CalendarIcon, WaitingIcon } from "@/components/icons";
+import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, CalendarIcon, UnresponsiveIcon, WaitingIcon } from "@/components/icons";
 import {
   leadHasMissedCall,
   hasPendingTask,
@@ -101,13 +101,6 @@ const CONVERSATION_COLUMNS: {
     color: step.dotClass,
     acceptsDrop: true,
   })),
-  {
-    id: UNRESPONSIVE_BUCKET.id,
-    title: UNRESPONSIVE_BUCKET.label,
-    empty: "No note in over two weeks, and no open task.",
-    color: UNRESPONSIVE_BUCKET.dotClass,
-    acceptsDrop: false,
-  },
 ];
 
 const ALL_STAGE_TABS = [...MAIN_COLUMNS, ...PARKED_COLUMNS];
@@ -341,7 +334,7 @@ export function PipelineView({
     if (focus === "conversation") {
       const bucket = String(over.id);
       if (!isConversationStep(bucket) || !onSetConversationStep) return;
-      const current = conversationBucket(lead, tasksByLeadId?.get(lead.id));
+      const current = conversationBucket(lead);
       if (current === bucket) return;
       onSetConversationStep(lead.id, bucket);
       return;
@@ -371,7 +364,7 @@ export function PipelineView({
     const groups = new Map<string, LeadWithOutreach[]>();
     for (const col of CONVERSATION_COLUMNS) groups.set(col.id, []);
     for (const lead of inConversation) {
-      const bucket = conversationBucket(lead, tasksByLeadId?.get(lead.id));
+      const bucket = conversationBucket(lead);
       groups.get(bucket)?.push(lead);
     }
     for (const list of groups.values()) {
@@ -380,7 +373,7 @@ export function PipelineView({
       );
     }
     return groups;
-  }, [inConversation, tasksByLeadId]);
+  }, [inConversation]);
   const narrowBucketCol =
     CONVERSATION_COLUMNS.find((c) => c.id === narrowBucket) ??
     CONVERSATION_COLUMNS[0]!;
@@ -708,7 +701,7 @@ function PipelineColumn({
     >
       <div className="flex min-h-[2.75rem] shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2.5 sm:px-4">
         <span className={`h-2 w-2 shrink-0 rounded-full ${col.color}`} />
-        <h3 className="truncate text-sm font-semibold leading-none text-mist-100">{col.title}</h3>
+        <h3 className="truncate text-sm font-semibold leading-none text-mist-100" title={col.title}>{col.title}</h3>
         <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
           {count}
         </span>
@@ -785,12 +778,16 @@ function pipelineCardChrome(
   const replied = lead.outreach?.deliveryStatus === "replied";
   const methods = lead.contactMethods ?? [];
   const missedCall = leadHasMissedCall(lead);
+  const unresponsive = isConversationUnresponsive(
+    lead,
+    tasksByLeadId?.get(lead.id),
+  );
   const iconMethods: ContactMethod[] =
     missedCall && !methods.includes("phone")
       ? [...methods, "phone"]
       : methods;
   const needsMethod = lead.crmStage === "contacted" && methods.length === 0;
-  return { pendingFollowUps, waitingOnUs, noteCount, replied, methods, missedCall, iconMethods, needsMethod };
+  return { pendingFollowUps, waitingOnUs, noteCount, replied, methods, missedCall, iconMethods, needsMethod, unresponsive };
 }
 
 function PipelineCardFace({
@@ -804,7 +801,7 @@ function PipelineCardFace({
 }) {
   const { onCompleteTask, onCompleteFollowUp, tasksByLeadId } =
     usePipelineCardActions();
-  const { pendingFollowUps, waitingOnUs, noteCount, replied, methods, missedCall, iconMethods, needsMethod } =
+  const { pendingFollowUps, waitingOnUs, noteCount, replied, methods, missedCall, iconMethods, needsMethod, unresponsive } =
     pipelineCardChrome(lead, tasksByLeadId);
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
 
@@ -836,6 +833,18 @@ function PipelineCardFace({
           <p className="truncate text-sm font-medium leading-snug text-mist-100">
             {lead.company}
           </p>
+          {unresponsive ? (
+            <span
+              className="inline-flex shrink-0"
+              title="Unresponsive — no touch in over two weeks"
+            >
+              <UnresponsiveIcon
+                className="h-3 w-3 text-rose-400"
+                aria-label="Unresponsive"
+                role="img"
+              />
+            </span>
+          ) : null}
           {waitingOnUs ? (
             <WaitingIcon
               className="h-3 w-3 shrink-0 text-amber-300"

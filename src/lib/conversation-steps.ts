@@ -1,9 +1,9 @@
 import type {
-  ConversationBucket,
   ConversationStep,
   CrmStage,
   FollowUp,
   Lead,
+  Outreach,
   Task,
 } from "@/lib/types";
 import { normalizeConversationStep } from "@/lib/types";
@@ -15,7 +15,7 @@ import {
   todayIsoDate,
 } from "@/lib/follow-ups";
 
-/** Days without a journal touch before an in-conversation lead is Unresponsive. */
+/** Days without a touch before a lead is marked unresponsive. */
 export const UNRESPONSIVE_AFTER_DAYS = 14;
 
 export const CONVERSATION_STEPS: readonly {
@@ -28,9 +28,9 @@ export const CONVERSATION_STEPS: readonly {
   dotClass: string;
 }[] = [
   {
-    id: "evaluating",
-    label: "Evaluating",
-    hint: "They're weighing the offer.",
+    id: "evaluating_pre_demo",
+    label: "Evaluating · pre-demo",
+    hint: "They're weighing the offer before a demo.",
     bubbleClass: "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/45",
     dotClass: "bg-amber-400",
   },
@@ -40,6 +40,13 @@ export const CONVERSATION_STEPS: readonly {
     hint: "A demo is scheduled or still owed.",
     bubbleClass: "bg-sky-400/20 text-sky-200 ring-1 ring-sky-400/40",
     dotClass: "bg-sky-400",
+  },
+  {
+    id: "evaluating_post_demo",
+    label: "Evaluating · post-demo",
+    hint: "They've seen the demo and are still deciding.",
+    bubbleClass: "bg-emerald-400/20 text-emerald-200 ring-1 ring-emerald-400/40",
+    dotClass: "bg-emerald-400",
   },
   {
     id: "reviewing_contract",
@@ -55,22 +62,7 @@ export const CONVERSATION_STEPS: readonly {
     bubbleClass: "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40",
     dotClass: "bg-aurora-300",
   },
-  {
-    id: "pending_delivery",
-    label: "Pending delivery",
-    hint: "Agreed — waiting to deliver.",
-    bubbleClass: "bg-emerald-400/20 text-emerald-200 ring-1 ring-emerald-400/40",
-    dotClass: "bg-emerald-400",
-  },
 ];
-
-export const UNRESPONSIVE_BUCKET = {
-  id: "unresponsive" as const,
-  label: "Unresponsive",
-  hint: "No journal touch in over two weeks, and no open task.",
-  bubbleClass: "bg-rose-400/15 text-rose-200 ring-1 ring-rose-400/40",
-  dotClass: "bg-rose-400",
-};
 
 const STEP_BY_ID = new Map(CONVERSATION_STEPS.map((s) => [s.id, s]));
 
@@ -78,13 +70,8 @@ export function conversationStepMeta(step: ConversationStep) {
   return STEP_BY_ID.get(step) ?? CONVERSATION_STEPS[0]!;
 }
 
-export function conversationBucketMeta(bucket: ConversationBucket) {
-  if (bucket === "unresponsive") return UNRESPONSIVE_BUCKET;
-  return conversationStepMeta(bucket);
-}
-
 export function isConversationStep(raw: string): raw is ConversationStep {
-  return normalizeConversationStep(raw) != null;
+  return normalizeConversationStep(raw) === raw;
 }
 
 /**
@@ -105,37 +92,42 @@ export function latestConversationTouchDate(
   return best;
 }
 
+/**
+ * Quiet lead: no journal touch, send, or step placement in 14 days, and no
+ * open task. New leads are untouched, not unresponsive. A lead with no
+ * history at all is unresponsive only once they are In Conversation.
+ */
 export function isConversationUnresponsive(
-  lead: Pick<Lead, "followUps" | "conversationStepAt">,
+  lead: Pick<Lead, "crmStage" | "followUps" | "conversationStepAt"> & {
+    outreach?: Pick<Outreach, "sentAt"> | null;
+  },
   tasks?: Task[],
   today = todayIsoDate(),
 ): boolean {
+  const stage = lead.crmStage ?? "new";
+  if (stage === "new") return false;
   if (hasPendingTask(lead.followUps, tasks)) return false;
   const cutoff = addDaysIso(-UNRESPONSIVE_AFTER_DAYS);
   const touch = latestConversationTouchDate(lead.followUps, today);
   const placed = lead.conversationStepAt?.slice(0, 10) || null;
-  const latest = [touch, placed].filter((d): d is string => !!d).sort().at(-1) ?? null;
-  // Never touched and never placed — treat as cold.
-  if (!latest) return true;
+  const sent = lead.outreach?.sentAt?.slice(0, 10) || null;
+  const latest =
+    [touch, placed, sent].filter((d): d is string => !!d).sort().at(-1) ?? null;
+  if (!latest) return stage === "in_conversation";
   return latest < cutoff;
 }
 
-/** Column this in-conversation lead belongs in. Others fall back to their stored step. */
+/** Column this in-conversation lead belongs in. */
 export function conversationBucket(
-  lead: Pick<Lead, "crmStage" | "followUps" | "conversationStep" | "conversationStepAt">,
-  tasks?: Task[],
-  today = todayIsoDate(),
-): ConversationBucket {
-  const stored = lead.conversationStep ?? "evaluating";
-  if ((lead.crmStage ?? "new") !== "in_conversation") return stored;
-  if (isConversationUnresponsive(lead, tasks, today)) return "unresponsive";
-  return stored;
+  lead: Pick<Lead, "conversationStep">,
+): ConversationStep {
+  return lead.conversationStep ?? "evaluating_pre_demo";
 }
 
 /**
- * Entering In Conversation without a step lands in Evaluating.
- * Setting a step refreshes `conversationStepAt` so Unresponsive does not
- * immediately reclaim the card.
+ * Entering In Conversation without a step lands in Evaluating · pre-demo.
+ * Setting a step refreshes `conversationStepAt` so the card does not look
+ * unresponsive the same day.
  */
 export function conversationStepPatch(
   lead: Pick<Lead, "crmStage" | "conversationStep" | "conversationStepAt">,
@@ -156,7 +148,7 @@ export function conversationStepPatch(
   }
   if (!lead.conversationStep) {
     return {
-      conversationStep: "evaluating",
+      conversationStep: "evaluating_pre_demo",
       conversationStepAt: (lead.conversationStepAt ?? today).slice(0, 10),
     };
   }

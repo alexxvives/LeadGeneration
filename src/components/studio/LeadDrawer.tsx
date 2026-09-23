@@ -211,7 +211,7 @@ export function LeadDrawer(props: DrawerProps) {
   // CRM state (local, synced on changes)
   const [crmStage, setCrmStage] = useState<CrmStage>(lead.crmStage ?? "new");
   const [conversationStep, setConversationStep] = useState<ConversationStep>(
-    lead.conversationStep ?? "evaluating",
+    lead.conversationStep ?? "evaluating_pre_demo",
   );
   const [contactMethods, setContactMethods] = useState<ContactMethod[]>(
     lead.contactMethods ?? [],
@@ -277,7 +277,7 @@ export function LeadDrawer(props: DrawerProps) {
       ? incomingMethods
       : mergeContactMethods(contactMethods, incomingMethods, droppedMethods);
     if (leadChanged || crmStage !== nextStage) setCrmStage(nextStage);
-    const nextStep = lead.conversationStep ?? "evaluating";
+    const nextStep = lead.conversationStep ?? "evaluating_pre_demo";
     if (leadChanged || conversationStep !== nextStep) setConversationStep(nextStep);
     if (leadChanged || !contactMethodsEqual(contactMethods, nextMethods)) {
       setContactMethods(nextMethods);
@@ -968,6 +968,11 @@ export function LeadDrawer(props: DrawerProps) {
                 </Lockable>
               ))}
             </div>
+            {isConversationUnresponsive(lead) ? (
+              <p className="mt-2 text-[11px] leading-relaxed text-rose-200/90">
+                Unresponsive — no touch in over two weeks, and no open task.
+              </p>
+            ) : null}
 
             {/* How contacted — skip In Conversation (collaborators already reached). */}
             {crmStage !== "new" && crmStage !== "in_conversation" && (
@@ -1024,11 +1029,6 @@ export function LeadDrawer(props: DrawerProps) {
                     </option>
                   ))}
                 </Select>
-                {isConversationUnresponsive(lead) ? (
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-rose-200/90">
-                    Unresponsive — the latest note is more than two weeks old and there is no open task.
-                  </p>
-                ) : null}
               </div>
             ) : null}
           </section>

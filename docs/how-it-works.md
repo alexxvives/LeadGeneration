@@ -88,12 +88,12 @@ Search  →  Enrich  →  Draft  →  Send
     (drag cards between columns). Below `lg` it is one stage at a time
     (a single scrolling row of tabs — no on-card stage select).
     A **Stages / In conversation** toggle beside the title switches the board
-    to in-conversation buckets only: *Evaluating · Waiting on demo ·
-    Reviewing contract · Onboarding (Excel / invoice) · Pending delivery ·
-    Unresponsive*. Unresponsive is automatic when the latest journal touch
-    is more than 14 days old and no task is open. Dragging to another
-    bucket sets `conversationStep` and refreshes that clock. Unresponsive
-    is not a drop target.
+    to in-conversation steps only: *Evaluating · pre-demo · Waiting on demo ·
+    Evaluating · post-demo · Reviewing contract · Onboarding (Excel / invoice)*.
+    Dragging to a step sets `conversationStep` and refreshes that clock.
+    **Unresponsive** is not a column. Any lead except New with no open task
+    and no touch (journal, send, or step placement) in 14 days shows a red
+    clock on the card and stays in its stage.
     Bulk draft lives on **Outreach** (Send stays per-lead).
     CRM **New** = needs human review (there is no separate “In review” tag).
     A **Missed call** stays in New but still shows the phone method icon
@@ -114,7 +114,8 @@ Search  →  Enrich  →  Draft  →  Send
     and recent **notes** / **tasks** (follow-up
     reminders are omitted from the preview).
     An hourglass on the title row means **Waiting on us** (an open task).
-    A colored mark beside it is the conversation step (or Unresponsive).
+    A colored mark beside it is the conversation step. A red clock beside
+    that mark means **Unresponsive** (same 14-day rule as Pipeline).
     Those bubbles sit beside the title **column**
     (name + company + city), so they do not push location down.
     The **Task** tag sits bottom-right when one is open. Follow-up chips

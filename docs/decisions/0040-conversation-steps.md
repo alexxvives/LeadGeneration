@@ -1,5 +1,5 @@
 # 0040. In-conversation steps on the pipeline
-- Status: accepted
+- Status: superseded in part by [0041](0041-conversation-steps-revised.md) (step list + Unresponsive column)
 - Date: 2026-09-23
 
 ## Context

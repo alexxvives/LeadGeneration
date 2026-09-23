@@ -10,9 +10,9 @@ import {
   resolveFollowUpKind,
   sortFollowUpsNewestFirst,
 } from "@/lib/follow-ups";
-import { conversationBucket } from "@/lib/conversation-steps";
+import { conversationBucket, isConversationUnresponsive } from "@/lib/conversation-steps";
 import { shortLocation } from "@/lib/format-location";
-import { PinIcon, WaitingIcon } from "@/components/icons";
+import { PinIcon, UnresponsiveIcon, WaitingIcon } from "@/components/icons";
 import { ConversationStepBadge } from "@/components/studio/ConversationStepBadge";
 import { EmptyState } from "@/components/studio/StudioHelpers";
 import { MarqueeText } from "@/components/studio/MarqueeText";
@@ -82,7 +82,11 @@ export function ConversationsView({
           lead.followUps,
           tasksByLeadId?.get(lead.id),
         );
-        const bucket = conversationBucket(lead, tasksByLeadId?.get(lead.id));
+        const step = conversationBucket(lead);
+        const unresponsive = isConversationUnresponsive(
+          lead,
+          tasksByLeadId?.get(lead.id),
+        );
         const comments = recentComments(lead.followUps);
         const name = lead.contactName?.trim() || lead.company || "Untitled";
         const cityCountry = shortLocation(lead.location);
@@ -130,7 +134,16 @@ export function ConversationsView({
                       <WaitingIcon className="h-3.5 w-3.5" />
                     </span>
                   ) : null}
-                  <ConversationStepBadge bucket={bucket} />
+                  {unresponsive ? (
+                    <span
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-rose-400/15 text-rose-200 ring-1 ring-rose-400/40"
+                      title="Unresponsive — no touch in over two weeks"
+                      aria-label="Unresponsive"
+                    >
+                      <UnresponsiveIcon className="h-3.5 w-3.5" />
+                    </span>
+                  ) : null}
+                  <ConversationStepBadge step={step} />
                 </span>
               </div>
               {comments.length > 0 ? (

@@ -73,6 +73,7 @@ Trade-offs, follow-ups, what this makes easy/hard.
 - [0037 — Studio overlay nav below `lg`](0037-studio-overlay-nav.md)
 - [0038 — Documents on closed leads](0038-closed-lead-documents.md)
 - [0039 — First-class Tasks unified with journal `kind: "task"`](0039-first-class-tasks.md)
-- [0040 — In-conversation steps on the pipeline](0040-conversation-steps.md)
+- [0040 — In-conversation steps on the pipeline](0040-conversation-steps.md) _(step list superseded by 0041)_
+- [0041 — Conversation steps revised — Unresponsive is a flag](0041-conversation-steps-revised.md) _(amends 0040)_
 ### Research notes (not ADRs)
 - [Competitor features backlog (Smartlead / Instantly / Lemlist) — 2026-07](competitor-features-2026-07.md)

@@ -4,6 +4,13 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-23 — Unresponsive is a flag, not a column
+- Pending delivery is gone. Evaluating is pre-demo, then Waiting on demo,
+  then Evaluating · post-demo, then contract and onboarding.
+- A stalled lead stays in its step. The red clock is `isConversationUnresponsive`:
+  not New, no open task, and the newest of journal / send / step date is
+  older than 14 days (or In Conversation with no history).
+
 ### 2026-09-23 — Prod board GET 500 after conversation steps
 - Live worker `listLeads` already selected `leads.conversation_step` and
   `conversation_step_at`. Prod D1 was still on 0039, so every lane query
