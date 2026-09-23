@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-23 — Prod board GET 500 after conversation steps
+- Live worker `listLeads` already selected `leads.conversation_step` and
+  `conversation_step_at`. Prod D1 was still on 0039, so every lane query
+  threw and `GET /api/board` returned 500. Apply migration 0040 before
+  (or with) any deploy that reads those columns.
+
 ### 2026-09-23 — Double “Email sent” notes
 - Two identical journal lines (same day, same “Email sent”, same initials)
   were not two sends. The drawer heal inserted a second row when the slim

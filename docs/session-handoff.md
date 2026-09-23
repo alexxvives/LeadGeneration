@@ -9,19 +9,17 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-23 (Conversation steps + email-note dedupe)
+## ⏱️ Status — updated 2026-09-23 (Prod board 500 — migration 0040)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0040** (0040 is local until `cf:migrate` on prod).  
-**Deploy:** Worker `33141cd5` still live; this pass is local until `cf:build` + `wrangler deploy`.
+**Migrations:** 0021–**0040** applied on prod D1.  
+**Deploy:** Worker already selects `conversation_step` (board GET 500’d until 0040). Local UI pass may still need `cf:build` + `wrangler deploy` if it is not this worker.
 
 ### This pass
-- Pipeline title toggle: Stages vs In conversation buckets (Evaluating → Pending delivery, plus automatic Unresponsive).
-- Conversations cards: step mark instead of Demo done; Follow-up chip removed. Drawer uses a “Where they are” dropdown.
-- Duplicate bare “Email sent” notes collapsed on read/merge/write (ADR 0040).
+- `GET /api/board` 500 on prod: `listLeads` selected `conversation_step` / `conversation_step_at` and D1 had no such columns. Applied `0040_conversation_step.sql` on `lodestar-prod`. Reload the studio.
 
 ### Next
-1. Apply migration 0040 on prod D1 before deploy (`npm run cf:migrate`), then `npm run cf:build` and `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
+1. If the live worker is still behind the local conversation-step UI, `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
 
 ---
 
