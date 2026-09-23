@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-23 — Conversation clock matches the step badge; tasks are aurora
+- Pipeline keeps the bare rose clock. On a conversation card the clock uses the same round badge as the step mark (`h-7`, tinted fill, ring).
+- Calendar task text is aurora. Notes stay amber, so a task is no longer the same orange chip as a note.
+
 ### 2026-09-23 — Quiet the stall mark and the calendar cell
 - The unresponsive sentence in the lead drawer is gone. The rose wash on a pipeline card is gone too: a small rose clock sits at the card’s top right, on Pipeline and Conversations.
 - Calendar day cells write notes and tasks as text. Follow-ups, calls, and sent emails are an icon plus a count in the top right. Month and year are centered.

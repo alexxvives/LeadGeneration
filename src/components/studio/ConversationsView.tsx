@@ -137,7 +137,7 @@ export function ConversationsView({
                   <ConversationStepBadge step={step} />
                   {unresponsive ? (
                     <span
-                      className="inline-flex text-rose-400"
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-400/15 text-rose-200 ring-1 ring-rose-400/40"
                       title="Unresponsive"
                     >
                       <UnresponsiveIcon

@@ -46,7 +46,7 @@ const KIND_CHIP: Record<FollowUpKind, string> = {
   note: "bg-amber-400/15 text-amber-200",
   email: "bg-aurora-400/15 text-aurora-200",
   phone: "bg-sky-400/15 text-sky-200",
-  task: "bg-amber-400/15 text-amber-200",
+  task: "bg-aurora-400/15 text-aurora-200",
 };
 
 function isoFromParts(year: number, month: number, day: number): string {
@@ -646,7 +646,7 @@ export function CalendarView({
             <CalendarDaysIcon size={14} className="flex text-violet-300" aria-hidden />
           </LegendItem>
           <LegendItem label="Tasks">
-            <CheckIcon className="h-3.5 w-3.5 text-amber-300" aria-hidden />
+            <CheckIcon className="h-3.5 w-3.5 text-aurora-300" aria-hidden />
           </LegendItem>
           <LegendItem label="Notes">
             <span className="h-2.5 w-2.5 rounded-full bg-amber-400" aria-hidden />
@@ -746,7 +746,7 @@ function GroupTitle({
       : kind === "phone"
         ? "text-sky-400"
         : kind === "task"
-          ? "text-amber-300"
+          ? "text-aurora-300"
           : kind === "note"
             ? "text-amber-200"
             : "text-violet-300";
@@ -838,7 +838,7 @@ function DayGroup({
                     className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors disabled:opacity-50 ${
                       ev.done
                         ? "border-aurora-400/40 bg-aurora-400/20 text-aurora-200"
-                        : "border-amber-400/40 text-amber-300 hover:border-amber-400/70 hover:text-amber-200"
+                        : "border-aurora-400/40 text-aurora-300 hover:border-aurora-400/70 hover:text-aurora-200"
                     }`}
                   >
                     {ev.done ? <CheckIcon className="h-3 w-3" /> : null}

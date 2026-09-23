@@ -115,8 +115,9 @@ Search  →  Enrich  →  Draft  →  Send
     and recent **notes** / **tasks** (follow-up
     reminders are omitted from the preview).
     An hourglass on the title row means **Waiting on us** (an open task).
-    A colored mark beside it is the conversation step. A small rose clock
-    at the top right means **Unresponsive** (same 14-day rule as Pipeline).
+    A colored mark beside it is the conversation step. A rose clock in the
+    same round badge means **Unresponsive** (same 14-day rule as Pipeline;
+    the pipeline card keeps a bare clock).
     Those bubbles sit beside the title **column**
     (name + company + city), so they do not push location down.
     The **Task** tag sits bottom-right when one is open. Follow-up chips
@@ -164,7 +165,7 @@ Search  →  Enrich  →  Draft  →  Send
     Month and year sit centered (glass menus, chevrons beside them, Today on
     the right). Note and
     follow-up dates use the same branded `DatePicker` — not the OS date
-    control. A day cell writes **notes** and **tasks** as text. Follow-ups,
+    control. A day cell writes **notes** (amber) and **tasks** (aurora) as text. Follow-ups,
     calls, and emails sent are a small icon plus a count in the top right.
     Sidebar groups: Follow-ups / Tasks / Notes / Emails sent / Phone
     calls. Task checkbox completes the row and syncs journal + `Task` status.
