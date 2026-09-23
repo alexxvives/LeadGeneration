@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-23 — Dev may not be on :3000
+- `npm run dev` bound to http://localhost:3002 because 3000/3001 were already taken.
+- Close-the-loop still means click the *running* studio, not a stale tab on another port.
+
 ### 2026-09-23 — Studio chrome shares one set of pieces
 - Dashboard stage bars had their own palette (emerald, and amber on In
   conversation). They now use `CRM_STAGE_DOT`, the same dots as Pipeline.
