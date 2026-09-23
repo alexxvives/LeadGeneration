@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": "node .cursor/hooks/close-the-loop-stop.mjs",
+        "loop_limit": 1
+      }
+    ]
+  }
+}

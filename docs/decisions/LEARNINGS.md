@@ -4,6 +4,26 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-23 — Studio chrome shares one set of pieces
+- Dashboard stage bars had their own palette (emerald, and amber on In
+  conversation). They now use `CRM_STAGE_DOT`, the same dots as Pipeline.
+- Page empties are `EmptyState`. Load failures are `ErrorBanner`. Section
+  labels are `.kicker`. Kanban headers (Pipeline, Tasks, Outreach) are a
+  sentence-case title plus an aurora count.
+- Violet stays the follow-up reminder. Conversation steps use amber, sky,
+  aurora, and mist — not emerald, and not violet on the contract column.
+- Lead-info and note-action chips stay one scrolling row. Card titles that
+  used to wrap (tasks) use `MarqueeText`.
+
+### 2026-09-23 — Stop hook nudges a dirty tree, once
+- Docs/rules alone still let an agent stop mid-change. `.cursor/hooks.json`
+  runs `node .cursor/hooks/close-the-loop-stop.mjs` on agent stop.
+- If `git status --porcelain` is empty (or the run aborted), it prints `{}`.
+  If dirty, it sends one `followup_message` (`loop_limit: 1`). Fail open.
+- `sessionStart` additional_context is unreliable on Windows; keep the always-on
+  rule + AGENTS.md as the source of truth. cursor-ide-browser MCP is already
+  available — do not add servers.
+
 ### 2026-09-23 — Close the loop is a Cursor rule, not a new process
 - Shipping already lived in constitution Art. III.4, `AGENTS.md`, and
   `.cursor/rules/git-commit-push.mdc`. Agents still finished on a story.

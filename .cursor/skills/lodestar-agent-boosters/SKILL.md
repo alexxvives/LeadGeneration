@@ -42,4 +42,4 @@ into `.cursor/skills/<name>/`.
 3. Email/send/verify → `docs/email-providers.md` + ADR 0009.
 4. Finish via `.cursor/rules/close-the-loop.mdc`: tsc + lint (+ smoke if the
    flow changed), click UI in cursor-ide-browser, then commit + push. Do not
-   deploy unless asked.
+   deploy unless asked. A stop hook nudges once if git is still dirty.

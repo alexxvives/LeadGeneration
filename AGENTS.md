@@ -12,9 +12,10 @@ this repository. Read it first. It is intentionally short: the details live in
 > for where we left off, and **update it at the end of any session that changes
 > state.** (You do not need to be told to read it — it's part of this index.)
 >
-> **After every completed change: commit and `git push` to GitHub.** Do this
-> without waiting to be asked. Never force-push `main`/`master`. Skip only when
-> the user explicitly says not to.
+> **Ship:** close the loop — [`.cursor/rules/close-the-loop.mdc`](.cursor/rules/close-the-loop.mdc).
+> Prove with tools, click UI in **cursor-ide-browser** when the screen changed,
+> write the handoff, then commit and `git push`. Never force-push. Do not deploy
+> unless asked. Skip commit/push only when the user explicitly says not to.
 
 ---
 
@@ -89,6 +90,7 @@ Also see [`README.md`](README.md) for setup/run instructions.
 
 Done is the five steps in [`.cursor/rules/close-the-loop.mdc`](.cursor/rules/close-the-loop.mdc)
 (always on). That rule points here and at `docs/` — it does not replace them.
+A Cursor **stop hook** (`.cursor/hooks.json`) nudges once if git is still dirty.
 
 | Step | Where |
 | --- | --- |

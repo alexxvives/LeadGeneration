@@ -50,3 +50,4 @@ Do not add MCP servers. Cloudflare and Stripe MCPs stay for those tasks only.
 - See [`.cursor/rules/git-commit-push.mdc`](.cursor/rules/git-commit-push.mdc).
 - Do not deploy the Worker unless the task says to deploy.
 - Deploy stays: `npm run cf:build`, then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
+- Cursor stop hook (`.cursor/hooks.json`) nudges once if git is still dirty.
