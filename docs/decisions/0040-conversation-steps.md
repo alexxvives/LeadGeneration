@@ -24,8 +24,8 @@ than 14 days ago, and there is no open task. Dragging to a stored step sets
 `conversation_step_at` to today so the card does not fall straight back.
 Unresponsive is not a drop target.
 
-The drawer’s Demo done toggle is gone. In Conversation shows a “Where they
-are” dropdown, the same way Contacted shows how you reached them.
+The drawer’s Demo done toggle is gone. In Conversation shows “Where they
+are” as selectable tags, the same way Contacted shows how you reached them.
 Conversation cards use a colored step mark instead of the demo icon, and
 no longer show a Follow-up chip.
 

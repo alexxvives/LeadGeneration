@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-23 — Where they are is tags, not a dropdown
+- In Conversation in the lead drawer uses the same chip row as Contacted’s
+  “Reached via”. One step stays selected; clicking another moves the lead.
+
 ### 2026-09-23 — Unresponsive is a flag, not a column
 - Pending delivery is gone. Evaluating is pre-demo, then Waiting on demo,
   then Evaluating · post-demo, then contract and onboarding.

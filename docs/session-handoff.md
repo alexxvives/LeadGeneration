@@ -19,6 +19,7 @@ first, and update the top block at the end of any session that changes state.**
 - Dropped Pending delivery and the Unresponsive column (ADR 0041).
 - Steps: Evaluating · pre-demo → Waiting on demo → Evaluating · post-demo → Reviewing contract → Onboarding.
 - Unresponsive is a red clock on the lead’s current stage (Pipeline and Conversations).
+- Lead info: “Where they are” is tags, same style as Contacted’s channel chips.
 
 ### Next
 1. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches this step list.

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, ConversationStep, CrmStage, DeliveryStatus, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
 import { Spinner } from "@/components/ui";
-import { Select } from "@/components/ui/Select";
 import { DatePicker } from "@/components/ui/DatePicker";
 import {
   ArrowIcon,
@@ -140,6 +139,44 @@ const CONTACT_METHODS: { method: ContactMethod; label: string }[] = [
   { method: "whatsapp",     label: "WhatsApp" },
   { method: "organic",      label: "Organic" },
 ];
+
+function ConversationStepChips({
+  selected,
+  onSelect,
+  disabled,
+  lockHint,
+}: {
+  selected: ConversationStep;
+  onSelect: (step: ConversationStep) => void;
+  disabled: boolean;
+  lockHint: string;
+}) {
+  return (
+    <div className="flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
+      {CONVERSATION_STEPS.map((step) => {
+        const on = selected === step.id;
+        return (
+          <Lockable key={step.id}>
+            <button
+              type="button"
+              disabled={disabled}
+              aria-pressed={on}
+              onClick={() => onSelect(step.id)}
+              title={disabled ? lockHint : step.label}
+              className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-60 ${
+                on
+                  ? "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40"
+                  : "border border-white/15 text-mist-400 hover:bg-white/5"
+              }`}
+            >
+              {step.label}
+            </button>
+          </Lockable>
+        );
+      })}
+    </div>
+  );
+}
 
 function ContactMethodChips({
   selected,
@@ -1004,31 +1041,22 @@ export function LeadDrawer(props: DrawerProps) {
 
             {crmStage === "in_conversation" ? (
               <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                <label className="block text-xs font-medium text-mist-400" htmlFor={`conv-step-${lead.id}`}>
-                  Where they are
-                </label>
-                <Select
-                  id={`conv-step-${lead.id}`}
-                  className="mt-1.5 w-full"
-                  disabled={editLocked}
-                  title={editLocked ? lockHint : "Conversation step"}
-                  value={conversationStep}
-                  onChange={(e) => {
-                    const next = e.target.value as ConversationStep;
-                    setConversationStep(next);
-                    void props.onUpdateCrm(lead.id, {
-                      crmStage: "in_conversation",
-                      conversationStep: next,
-                      conversationStepAt: todayIsoDate(),
-                    });
-                  }}
-                >
-                  {CONVERSATION_STEPS.map((step) => (
-                    <option key={step.id} value={step.id}>
-                      {step.label}
-                    </option>
-                  ))}
-                </Select>
+                <p className="text-xs font-medium text-mist-400">Where they are</p>
+                <div className="mt-1.5">
+                  <ConversationStepChips
+                    selected={conversationStep}
+                    disabled={editLocked}
+                    lockHint={lockHint}
+                    onSelect={(next) => {
+                      setConversationStep(next);
+                      void props.onUpdateCrm(lead.id, {
+                        crmStage: "in_conversation",
+                        conversationStep: next,
+                        conversationStepAt: todayIsoDate(),
+                      });
+                    }}
+                  />
+                </div>
               </div>
             ) : null}
           </section>

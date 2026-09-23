@@ -237,8 +237,8 @@ Search  →  Enrich  →  Draft  →  Send
     A bounce silently deletes that address (and may return the lead to New) —
     no Bounced chip, toast, or drawer button. The outreach composer
     (draft → edit → send) is on the draft pane. In Conversation hides the
-    “how did you reach them” chips and shows a **Where they are** dropdown
-    (same idea as Contacted’s channel chips). A second bare “Email sent”
+    “how did you reach them” chips and shows **Where they are** as the same
+    kind of tags (one step selected). A second bare “Email sent”
     on the same day is collapsed — send and the drawer used to each insert
     one, and the journal merge put the dropped copy back.
     **Add Task** in Notes opens a green **Task** composer (“What they
