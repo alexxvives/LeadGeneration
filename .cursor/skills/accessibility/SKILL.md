@@ -2,8 +2,9 @@
 name: accessibility
 description: >-
   Design, implement, and audit inclusive digital products using WCAG 2.2 Level
-  AA. Use when generating ARIA, auditing accessibility barriers, or implementing
-  keyboard/focus/contrast requirements for Web (and native trait mapping).
+  AA. Use when building or reviewing studio UI that involves forms, drawers,
+  overlays, keyboard, focus, or contrast; when generating ARIA; or when auditing
+  accessibility barriers (including native trait mapping).
 ---
 
 # Accessibility (WCAG 2.2)

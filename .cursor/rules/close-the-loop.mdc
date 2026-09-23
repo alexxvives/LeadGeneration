@@ -1,0 +1,52 @@
+---
+description: Finish a change by reading the repo, proving it with tools, clicking the running app when UI changed, writing the handoff, then committing and pushing. Never force-push. Do not deploy unless asked.
+alwaysApply: true
+---
+
+# Close the loop
+
+An agent is not done when the change “should work.” Finish the way this repo
+already defines. Details live in the docs below — do not copy the constitution
+into a rule; read it.
+
+## 1. Read before editing
+
+- [`docs/constitution.md`](docs/constitution.md) — non-negotiable principles.
+- [`docs/session-handoff.md`](docs/session-handoff.md) — where we left off.
+- UI work also reads [`.cursor/skills/lodestar-ui/SKILL.md`](.cursor/skills/lodestar-ui/SKILL.md).
+- Index: [`AGENTS.md`](AGENTS.md).
+
+## 2. Validate with tools, not with a story
+
+- `npx tsc --noEmit`
+- `npm run lint`
+- When the dev server is up **and** the flow changed: `npm run smoke`
+
+That is constitution Article III.4.
+
+## 3. UI changes: click the running app
+
+Use the **cursor-ide-browser** MCP (`browser_navigate`, `browser_lock`,
+`browser_snapshot`, `browser_click`, `browser_take_screenshot`). Click through
+the changed flow. A screenshot of a static screen is not validation.
+
+- Dev is http://localhost:3000 (demo JSON store, no keys). Auth is production-only.
+- QA after a UI pass: [`.cursor/skills/dogfood/SKILL.md`](.cursor/skills/dogfood/SKILL.md).
+- Keyboard / focus / ARIA / contrast: [`.cursor/skills/accessibility/SKILL.md`](.cursor/skills/accessibility/SKILL.md).
+
+Do not add MCP servers. Cloudflare and Stripe MCPs stay for those tasks only.
+
+## 4. Write the memory in the same change
+
+- Update [`docs/session-handoff.md`](docs/session-handoff.md).
+- Non-trivial findings → [`docs/decisions/LEARNINGS.md`](docs/decisions/LEARNINGS.md).
+- A real decision with alternatives → an ADR in [`docs/decisions/`](docs/decisions/)
+  ([`.cursor/skills/adr-skill/SKILL.md`](.cursor/skills/adr-skill/SKILL.md)).
+
+## 5. Commit and push — do not deploy unless asked
+
+- Commit and `git push` to the current branch. Integration branch is **master**.
+- Never force-push. Skip only when the user explicitly says not to.
+- See [`.cursor/rules/git-commit-push.mdc`](.cursor/rules/git-commit-push.mdc).
+- Do not deploy the Worker unless the task says to deploy.
+- Deploy stays: `npm run cf:build`, then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.

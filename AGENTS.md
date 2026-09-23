@@ -85,6 +85,21 @@ Also see [`README.md`](README.md) for setup/run instructions.
    commit when state changed. Skip commit/push only when the user explicitly
    says not to.
 
+## How an agent ships
+
+Done is the five steps in [`.cursor/rules/close-the-loop.mdc`](.cursor/rules/close-the-loop.mdc)
+(always on). That rule points here and at `docs/` — it does not replace them.
+
+| Step | Where |
+| --- | --- |
+| Read constitution + session-handoff before editing. UI also reads lodestar-ui. | [`docs/constitution.md`](docs/constitution.md), [`docs/session-handoff.md`](docs/session-handoff.md), [`.cursor/skills/lodestar-ui/SKILL.md`](.cursor/skills/lodestar-ui/SKILL.md) |
+| Prove with tools, not a story: `npx tsc --noEmit`, `npm run lint`, `npm run smoke` when the flow changed and dev is up. | Commands below; constitution Art. III.4 |
+| UI: click the changed flow in **cursor-ide-browser** (http://localhost:3000). A static screenshot is not validation. Auth is production-only. | [`.cursor/skills/dogfood/SKILL.md`](.cursor/skills/dogfood/SKILL.md), [`.cursor/skills/accessibility/SKILL.md`](.cursor/skills/accessibility/SKILL.md) |
+| Update session-handoff in the same change. Findings → LEARNINGS. A real decision → ADR. | [`docs/decisions/`](docs/decisions/), [`.cursor/skills/adr-skill/SKILL.md`](.cursor/skills/adr-skill/SKILL.md) |
+| Commit and `git push` to the current branch (`master` is integration). Never force-push. Do not deploy unless the task says to. | [`.cursor/rules/git-commit-push.mdc`](.cursor/rules/git-commit-push.mdc) |
+
+Deploy stays: `npm run cf:build`, then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
+
 ## Commands
 
 ```bash

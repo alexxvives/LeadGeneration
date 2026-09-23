@@ -9,19 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-23 (Lead info chips + unresponsive clock)
+## ⏱️ Status — updated 2026-09-23 (agent close-the-loop)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
-**Deploy:** Local until `cf:build` + `wrangler deploy`. Prod still uses the old touch rule until then.
+**Deploy:** Local until `cf:build` + `wrangler deploy`. Prod still uses the old touch rule until then. This pass did not deploy.
 
 ### This pass
-- Lead info stage chips and “Where they are” stay on one scrolling row.
-- Pipeline unresponsive clock is a solid rose badge at the start of the card title.
-- Follow-up reminders no longer count as a touch. Moving a card into a step no longer overrides an older note. An open task still hides the clock.
+- Always-on Cursor rule [`.cursor/rules/close-the-loop.mdc`](../.cursor/rules/close-the-loop.mdc): read constitution + session-handoff, prove with tsc/lint/smoke, click UI in **cursor-ide-browser**, write memory, commit + push. No product behavior change.
+- `AGENTS.md` now has a short **How an agent ships** index to that rule and the UI/QA skills (`lodestar-ui`, `dogfood`, `accessibility`, `adr-skill`).
 
 ### Next
-1. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches the step list and this touch rule.
+1. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches the step list and the 2026-09-23 touch rule.
 
 ---
 

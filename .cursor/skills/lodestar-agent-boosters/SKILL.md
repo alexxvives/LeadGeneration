@@ -40,4 +40,6 @@ into `.cursor/skills/<name>/`.
 1. Read `docs/session-handoff.md` + `docs/constitution.md` before coding.
 2. Touch UI → read `.cursor/skills/lodestar-ui/SKILL.md` first.
 3. Email/send/verify → `docs/email-providers.md` + ADR 0009.
-4. After meaningful batches: commit + push (AGENTS #8); CI runs on push.
+4. Finish via `.cursor/rules/close-the-loop.mdc`: tsc + lint (+ smoke if the
+   flow changed), click UI in cursor-ide-browser, then commit + push. Do not
+   deploy unless asked.

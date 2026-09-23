@@ -1,16 +1,20 @@
 ---
 name: dogfood
 description: >-
-  Systematic exploratory QA of web apps with browser tools: plan, explore,
-  collect evidence, categorize, and report bugs. Use after UI passes or when
-  the user asks to dogfood / QA the studio.
+  Systematic exploratory QA of the studio in cursor-ide-browser: plan, click
+  through the changed flow, collect evidence, categorize, and report bugs. Use
+  after any UI change (a static screenshot is not validation), or when the user
+  asks to dogfood / QA.
 ---
 
 # Dogfood: Systematic Web App QA
 
 ## Prerequisites
 
-Browser tools available (Playwright MCP / chrome-devtools). Target URL + scope from the user.
+Browser tools: **cursor-ide-browser** MCP (`browser_navigate`, `browser_lock`,
+`browser_snapshot`, `browser_click`, `browser_take_screenshot`). Target URL +
+scope from the user. Dev is http://localhost:3000 (demo JSON store; auth is
+production-only).
 
 ## Workflow
 

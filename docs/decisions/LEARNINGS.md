@@ -4,6 +4,17 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-09-23 — Close the loop is a Cursor rule, not a new process
+- Shipping already lived in constitution Art. III.4, `AGENTS.md`, and
+  `.cursor/rules/git-commit-push.mdc`. Agents still finished on a story.
+- Always-on [`.cursor/rules/close-the-loop.mdc`](../../.cursor/rules/close-the-loop.mdc)
+  points at those docs and names **cursor-ide-browser** as the UI validation MCP.
+  A static screenshot is not validation. Dev is http://localhost:3000; auth is
+  production-only. Do not deploy unless the task says to.
+- UI/QA gates stay the existing skills: `lodestar-ui`, `dogfood`,
+  `accessibility`, `adr-skill`. No new MCP servers. Cloudflare and Stripe MCPs
+  stay for those tasks only.
+
 ### 2026-09-23 — Follow-up reminders are not a touch
 - A done follow-up dated after the last note reset the 14-day clock. So did
   dragging the card into a step, because `conversationStepAt` was mixed in
