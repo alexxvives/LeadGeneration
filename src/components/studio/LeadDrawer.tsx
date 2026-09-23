@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, ConversationStep, CrmStage, DeliveryStatus, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
 import { Spinner } from "@/components/ui";
+import { noteActionClass, noteActionRowClass } from "@/components/studio/StudioHelpers";
 import { DatePicker } from "@/components/ui/DatePicker";
 import {
   ArrowIcon,
@@ -949,7 +950,7 @@ export function LeadDrawer(props: DrawerProps) {
                     type="button"
                     disabled={editLocked}
                     onClick={() => setConfirmDelete(true)}
-                    className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 disabled:opacity-50"
+                    className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400/60 disabled:opacity-50"
                     aria-label={
                       editLocked ? lockHint : `Delete ${lead.company}`
                     }
@@ -963,7 +964,7 @@ export function LeadDrawer(props: DrawerProps) {
             <button
               type="button"
               onClick={requestClose}
-              className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100"
+              className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
               aria-label="Close (Esc)"
               title="Close (Esc)"
             >
@@ -1062,15 +1063,16 @@ export function LeadDrawer(props: DrawerProps) {
           </section>
 
           {/* Contact info — all fields editable */}
-          <section className="grid gap-2.5">
-            <div className="grid gap-1">
-              <div className="flex items-center justify-end gap-2 pl-7">
+          <section className="grid min-w-0 gap-2.5">
+            <div className="grid min-w-0 gap-1">
+              <div className="flex min-w-0 items-center justify-end pl-7">
                 {isUsableWebsite(lead.website) ? (
                   <a
                     href={lead.website!}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[11px] text-aurora-300 hover:underline"
+                    title={lead.website!}
+                    className="min-w-0 truncate text-[11px] text-aurora-300 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
                   >
                     Open {displayWebsite(lead.website)}
                   </a>
@@ -1081,7 +1083,8 @@ export function LeadDrawer(props: DrawerProps) {
                     )}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[11px] text-aurora-300 hover:underline"
+                    title="Search the web for this lead"
+                    className="min-w-0 truncate text-[11px] text-aurora-300 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
                   >
                     No website on file — Google search for this lead
                   </a>
@@ -1198,15 +1201,15 @@ export function LeadDrawer(props: DrawerProps) {
             className="flex min-h-0 flex-col border-t border-white/5 bg-ink-950/40 sm:border-l sm:border-t-0"
           >
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/5 px-4 py-3">
-              <SectionLabel>Notes</SectionLabel>
-              <div className="flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1">
+              <SectionLabel className="mb-0 shrink-0">Notes</SectionLabel>
+              <div className={noteActionRowClass}>
                 <Lockable>
                   <button
                     type="button"
                     disabled={editLocked}
                     onClick={() => openComposer("note")}
                     title={editLocked ? lockHint : undefined}
-                    className="text-[11px] text-amber-300 hover:underline disabled:opacity-50"
+                    className={noteActionClass("amber")}
                   >
                     Add Note
                   </button>
@@ -1217,7 +1220,7 @@ export function LeadDrawer(props: DrawerProps) {
                     disabled={editLocked}
                     onClick={() => openComposer("follow_up")}
                     title={editLocked ? lockHint : undefined}
-                    className="text-[11px] text-violet-300 hover:underline disabled:opacity-50"
+                    className={noteActionClass("violet")}
                   >
                     Follow up
                   </button>
@@ -1228,7 +1231,7 @@ export function LeadDrawer(props: DrawerProps) {
                     disabled={editLocked}
                     onClick={() => openComposer("task")}
                     title={editLocked ? lockHint : undefined}
-                    className="text-[11px] text-aurora-300 hover:underline disabled:opacity-50"
+                    className={noteActionClass("aurora")}
                   >
                     Add Task
                   </button>
@@ -1239,7 +1242,7 @@ export function LeadDrawer(props: DrawerProps) {
                     disabled={editLocked}
                     onClick={() => void addNote("missed")}
                     title={editLocked ? lockHint : undefined}
-                    className="text-[11px] text-mist-400 hover:underline disabled:opacity-50"
+                    className={noteActionClass("mist")}
                   >
                     Missed call
                   </button>
@@ -1859,11 +1862,15 @@ function AutoGrowAbout({
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-mist-500">
-      {children}
-    </h4>
+    <h4 className={`kicker ${className || "mb-2"}`}>{children}</h4>
   );
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { BoardSummary, CrmStage, DashboardStats, WorkspaceSummary } from "@/lib/types";
 import Link from "next/link";
+import { CRM_STAGE_DOT } from "@/components/ui";
 import { DashboardSkeleton, DeferredSkeleton } from "./skeletons";
 
 const STAGE_LABELS: Record<CrmStage, string> = {
@@ -14,13 +15,7 @@ const STAGE_LABELS: Record<CrmStage, string> = {
   not_interested: "Not interested",
 };
 
-const STAGE_COLORS: Record<CrmStage, string> = {
-  new: "bg-mist-400",
-  contacted: "bg-aurora-400",
-  in_conversation: "bg-amber-400",
-  closed: "bg-emerald-400",
-  not_interested: "bg-rose-400/70",
-};
+const STAGE_COLORS = CRM_STAGE_DOT;
 
 function BarChart({
   items,
@@ -59,7 +54,7 @@ function StatCard({
 }) {
   return (
     <div className="glass rounded-xl2 p-5 min-w-0">
-      <p className="text-[11px] uppercase tracking-wider text-mist-500">{label}</p>
+      <p className="kicker">{label}</p>
       <p className="mt-2 font-display text-3xl font-semibold text-mist-100">{value}</p>
       {hint ? <p className="mt-1 text-xs text-mist-500">{hint}</p> : null}
     </div>

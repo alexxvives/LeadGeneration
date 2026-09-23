@@ -622,7 +622,7 @@ function WebhookHint({ liveAppUrl }: { liveAppUrl?: string | null }) {
 
   return (
     <div className="mt-4 rounded-lg border border-white/8 bg-ink-950/40 px-3 py-2.5">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-mist-500">
+      <p className="kicker">
         Optional · bounce / reply tracking
       </p>
       <p className="mt-1 text-[11px] leading-relaxed text-mist-400">

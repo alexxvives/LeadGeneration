@@ -13,6 +13,7 @@ import {
   withFollowUpAuthor,
 } from "@/lib/follow-ups";
 import { parseRecipientEmail } from "@/lib/email/address";
+import { noteActionClass, noteActionRowClass } from "@/components/studio/StudioHelpers";
 import {
   BuildingIcon,
   MailIcon,
@@ -83,11 +84,15 @@ function EditableInfoRow({
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-mist-500">
-      {children}
-    </h4>
+    <h4 className={`kicker ${className || "mb-2"}`}>{children}</h4>
   );
 }
 
@@ -469,7 +474,7 @@ export function ContactDrawer({
                   type="button"
                   disabled={editLocked}
                   onClick={() => setConfirmDelete(true)}
-                  className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 disabled:opacity-50"
+                  className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400/60 disabled:opacity-50"
                   aria-label={
                     editLocked ? lockHint : `Delete ${contact?.name ?? ""}`
                   }
@@ -482,7 +487,7 @@ export function ContactDrawer({
             <button
               type="button"
               onClick={() => void requestClose()}
-              className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200"
+              className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
               aria-label="Close"
             >
               <XIcon className="h-5 w-5" />
@@ -597,9 +602,9 @@ export function ContactDrawer({
           </section>
 
           <section className="mt-6">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <SectionLabel>Notes</SectionLabel>
-              <div className="flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1">
+            <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
+              <SectionLabel className="mb-0 shrink-0">Notes</SectionLabel>
+              <div className={noteActionRowClass}>
                 <Lockable>
                   <button
                     type="button"
@@ -612,7 +617,7 @@ export function ContactDrawer({
                           : undefined
                     }
                     onClick={() => openComposer("note")}
-                    className="text-[11px] text-amber-300 hover:underline disabled:opacity-50"
+                    className={noteActionClass("amber")}
                   >
                     Add Note
                   </button>
@@ -629,7 +634,7 @@ export function ContactDrawer({
                           : undefined
                     }
                     onClick={() => openComposer("follow_up")}
-                    className="text-[11px] text-violet-300 hover:underline disabled:opacity-50"
+                    className={noteActionClass("violet")}
                   >
                     Follow up
                   </button>
@@ -646,7 +651,7 @@ export function ContactDrawer({
                           : undefined
                     }
                     onClick={() => openComposer("task")}
-                    className="text-[11px] text-aurora-300 hover:underline disabled:opacity-50"
+                    className={noteActionClass("aurora")}
                   >
                     Add Task
                   </button>

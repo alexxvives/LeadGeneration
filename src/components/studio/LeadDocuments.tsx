@@ -81,7 +81,7 @@ export function LeadDocuments({
 
   return (
     <section>
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-mist-500">
+      <h4 className="kicker mb-2">
         Documents
       </h4>
       <Lockable className="block w-full">

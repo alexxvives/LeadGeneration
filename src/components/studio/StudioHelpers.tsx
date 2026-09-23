@@ -28,29 +28,78 @@ export function LayoutToggle({
   );
 }
 
-/** Compact empty CTA — no full-bleed image/gradient (that bled into Search). */
+/** Compact empty — dashed frame, display title, optional body and aurora CTA. */
 export function EmptyState({
+  title = "Your board is clear",
+  body = "Search a niche, import a list, or add a lead by hand — then send one at a time.",
   actionHref = "/app",
   actionLabel = "Find leads",
+  showAction = true,
 }: {
+  title?: string;
+  body?: string;
   actionHref?: string;
   actionLabel?: string;
+  showAction?: boolean;
 }) {
   return (
     <div className="rounded-xl2 border border-dashed border-white/10 px-6 py-10 text-center sm:px-8">
       <SparkIcon className="mx-auto h-7 w-7 text-aurora-300" />
-      <h2 className="mt-3 font-display text-xl font-semibold text-mist-100">Your board is clear</h2>
-      <p className="mx-auto mt-2 max-w-md text-sm text-mist-300">
-        Search a niche, import a list, or add a lead by hand — then send one at a time.
-      </p>
-      <Link
-        href={actionHref}
-        className="mt-5 inline-flex items-center justify-center rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02]"
-      >
-        {actionLabel}
-      </Link>
+      <h2 className="mt-3 font-display text-xl font-semibold text-mist-100">{title}</h2>
+      {body ? (
+        <p className="mx-auto mt-2 max-w-md text-sm text-mist-300">{body}</p>
+      ) : null}
+      {showAction ? (
+        <Link
+          href={actionHref}
+          className="mt-5 inline-flex items-center justify-center rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+        >
+          {actionLabel}
+        </Link>
+      ) : null}
     </div>
   );
+}
+
+/** Page-level load failure. Inline field errors stay as text. */
+export function ErrorBanner({
+  children,
+  onRetry,
+}: {
+  children: React.ReactNode;
+  onRetry?: () => void;
+}) {
+  return (
+    <div
+      className="rounded-xl2 border border-rose-400/20 bg-rose-400/5 px-5 py-4 text-sm text-rose-200"
+      role="alert"
+    >
+      {children}
+      {onRetry ? (
+        <button
+          type="button"
+          className="ml-3 text-aurora-300 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+          onClick={onRetry}
+        >
+          Retry
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** One scrolling row of note actions in the lead and collaborator drawers. */
+export const noteActionRowClass =
+  "flex min-w-0 flex-nowrap items-center justify-end gap-x-2.5 overflow-x-auto [scrollbar-width:thin]";
+
+export function noteActionClass(tone: "amber" | "violet" | "aurora" | "mist") {
+  const color = {
+    amber: "text-amber-300",
+    violet: "text-violet-300",
+    aurora: "text-aurora-300",
+    mist: "text-mist-400",
+  }[tone];
+  return `shrink-0 whitespace-nowrap text-[11px] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/60 disabled:opacity-50 ${color}`;
 }
 
 const SEARCH_PHASES = [

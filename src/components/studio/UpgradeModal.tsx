@@ -40,7 +40,7 @@ export function UpgradeModal({
       >
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100"
+          className="absolute right-4 top-4 rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-mist-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
           aria-label="Close"
         >
           <XIcon className="h-5 w-5" />

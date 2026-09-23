@@ -13,6 +13,7 @@ import {
 import { Spinner } from "@/components/ui";
 import { PencilIcon, UsersIcon, XIcon } from "@/components/icons";
 import { BoardsSkeleton, Bone, useDeferredLoading } from "./skeletons";
+import { ErrorBanner } from "./StudioHelpers";
 
 export function BoardsView({
   onSelectBoard,
@@ -166,24 +167,19 @@ export function BoardsView({
 
   return (
     <div className="animate-float-up space-y-6">
-      {err && (
-        <p className="text-sm text-rose-300">
-          {err}{" "}
-          <button
-            type="button"
-            className="text-aurora-300 underline-offset-2 hover:underline"
-            onClick={() => {
-              setErr(null);
-              setLoading(true);
-              void refresh()
-                .catch((e) => setErr(e instanceof Error ? e.message : "Failed"))
-                .finally(() => setLoading(false));
-            }}
-          >
-            Retry
-          </button>
-        </p>
-      )}
+      {err ? (
+        <ErrorBanner
+          onRetry={() => {
+            setErr(null);
+            setLoading(true);
+            void refresh()
+              .catch((e) => setErr(e instanceof Error ? e.message : "Failed"))
+              .finally(() => setLoading(false));
+          }}
+        >
+          {err}
+        </ErrorBanner>
+      ) : null}
       {busy ? (
         <p className="text-xs text-mist-500">Working…</p>
       ) : null}
@@ -704,7 +700,7 @@ function BoardInviteModal({
         ) : null}
 
         <div className="mt-5 border-t border-white/10 pt-4">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-mist-500">
+          <h3 className="kicker">
             People on this board
           </h3>
           {loading ? (

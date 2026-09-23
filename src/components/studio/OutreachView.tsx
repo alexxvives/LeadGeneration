@@ -337,9 +337,11 @@ export function OutreachView({
       >
         <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
           <div className="min-w-0">
-            <h3 className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-mist-500">
-              {meta.title}
-              <span className="tabular-nums text-mist-400">{rows.length}</span>
+            <h3 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold leading-none text-mist-100">
+              <span className="truncate">{meta.title}</span>
+              <span className="font-display text-lg leading-none tabular-nums text-aurora-300">
+                {rows.length}
+              </span>
               {backfilling ? (
                 <span
                   role="status"
@@ -351,10 +353,10 @@ export function OutreachView({
               ) : null}
             </h3>
             <p
-              className={`mt-0.5 text-[11px] ${
+              className={`mt-1 truncate text-xs ${
                 key === "contacted" && overSoftCap
                   ? "text-amber-300/90"
-                  : "text-mist-600"
+                  : "text-mist-500"
               }`}
               title={
                 key === "contacted"

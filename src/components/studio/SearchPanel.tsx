@@ -427,7 +427,7 @@ export function SearchPanel({
       {icps.length > 0 ? (
         <div className="mt-4 rounded-xl border border-white/10 bg-ink-950/40 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-widest text-mist-500">
+            <p className="kicker">
               Saved searches
             </p>
             {niche.trim() ? (

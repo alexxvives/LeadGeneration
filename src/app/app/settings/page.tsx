@@ -85,7 +85,7 @@ export default async function SettingsPage() {
         </div>
 
         <section className="mt-8">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          <h2 className="kicker mb-3">
             Signed in as
           </h2>
           <div className="rounded-xl2 border border-white/10 p-5">
@@ -111,7 +111,7 @@ export default async function SettingsPage() {
         </section>
 
         <section className="mt-8">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+          <h2 className="kicker mb-3">
             Resources
           </h2>
           <div className="overflow-hidden rounded-xl2 border border-white/10">
@@ -147,7 +147,7 @@ export default async function SettingsPage() {
       </div>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+        <h2 className="kicker mb-3">
           Outreach profiles
         </h2>
         <SenderProfileForm />
@@ -190,7 +190,7 @@ export default async function SettingsPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+        <h2 className="kicker mb-3">
           Plan &amp; usage
         </h2>
         <div className="rounded-xl2 border border-white/10 p-5">
@@ -263,7 +263,7 @@ export default async function SettingsPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+        <h2 className="kicker mb-3">
           Resources
         </h2>
         <div className="overflow-hidden rounded-xl2 border border-white/10">
@@ -304,7 +304,7 @@ export default async function SettingsPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist-500">
+        <h2 className="kicker mb-3">
           Danger zone
         </h2>
         <DeleteAccountPanel email={userEmail} liveApp={authRequired()} />

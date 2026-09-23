@@ -747,7 +747,7 @@ function GroupTitle({
             ? "text-amber-200"
             : "text-violet-300";
   return (
-    <h4 className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-mist-500">
+    <h4 className="kicker mb-2 inline-flex items-center gap-1.5">
       {kind === "email" ? (
         <MailCheckIcon size={14} className={`flex ${color}`} aria-hidden />
       ) : kind === "phone" ? (

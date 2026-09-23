@@ -199,7 +199,7 @@ export function SendSetupPanel({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-mist-500">
+        <h2 className="kicker mb-2">
           How do you want to send?
           {profileName ? (
             <span className="ml-2 normal-case tracking-normal text-aurora-300">

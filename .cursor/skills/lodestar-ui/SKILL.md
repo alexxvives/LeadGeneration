@@ -142,6 +142,15 @@ token becomes the page color in light mode).
 </div>
 ```
 
+## Studio standards
+Reuse these. Do not invent a second version.
+
+- **Section label:** `.kicker` (uppercase, mist-500). Kanban column titles are sentence case: colored dot, `text-sm font-semibold`, display count in `text-aurora-300`. Pipeline, Tasks, and Outreach share that header.
+- **Page empty:** `EmptyState` (dashed `rounded-xl2`, spark, display title). Filter empties use the same dashed frame without the spark. Load failures use `ErrorBanner`.
+- **Stage color:** `CRM_STAGE_DOT` / `.pill-*` — new mist, contacted amber, in conversation sky, closed aurora, not interested rose. Conversation steps use amber, sky, aurora, and mist. Violet is the follow-up reminder only. Rose clock is unresponsive.
+- **Chips:** one `flex-nowrap overflow-x-auto` row. Do not wrap lead-info, stage, or note-action chips. Card titles use `MarqueeText` or `truncate`.
+- **Icon buttons:** `rounded-lg p-2`, `aria-label`, and `focus-visible:outline-aurora-400/70` (rose outline on delete).
+
 ## Icons
 Dense UI (pipeline cards, drawer chips) uses inline SVGs in `src/components/icons.tsx`.
 Studio nav, calendar chrome, theme toggle, and the Find-leads compact CTA use

@@ -22,6 +22,7 @@ import {
   isConversationUnresponsive,
 } from "@/lib/conversation-steps";
 import { MailIcon, PhoneIcon, FormIcon, InstagramIcon, WhatsAppIcon, GlobeIcon, CalendarIcon, UnresponsiveIcon, WaitingIcon } from "@/components/icons";
+import { CRM_STAGE_DOT } from "@/components/ui";
 import {
   leadHasMissedCall,
   hasPendingTask,
@@ -46,28 +47,28 @@ const MAIN_COLUMNS: {
     stage: "new",
     title: "New",
     empty: "No untouched leads — run a search to add more.",
-    color: "bg-mist-500",
+    color: CRM_STAGE_DOT.new,
   },
   {
     id: "contacted",
     stage: "contacted",
     title: "Contacted",
     empty: "Send an email or drag a card here.",
-    color: "bg-amber-400",
+    color: CRM_STAGE_DOT.contacted,
   },
   {
     id: "in_conversation",
     stage: "in_conversation",
     title: "In Conversation",
     empty: "Replies land here from email webhooks.",
-    color: "bg-sky-400",
+    color: CRM_STAGE_DOT.in_conversation,
   },
   {
     id: "closed",
     stage: "closed",
     title: "Closed",
     empty: "Move here when you close the deal.",
-    color: "bg-aurora-300",
+    color: CRM_STAGE_DOT.closed,
   },
 ];
 
@@ -83,7 +84,7 @@ const PARKED_COLUMNS: {
     stage: "not_interested",
     title: "Not Interested",
     empty: "Move here when they decline.",
-    color: "bg-rose-400",
+    color: CRM_STAGE_DOT.not_interested,
   },
 ];
 
@@ -925,7 +926,7 @@ function PipelineCardFace({
             </span>
           ) : null}
           {needsMethod ? (
-            <span className="shrink-0 rounded-full bg-amber-400/25 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-400/25 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
               How contacted?
             </span>
           ) : null}

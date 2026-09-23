@@ -48,6 +48,15 @@ export function crmStageLabel(stage: CrmStage): string {
   return CRM_STAGE_STYLES[stage]?.label ?? stage;
 }
 
+/** Column dots — same hues as the stage pills, shared by Pipeline and Dashboard. */
+export const CRM_STAGE_DOT: Record<CrmStage, string> = {
+  new: "bg-mist-500",
+  contacted: "bg-amber-400",
+  in_conversation: "bg-sky-400",
+  closed: "bg-aurora-300",
+  not_interested: "bg-rose-400",
+};
+
 export function Spinner({ className = "" }: { className?: string }) {
   return (
     <span

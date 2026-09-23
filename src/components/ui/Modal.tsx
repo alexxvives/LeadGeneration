@@ -125,7 +125,7 @@ export function Modal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-mist-500 hover:bg-white/5 hover:text-mist-200"
+                className="rounded-lg p-1.5 text-mist-500 hover:bg-white/5 hover:text-mist-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
                 aria-label="Close"
               >
                 <XIcon className="h-4 w-4" />

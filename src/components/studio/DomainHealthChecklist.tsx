@@ -162,16 +162,14 @@ export function DomainHealthPanel({ compact = false }: { compact?: boolean }) {
     return (
       <div className="rounded-lg border border-white/8 bg-ink-950/40 px-3 py-1.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <p className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-mist-500">
-            Domain health
-          </p>
+          <p className="kicker shrink-0">Domain health</p>
           <p className="min-w-0 truncate text-xs text-mist-200">{statusLabel}</p>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto">
             {items.map((item) => (
               <span
                 key={item.key}
                 title={item.tip}
-                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${chipTone(item)}`}
+                className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ${chipTone(item)}`}
               >
                 {item.ok ? (
                   <CheckIcon className="h-3 w-3" aria-hidden />

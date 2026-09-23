@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { Run } from "@/lib/types";
 import { DeferredSkeleton, RunsSkeleton } from "./skeletons";
+import { EmptyState, ErrorBanner } from "./StudioHelpers";
 
 /** Search history — click a row to open that run’s leads on the Leads view. */
 export function RunsView({
@@ -25,32 +26,30 @@ export function RunsView({
 
   if (err) {
     return (
-      <div className="rounded-xl2 border border-rose-400/20 bg-rose-400/5 px-5 py-4 text-sm text-rose-200">
+      <ErrorBanner
+        onRetry={() => {
+          setErr(null);
+          setRuns(null);
+          void api
+            .listRuns()
+            .then((r) => setRuns(r.runs))
+            .catch((e) => setErr((e as Error).message));
+        }}
+      >
         {err}
-        <button
-          type="button"
-          className="ml-3 text-aurora-300 underline-offset-2 hover:underline"
-          onClick={() => {
-            setErr(null);
-            setRuns(null);
-            void api
-              .listRuns()
-              .then((r) => setRuns(r.runs))
-              .catch((e) => setErr((e as Error).message));
-          }}
-        >
-          Retry
-        </button>
-      </div>
+      </ErrorBanner>
     );
   }
 
   return (
     <DeferredSkeleton loading={!runs} skeleton={<RunsSkeleton />}>
       {!runs || runs.length === 0 ? (
-        <div className="glass rounded-xl2 p-10 text-center text-mist-300">
-          No searches yet. Run one from Search.
-        </div>
+        <EmptyState
+          title="No searches yet"
+          body="Run one from Search."
+          actionHref="/app?view=search"
+          actionLabel="Search"
+        />
       ) : (
         <div className="overflow-hidden rounded-xl2 border border-white/10">
           <p className="border-b border-white/5 px-5 py-2 text-xs text-mist-500">

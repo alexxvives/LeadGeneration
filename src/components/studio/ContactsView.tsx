@@ -11,6 +11,7 @@ import {
 import { shortLocation } from "@/lib/format-location";
 import { MailIcon, PhoneIcon, PinIcon } from "@/components/icons";
 import { AuthorAvatar } from "@/components/studio/JournalEntries";
+import { EmptyState } from "@/components/studio/StudioHelpers";
 
 function formatCreated(iso: string): string {
   const d = new Date(iso);
@@ -83,16 +84,16 @@ export function ContactsView({
       </div>
 
       {contacts.length === 0 ? (
-        <div className="glass rounded-xl2 px-6 py-16 text-center">
-          <p className="font-display text-xl font-semibold">No collaborators yet</p>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-mist-400">
-            Track partners, referrers, and team contacts — notes and follow-ups
-            sync to Calendar.
-          </p>
-        </div>
+        <EmptyState
+          title="No collaborators yet"
+          body="Track partners, referrers, and team contacts — notes and follow-ups sync to Calendar."
+          showAction={false}
+        />
       ) : filtered.length === 0 ? (
-        <div className="glass rounded-xl2 px-6 py-12 text-center">
-          <p className="text-sm text-mist-400">No matches for &ldquo;{query.trim()}&rdquo;</p>
+        <div className="rounded-xl2 border border-dashed border-white/10 px-6 py-12 text-center">
+          <p className="text-sm text-mist-300">
+            No matches for &ldquo;{query.trim()}&rdquo;
+          </p>
         </div>
       ) : (
         <div className="grid auto-rows-fr items-stretch content-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -165,7 +166,7 @@ export function ContactsView({
                       </>
                     ) : null}
                     {pending > 0 ? (
-                      <span className="rounded-full bg-violet-400/15 px-1.5 py-0.5 font-medium text-violet-200">
+                      <span className="shrink-0 whitespace-nowrap rounded-full bg-violet-400/15 px-1.5 py-0.5 font-medium text-violet-200">
                         {pending === 1 ? "Follow-up" : `${pending} follow-ups`}
                       </span>
                     ) : null}

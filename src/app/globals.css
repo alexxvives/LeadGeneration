@@ -333,6 +333,16 @@ html[data-theme="light"] {
     --tw-ring-color: rgba(190, 18, 60, 0.28);
   }
 
+  /* Section labels (drawer, stat cards). Not kanban column titles. */
+  .kicker {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--mist-500);
+  }
+
   .glass {
     background: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
     backdrop-filter: blur(12px);

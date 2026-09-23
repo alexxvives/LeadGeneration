@@ -17,6 +17,11 @@ import {
 /** Days without a touch before a lead is marked unresponsive. */
 export const UNRESPONSIVE_AFTER_DAYS = 14;
 
+/**
+ * Step dots stay on amber, sky, aurora, and mist.
+ * Violet is the follow-up reminder only. Rose is the unresponsive clock.
+ */
+
 export const CONVERSATION_STEPS: readonly {
   id: ConversationStep;
   label: string;
@@ -44,15 +49,15 @@ export const CONVERSATION_STEPS: readonly {
     id: "evaluating_post_demo",
     label: "Evaluating · post-demo",
     hint: "They've seen the demo and are still deciding.",
-    bubbleClass: "bg-emerald-400/20 text-emerald-200 ring-1 ring-emerald-400/40",
-    dotClass: "bg-emerald-400",
+    bubbleClass: "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40",
+    dotClass: "bg-aurora-500",
   },
   {
     id: "reviewing_contract",
     label: "Reviewing contract",
     hint: "Proposal or contract is with them.",
-    bubbleClass: "bg-violet-400/20 text-violet-200 ring-1 ring-violet-400/40",
-    dotClass: "bg-violet-400",
+    bubbleClass: "bg-mist-500/15 text-mist-200 ring-1 ring-mist-500/35",
+    dotClass: "bg-mist-400",
   },
   {
     id: "onboarding",

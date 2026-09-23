@@ -33,6 +33,8 @@ import {
   taskStatusLabel,
 } from "@/lib/tasks";
 import { AuthorAvatar } from "@/components/studio/JournalEntries";
+import { MarqueeText } from "@/components/studio/MarqueeText";
+import { EmptyState } from "@/components/studio/StudioHelpers";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 import { TrashIcon } from "@/components/icons";
@@ -44,6 +46,21 @@ const STATUS_CHIP: Record<TaskStatus, string> = {
   in_progress: "bg-aurora-400/15 text-aurora-200",
   ongoing: "bg-amber-400/15 text-amber-200",
   completed: "bg-mist-600/20 text-mist-500",
+};
+
+const STATUS_DOT: Record<TaskStatus, string> = {
+  todo: "bg-mist-500",
+  in_progress: "bg-aurora-400",
+  ongoing: "bg-amber-400",
+  completed: "bg-mist-600",
+};
+
+/** Column and phone-tab titles. Chips keep the short uppercase label. */
+const COLUMN_TITLE: Record<TaskStatus, string> = {
+  todo: "To do",
+  in_progress: "In progress",
+  ongoing: "Ongoing",
+  completed: "Completed",
 };
 
 function StatusTabs({
@@ -135,7 +152,8 @@ function TaskCardFace({
             e.stopPropagation();
             onDelete();
           }}
-          className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg text-mist-500 opacity-100 transition-opacity hover:bg-white/5 hover:text-rose-300 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 disabled:opacity-50"
+          aria-label="Delete task"
+          className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg text-mist-500 opacity-100 transition-opacity hover:bg-white/5 hover:text-rose-300 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400/60 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 disabled:opacity-50"
         >
           <TrashIcon className="h-4 w-4" />
         </button>
@@ -147,7 +165,7 @@ function TaskCardFace({
       >
         <div className="flex min-w-0 items-start gap-2 pr-8">
           <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${STATUS_CHIP[task.status]}`}
+            className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${STATUS_CHIP[task.status]}`}
           >
             {taskStatusLabel(task.status)}
           </span>
@@ -162,11 +180,11 @@ function TaskCardFace({
           ) : null}
         </div>
         <h3
-          className={`mt-2 break-words font-display text-base font-semibold leading-snug ${
+          className={`mt-2 min-w-0 font-display text-base font-semibold leading-snug ${
             completed ? "text-mist-500 line-through" : "text-mist-100"
           }`}
         >
-          {task.title}
+          <MarqueeText>{task.title}</MarqueeText>
         </h3>
         <AssigneeRow task={task} />
       </button>
@@ -232,10 +250,15 @@ function TaskStatusColumn({
           : "border-white/5 bg-ink-950/30"
       }`}
     >
-      <h3 className="shrink-0 border-b border-white/5 px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-mist-500">
-        {taskStatusLabel(status)}
-        <span className="ml-1 tabular-nums text-mist-400">{tasks.length}</span>
-      </h3>
+      <div className="flex min-h-[2.75rem] shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2.5">
+        <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[status]}`} />
+        <h3 className="truncate text-sm font-semibold leading-none text-mist-100">
+          {COLUMN_TITLE[status]}
+        </h3>
+        <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
+          {tasks.length}
+        </span>
+      </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
         {tasks.map((task) => (
           <DraggableTaskCard
@@ -687,12 +710,10 @@ export function TasksView({
       ) : null}
 
       {tasks.length === 0 ? (
-        <div className="glass rounded-xl2 px-6 py-16 text-center">
-          <p className="font-display text-xl font-semibold">No tasks yet</p>
-        </div>
+        <EmptyState title="No tasks yet" body="" showAction={false} />
       ) : filtered.length === 0 ? (
-        <div className="glass rounded-xl2 px-6 py-12 text-center">
-          <p className="text-sm text-mist-400">No tasks match this filter.</p>
+        <div className="rounded-xl2 border border-dashed border-white/10 px-6 py-12 text-center">
+          <p className="text-sm text-mist-300">No tasks match this filter.</p>
         </div>
       ) : (
         <>
@@ -733,13 +754,13 @@ export function TasksView({
                   key={s}
                   type="button"
                   onClick={() => setMobileStatus(s)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
+                  className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium ${
                     mobileStatus === s
                       ? "bg-aurora-400 text-on-accent"
                       : "border border-white/10 text-mist-300"
                   }`}
                 >
-                  {taskStatusLabel(s)}
+                  {COLUMN_TITLE[s]}
                   <span className="ml-1 tabular-nums opacity-80">
                     {byStatus[s].length}
                   </span>
