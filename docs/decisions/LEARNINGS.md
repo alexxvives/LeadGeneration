@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-03 — Spreadsheet import drops the About column
+- `importLeads` always stores `aboutBlurb` as null. A CSV About column never reaches the lead.
+- The AKADEMO wave import wrote `about_blurb` in the D1 insert so the one-line description is on the card. The in-app importer still ignores About.
+
 ### 2026-09-23 — Conversation clock matches the step badge; tasks are aurora
 - Pipeline keeps the bare rose clock. On a conversation card the clock uses the same round badge as the step mark (`h-7`, tinted fill, ring).
 - Calendar task text is aurora. Notes stay amber, so a task is no longer the same orange chip as a note.

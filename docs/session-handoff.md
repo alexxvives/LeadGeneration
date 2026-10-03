@@ -9,19 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-03 (Akademo wave 2 review list)
+## ⏱️ Status — updated 2026-10-03 (Akademo leads imported)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
 **Deploy:** Not deployed. Prod studio chrome is still the previous build.
 
 ### This pass
-- Research-only CSV for review, not imported: `docs/leads/akademo-wave2-500.csv` (492 rows). Oposiciones 125, Idiomas 150, FP 93, Colegios y centros 124.
-- Nothing was written to the AKADEMO board and no email was sent. FP stayed under 100 because later hits were national chains, government portals, or presencial-only.
-- Wave 1 (40 rows) is `akademo-new-leads.csv` in the repo root.
+- Imported **513** new leads onto the AKADEMO board (`board_f56f7ebb891648d9a4e3`). Board is now **917**. Import run `run_ff46f5ae76b44bbe9d4c`. No email was sent; every new row is status `new`.
+- Sources: wave 1 `akademo-new-leads.csv` (40) and `docs/leads/akademo-wave2-500.csv` (492). Mix on the board from this import: Idiomas 161, Oposiciones 133, Colegios y centros 129, FP 90.
+- Left off the board: Instituto Europeo (already there). 18 rows that were city halls, public-school inboxes (`educa.madrid.org`, `educa.jcyl.es`, `xtec.cat`, `murciaeduca.es`, `edu.xunta.es`), or pages whose only “phone” was opening hours.
+- Agency lead usage this month is 513 of 2,000.
 
 ### Next
-1. Review `docs/leads/akademo-wave2-500.csv`, then import it with wave 1 onto the AKADEMO board only if the rows still look right.
+1. Review the new AKADEMO rows and send one lead at a time.
 2. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches the step list, touch rule, and studio chrome.
 
 ---
