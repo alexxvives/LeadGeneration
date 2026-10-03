@@ -9,18 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-09-23 (Conversation clock badge, aurora tasks)
+## ⏱️ Status — updated 2026-10-03 (Akademo wave 2 review list)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
-**Deploy:** Local until `cf:build` + `wrangler deploy`. Prod still uses the previous studio chrome until then. This pass did not deploy.
+**Deploy:** Not deployed. Prod studio chrome is still the previous build.
 
 ### This pass
-- Conversation cards use a rose clock in the same round badge as the step mark. Pipeline keeps the bare clock.
-- Calendar tasks are aurora. Notes stay amber.
+- Research-only CSV for review, not imported: `docs/leads/akademo-wave2-500.csv` (492 rows). Oposiciones 125, Idiomas 150, FP 93, Colegios y centros 124.
+- Nothing was written to the AKADEMO board and no email was sent. FP stayed under 100 because later hits were national chains, government portals, or presencial-only.
+- Wave 1 (40 rows) is `akademo-new-leads.csv` in the repo root.
 
 ### Next
-1. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches the step list, touch rule, and this chrome.
+1. Review `docs/leads/akademo-wave2-500.csv`, then import it with wave 1 onto the AKADEMO board only if the rows still look right.
+2. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches the step list, touch rule, and studio chrome.
 
 ---
 
