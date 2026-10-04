@@ -9,20 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-03 (Akademo leads imported)
+## ⏱️ Status — updated 2026-10-04 (LUMIA Spain import)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
 **Deploy:** Not deployed. Prod studio chrome is still the previous build.
 
 ### This pass
-- Imported **513** new leads onto the AKADEMO board (`board_f56f7ebb891648d9a4e3`). Board is now **917**. Import run `run_ff46f5ae76b44bbe9d4c`. No email was sent; every new row is status `new`.
-- Sources: wave 1 `akademo-new-leads.csv` (40) and `docs/leads/akademo-wave2-500.csv` (492). Mix on the board from this import: Idiomas 161, Oposiciones 133, Colegios y centros 129, FP 90.
-- Left off the board: Instituto Europeo (already there). 18 rows that were city halls, public-school inboxes (`educa.madrid.org`, `educa.jcyl.es`, `xtec.cat`, `murciaeduca.es`, `edu.xunta.es`), or pages whose only “phone” was opening hours.
-- Agency lead usage this month is 513 of 2,000.
+- Imported **1,000** new leads onto the LUMIA board (`board_0d0b6430692147b5af04`). Board is now **3,503**. Import run `run_9ac57b8da7f14114a585`. No email was sent; every new row is status `new`.
+- **746 have an email**, 254 are phone only. Mix: Clínica estética 250, Dermatología 166, Spa 137, Alta peluquería 120, Farmacia 119, Láser 115, Bronceado 93.
+- Existing LUMIA rows were almost all Barcelona, so this wave is the rest of Spain. Colleges of pharmacy, university pages, and directory sites were left off. Copy of the list: `docs/leads/lumia-spain-1000.csv`.
+- Agency lead usage this month is **1,513 of 2,000** (513 Akademo + 1,000 LUMIA).
 
 ### Next
-1. Review the new AKADEMO rows and send one lead at a time.
+1. Review the new LUMIA rows and send one lead at a time.
 2. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches the step list, touch rule, and studio chrome.
 
 ---
