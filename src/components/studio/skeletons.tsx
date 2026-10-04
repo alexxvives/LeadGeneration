@@ -475,37 +475,28 @@ export function LeadsLayoutSkeleton({
   return <LeadsTableBodySkeleton />;
 }
 
-function OutreachRowBone() {
-  return (
-    <li className="flex items-center justify-between gap-3 px-3 py-2.5">
-      <div className="min-w-0 flex-1 space-y-1">
-        <Bone className="h-4 w-36 max-w-full" />
-        <Bone className="h-3 w-44 max-w-full" />
-        <Bone className="h-3 w-56 max-w-full" />
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <Bone className="h-9 w-9 rounded-lg" />
-        <Bone className="h-9 w-16 rounded-full" />
-      </div>
-    </li>
-  );
-}
-
 export function OutreachSkeleton() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <Bone className="h-9 w-44 rounded-full" />
-        <Bone className="h-9 w-36 rounded-full" />
+        <Bone className="h-9 w-56 rounded-full" />
       </div>
       <Bone className="h-3 w-52" />
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40">
-        <ul className="divide-y divide-white/5">
-          {Array.from({ length: 8 }, (_, j) => (
-            <OutreachRowBone key={j} />
-          ))}
-        </ul>
-      </section>
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
+        <div className="rounded-xl2 border border-white/10 bg-ink-950/40 p-4">
+          <Bone className="h-3 w-12" />
+          <Bone className="mt-3 h-8 w-40" />
+          <Bone className="mt-4 h-3 w-48" />
+          <Bone className="mt-2 h-3 w-32" />
+        </div>
+        <div className="flex min-h-48 flex-col rounded-xl2 border border-white/10 bg-ink-950/40 p-4">
+          <Bone className="h-3 w-12" />
+          <Bone className="mt-3 h-10 w-full rounded-lg" />
+          <Bone className="mt-3 h-10 w-full rounded-lg" />
+          <Bone className="mt-3 min-h-32 flex-1 rounded-lg" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -556,7 +547,7 @@ export function ContactsSkeleton() {
 
 export function SearchSkeleton() {
   return (
-    <div className="mb-8">
+    <div className="mx-auto mb-8 w-full max-w-3xl">
       <div className="glass rounded-xl2 p-5 sm:p-6">
         <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
           <div>

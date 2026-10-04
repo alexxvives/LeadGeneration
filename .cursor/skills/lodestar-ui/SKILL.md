@@ -117,7 +117,7 @@ token becomes the page color in light mode).
   stage as full-width rows. Desktop toolbar stays split.
 - **Kanban / multi-column queues** (Pipeline, Tasks): keep columns at `lg+`.
   Below `lg`, use stage/bucket **tabs** + a single list. Outreach is one
-  send list at every width (drafted emails and phone-only leads together).
+  lead at a time at every width: facts on the left, draft or call on the right.
   Phone Pipeline tabs stay on one row and scroll
   (`flex-nowrap overflow-x-auto`) so Closed / Not interested stay reachable.
   Do not put `@dnd-kit` `useDraggable` on cards that render outside
@@ -147,7 +147,7 @@ token becomes the page color in light mode).
 ## Studio standards
 Reuse these. Do not invent a second version.
 
-- **Section label:** `.kicker` (uppercase, mist-500). Kanban column titles are sentence case: colored dot, `text-sm font-semibold`, display count in `text-aurora-300`. Pipeline and Tasks share that header. Outreach is a single send list, not a kanban.
+- **Section label:** `.kicker` (uppercase, mist-500). Kanban column titles are sentence case: colored dot, `text-sm font-semibold`, display count in `text-aurora-300`. Pipeline and Tasks share that header. Outreach is a one-lead review (facts + draft), not a kanban.
 - **Page empty:** `EmptyState` (dashed `rounded-xl2`, spark, display title). Filter empties use the same dashed frame without the spark. Load failures use `ErrorBanner`.
 - **Stage color:** `CRM_STAGE_DOT` / `.pill-*` — new mist, contacted amber, in conversation sky, closed aurora, not interested rose. Conversation steps use amber, sky, aurora, and mist. Violet is the follow-up reminder only. Rose clock is unresponsive.
 - **Chips:** one `flex-nowrap overflow-x-auto` row. Do not wrap lead-info, stage, or note-action chips. Card titles use `MarqueeText` or `truncate`.

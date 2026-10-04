@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-04 — Outreach is a one-lead review, not a send list
+- A flat list hid the draft. The page now shows that lead’s facts on the left and the email (or call) on the right. Send and next moves to the following lead. First N only shortens the pass.
+- Send is still one click per lead (Art. I.1). A single button does not fire the next N emails.
+
 ### 2026-10-04 — Outreach dropped the Contact Draft and Contacted columns
 - Those two columns turned the send page into a review board. This page is the next send or call. Sent mail already lives on Pipeline, Leads, Calendar, and the lead drawer, so a third copy of history only slowed the list.
 - Imports still do not auto-draft. **Draft remaining (N)** is how those emails join the list. Search still drafts on the way in.

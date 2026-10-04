@@ -1985,13 +1985,6 @@ export function Studio() {
     setSelectedId(id);
     void ensureLeadDetail(id);
   };
-  const openDraft = (id: string) => {
-    setDrawerPromptNote(false);
-    setDrawerMode("draft");
-    setSelectedId(id);
-    void ensureLeadDetail(id);
-  };
-
   const onAddLead = async () => {
     if (addingLead || editLocked || !board) return;
     setAddingLead(true);
@@ -2428,7 +2421,7 @@ export function Studio() {
                   : view === "leads"
                     ? "All prospects on this board — filter, edit, and export."
                     : view === "outreach"
-                      ? "Send drafted emails and call phone-only leads, one at a time."
+                      ? "One lead at a time — read the draft, send it, or skip to the next."
                       : view === "conversations"
                         ? "Active dialogues — step, waiting, and recent notes."
                         : view === "contacts"
@@ -2610,7 +2603,7 @@ export function Studio() {
 
       {/* Search view — always show the full panel */}
       {view === "board" && (
-        <div className="mb-8">
+        <div className="mx-auto mb-8 w-full max-w-3xl">
           <SearchPanel
             onSearch={requestSearch}
             running={running}
@@ -2949,11 +2942,9 @@ export function Studio() {
               loadedCount={board.leads.length}
               totalCount={board.leadsTotal ?? board.leads.length}
               onOpenInfo={openInfo}
-              onOpenDraft={openDraft}
-              onSend={(outreachId) => {
-                // Non-blocking: verify/send continue while user works other leads.
-                void requestSend(outreachId);
-              }}
+              onEnsureDetail={(id) => void ensureLeadDetail(id)}
+              onSaveDraft={onSaveDraft}
+              onSend={requestSend}
               onDraftAll={onDraftAllOutreach}
               onMarkContacted={onMarkContacted}
               onLogCall={onLogCall}

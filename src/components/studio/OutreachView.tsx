@@ -1,14 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
 import { loadWarmupProfile, warmupStatus } from "@/lib/email/warmup";
+import { parseRecipientEmail } from "@/lib/email/address";
 import { Spinner } from "@/components/ui";
-import { MailIcon, PencilIcon, PhoneIcon, SendIcon } from "@/components/icons";
-import { useStableDuringLoad } from "./skeletons";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  MailIcon,
+  PencilIcon,
+  PhoneIcon,
+  SendIcon,
+} from "@/components/icons";
+import { Bone, useStableDuringLoad } from "./skeletons";
 import { isOutreachReadyStatus } from "@/lib/lead-lanes";
-import { VirtualColumnList } from "./virtual-list";
+import { PitchEditor } from "./PitchEditor";
 import { Lockable, useBoardLockUi } from "./board-lock";
+import { displayWebsite, isUsableWebsite } from "@/lib/website";
 
 type OutreachBucket = "review" | "ready" | "contacted";
 /** Send-list contact-channel filter. */
@@ -157,9 +166,9 @@ function contactedDayHint(sentToday: number, softCap: number): string {
 }
 
 /**
- * One send list: drafted emails and phone-only leads.
- * Undrafted emails stay off the list until Draft remaining.
- * Send is the per-lead human gate (ADR 0029). A successful send leaves the list.
+ * One lead at a time: facts on the left, draft (or call) on the right.
+ * Undrafted emails stay out until Draft remaining.
+ * Send is the per-lead human gate (ADR 0029). A successful send leaves this view.
  */
 export function OutreachView({
   leads,
@@ -171,7 +180,8 @@ export function OutreachView({
   loadedCount,
   totalCount,
   onOpenInfo,
-  onOpenDraft,
+  onEnsureDetail,
+  onSaveDraft,
   onSend,
   onDraftAll,
   onMarkContacted,
@@ -185,20 +195,26 @@ export function OutreachView({
   canSendEmail: boolean;
   /** Lead / outreach ids currently drafting or sending (concurrent OK). */
   busyIds?: readonly string[];
-  /** Large boards page in — the list may gain rows until this finishes. */
+  /** Large boards page in — the queue may gain rows until this finishes. */
   backfilling?: boolean;
   loadedCount?: number;
   totalCount?: number;
   onOpenInfo: (id: string) => void;
-  onOpenDraft: (id: string) => void;
-  onSend: (outreachId: string) => void | Promise<void>;
+  /** Board list omits the email body — fetch it when this lead is on screen. */
+  onEnsureDetail: (id: string) => void;
+  onSaveDraft: (
+    outreachId: string,
+    patch: { subject: string; body: string; toEmail: string | null },
+    opts?: { silent?: boolean },
+  ) => Promise<void>;
+  onSend: (outreachId: string) => Promise<boolean>;
   onDraftAll: (opts?: { redraft?: boolean }) => Promise<void>;
   onMarkContacted: (
     leadId: string,
     method: ContactMethod,
     opts?: { promptNote?: boolean; missed?: boolean },
   ) => Promise<void>;
-  /** Phone-only: open the call log without leaving the list yet. */
+  /** Phone-only: open the call log without leaving the queue yet. */
   onLogCall?: (leadId: string) => void;
 }) {
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
@@ -206,6 +222,10 @@ export function OutreachView({
   const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
   const [drafting, setDrafting] = useState<null | "remaining" | "redraft">(null);
   const skipReadyChannelPersist = useRef(true);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [passIds, setPassIds] = useState<string[] | null>(null);
+  const [passSize, setPassSize] = useState(10);
+  const pendingFocus = useRef<string | null>(null);
 
   // Keep channel filter across tab switches / Settings (session only).
   useEffect(() => {
@@ -255,6 +275,37 @@ export function OutreachView({
   }, [leads, readyChannel]);
 
   const rows = useStableDuringLoad(groupedReady, byCompany, backfilling);
+  const visibleRows = useMemo(() => {
+    if (!passIds) return rows;
+    const keep = new Set(passIds);
+    return rows.filter((lead) => keep.has(lead.id));
+  }, [rows, passIds]);
+
+  useEffect(() => {
+    if (visibleRows.length === 0) return;
+    if (focusId && visibleRows.some((row) => row.id === focusId)) {
+      pendingFocus.current = null;
+      return;
+    }
+    const pending = pendingFocus.current;
+    pendingFocus.current = null;
+    if (pending && visibleRows.some((lead) => lead.id === pending)) {
+      setFocusId(pending);
+      return;
+    }
+    setFocusId(visibleRows[0]!.id);
+  }, [visibleRows, focusId]);
+
+  const index = Math.max(
+    0,
+    visibleRows.findIndex((lead) => lead.id === focusId),
+  );
+  const lead = visibleRows[index] ?? null;
+  const leadId = lead?.id ?? null;
+
+  useEffect(() => {
+    if (leadId) onEnsureDetail(leadId);
+  }, [leadId, onEnsureDetail]);
 
   const softCap = warmupStatus(loadWarmupProfile(warmupScopeId)).softCap;
   const overSoftCap = sendsToday >= softCap;
@@ -268,6 +319,27 @@ export function OutreachView({
     } finally {
       setDrafting(null);
     }
+  };
+
+  const go = (delta: number) => {
+    const next = visibleRows[index + delta];
+    if (next) setFocusId(next.id);
+  };
+
+  const startPass = () => {
+    const n = Math.min(50, Math.max(1, Math.round(passSize) || 1));
+    const ids = rows.slice(0, n).map((row) => row.id);
+    setPassIds(ids);
+    pendingFocus.current = ids[0] ?? null;
+    setFocusId(ids[0] ?? null);
+  };
+
+  const advanceAfterSend = (ok: boolean) => {
+    if (!ok) return;
+    const nextId =
+      visibleRows[index + 1]?.id ?? visibleRows[index - 1]?.id ?? null;
+    pendingFocus.current = nextId;
+    setFocusId(nextId);
   };
 
   return (
@@ -304,6 +376,45 @@ export function OutreachView({
           })}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {passIds ? (
+            <div className="inline-flex min-h-9 items-center gap-2 rounded-full border border-white/10 bg-ink-900/60 px-3">
+              <span className="text-xs text-mist-300">
+                {visibleRows.length} left in this pass
+              </span>
+              <button
+                type="button"
+                onClick={() => setPassIds(null)}
+                className="text-xs font-medium text-aurora-300 hover:underline"
+              >
+                Show all
+              </button>
+            </div>
+          ) : (
+            <div className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white/10 bg-ink-900/60 py-1 pl-3 pr-1">
+              <label className="flex items-center gap-1.5 text-xs text-mist-400">
+                First
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  inputMode="numeric"
+                  aria-label="How many leads to review"
+                  value={passSize}
+                  onChange={(e) => setPassSize(Number(e.target.value))}
+                  className="w-12 rounded-md border border-white/10 bg-ink-950/60 px-1.5 py-0.5 text-center text-sm text-mist-100 outline-none focus:border-aurora-400/60"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={startPass}
+                disabled={rows.length === 0}
+                title="Open the first leads in this list. Each one still needs its own Send."
+                className="rounded-full px-3 py-1 text-sm font-medium text-mist-100 hover:bg-white/5 disabled:opacity-50"
+              >
+                Review
+              </button>
+            </div>
+          )}
           {redraftAllAvailable ? (
             <Lockable>
               <button
@@ -380,190 +491,447 @@ export function OutreachView({
 
       <section
         data-tour="outreach-queue"
-        aria-label="Send list"
-        className="flex min-h-0 flex-1 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
+        aria-label="Outreach review"
+        className="flex min-h-0 flex-1 flex-col"
       >
-        {rows.length === 0 ? (
-          <div className="m-3 rounded-xl2 border border-dashed border-white/10 px-6 py-10 text-center">
-            <p className="text-sm text-mist-300">
-              {backfilling
-                ? "Loading the send list…"
-                : emptyCopy(leads, readyChannel, draftRemainingCount)}
-            </p>
+        {visibleRows.length === 0 || !lead ? (
+          <div className="m-0 flex flex-1 items-center justify-center rounded-xl2 border border-dashed border-white/10 px-6 py-10 text-center">
+            <div>
+              <p className="text-sm text-mist-300">
+                {backfilling
+                  ? "Loading the queue…"
+                  : passIds
+                    ? "This pass is done."
+                    : emptyCopy(leads, readyChannel, draftRemainingCount)}
+              </p>
+              {passIds ? (
+                <button
+                  type="button"
+                  onClick={() => setPassIds(null)}
+                  className="mt-3 text-sm font-medium text-aurora-300 hover:underline"
+                >
+                  Show the rest
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : (
-          <VirtualColumnList
-            items={rows}
-            estimateSize={76}
-            padding={0}
-            gap={0}
-            itemClassName=""
-            renderItem={(lead, i) => (
-              <OutreachRow
-                lead={lead}
-                busy={
-                  busySet.has(lead.id) ||
-                  (!!lead.outreach?.id && busySet.has(lead.outreach.id))
-                }
-                canSendEmail={canSendEmail}
-                showDivider={i > 0}
-                onOpenInfo={() => onOpenInfo(lead.id)}
-                onOpenDraft={() => onOpenDraft(lead.id)}
-                onSend={() =>
-                  lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
-                }
-                onMarkContacted={(method, opts) =>
-                  onMarkContacted(lead.id, method, opts)
-                }
-                onLogCall={onLogCall ? () => onLogCall(lead.id) : undefined}
-              />
-            )}
-          />
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
+            <LeadFacts
+              lead={lead}
+              index={index}
+              total={visibleRows.length}
+              onOpenInfo={() => onOpenInfo(lead.id)}
+              onPrev={() => go(-1)}
+              onNext={() => go(1)}
+            />
+            <ReviewAction
+              lead={lead}
+              busy={
+                busySet.has(lead.id) ||
+                (!!lead.outreach?.id && busySet.has(lead.outreach.id))
+              }
+              canSendEmail={canSendEmail}
+              hasNext={index < visibleRows.length - 1}
+              onSaveDraft={onSaveDraft}
+              onSend={onSend}
+              onAdvance={advanceAfterSend}
+              onMarkContacted={onMarkContacted}
+              onLogCall={onLogCall ? () => onLogCall(lead.id) : undefined}
+              onSkip={() => go(1)}
+            />
+          </div>
         )}
       </section>
     </div>
   );
 }
 
-function OutreachRow({
+function LeadFacts({
+  lead,
+  index,
+  total,
+  onOpenInfo,
+  onPrev,
+  onNext,
+}: {
+  lead: LeadWithOutreach;
+  index: number;
+  total: number;
+  onOpenInfo: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const email = leadEmail(lead);
+  const phone = leadPhone(lead);
+  const about = lead.aboutBlurb?.trim();
+  return (
+    <aside className="flex max-h-56 min-h-0 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 lg:max-h-none">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <p className="kicker">Lead</p>
+        <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-mist-100">
+          {lead.company}
+        </h2>
+        {lead.contactName ? (
+          <p className="mt-1 text-sm text-mist-300">{lead.contactName}</p>
+        ) : null}
+        <dl className="mt-4 space-y-2 text-sm">
+          {email ? (
+            <Fact icon={<MailIcon className="h-3.5 w-3.5" />} value={email} />
+          ) : null}
+          {phone ? (
+            <Fact icon={<PhoneIcon className="h-3.5 w-3.5" />} value={phone} />
+          ) : null}
+          {lead.location ? <Fact label="Location" value={lead.location} /> : null}
+          {lead.companyType ? (
+            <Fact label="Type" value={lead.companyType} />
+          ) : null}
+          {isUsableWebsite(lead.website) ? (
+            <div className="min-w-0">
+              <dt className="text-[11px] uppercase tracking-wide text-mist-500">
+                Website
+              </dt>
+              <dd className="truncate">
+                <a
+                  href={
+                    /^https?:\/\//i.test(lead.website!)
+                      ? lead.website!
+                      : `https://${lead.website}`
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-aurora-300 hover:underline"
+                >
+                  {displayWebsite(lead.website)}
+                </a>
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+        {about ? (
+          <p className="mt-4 text-sm leading-relaxed text-mist-300">{about}</p>
+        ) : null}
+        <button
+          type="button"
+          onClick={onOpenInfo}
+          className="mt-4 text-xs font-medium text-aurora-300 hover:underline"
+        >
+          Open full lead
+        </button>
+      </div>
+      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
+        <button
+          type="button"
+          onClick={onPrev}
+          disabled={index <= 0}
+          aria-label="Previous lead"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-mist-300 hover:bg-white/5 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+        </button>
+        <p className="text-xs tabular-nums text-mist-400">
+          {index + 1} of {total}
+        </p>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={index >= total - 1}
+          aria-label="Next lead"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-mist-300 hover:bg-white/5 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+        >
+          <ChevronRightIcon className="h-4 w-4" />
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function Fact({
+  label,
+  value,
+  icon,
+}: {
+  label?: string;
+  value: string;
+  icon?: ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      {label ? (
+        <dt className="text-[11px] uppercase tracking-wide text-mist-500">
+          {label}
+        </dt>
+      ) : null}
+      <dd className="flex min-w-0 items-center gap-1.5 text-mist-100">
+        {icon ? <span className="shrink-0 text-mist-500">{icon}</span> : null}
+        <span className="truncate" title={value}>
+          {value}
+        </span>
+      </dd>
+    </div>
+  );
+}
+
+function ReviewAction({
   lead,
   busy,
   canSendEmail,
-  showDivider,
-  onOpenInfo,
-  onOpenDraft,
+  hasNext,
+  onSaveDraft,
   onSend,
+  onAdvance,
   onMarkContacted,
   onLogCall,
+  onSkip,
 }: {
   lead: LeadWithOutreach;
   busy: boolean;
   canSendEmail: boolean;
-  showDivider: boolean;
-  onOpenInfo: () => void;
-  onOpenDraft: () => void;
-  onSend: () => void | Promise<void>;
+  hasNext: boolean;
+  onSaveDraft: (
+    outreachId: string,
+    patch: { subject: string; body: string; toEmail: string | null },
+    opts?: { silent?: boolean },
+  ) => Promise<void>;
+  onSend: (outreachId: string) => Promise<boolean>;
+  onAdvance: (ok: boolean) => void;
   onMarkContacted: (
+    leadId: string,
     method: ContactMethod,
     opts?: { promptNote?: boolean; missed?: boolean },
   ) => Promise<void>;
   onLogCall?: () => void;
+  onSkip: () => void;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const email = leadEmail(lead);
   const phone = leadPhone(lead);
   const phoneOnly = !email && Boolean(phone);
-  const subject = lead.outreach?.subject?.trim() ?? "";
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
 
   return (
-    <div
-      className={`flex min-w-0 items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.03] ${
-        showDivider ? "border-t border-white/10" : ""
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onOpenInfo}
-        className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-1 focus-visible:ring-aurora-400/50"
-      >
-        <span className="block truncate text-sm font-medium text-mist-100">
-          {lead.company}
-        </span>
-        {email ? (
-          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-mist-400">
-            <MailIcon className="h-3 w-3 shrink-0" aria-hidden />
-            <span className="truncate" title={email}>
-              {email}
-            </span>
-          </span>
-        ) : phone ? (
-          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-mist-400">
-            <PhoneIcon className="h-3 w-3 shrink-0" aria-hidden />
-            <span className="truncate" title={phone}>
-              {phone}
-            </span>
-          </span>
-        ) : null}
-        {email && subject ? (
-          <span
-            className="mt-0.5 block truncate text-xs text-mist-500"
-            title={subject}
-          >
-            {subject}
-          </span>
-        ) : null}
-        {lead.outreach?.status === "failed" && lead.outreach.error ? (
-          <span className="mt-1 line-clamp-2 block text-[11px] text-rose-300/90">
-            {lead.outreach.error}
-          </span>
-        ) : null}
-      </button>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {email ? (
-          <>
-            <button
-              type="button"
-              onClick={onOpenDraft}
-              aria-label="Edit draft"
-              title="Edit draft"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-mist-300 hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
-            >
-              <PencilIcon className="h-4 w-4" />
-            </button>
+    <div className="flex min-h-0 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40">
+      {email && lead.outreach ? (
+        lead.detailLoaded === true ? (
+          <EmailComposer
+            key={`${lead.id}:${lead.outreach.id}`}
+            lead={lead}
+            busy={busy}
+            canSendEmail={canSendEmail}
+            hasNext={hasNext}
+            onSaveDraft={onSaveDraft}
+            onSend={onSend}
+            onAdvance={onAdvance}
+            onSkip={onSkip}
+          />
+        ) : (
+          <div className="flex flex-1 flex-col gap-3 p-4" role="status" aria-busy="true" aria-label="Loading draft">
+            <Bone className="h-4 w-16" />
+            <Bone className="h-10 w-full rounded-lg" />
+            <Bone className="h-4 w-20" />
+            <Bone className="h-10 w-full rounded-lg" />
+            <Bone className="min-h-40 w-full flex-1 rounded-lg" />
+          </div>
+        )
+      ) : phoneOnly ? (
+        <div className="flex flex-1 flex-col justify-between p-5">
+          <div>
+            <p className="kicker">Call</p>
+            <p className="mt-2 font-display text-3xl text-mist-100">{phone}</p>
+            <p className="mt-3 max-w-md text-sm text-mist-400">
+              Log the call when you hang up. Missed stays here. Connected leaves this queue.
+            </p>
+          </div>
+          <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+            {hasNext ? (
+              <button
+                type="button"
+                onClick={onSkip}
+                className="inline-flex h-10 items-center rounded-full px-4 text-sm font-medium text-mist-300 hover:bg-white/5"
+              >
+                Next
+              </button>
+            ) : null}
             <Lockable>
               <button
                 type="button"
                 disabled={busy || editLocked}
-                onClick={() => void onSend()}
+                onClick={() => {
+                  if (onLogCall) onLogCall();
+                  else void onMarkContacted(lead.id, "phone", { promptNote: true });
+                }}
                 title={
                   editLocked
                     ? lockHint
-                    : canSendEmail
-                      ? "Send"
-                      : "Send (simulate)"
+                    : "Log the call. Missed stays here; connected leaves."
                 }
-                className="inline-flex h-9 min-h-9 items-center gap-1.5 rounded-full bg-aurora-400 px-3.5 text-sm font-medium text-on-accent disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-aurora-400 px-5 text-sm font-medium text-on-accent disabled:opacity-50"
               >
-                {busy ? (
-                  <Spinner className="h-3.5 w-3.5" />
-                ) : (
-                  <SendIcon className="h-3.5 w-3.5" />
-                )}
-                Send
+                {busy ? <Spinner className="h-3.5 w-3.5" /> : <PhoneIcon className="h-3.5 w-3.5" />}
+                Call
               </button>
             </Lockable>
-          </>
-        ) : phoneOnly ? (
-          <Lockable>
-            <button
-              type="button"
-              disabled={busy || editLocked}
-              onClick={() => {
-                if (onLogCall) onLogCall();
-                else void onMarkContacted("phone", { promptNote: true });
-              }}
-              aria-label={
-                editLocked
-                  ? lockHint
-                  : "Log a call — stays in the list until you save as connected"
-              }
-              title={
-                editLocked
-                  ? lockHint
-                  : "Log the call. Missed stays in the list; connected leaves it."
-              }
-              className="inline-flex h-9 min-h-9 items-center gap-1.5 rounded-full bg-aurora-400 px-3.5 text-sm font-medium text-on-accent disabled:opacity-50"
-            >
-              {busy ? (
-                <Spinner className="h-3.5 w-3.5" />
-              ) : (
-                <PhoneIcon className="h-3.5 w-3.5" />
-              )}
-              Call
-            </button>
-          </Lockable>
+          </div>
+        </div>
+      ) : (
+        <p className="p-5 text-sm text-mist-400">Nothing to send for this lead.</p>
+      )}
+    </div>
+  );
+}
+
+function EmailComposer({
+  lead,
+  busy,
+  canSendEmail,
+  hasNext,
+  onSaveDraft,
+  onSend,
+  onAdvance,
+  onSkip,
+}: {
+  lead: LeadWithOutreach;
+  busy: boolean;
+  canSendEmail: boolean;
+  hasNext: boolean;
+  onSaveDraft: (
+    outreachId: string,
+    patch: { subject: string; body: string; toEmail: string | null },
+    opts?: { silent?: boolean },
+  ) => Promise<void>;
+  onSend: (outreachId: string) => Promise<boolean>;
+  onAdvance: (ok: boolean) => void;
+  onSkip: () => void;
+}) {
+  const outreach = lead.outreach!;
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  const initialTo = outreach.toEmail ?? lead.emails[0] ?? "";
+  const [toEmail, setToEmail] = useState(initialTo);
+  const [subject, setSubject] = useState(outreach.subject ?? "");
+  const [body, setBody] = useState(outreach.body ?? "");
+  const [saved, setSaved] = useState({
+    subject: outreach.subject ?? "",
+    body: outreach.body ?? "",
+    toEmail: initialTo,
+  });
+  const [saving, setSaving] = useState(false);
+  const dirty =
+    subject !== saved.subject || body !== saved.body || toEmail !== saved.toEmail;
+  const addressOk = Boolean(parseRecipientEmail(toEmail));
+
+  const persist = async () => {
+    if (!dirty || editLocked) return;
+    setSaving(true);
+    try {
+      await onSaveDraft(
+        outreach.id,
+        { subject, body, toEmail: toEmail || null },
+        { silent: true },
+      );
+      setSaved({ subject, body, toEmail });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const send = async () => {
+    if (editLocked || busy || !addressOk) return;
+    try {
+      await persist();
+    } catch {
+      return;
+    }
+    const ok = await onSend(outreach.id);
+    onAdvance(ok);
+  };
+
+  return (
+    <>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        <p className="kicker">Draft</p>
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-mist-100">To</span>
+          <input
+            value={toEmail}
+            onChange={(e) => setToEmail(e.target.value)}
+            onBlur={() => {
+              const next = parseRecipientEmail(toEmail);
+              if (next && next !== toEmail.trim()) setToEmail(next);
+            }}
+            disabled={editLocked}
+            title={editLocked ? lockHint : undefined}
+            placeholder="name@company.com"
+            className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60 disabled:opacity-60"
+          />
+          {toEmail.trim() && !addressOk ? (
+            <span className="mt-1 block text-[11px] text-rose-300">
+              Needs a real address (name@example.com).
+            </span>
+          ) : null}
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-mist-100">Subject</span>
+          <input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            disabled={editLocked}
+            title={editLocked ? lockHint : undefined}
+            className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60 disabled:opacity-60"
+          />
+        </label>
+        <div>
+          <span className="mb-1.5 block text-sm font-medium text-mist-100">Body</span>
+          <PitchEditor
+            value={body}
+            onChange={setBody}
+            placeholder="Email body…"
+            disabled={editLocked}
+          />
+        </div>
+        {outreach.status === "failed" && outreach.error ? (
+          <p className="text-xs text-rose-300/90">{outreach.error}</p>
         ) : null}
       </div>
-    </div>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
+        {dirty ? (
+          <button
+            type="button"
+            onClick={() => void persist().catch(() => undefined)}
+            disabled={saving || editLocked}
+            className="inline-flex h-10 items-center rounded-full px-4 text-sm font-medium text-mist-300 hover:bg-white/5 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        ) : null}
+        {hasNext ? (
+          <button
+            type="button"
+            onClick={onSkip}
+            className="inline-flex h-10 items-center rounded-full px-4 text-sm font-medium text-mist-300 hover:bg-white/5"
+          >
+            Next
+          </button>
+        ) : null}
+        <Lockable>
+          <button
+            type="button"
+            disabled={busy || saving || editLocked || !addressOk}
+            onClick={() => void send()}
+            title={
+              editLocked
+                ? lockHint
+                : canSendEmail
+                  ? hasNext
+                    ? "Send this email and open the next lead"
+                    : "Send"
+                  : "Send (simulate)"
+            }
+            className="inline-flex h-10 items-center gap-1.5 rounded-full bg-aurora-400 px-5 text-sm font-medium text-on-accent disabled:opacity-50"
+          >
+            {busy ? <Spinner className="h-3.5 w-3.5" /> : <SendIcon className="h-3.5 w-3.5" />}
+            {hasNext ? "Send and next" : "Send"}
+          </button>
+        </Lockable>
+      </div>
+    </>
   );
 }
