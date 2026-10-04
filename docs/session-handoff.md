@@ -9,17 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-04 (Outreach review desk)
+## ⏱️ Status — updated 2026-10-04 (Outreach desk layout)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
 **Deploy:** Not deployed. Prod is still the three-column Outreach queue.
 
 ### This pass
-- Outreach is one lead at a time on desktop and phone. Facts on the left, draft or call on the right. **Send and next** sends that lead and opens the following one. **Next** skips. **First N → Review** limits the pass. Send is still one click per lead.
-- Search on desktop is a centered column (`max-w-3xl`), form and import together.
-- **Draft remaining** and **Re-draft all** stay in the toolbar. History stays on Pipeline, Leads, Calendar, and the drawer.
-- LUMIA Spain import from earlier today is unchanged: board `board_0d0b6430692147b5af04` at 3,503 leads. No email was sent.
+- Outreach is still one lead at a time. The lead column is wider (`minmax(24rem, 33rem)`). Previous / next sit centered above the lead card. **Next** and **Send and next** sit centered under the draft.
+- **First N → Review** is gone. The queue is the full ready list.
+- **All types** collapses company types that differ only by letter case.
+- **Draft remaining** and **Re-draft all** stay in the toolbar. Send is still one click per lead.
+- LUMIA Spain import is unchanged: board `board_0d0b6430692147b5af04` at 3,503 leads. No email was sent.
 
 ### Next
 1. Review leads from Outreach one at a time.

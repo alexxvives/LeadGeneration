@@ -89,7 +89,11 @@ import {
 } from "./studio-ui-prefs";
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
-import { TypeFilterMenu } from "./TypeFilterMenu";
+import {
+  TypeFilterMenu,
+  canonicalCompanyType,
+  companyTypeKey,
+} from "./TypeFilterMenu";
 import { CollapsibleLeadSearch } from "./CollapsibleLeadSearch";
 import { PhoneTopBarSlot } from "./PhoneTopBarSlot";
 import { LeadsFilterMenu } from "./LeadsFilterMenu";
@@ -2077,20 +2081,25 @@ export function Studio() {
     null;
 
   const outreachCompanyTypes = useMemo(() => {
-    const set = new Set<string>();
+    const groups = new Map<string, string[]>();
     for (const l of board?.leads ?? []) {
       const t = l.companyType?.trim();
-      if (t) set.add(t);
+      if (!t) continue;
+      const key = companyTypeKey(t);
+      const list = groups.get(key) ?? [];
+      list.push(t);
+      groups.set(key, list);
     }
-    return [...set].sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" }),
-    );
+    return [...groups.values()]
+      .map((variants) => canonicalCompanyType(variants))
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   }, [board?.leads]);
 
   const outreachFilteredLeads = useMemo(() => {
     if (outreachTypeFilter === "all") return searchFilteredLeads;
+    const want = companyTypeKey(outreachTypeFilter);
     return searchFilteredLeads.filter(
-      (l) => (l.companyType?.trim() || "") === outreachTypeFilter,
+      (l) => companyTypeKey(l.companyType ?? "") === want,
     );
   }, [searchFilteredLeads, outreachTypeFilter]);
 

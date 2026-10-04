@@ -223,8 +223,6 @@ export function OutreachView({
   const [drafting, setDrafting] = useState<null | "remaining" | "redraft">(null);
   const skipReadyChannelPersist = useRef(true);
   const [focusId, setFocusId] = useState<string | null>(null);
-  const [passIds, setPassIds] = useState<string[] | null>(null);
-  const [passSize, setPassSize] = useState(10);
   const pendingFocus = useRef<string | null>(null);
 
   // Keep channel filter across tab switches / Settings (session only).
@@ -275,32 +273,27 @@ export function OutreachView({
   }, [leads, readyChannel]);
 
   const rows = useStableDuringLoad(groupedReady, byCompany, backfilling);
-  const visibleRows = useMemo(() => {
-    if (!passIds) return rows;
-    const keep = new Set(passIds);
-    return rows.filter((lead) => keep.has(lead.id));
-  }, [rows, passIds]);
 
   useEffect(() => {
-    if (visibleRows.length === 0) return;
-    if (focusId && visibleRows.some((row) => row.id === focusId)) {
+    if (rows.length === 0) return;
+    if (focusId && rows.some((row) => row.id === focusId)) {
       pendingFocus.current = null;
       return;
     }
     const pending = pendingFocus.current;
     pendingFocus.current = null;
-    if (pending && visibleRows.some((lead) => lead.id === pending)) {
+    if (pending && rows.some((lead) => lead.id === pending)) {
       setFocusId(pending);
       return;
     }
-    setFocusId(visibleRows[0]!.id);
-  }, [visibleRows, focusId]);
+    setFocusId(rows[0]!.id);
+  }, [rows, focusId]);
 
   const index = Math.max(
     0,
-    visibleRows.findIndex((lead) => lead.id === focusId),
+    rows.findIndex((lead) => lead.id === focusId),
   );
-  const lead = visibleRows[index] ?? null;
+  const lead = rows[index] ?? null;
   const leadId = lead?.id ?? null;
 
   useEffect(() => {
@@ -322,22 +315,13 @@ export function OutreachView({
   };
 
   const go = (delta: number) => {
-    const next = visibleRows[index + delta];
+    const next = rows[index + delta];
     if (next) setFocusId(next.id);
-  };
-
-  const startPass = () => {
-    const n = Math.min(50, Math.max(1, Math.round(passSize) || 1));
-    const ids = rows.slice(0, n).map((row) => row.id);
-    setPassIds(ids);
-    pendingFocus.current = ids[0] ?? null;
-    setFocusId(ids[0] ?? null);
   };
 
   const advanceAfterSend = (ok: boolean) => {
     if (!ok) return;
-    const nextId =
-      visibleRows[index + 1]?.id ?? visibleRows[index - 1]?.id ?? null;
+    const nextId = rows[index + 1]?.id ?? rows[index - 1]?.id ?? null;
     pendingFocus.current = nextId;
     setFocusId(nextId);
   };
@@ -376,45 +360,6 @@ export function OutreachView({
           })}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
-          {passIds ? (
-            <div className="inline-flex min-h-9 items-center gap-2 rounded-full border border-white/10 bg-ink-900/60 px-3">
-              <span className="text-xs text-mist-300">
-                {visibleRows.length} left in this pass
-              </span>
-              <button
-                type="button"
-                onClick={() => setPassIds(null)}
-                className="text-xs font-medium text-aurora-300 hover:underline"
-              >
-                Show all
-              </button>
-            </div>
-          ) : (
-            <div className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white/10 bg-ink-900/60 py-1 pl-3 pr-1">
-              <label className="flex items-center gap-1.5 text-xs text-mist-400">
-                First
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  inputMode="numeric"
-                  aria-label="How many leads to review"
-                  value={passSize}
-                  onChange={(e) => setPassSize(Number(e.target.value))}
-                  className="w-12 rounded-md border border-white/10 bg-ink-950/60 px-1.5 py-0.5 text-center text-sm text-mist-100 outline-none focus:border-aurora-400/60"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={startPass}
-                disabled={rows.length === 0}
-                title="Open the first leads in this list. Each one still needs its own Send."
-                className="rounded-full px-3 py-1 text-sm font-medium text-mist-100 hover:bg-white/5 disabled:opacity-50"
-              >
-                Review
-              </button>
-            </div>
-          )}
           {redraftAllAvailable ? (
             <Lockable>
               <button
@@ -494,33 +439,22 @@ export function OutreachView({
         aria-label="Outreach review"
         className="flex min-h-0 flex-1 flex-col"
       >
-        {visibleRows.length === 0 || !lead ? (
+        {rows.length === 0 || !lead ? (
           <div className="m-0 flex flex-1 items-center justify-center rounded-xl2 border border-dashed border-white/10 px-6 py-10 text-center">
             <div>
               <p className="text-sm text-mist-300">
                 {backfilling
                   ? "Loading the queue…"
-                  : passIds
-                    ? "This pass is done."
-                    : emptyCopy(leads, readyChannel, draftRemainingCount)}
+                  : emptyCopy(leads, readyChannel, draftRemainingCount)}
               </p>
-              {passIds ? (
-                <button
-                  type="button"
-                  onClick={() => setPassIds(null)}
-                  className="mt-3 text-sm font-medium text-aurora-300 hover:underline"
-                >
-                  Show the rest
-                </button>
-              ) : null}
             </div>
           </div>
         ) : (
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(24rem,33rem)_minmax(0,1fr)]">
             <LeadFacts
               lead={lead}
               index={index}
-              total={visibleRows.length}
+              total={rows.length}
               onOpenInfo={() => onOpenInfo(lead.id)}
               onPrev={() => go(-1)}
               onNext={() => go(1)}
@@ -532,7 +466,7 @@ export function OutreachView({
                 (!!lead.outreach?.id && busySet.has(lead.outreach.id))
               }
               canSendEmail={canSendEmail}
-              hasNext={index < visibleRows.length - 1}
+              hasNext={index < rows.length - 1}
               onSaveDraft={onSaveDraft}
               onSend={onSend}
               onAdvance={advanceAfterSend}
@@ -566,8 +500,34 @@ function LeadFacts({
   const phone = leadPhone(lead);
   const about = lead.aboutBlurb?.trim();
   return (
-    <aside className="flex max-h-56 min-h-0 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 lg:max-h-none">
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+    <div className="flex min-h-0 min-w-0 flex-col gap-2">
+      <div className="flex shrink-0 justify-center">
+        <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-ink-900/60 px-1 py-0.5">
+          <button
+            type="button"
+            onClick={onPrev}
+            disabled={index <= 0}
+            aria-label="Previous lead"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-mist-300 hover:bg-white/5 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+          >
+            <ChevronLeftIcon className="h-4 w-4" />
+          </button>
+          <p className="min-w-[4.5rem] text-center text-xs tabular-nums text-mist-400">
+            {index + 1} of {total}
+          </p>
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={index >= total - 1}
+            aria-label="Next lead"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-mist-300 hover:bg-white/5 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+          >
+            <ChevronRightIcon className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <aside className="flex max-h-56 min-h-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 lg:max-h-none">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <p className="kicker">Lead</p>
         <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-mist-100">
           {lead.company}
@@ -619,30 +579,8 @@ function LeadFacts({
           Open full lead
         </button>
       </div>
-      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
-        <button
-          type="button"
-          onClick={onPrev}
-          disabled={index <= 0}
-          aria-label="Previous lead"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-mist-300 hover:bg-white/5 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
-        >
-          <ChevronLeftIcon className="h-4 w-4" />
-        </button>
-        <p className="text-xs tabular-nums text-mist-400">
-          {index + 1} of {total}
-        </p>
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={index >= total - 1}
-          aria-label="Next lead"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-mist-300 hover:bg-white/5 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
-        >
-          <ChevronRightIcon className="h-4 w-4" />
-        </button>
-      </div>
     </aside>
+    </div>
   );
 }
 
@@ -741,7 +679,7 @@ function ReviewAction({
               Log the call when you hang up. Missed stays here. Connected leaves this queue.
             </p>
           </div>
-          <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
             {hasNext ? (
               <button
                 type="button"
@@ -891,7 +829,7 @@ function EmailComposer({
           <p className="text-xs text-rose-300/90">{outreach.error}</p>
         ) : null}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/10 px-4 py-3">
         {dirty ? (
           <button
             type="button"

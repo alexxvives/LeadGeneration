@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-04 — Outreach desk: wider lead, centered controls, one type spelling
+- **First N → Review** is removed. The queue is every ready lead.
+- Previous / next sit centered above the lead card. **Next** and **Send and next** sit centered under the draft. The lead column max is 33rem (about half again the old 22rem).
+- **All types** groups `companyType` with a case-insensitive key. A mixed-case spelling wins when the board has one; otherwise the label is title case. Filtering still matches every case variant.
+
 ### 2026-10-04 — Outreach is a one-lead review, not a send list
 - A flat list hid the draft. The page now shows that lead’s facts on the left and the email (or call) on the right. Send and next moves to the following lead. First N only shortens the pass.
 - Send is still one click per lead (Art. I.1). A single button does not fire the next N emails.

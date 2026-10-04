@@ -117,7 +117,9 @@ token becomes the page color in light mode).
   stage as full-width rows. Desktop toolbar stays split.
 - **Kanban / multi-column queues** (Pipeline, Tasks): keep columns at `lg+`.
   Below `lg`, use stage/bucket **tabs** + a single list. Outreach is one
-  lead at a time at every width: facts on the left, draft or call on the right.
+  lead at a time at every width: facts on the left (`minmax(24rem, 33rem)`
+  at `lg+`), draft or call on the right. Previous / next sit centered above
+  the lead card. **Next** and **Send and next** sit centered under the draft.
   Phone Pipeline tabs stay on one row and scroll
   (`flex-nowrap overflow-x-auto`) so Closed / Not interested stay reachable.
   Do not put `@dnd-kit` `useDraggable` on cards that render outside

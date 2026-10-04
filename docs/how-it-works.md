@@ -39,8 +39,7 @@ Search  →  Enrich  →  Draft  →  Send
    Nothing sends without that click. Search still writes a draft as each lead
    arrives. Imports do not. **Draft remaining** on Outreach writes those
    missing drafts into the queue; **Re-draft all** rewrites queued drafts and
-   drafts anything still remaining. **First N → Review** opens a short pass
-   of the next leads. **Send stays per-lead** (Art. I.1 / ADR 0029) — Send
+   drafts anything still remaining. **Send stays per-lead** (Art. I.1 / ADR 0029) — Send
    and next still sends only the lead on screen.
 
 ## 3. Screens
@@ -150,14 +149,16 @@ Search  →  Enrich  →  Draft  →  Send
 
   - **Outreach** (`?view=outreach`) — one lead at a time on desktop and phone.
     The company sits on the left (address or phone, location, website, about).
-    The draft sits on the right (to, subject, body). **Send and next** sends
+    The draft sits on the right (to, subject, body). The lead column runs up
+    to 33rem. Previous and next sit centered above the lead card. **Send and
+    next** and **Next** sit centered under the draft. **Send and next** sends
     that email and opens the following lead. **Next** skips without sending.
     Phone-only leads show the number and a call button instead of a draft.
     **Save** or **Skip details** marks the call connected and the lead leaves;
     **Missed call** journals the miss and the lead stays. The same miss path
     exists from the lead’s **Notes**. **All / Email / Phone** filters who is
-    in the queue. **First N** then **Review** limits the pass to the first N
-    leads in that queue. Undrafted email leads are not in the queue. **Draft
+    in the queue. **All types** merges spellings that differ only by case.
+    Undrafted email leads are not in the queue. **Draft
     remaining (N)** shows in the toolbar only when some exist; they join after
     it runs. **Re-draft all** is the secondary toolbar action: it rewrites
     queued drafts and drafts anything still remaining. After a successful send

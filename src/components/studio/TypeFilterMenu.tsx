@@ -4,20 +4,50 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDownIcon } from "@/components/icons";
 
-/** Soft title-case for ALL-CAPS company types without changing filter values. */
-function displayType(raw: string): string {
-  const t = raw.trim();
+/** Case-insensitive identity for company types ("Cafe" and "cafe" are one). */
+export function companyTypeKey(raw: string): string {
+  return raw.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
+function titleCaseType(raw: string): string {
+  const t = raw.trim().replace(/\s+/g, " ");
   if (!t) return t;
-  if (t !== t.toUpperCase()) return t;
   return t
-    .toLowerCase()
+    .toLocaleLowerCase()
     .split(/([\s_/.-]+)/)
     .map((part) =>
       /^[\s_/.-]+$/.test(part)
         ? part
-        : part.charAt(0).toUpperCase() + part.slice(1),
+        : part.charAt(0).toLocaleUpperCase() + part.slice(1),
     )
     .join("");
+}
+
+/**
+ * One menu label for a case-variant group. Keep a mixed-case spelling when
+ * the board already has one ("IT Services"); otherwise title-case.
+ */
+export function canonicalCompanyType(variants: readonly string[]): string {
+  const counts = new Map<string, number>();
+  for (const raw of variants) {
+    const t = raw.trim().replace(/\s+/g, " ");
+    if (!t) continue;
+    counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  const ranked = [...counts.entries()].sort(
+    (a, b) =>
+      b[1] - a[1] ||
+      a[0].localeCompare(b[0], undefined, { sensitivity: "base" }),
+  );
+  const mixed = ranked.find(
+    ([label]) => {
+      const lower = label.toLocaleLowerCase();
+      const upper = label.toLocaleUpperCase();
+      return label !== lower && label !== upper;
+    },
+  );
+  if (mixed) return mixed[0];
+  return titleCaseType(ranked[0]?.[0] ?? "");
 }
 
 const MENU_MAX_H = 256;
@@ -88,10 +118,22 @@ export function TypeFilterMenu({
     };
   }, [open]);
 
-  const label = value === "all" ? "All types" : displayType(value);
+  const typeRows: { id: string; label: string }[] = [];
+  const seen = new Set<string>();
+  for (const raw of options) {
+    const key = companyTypeKey(raw);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    typeRows.push({ id: raw, label: canonicalCompanyType([raw]) });
+  }
+  const selected = typeRows.find(
+    (row) => companyTypeKey(row.id) === companyTypeKey(value),
+  );
+  const label =
+    value === "all" ? "All types" : (selected?.label ?? titleCaseType(value));
   const rows: { id: string; label: string }[] = [
     { id: "all", label: "All types" },
-    ...options.map((t) => ({ id: t, label: displayType(t) })),
+    ...typeRows,
   ];
 
   const menu =
@@ -106,7 +148,11 @@ export function TypeFilterMenu({
             style={{ top: pos.top, left: pos.left, width: pos.width }}
           >
             {rows.map((row) => {
-              const active = value === row.id;
+              const active =
+                row.id === "all"
+                  ? value === "all"
+                  : value !== "all" &&
+                    companyTypeKey(value) === companyTypeKey(row.id);
               return (
                 <li key={row.id} role="option" aria-selected={active}>
                   <button
