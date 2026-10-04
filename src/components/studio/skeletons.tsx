@@ -477,15 +477,15 @@ export function LeadsLayoutSkeleton({
 
 function OutreachRowBone() {
   return (
-    <li className="flex items-center justify-between gap-2 px-3 py-2">
+    <li className="flex items-center justify-between gap-3 px-3 py-2.5">
       <div className="min-w-0 flex-1 space-y-1">
-        <Bone className="h-4 w-32 max-w-full" />
-        <Bone className="h-3 w-24" />
+        <Bone className="h-4 w-36 max-w-full" />
+        <Bone className="h-3 w-44 max-w-full" />
+        <Bone className="h-3 w-56 max-w-full" />
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
-        <Bone className="h-1 w-10 rounded-full" />
-        <Bone className="h-6 w-14 rounded-full" />
-        <Bone className="h-6 w-6 rounded-md" />
+        <Bone className="h-9 w-9 rounded-lg" />
+        <Bone className="h-9 w-16 rounded-full" />
       </div>
     </li>
   );
@@ -494,45 +494,18 @@ function OutreachRowBone() {
 export function OutreachSkeleton() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
-        <div className="flex shrink-0 gap-1 overflow-hidden">
-          {Array.from({ length: 3 }, (_, i) => (
-            <Bone key={i} className="h-11 w-28 shrink-0 rounded-full" />
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+        <Bone className="h-9 w-44 rounded-full" />
+        <Bone className="h-9 w-36 rounded-full" />
+      </div>
+      <Bone className="h-3 w-52" />
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40">
+        <ul className="divide-y divide-white/5">
+          {Array.from({ length: 8 }, (_, j) => (
+            <OutreachRowBone key={j} />
           ))}
-        </div>
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40">
-          <ul className="divide-y divide-white/5">
-            {Array.from({ length: 6 }, (_, j) => (
-              <OutreachRowBone key={j} />
-            ))}
-          </ul>
-        </section>
-      </div>
-      <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-cols-3 lg:items-stretch">
-        {Array.from({ length: 3 }, (_, i) => (
-          <section
-            key={i}
-            className="flex min-h-0 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
-          >
-            <div className="flex shrink-0 items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
-              <div className="min-w-0 space-y-1.5">
-                <Bone className="h-3 w-28" />
-                <Bone className="h-3 w-36" />
-              </div>
-              {i === 0 ? (
-                <Bone className="h-6 w-20 rounded-full" />
-              ) : i === 1 ? (
-                <Bone className="h-6 w-28 rounded-full" />
-              ) : null}
-            </div>
-            <ul className="min-h-0 flex-1 divide-y divide-white/5 overflow-hidden">
-              {Array.from({ length: 5 }, (_, j) => (
-                <OutreachRowBone key={j} />
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
+        </ul>
+      </section>
     </div>
   );
 }

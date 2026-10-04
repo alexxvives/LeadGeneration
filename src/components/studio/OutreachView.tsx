@@ -4,26 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
 import { loadWarmupProfile, warmupStatus } from "@/lib/email/warmup";
 import { Spinner } from "@/components/ui";
-import {
-  CheckIcon,
-  EyeIcon,
-  FormIcon,
-  GlobeIcon,
-  InstagramIcon,
-  MailIcon,
-  PencilIcon,
-  PhoneIcon,
-  PlusIcon,
-  WhatsAppIcon,
-  SendIcon,
-} from "@/components/icons";
+import { MailIcon, PencilIcon, PhoneIcon, SendIcon } from "@/components/icons";
 import { useStableDuringLoad } from "./skeletons";
 import { isOutreachReadyStatus } from "@/lib/lead-lanes";
 import { VirtualColumnList } from "./virtual-list";
 import { Lockable, useBoardLockUi } from "./board-lock";
 
 type OutreachBucket = "review" | "ready" | "contacted";
-/** Ready-column contact-channel filter. */
+/** Send-list contact-channel filter. */
 type ReadyChannelFilter = "all" | "email" | "phone";
 
 function leadEmail(lead: LeadWithOutreach): string | null {
@@ -138,56 +126,27 @@ function byCompany(a: LeadWithOutreach, b: LeadWithOutreach): number {
   return a.company.localeCompare(b.company, undefined, { sensitivity: "base" });
 }
 
-/** Contacted: newest sends first, then company. */
-function byContactedRecent(a: LeadWithOutreach, b: LeadWithOutreach): number {
-  const aSent = a.outreach?.sentAt ?? "";
-  const bSent = b.outreach?.sentAt ?? "";
-  if (aSent !== bSent) return bSent.localeCompare(aSent);
-  return byCompany(a, b);
-}
-
-const BUCKET_META: Record<
-  OutreachBucket,
-  { title: string; hint: string; empty: string }
-> = {
-  review: {
-    title: "Contact Draft",
-    hint: "Email leads that still need a draft",
-    empty: "Every email lead has a draft — they're in Ready to Contact.",
-  },
-  ready: {
-    title: "Ready to Contact",
-    hint: "Drafted emails & phone-only leads",
-    empty: "Draft an email in Contact Draft, or add a phone-only lead.",
-  },
-  contacted: {
-    title: "Contacted",
-    hint: "Sent emails — open a row to view the message",
-    empty: "No emails sent yet.",
-  },
-};
-
 function emptyCopy(
-  bucket: OutreachBucket,
   leads: LeadWithOutreach[],
   channel: ReadyChannelFilter,
+  draftRemaining: number,
 ): string {
-  if (leads.length === 0) {
-    return "No leads on this board yet — run a search or import.";
+  if (channel === "phone") {
+    return "No phone-only leads to call. Switch to All or Email.";
   }
-  if (bucket === "ready" && channel === "phone") {
-    return "No phone-only leads in Ready. Switch to All or Email.";
-  }
-  if (bucket === "ready" && channel === "email") {
-    return "No email-ready leads. Draft remaining emails in Contact Draft.";
-  }
-  if (bucket === "review") {
-    const hasEmail = leads.some((l) => Boolean(leadEmail(l)));
-    if (!hasEmail) {
-      return "No email addresses on this board — phone-only leads skip to Ready.";
+  if (channel === "email") {
+    if (draftRemaining > 0) {
+      return "No drafted emails yet. Draft remaining adds them to this list.";
     }
+    return "No drafted emails to send.";
   }
-  return BUCKET_META[bucket].empty;
+  if (draftRemaining > 0) {
+    return "Nothing to send yet. Draft remaining writes the emails that are still waiting.";
+  }
+  if (leads.length === 0) {
+    return "Nothing to send for this search or type.";
+  }
+  return "Nothing to send.";
 }
 
 function contactedDayHint(sentToday: number, softCap: number): string {
@@ -198,9 +157,9 @@ function contactedDayHint(sentToday: number, softCap: number): string {
 }
 
 /**
- * Compact 3-column send queue: Contact Draft → Ready → Contacted.
- * Phone-only leads land in Ready (no email draft required).
- * A saved draft is Ready; Send is the per-lead human gate (ADR 0029).
+ * One send list: drafted emails and phone-only leads.
+ * Undrafted emails stay off the list until Draft remaining.
+ * Send is the per-lead human gate (ADR 0029). A successful send leaves the list.
  */
 export function OutreachView({
   leads,
@@ -213,7 +172,6 @@ export function OutreachView({
   totalCount,
   onOpenInfo,
   onOpenDraft,
-  onCreateDraft,
   onSend,
   onDraftAll,
   onMarkContacted,
@@ -227,13 +185,12 @@ export function OutreachView({
   canSendEmail: boolean;
   /** Lead / outreach ids currently drafting or sending (concurrent OK). */
   busyIds?: readonly string[];
-  /** Large boards page in — Contacted may gain rows until this finishes. */
+  /** Large boards page in — the list may gain rows until this finishes. */
   backfilling?: boolean;
   loadedCount?: number;
   totalCount?: number;
   onOpenInfo: (id: string) => void;
   onOpenDraft: (id: string) => void;
-  onCreateDraft: (id: string) => Promise<void>;
   onSend: (outreachId: string) => void | Promise<void>;
   onDraftAll: (opts?: { redraft?: boolean }) => Promise<void>;
   onMarkContacted: (
@@ -241,16 +198,16 @@ export function OutreachView({
     method: ContactMethod,
     opts?: { promptNote?: boolean; missed?: boolean },
   ) => Promise<void>;
-  /** Ready phone-only: open the call log without moving to Contacted yet. */
+  /** Phone-only: open the call log without leaving the list yet. */
   onLogCall?: (leadId: string) => void;
 }) {
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const busySet = useMemo(() => new Set(busyIds), [busyIds]);
   const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
-  const [narrowBucket, setNarrowBucket] = useState<OutreachBucket>("ready");
+  const [drafting, setDrafting] = useState<null | "remaining" | "redraft">(null);
   const skipReadyChannelPersist = useRef(true);
 
-  // Keep Ready-column channel filter across tab switches / Settings (session only).
+  // Keep channel filter across tab switches / Settings (session only).
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("hermes_outreach_ready_channel");
@@ -274,50 +231,8 @@ export function OutreachView({
     }
   }, [readyChannel]);
 
-  const grouped = useMemo(() => {
-    const next: Record<OutreachBucket, LeadWithOutreach[]> = {
-      review: [],
-      ready: [],
-      contacted: [],
-    };
-    for (const lead of leads) {
-      const b = bucketOf(lead);
-      if (b) next[b].push(lead);
-    }
-    if (readyChannel === "email") {
-      next.ready = next.ready.filter((l) => Boolean(leadEmail(l)));
-    } else if (readyChannel === "phone") {
-      next.ready = next.ready.filter((l) => !leadEmail(l) && Boolean(leadPhone(l)));
-    }
-    return next;
-  }, [leads, readyChannel]);
-
-  const reviewRows = useStableDuringLoad(
-    grouped.review,
-    byCompany,
-    backfilling,
-  );
-  const readyRows = useStableDuringLoad(
-    grouped.ready,
-    byCompany,
-    backfilling,
-  );
-  const contactedRows = useStableDuringLoad(
-    grouped.contacted,
-    byContactedRecent,
-    backfilling,
-  );
-  const groups: Record<OutreachBucket, LeadWithOutreach[]> = {
-    review: reviewRows,
-    ready: readyRows,
-    contacted: contactedRows,
-  };
-
-  const softCap = warmupStatus(loadWarmupProfile(warmupScopeId)).softCap;
-  const overSoftCap = sendsToday >= softCap;
-
-  const draftAllRemaining = useMemo(
-    () => leads.some(needsOutreachDraft),
+  const draftRemainingCount = useMemo(
+    () => leads.filter(needsOutreachDraft).length,
     [leads],
   );
   const redraftAllAvailable = useMemo(
@@ -325,174 +240,124 @@ export function OutreachView({
     [leads],
   );
 
-  const columns: OutreachBucket[] = ["review", "ready", "contacted"];
+  const groupedReady = useMemo(() => {
+    const ready: LeadWithOutreach[] = [];
+    for (const lead of leads) {
+      if (bucketOf(lead) === "ready") ready.push(lead);
+    }
+    if (readyChannel === "email") {
+      return ready.filter((l) => Boolean(leadEmail(l)));
+    }
+    if (readyChannel === "phone") {
+      return ready.filter((l) => !leadEmail(l) && Boolean(leadPhone(l)));
+    }
+    return ready;
+  }, [leads, readyChannel]);
 
-  const renderColumn = (key: OutreachBucket) => {
-    const meta = BUCKET_META[key];
-    const rows = groups[key];
-    return (
-      <section
-        key={key}
-        className="flex min-h-0 flex-1 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
-      >
-        <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-white/5 px-3 py-2.5">
-          <div className="min-w-0">
-            <h3 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold leading-none text-mist-100">
-              <span className="truncate">{meta.title}</span>
-              <span className="font-display text-lg leading-none tabular-nums text-aurora-300">
-                {rows.length}
-              </span>
-              {backfilling ? (
-                <span
-                  role="status"
-                  title="More leads are still loading"
-                  aria-label="More leads are still loading"
-                >
-                  <Spinner className="h-3 w-3 text-mist-400" />
-                </span>
-              ) : null}
-            </h3>
-            <p
-              className={`mt-1 truncate text-xs ${
-                key === "contacted" && overSoftCap
-                  ? "text-amber-300/90"
-                  : "text-mist-500"
-              }`}
-              title={
-                key === "contacted"
-                  ? "Soft recommend for this board’s inbox (Settings → mailbox age). Warning only — not a hard block."
-                  : undefined
-              }
-            >
-              {key === "contacted"
-                ? contactedDayHint(sendsToday, softCap)
-                : meta.hint}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-            {key === "ready" ? (
-              <div
-                className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-0.5"
-                role="group"
-                aria-label="Filter Ready by contact channel"
-              >
-                {(
-                  [
-                    ["all", "All"],
-                    ["email", "Email"],
-                    ["phone", "Phone"],
-                  ] as const
-                ).map(([id, label]) => {
-                  const active = readyChannel === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setReadyChannel(id)}
-                      className={`min-h-8 rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors ${
-                        active
-                          ? "bg-aurora-400 text-on-accent"
-                          : "text-mist-400 hover:text-mist-100"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-            {key === "review" && redraftAllAvailable ? (
-              <Lockable>
-                <button
-                  type="button"
-                  onClick={() => void onDraftAll({ redraft: true })}
-                  disabled={editLocked || busySet.has("draft-all")}
-                  title={
-                    editLocked
-                      ? lockHint
-                      : "Rewrite Ready emails and draft remaining Contact Draft leads"
-                  }
-                  className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                >
-                {busySet.has("draft-all") ? (
-                  <Spinner className="h-3 w-3" />
-                ) : (
-                  <PencilIcon className="h-3 w-3" />
-                )}
-                  Re-draft all
-                </button>
-              </Lockable>
-            ) : null}
-            {key === "review" && draftAllRemaining ? (
-              <Lockable>
-                <button
-                  type="button"
-                  onClick={() => void onDraftAll()}
-                  disabled={editLocked || busySet.has("draft-all")}
-                  title={
-                    editLocked
-                      ? lockHint
-                      : "Draft remaining email leads — they move to Ready to Contact"
-                  }
-                  className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-on-accent disabled:opacity-50"
-                >
-                {busySet.has("draft-all") ? (
-                  <Spinner className="h-3 w-3" />
-                ) : (
-                  <CheckIcon className="h-3 w-3" />
-                )}
-                  Draft all
-                </button>
-              </Lockable>
-            ) : null}
-          </div>
-        </div>
+  const rows = useStableDuringLoad(groupedReady, byCompany, backfilling);
 
-        {rows.length === 0 ? (
-          <div className="px-3 py-6 text-center text-[11px] text-mist-600">
-            {backfilling && key === "contacted"
-              ? "Loading contacted leads…"
-              : emptyCopy(key, leads, readyChannel)}
-          </div>
-        ) : (
-          <VirtualColumnList
-            items={rows}
-            estimateSize={52}
-            padding={0}
-            gap={0}
-            itemClassName=""
-            renderItem={(lead, i) => (
-              <OutreachRow
-                lead={lead}
-                bucket={key}
-                busy={
-                  busySet.has(lead.id) ||
-                  (!!lead.outreach?.id && busySet.has(lead.outreach.id))
-                }
-                canSendEmail={canSendEmail}
-                showDivider={i > 0}
-                onOpenInfo={() => onOpenInfo(lead.id)}
-                onOpenDraft={() => onOpenDraft(lead.id)}
-                onCreateDraft={() => onCreateDraft(lead.id)}
-                onSend={() =>
-                  lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
-                }
-                onMarkContacted={(method, opts) =>
-                  onMarkContacted(lead.id, method, opts)
-                }
-                onLogCall={
-                  onLogCall ? () => onLogCall(lead.id) : undefined
-                }
-              />
-            )}
-          />
-        )}
-      </section>
-    );
+  const softCap = warmupStatus(loadWarmupProfile(warmupScopeId)).softCap;
+  const overSoftCap = sendsToday >= softCap;
+  const draftBusy = drafting !== null || busySet.has("draft-all");
+
+  const runDraft = async (mode: "remaining" | "redraft") => {
+    if (editLocked || draftBusy) return;
+    setDrafting(mode);
+    try {
+      await onDraftAll(mode === "redraft" ? { redraft: true } : undefined);
+    } finally {
+      setDrafting(null);
+    }
   };
 
   return (
-    <div data-tour="outreach-queue" className="flex h-full min-h-0 min-w-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+        <div
+          className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1"
+          role="group"
+          aria-label="Filter by contact channel"
+        >
+          {(
+            [
+              ["all", "All"],
+              ["email", "Email"],
+              ["phone", "Phone"],
+            ] as const
+          ).map(([id, label]) => {
+            const active = readyChannel === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setReadyChannel(id)}
+                aria-pressed={active}
+                className={`min-h-8 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-aurora-400 text-on-accent"
+                    : "text-mist-300 hover:text-mist-100"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {redraftAllAvailable ? (
+            <Lockable>
+              <button
+                type="button"
+                onClick={() => void runDraft("redraft")}
+                disabled={editLocked || draftBusy}
+                title={
+                  editLocked
+                    ? lockHint
+                    : "Rewrite queued drafts and draft anything still remaining"
+                }
+                className="glass inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium text-mist-100 disabled:opacity-50"
+              >
+                {drafting === "redraft" ? (
+                  <Spinner className="h-3.5 w-3.5" />
+                ) : (
+                  <PencilIcon className="h-3.5 w-3.5" />
+                )}
+                Re-draft all
+              </button>
+            </Lockable>
+          ) : null}
+          {draftRemainingCount > 0 ? (
+            <Lockable>
+              <button
+                type="button"
+                onClick={() => void runDraft("remaining")}
+                disabled={editLocked || draftBusy}
+                title={
+                  editLocked
+                    ? lockHint
+                    : "Write the emails that still need a first draft. They join this list when it finishes."
+                }
+                className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-amber-400 px-3.5 text-sm font-medium text-on-accent disabled:opacity-50"
+              >
+                {drafting === "remaining" ? (
+                  <Spinner className="h-3.5 w-3.5" />
+                ) : null}
+                Draft remaining ({draftRemainingCount})
+              </button>
+            </Lockable>
+          ) : null}
+        </div>
+      </div>
+
+      <p
+        className={`shrink-0 text-xs ${
+          overSoftCap ? "text-amber-300/90" : "text-mist-500"
+        }`}
+        title="Soft recommend for this board’s inbox (Settings → mailbox age). Warning only — not a hard block."
+      >
+        {contactedDayHint(sendsToday, softCap)}
+      </p>
+
       {backfilling ? (
         <p
           className="shrink-0 text-[11px] text-mist-500"
@@ -509,71 +374,74 @@ export function OutreachView({
               </span>
             </>
           ) : null}
-          … top of each column first
+          … top of the list first
         </p>
       ) : null}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
-        <div
-          className="flex shrink-0 gap-1 overflow-x-auto pb-1"
-          role="tablist"
-          aria-label="Outreach queue"
-        >
-          {columns.map((key) => {
-            const active = narrowBucket === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setNarrowBucket(key)}
-                className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors ${
-                  active
-                    ? "bg-aurora-400 text-on-accent"
-                    : "border border-white/10 bg-ink-900/60 text-mist-300 hover:text-mist-100"
-                }`}
-              >
-                {BUCKET_META[key].title}
-                <span className="tabular-nums opacity-80">{groups[key].length}</span>
-              </button>
-            );
-          })}
-        </div>
-        {renderColumn(narrowBucket)}
-      </div>
-      <div className="hidden min-h-0 flex-1 gap-3 lg:grid lg:grid-cols-3 lg:items-stretch">
-        {columns.map((key) => renderColumn(key))}
-      </div>
+
+      <section
+        data-tour="outreach-queue"
+        aria-label="Send list"
+        className="flex min-h-0 flex-1 flex-col rounded-xl2 border border-white/10 bg-ink-950/40"
+      >
+        {rows.length === 0 ? (
+          <div className="m-3 rounded-xl2 border border-dashed border-white/10 px-6 py-10 text-center">
+            <p className="text-sm text-mist-300">
+              {backfilling
+                ? "Loading the send list…"
+                : emptyCopy(leads, readyChannel, draftRemainingCount)}
+            </p>
+          </div>
+        ) : (
+          <VirtualColumnList
+            items={rows}
+            estimateSize={76}
+            padding={0}
+            gap={0}
+            itemClassName=""
+            renderItem={(lead, i) => (
+              <OutreachRow
+                lead={lead}
+                busy={
+                  busySet.has(lead.id) ||
+                  (!!lead.outreach?.id && busySet.has(lead.outreach.id))
+                }
+                canSendEmail={canSendEmail}
+                showDivider={i > 0}
+                onOpenInfo={() => onOpenInfo(lead.id)}
+                onOpenDraft={() => onOpenDraft(lead.id)}
+                onSend={() =>
+                  lead.outreach ? onSend(lead.outreach.id) : Promise.resolve()
+                }
+                onMarkContacted={(method, opts) =>
+                  onMarkContacted(lead.id, method, opts)
+                }
+                onLogCall={onLogCall ? () => onLogCall(lead.id) : undefined}
+              />
+            )}
+          />
+        )}
+      </section>
     </div>
   );
 }
 
-const ACTION_BTN =
-  "inline-flex h-6 min-h-6 items-center justify-center gap-1 rounded-full text-[11px] font-medium leading-none";
-const ACTION_ICON_BTN = `${ACTION_BTN} w-6 min-w-6 px-0`;
-const ACTION_TEXT_BTN = `${ACTION_BTN} min-w-[1.5rem] px-2`;
-
 function OutreachRow({
   lead,
-  bucket,
   busy,
   canSendEmail,
   showDivider,
   onOpenInfo,
   onOpenDraft,
-  onCreateDraft,
   onSend,
   onMarkContacted,
   onLogCall,
 }: {
   lead: LeadWithOutreach;
-  bucket: OutreachBucket;
   busy: boolean;
   canSendEmail: boolean;
   showDivider: boolean;
   onOpenInfo: () => void;
   onOpenDraft: () => void;
-  onCreateDraft: () => Promise<void>;
   onSend: () => void | Promise<void>;
   onMarkContacted: (
     method: ContactMethod,
@@ -585,304 +453,115 @@ function OutreachRow({
   const email = leadEmail(lead);
   const phone = leadPhone(lead);
   const phoneOnly = !email && Boolean(phone);
-  const [pickingMethod, setPickingMethod] = useState(false);
-  const methods = lead.contactMethods ?? [];
-  const sent = lead.outreach?.status === "sent";
-  // Sent email already implies the channel — don’t nag “register” during a
-  // brief client merge gap where contactMethods is still empty.
-  const needsMethod =
-    bucket === "contacted" && methods.length === 0 && !sent;
-
-  const hasDraft = Boolean(lead.outreach);
-  const openComposer = () => {
-    if (bucket === "contacted") {
-      // Info pane has Notes (dated "Email sent"); draft is via draft button.
-      onOpenInfo();
-      return;
-    }
-    if (phoneOnly) {
-      onOpenInfo();
-      return;
-    }
-    if (bucket === "review") {
-      if (hasDraft) onOpenDraft();
-      else if (editLocked) onOpenInfo();
-      else void onCreateDraft();
-      return;
-    }
-    onOpenDraft();
-  };
+  const subject = lead.outreach?.subject?.trim() ?? "";
 
   return (
     <div
-      className={`flex min-w-0 cursor-pointer items-center gap-2 px-3 py-2 transition-colors hover:bg-white/[0.03] ${
+      className={`flex min-w-0 items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.03] ${
         showDivider ? "border-t border-white/10" : ""
-      } ${needsMethod ? "bg-amber-400/[0.06]" : ""}`}
-      onClick={onOpenInfo}
+      }`}
     >
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              openComposer();
-            }}
-            className="min-w-0 truncate rounded-md text-left text-sm font-medium text-mist-100 outline-none hover:text-aurora-200 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
-          >
-            {lead.company}
-          </button>
-        </div>
+      <button
+        type="button"
+        onClick={onOpenInfo}
+        className="min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-1 focus-visible:ring-aurora-400/50"
+      >
+        <span className="block truncate text-sm font-medium text-mist-100">
+          {lead.company}
+        </span>
         {email ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              openComposer();
-            }}
-            className="mt-0.5 flex w-full min-w-0 items-center gap-1 truncate rounded-md text-left text-[11px] text-mist-500 outline-none hover:text-mist-300 focus-visible:ring-1 focus-visible:ring-aurora-400/50"
-          >
-            <MailIcon className="h-3 w-3 shrink-0" />
-            <span className="truncate">{email}</span>
-          </button>
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-mist-400">
+            <MailIcon className="h-3 w-3 shrink-0" aria-hidden />
+            <span className="truncate" title={email}>
+              {email}
+            </span>
+          </span>
         ) : phone ? (
-          <p className="mt-0.5 flex min-w-0 items-center gap-1 truncate text-[11px] text-mist-500">
-            <PhoneIcon className="h-3 w-3 shrink-0" />
-            <span className="truncate">{phone}</span>
-          </p>
-        ) : (
-          <p className="mt-0.5 text-[11px] text-mist-600">No email or phone</p>
-        )}
-        {needsMethod ? (
-          <p className="mt-1 text-[10px] font-medium text-amber-300/90">
-            How contacted? — open to register
-          </p>
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-mist-400">
+            <PhoneIcon className="h-3 w-3 shrink-0" aria-hidden />
+            <span className="truncate" title={phone}>
+              {phone}
+            </span>
+          </span>
+        ) : null}
+        {email && subject ? (
+          <span
+            className="mt-0.5 block truncate text-xs text-mist-500"
+            title={subject}
+          >
+            {subject}
+          </span>
         ) : null}
         {lead.outreach?.status === "failed" && lead.outreach.error ? (
-          <p className="mt-1 line-clamp-2 text-[10px] text-rose-300/90">{lead.outreach.error}</p>
+          <span className="mt-1 line-clamp-2 block text-[11px] text-rose-300/90">
+            {lead.outreach.error}
+          </span>
         ) : null}
-      </div>
-      <div
-        className="flex shrink-0 flex-col items-end gap-1"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {bucket === "review" && (
-          <div className="flex items-center justify-end gap-1">
-            {hasDraft ? (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={onOpenDraft}
-                aria-label="Review draft"
-                title="Open draft"
-                className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
-              >
-                {busy ? (
-                  <Spinner className="h-2.5 w-2.5" />
-                ) : (
-                  <EyeIcon className="h-2.5 w-2.5" />
-                )}
-              </button>
-            ) : (
-              <Lockable>
-                <button
-                  type="button"
-                  disabled={busy || editLocked}
-                  onClick={() => void onCreateDraft()}
-                  aria-label={editLocked ? lockHint : "Create draft"}
-                  title={
-                    editLocked
-                      ? lockHint
-                      : email
-                        ? "Create draft from active profile — moves to Ready"
-                        : "Create draft (add email in the composer if needed)"
-                  }
-                  className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5 disabled:opacity-50`}
-                >
-                  {busy ? (
-                    <Spinner className="h-2.5 w-2.5" />
-                  ) : (
-                    <PlusIcon className="h-2.5 w-2.5" />
-                  )}
-                </button>
-              </Lockable>
-            )}
-          </div>
-        )}
-        {bucket === "ready" && (
-          <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center justify-end gap-1">
-              {email && !phoneOnly ? (
-                <button
-                  type="button"
-                  onClick={onOpenDraft}
-                  aria-label="Edit draft"
-                  title="Edit draft"
-                  className={`${ACTION_ICON_BTN} border border-white/15 text-mist-300 hover:bg-white/5`}
-                >
-                  <PencilIcon className="h-2.5 w-2.5" />
-                </button>
-              ) : null}
-              {email ? (
-                <Lockable>
-                  <button
-                    type="button"
-                    disabled={busy || editLocked}
-                    onClick={() => void onSend()}
-                    aria-label={
-                      editLocked
-                        ? lockHint
-                        : canSendEmail
-                          ? "Send"
-                          : "Send (simulate)"
-                    }
-                    title={
-                      editLocked
-                        ? lockHint
-                        : canSendEmail
-                          ? "Send"
-                          : "Send (simulate)"
-                    }
-                    className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
-                  >
-                    {busy ? <Spinner className="h-2.5 w-2.5" /> : <SendIcon className="h-2.5 w-2.5" />}
-                  </button>
-                </Lockable>
-              ) : phoneOnly ? (
-                <Lockable>
-                  <button
-                    type="button"
-                    disabled={busy || editLocked}
-                    onClick={() => {
-                      if (onLogCall) onLogCall();
-                      else void onMarkContacted("phone", { promptNote: true });
-                    }}
-                    aria-label={
-                      editLocked
-                        ? lockHint
-                        : "Log a call — stays in Ready until you save as connected"
-                    }
-                    title={
-                      editLocked
-                        ? lockHint
-                        : "Log the call. Missed stays in Ready; connected moves to Contacted."
-                    }
-                    className={`${ACTION_ICON_BTN} bg-aurora-400 text-on-accent disabled:opacity-50`}
-                  >
-                    {busy ? <Spinner className="h-2.5 w-2.5" /> : <PhoneIcon className="h-2.5 w-2.5" />}
-                  </button>
-                </Lockable>
-              ) : (
-                <Lockable>
-                  <button
-                    type="button"
-                    disabled={busy || editLocked}
-                    onClick={() => setPickingMethod((v) => !v)}
-                    title={editLocked ? lockHint : undefined}
-                    className={`${ACTION_TEXT_BTN} border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 disabled:opacity-50`}
-                  >
-                    Log contact
-                  </button>
-                </Lockable>
-              )}
-            </div>
-            {pickingMethod && !email && !phoneOnly ? (
-              <div className="flex flex-wrap justify-end gap-1">
-                {(
-                  [
-                    ["phone", "Called"],
-                    ["contact_form", "Form"],
-                    ["instagram", "Instagram"],
-                    ["whatsapp", "WhatsApp"],
-                    ["organic", "Organic"],
-                  ] as const
-                ).map(([method, label]) => (
-                  <button
-                    key={`${method}-${label}`}
-                    type="button"
-                    disabled={busy || editLocked}
-                    onClick={() => {
-                      setPickingMethod(false);
-                      void onMarkContacted(method, {
-                        promptNote: true,
-                      });
-                    }}
-                    className={`${ACTION_TEXT_BTN} border border-amber-400/30 bg-amber-400/10 text-amber-100 disabled:opacity-50`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        )}
-        {bucket === "contacted" ? (
-          needsMethod ? (
+      </button>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {email ? (
+          <>
             <button
               type="button"
-              onClick={openComposer}
-              className={`${ACTION_TEXT_BTN} border border-amber-400/40 bg-amber-400/15 text-amber-100`}
+              onClick={onOpenDraft}
+              aria-label="Edit draft"
+              title="Edit draft"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-mist-300 hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
             >
-              Register
+              <PencilIcon className="h-4 w-4" />
             </button>
-          ) : (
-            <div className="flex flex-wrap justify-end gap-1">
-              {sent || methods.includes("email") ? (
-                <span
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-aurora-400/10 text-aurora-200 ring-1 ring-aurora-400/30"
-                  title="Email"
-                  aria-label="Email"
-                >
-                  <MailIcon className="h-3 w-3" />
-                </span>
-              ) : null}
-              {methods.includes("phone") ? (
-                <span
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-sky-400/10 text-sky-200 ring-1 ring-sky-400/30"
-                  title="Phone"
-                  aria-label="Phone"
-                >
-                  <PhoneIcon className="h-3 w-3" />
-                </span>
-              ) : null}
-              {methods.includes("contact_form") ? (
-                <span
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink-800/80 text-mist-300 ring-1 ring-ink-600/40"
-                  title="Contact form"
-                  aria-label="Contact form"
-                >
-                  <FormIcon className="h-3 w-3" />
-                </span>
-              ) : null}
-              {methods.includes("instagram") ? (
-                <span
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink-800/80 text-mist-300 ring-1 ring-ink-600/40"
-                  title="Instagram"
-                  aria-label="Instagram"
-                >
-                  <InstagramIcon className="h-3 w-3" />
-                </span>
-              ) : null}
-              {methods.includes("whatsapp") ? (
-                <span
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink-800/80 text-mist-300 ring-1 ring-ink-600/40"
-                  title="WhatsApp"
-                  aria-label="WhatsApp"
-                >
-                  <WhatsAppIcon className="h-3 w-3" />
-                </span>
-              ) : null}
-              {methods.includes("organic") ? (
-                <span
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink-800/80 text-mist-300 ring-1 ring-ink-600/40"
-                  title="Organic"
-                  aria-label="Organic"
-                >
-                  <GlobeIcon className="h-3 w-3" />
-                </span>
-              ) : null}
-            </div>
-          )
+            <Lockable>
+              <button
+                type="button"
+                disabled={busy || editLocked}
+                onClick={() => void onSend()}
+                title={
+                  editLocked
+                    ? lockHint
+                    : canSendEmail
+                      ? "Send"
+                      : "Send (simulate)"
+                }
+                className="inline-flex h-9 min-h-9 items-center gap-1.5 rounded-full bg-aurora-400 px-3.5 text-sm font-medium text-on-accent disabled:opacity-50"
+              >
+                {busy ? (
+                  <Spinner className="h-3.5 w-3.5" />
+                ) : (
+                  <SendIcon className="h-3.5 w-3.5" />
+                )}
+                Send
+              </button>
+            </Lockable>
+          </>
+        ) : phoneOnly ? (
+          <Lockable>
+            <button
+              type="button"
+              disabled={busy || editLocked}
+              onClick={() => {
+                if (onLogCall) onLogCall();
+                else void onMarkContacted("phone", { promptNote: true });
+              }}
+              aria-label={
+                editLocked
+                  ? lockHint
+                  : "Log a call — stays in the list until you save as connected"
+              }
+              title={
+                editLocked
+                  ? lockHint
+                  : "Log the call. Missed stays in the list; connected leaves it."
+              }
+              className="inline-flex h-9 min-h-9 items-center gap-1.5 rounded-full bg-aurora-400 px-3.5 text-sm font-medium text-on-accent disabled:opacity-50"
+            >
+              {busy ? (
+                <Spinner className="h-3.5 w-3.5" />
+              ) : (
+                <PhoneIcon className="h-3.5 w-3.5" />
+              )}
+              Call
+            </button>
+          </Lockable>
         ) : null}
       </div>
     </div>

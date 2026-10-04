@@ -9,21 +9,21 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-04 (LUMIA Spain import)
+## ⏱️ Status — updated 2026-10-04 (Outreach send list)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
-**Deploy:** Not deployed. Prod studio chrome is still the previous build.
+**Deploy:** Not deployed. Prod is still the three-column Outreach queue.
 
 ### This pass
-- Imported **1,000** new leads onto the LUMIA board (`board_0d0b6430692147b5af04`). Board is now **3,503**. Import run `run_9ac57b8da7f14114a585`. No email was sent; every new row is status `new`.
-- **746 have an email**, 254 are phone only. Mix: Clínica estética 250, Dermatología 166, Spa 137, Alta peluquería 120, Farmacia 119, Láser 115, Bronceado 93.
-- Existing LUMIA rows were almost all Barcelona, so this wave is the rest of Spain. Colleges of pharmacy, university pages, and directory sites were left off. Copy of the list: `docs/leads/lumia-spain-1000.csv`.
-- Agency lead usage this month is **1,513 of 2,000** (513 Akademo + 1,000 LUMIA).
+- Outreach is one send list on desktop and phone. Contact Draft and Contacted are no longer columns. Drafted emails and phone-only leads share the list; All / Email / Phone still filters it.
+- **Draft remaining (N)** shows in the toolbar only when email leads still need a first draft. **Re-draft all** stays secondary. A successful send leaves the list; history stays on Pipeline, Leads, Calendar, and the drawer.
+- The daily send hint is a status line (warning, not a block). All types uses the same portaled menu as the board picker and calendar.
+- LUMIA Spain import from earlier today is unchanged: board `board_0d0b6430692147b5af04` at 3,503 leads. No email was sent.
 
 ### Next
-1. Review the new LUMIA rows and send one lead at a time.
-2. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` so prod matches the step list, touch rule, and studio chrome.
+1. Review the new LUMIA rows and send one lead at a time from the new list.
+2. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` when asked, so prod matches this send list.
 
 ---
 

@@ -2073,8 +2073,9 @@ export class D1Store implements LeadRepository {
     const out: Outreach[] = [];
     const CHUNK = 50;
     // List path skips body — largest column and unused until drawer open.
+    // Subject stays so the Outreach send list can show it.
     const cols = opts?.omitBody
-      ? `id, workspace_id, lead_id, run_id, to_email, '' AS subject, '' AS body,
+      ? `id, workspace_id, lead_id, run_id, to_email, subject, '' AS body,
          status, delivery_status, sent_at,
          CASE WHEN status = 'failed' THEN error ELSE NULL END AS error,
          created_at, updated_at`

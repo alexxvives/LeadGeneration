@@ -139,7 +139,7 @@ function buildSteps(): TourStep[] {
       target: '[data-tour="outreach-queue"]',
       prefer: "right",
       title: "Send from Outreach",
-      body: "Draft → Ready → Send lives here. Call a phone-only lead or set a follow-up from the drawer — follow-ups show on Calendar.",
+      body: "Send one drafted email at a time, or call a phone-only lead. The pencil opens the draft. Follow-ups show on Calendar.",
       scrollBlock: "start",
     },
     {

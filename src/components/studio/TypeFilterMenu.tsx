@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDownIcon } from "@/components/icons";
 
 /** Soft title-case for ALL-CAPS company types without changing filter values. */
@@ -19,8 +20,12 @@ function displayType(raw: string): string {
     .join("");
 }
 
+const MENU_MAX_H = 256;
+
 /**
- * Custom glass menu for Outreach company-type filter (replaces native select).
+ * Company-type filter. Same portaled glass menu as the board picker and
+ * calendar: the studio header is overflow-clipped, so the list renders on
+ * document.body.
  */
 export function TypeFilterMenu({
   value,
@@ -32,37 +37,112 @@ export function TypeFilterMenu({
   onChange: (next: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popRef = useRef<HTMLUListElement | null>(null);
+  const listId = useId();
 
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
+    const place = () => {
+      const el = triggerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const width = Math.max(r.width, 180);
+      let top = r.bottom + 6;
+      let left = r.left;
+      if (top + MENU_MAX_H > window.innerHeight - 8) {
+        top = Math.max(8, r.top - MENU_MAX_H - 6);
       }
+      left = Math.min(Math.max(8, left), window.innerWidth - width - 8);
+      setPos({ top, left, width });
+    };
+    place();
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
+      triggerRef.current?.focus();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
     };
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
     document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
       document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
 
   const label = value === "all" ? "All types" : displayType(value);
+  const rows: { id: string; label: string }[] = [
+    { id: "all", label: "All types" },
+    ...options.map((t) => ({ id: t, label: displayType(t) })),
+  ];
+
+  const menu =
+    open && pos && typeof document !== "undefined"
+      ? createPortal(
+          <ul
+            ref={popRef}
+            id={listId}
+            role="listbox"
+            aria-label="Lead types"
+            className="fixed z-[1200] max-h-64 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
+            style={{ top: pos.top, left: pos.left, width: pos.width }}
+          >
+            {rows.map((row) => {
+              const active = value === row.id;
+              return (
+                <li key={row.id} role="option" aria-selected={active}>
+                  <button
+                    type="button"
+                    className={`block w-full truncate px-3 py-2 text-left text-sm transition-colors ${
+                      active
+                        ? "bg-aurora-400/10 font-medium text-aurora-300"
+                        : "text-mist-200 hover:bg-white/5"
+                    }`}
+                    onClick={() => {
+                      onChange(row.id);
+                      setOpen(false);
+                      triggerRef.current?.focus();
+                    }}
+                  >
+                    {row.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>,
+          document.body,
+        )
+      : null;
 
   return (
-    <div ref={rootRef} className="relative inline-flex h-full shrink-0">
+    <div ref={rootRef} className="relative inline-flex h-9 shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={listId}
         aria-label="Filter outreach by lead type"
-        className="inline-flex h-full min-w-[9.75rem] items-center justify-between gap-2 rounded-xl border border-white/10 bg-ink-900/60 py-0 pl-3 pr-2.5 text-sm text-mist-100 outline-none transition-colors hover:border-white/20 focus-visible:border-aurora-400/50"
+        className="inline-flex h-9 min-w-[9.75rem] items-center justify-between gap-2 rounded-xl border border-white/10 bg-ink-900/60 py-0 pl-3 pr-2.5 text-sm text-mist-100 outline-none transition-colors hover:border-white/20 focus-visible:border-aurora-400/50"
       >
         <span className="truncate">{label}</span>
         <ChevronDownIcon
@@ -72,48 +152,7 @@ export function TypeFilterMenu({
           aria-hidden
         />
       </button>
-      {open ? (
-        <ul
-          role="listbox"
-          aria-label="Lead types"
-          className="absolute right-0 top-[calc(100%+0.35rem)] z-40 max-h-64 min-w-full overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
-        >
-          <li role="option" aria-selected={value === "all"}>
-            <button
-              type="button"
-              className={`block w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-white/5 ${
-                value === "all"
-                  ? "font-medium text-aurora-300"
-                  : "text-mist-200"
-              }`}
-              onClick={() => {
-                onChange("all");
-                setOpen(false);
-              }}
-            >
-              All types
-            </button>
-          </li>
-          {options.map((t) => (
-            <li key={t} role="option" aria-selected={value === t}>
-              <button
-                type="button"
-                className={`block w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-white/5 ${
-                  value === t
-                    ? "font-medium text-aurora-300"
-                    : "text-mist-200"
-                }`}
-                onClick={() => {
-                  onChange(t);
-                  setOpen(false);
-                }}
-              >
-                {displayType(t)}
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {menu}
     </div>
   );
 }

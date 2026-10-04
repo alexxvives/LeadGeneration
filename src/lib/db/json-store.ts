@@ -1198,7 +1198,6 @@ export class JsonStore implements LeadRepository {
         return opts?.omitBody
           ? {
               ...n,
-              subject: "",
               body: "",
               error: n.status === "failed" ? n.error : null,
             }

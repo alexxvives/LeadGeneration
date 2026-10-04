@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-04 — Outreach dropped the Contact Draft and Contacted columns
+- Those two columns turned the send page into a review board. This page is the next send or call. Sent mail already lives on Pipeline, Leads, Calendar, and the lead drawer, so a third copy of history only slowed the list.
+- Imports still do not auto-draft. **Draft remaining (N)** is how those emails join the list. Search still drafts on the way in.
+- The email row shows the subject, so the board list keeps `outreach.subject` and still drops the body.
+
 ### 2026-10-03 — Spreadsheet import drops the About column
 - `importLeads` always stores `aboutBlurb` as null. A CSV About column never reaches the lead.
 - The AKADEMO wave import wrote `about_blurb` in the D1 insert so the one-line description is on the card. The in-app importer still ignores About.

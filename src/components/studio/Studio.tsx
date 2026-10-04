@@ -1331,17 +1331,6 @@ export function Studio() {
     }
   };
 
-  /** Contact Draft: generate from latest profile, then open the composer. */
-  const createAndOpenDraft = async (leadId: string) => {
-    markOutreachBusy(leadId);
-    try {
-      const id = await onDraft(leadId);
-      if (id) openDraft(leadId);
-    } finally {
-      clearOutreachBusy(leadId);
-    }
-  };
-
   const findLeadByOutreach = (outreachId: string) =>
     boardRef.current?.leads.find((l) => l.outreach?.id === outreachId);
 
@@ -1936,8 +1925,8 @@ export function Studio() {
       );
       const unit = `draft${ok === 1 ? "" : "s"}`;
       const verb = redraft
-        ? "rewritten or moved to Ready to Contact"
-        : "moved to Ready to Contact";
+        ? "rewritten or added to the send list"
+        : "added to the send list";
       if (ac.signal.aborted) {
         toast(
           "ok",
@@ -2439,7 +2428,7 @@ export function Studio() {
                   : view === "leads"
                     ? "All prospects on this board — filter, edit, and export."
                     : view === "outreach"
-                      ? "Draft and send outreach one lead at a time."
+                      ? "Send drafted emails and call phone-only leads, one at a time."
                       : view === "conversations"
                         ? "Active dialogues — step, waiting, and recent notes."
                         : view === "contacts"
@@ -2961,7 +2950,6 @@ export function Studio() {
               totalCount={board.leadsTotal ?? board.leads.length}
               onOpenInfo={openInfo}
               onOpenDraft={openDraft}
-              onCreateDraft={createAndOpenDraft}
               onSend={(outreachId) => {
                 // Non-blocking: verify/send continue while user works other leads.
                 void requestSend(outreachId);

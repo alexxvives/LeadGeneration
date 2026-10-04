@@ -32,13 +32,14 @@ Search  →  Enrich  →  Draft  →  Send
    name** (Settings), passed via the API — the server never reads browser storage.
    Sign-off / from-identity come from Settings (and env defaults). Bodies stay
    natural — no STOP / mailing-address auto-footer (ADR 0012).
-4. **Send** — From Ready to Contact or the drawer, **Send** on that lead. Soft
-   verify blocks show a confirm modal; hard junk removes the address. Status
-   flows `draft → sending → sent` (or `failed`; retry Send). Successful send
-   advances CRM stage to **Contacted**. Nothing sends without that click.
-   **Outreach → Contact Draft → Draft all** writes missing drafts into Ready;
-   **Re-draft all** (same column) rewrites Ready copy and drafts remaining
-   Contact Draft leads. **Send stays per-lead**
+4. **Send** — From the Outreach send list or the drawer, **Send** on that lead.
+   Soft verify blocks show a confirm modal; hard junk removes the address.
+   Status flows `draft → sending → sent` (or `failed`; retry Send). Successful
+   send advances CRM stage to **Contacted** and the row leaves the send list.
+   Nothing sends without that click. Search still writes a draft as each lead
+   arrives. Imports do not. **Draft remaining** on Outreach writes those
+   missing drafts into the list; **Re-draft all** rewrites queued drafts and
+   drafts anything still remaining. **Send stays per-lead**
    (Art. I.1 / ADR 0029).
 
 ## 3. Screens
@@ -146,19 +147,23 @@ Search  →  Enrich  →  Draft  →  Send
     like Calendar). **Add Task** in a lead or collaborator drawer still writes
     the green journal line and creates the matching `Task` row.
 
-  - **Outreach** (`?view=outreach`) — send queue at `lg+` as three columns;
-    below `lg` the same buckets are tabs (one list at a time): **Contact Draft** (email
-    leads with no draft yet; **Draft all** writes them; **Re-draft all** rewrites
-    Ready emails *and* drafts remaining Contact Draft leads) → **Ready** (has a
-    draft, or phone-only; send or call as icons) → **Contacted**.
-    Phone-only Ready rows open a call log without leaving Ready. **Save** or
-    **Skip details** marks Contacted; **Missed call** journals the miss and
-    stays in Ready.
-    The same miss path exists from the lead’s **Notes**.
-    Closing the draft drawer does not send. The board picker activates that
-    board’s linked outreach profile. Contacted **N sent today · ~Y/day suggest**
-    is that board’s mailbox (boards that share an outreach profile share the
-    cap) — not a workspace total. Send remains per-lead
+  - **Outreach** (`?view=outreach`) — one send list on desktop and phone.
+    Drafted emails and phone-only leads sit together. **All / Email / Phone**
+    filters that list. An email row shows company, address, and subject.
+    **Send** is the primary button; a pencil opens the draft. A phone-only
+    row shows the number and a call button. **Save** or **Skip details**
+    marks the call connected and the row leaves; **Missed call** journals
+    the miss and the row stays. The same miss path exists from the lead’s
+    **Notes**. Undrafted email leads are not on the list. **Draft remaining
+    (N)** shows in the toolbar only when some exist; they join after it runs.
+    **Re-draft all** is the secondary toolbar action: it rewrites queued
+    drafts and drafts anything still remaining. After a successful send the
+    row leaves. Sent history stays on Pipeline, Leads, Calendar, and the
+    lead drawer. Closing the draft drawer does not send. The board picker
+    activates that board’s linked outreach profile. **N sent today · ~Y/day
+    suggest** is a status line for that board’s mailbox (boards that share
+    an outreach profile share the cap) — a warning, not a block, and not a
+    workspace total. Send remains per-lead
     (constitution Art. I.1 / ADR 0029).
 
   - **Calendar** (`?view=calendar`) — month view of the active board filter.
@@ -368,12 +373,14 @@ and uses `D1Store` instead. Pipeline/Leads respect the sidebar board filter
 (**All** by default). Boards are user-created (ADR 0014 / 0023).
 
 Board hydrate is **progressive + card-sized**: **100 leads per Pipeline /
-Outreach lane** (New split into Contact Draft vs Ready, then Contacted /
-In Conversation / Closed / Not Interested), then the same 100-per-lane
-again in the background until the board is complete. D1 `SELECT`s only
+Outreach lane** (CRM New still pages as needs-draft vs ready-to-send, then
+Contacted / In Conversation / Closed / Not Interested), then the same
+100-per-lane again in the background until the board is complete. The
+Outreach screen is one send list, not those lanes. D1 `SELECT`s only
 card columns (no about/notes/tags/fit/source). Rows on the wire omit
-email bodies and subjects, blurbs, notes, tags, fit, source URL, and
-journal note text (`detailLoaded: false`) — Calendar still gets
+email bodies, blurbs, notes, tags, fit, source URL, and
+journal note text (`detailLoaded: false`). Subject stays so the send list
+can show it. Calendar still gets
 id/date/kind/done for dots. Opening a
 lead drawer fetches full detail via `GET /api/leads/:id`. Closed-lead
 files are a separate `lead_documents` table / `data/documents/` folder
@@ -392,7 +399,7 @@ remembered so a toggle-off cannot come back). CRM stage, emails/phones,
 and other drawer fields keep the cached value while a local write is
 pending (`writePending`) or when the snapshot started before
 `lastWriteAt` — the same flash class as the journal bug. Card-list rows
-omit body/subject/about/notes/journal text (`detailLoaded: false`); a
+omit body/about/notes/journal text and keep the subject (`detailLoaded: false`); a
 full GET prefers incoming journal notes so those bodies return. Empty
 email/phone arrays on a non-stale snapshot are authoritative (bounce strip). Deleted
 leads are removed from the cache immediately; later polls merge with

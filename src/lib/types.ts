@@ -578,8 +578,9 @@ export interface Outreach {
 export interface LeadWithOutreach extends Lead {
   outreach: Outreach | null;
   /**
-   * Board list responses omit fields the cards don't show (email body/subject,
-   * about, notes, tags, fit, source, journal note text). `false` = card row;
+   * Board list responses omit fields the cards don't show (email body,
+   * about, notes, tags, fit, source, journal note text). Subject stays for
+   * the Outreach send list. `false` = card row;
    * open the drawer to fetch full detail. `true` / omitted after mutations =
    * full payload available.
    */

@@ -1189,7 +1189,8 @@ export async function getLatestBoard(
         : false;
   return {
     run,
-    // Card list: no blurb/notes/body/subject/journal text — drawer GET on open.
+    // Card list: no blurb/notes/body/journal text — drawer GET on open.
+    // Subject stays for the Outreach send list.
     leads: await attachOutreach(leadDb, listed.raw, { slim: true }),
     leadsTotal,
     leadsHasMore,
@@ -1258,7 +1259,8 @@ async function attachOutreach(
     if (!opts?.slim) {
       return { ...l, outreach, detailLoaded: true };
     }
-    // Card rows: drop everything the list/kanban/map/calendar dots don't paint.
+    // Card rows: drop the email body and fields the boards don't paint.
+    // Subject stays — the Outreach send list shows it on each email row.
     return {
       ...l,
       aboutBlurb: null,
@@ -1271,7 +1273,6 @@ async function attachOutreach(
       outreach: outreach
         ? {
             ...outreach,
-            subject: "",
             body: "",
             error: outreach.status === "failed" ? outreach.error : null,
           }
