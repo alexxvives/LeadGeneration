@@ -555,7 +555,7 @@ function LeadQueue({
   return (
     <aside
       aria-label="Leads to contact"
-      className="flex max-h-56 min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 sm:max-h-none sm:w-60"
+      className="flex max-h-56 min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 sm:max-h-none sm:w-60 lg:w-[30rem]"
     >
       <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2.5">
         <span className="h-2 w-2 shrink-0 rounded-full bg-aurora-400" aria-hidden />

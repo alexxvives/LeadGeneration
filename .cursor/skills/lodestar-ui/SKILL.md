@@ -117,7 +117,8 @@ token becomes the page color in light mode).
   stage as full-width rows. Desktop toolbar stays split.
 - **Kanban / multi-column queues** (Pipeline, Tasks): keep columns at `lg+`.
   Below `lg`, use stage/bucket **tabs** + a single list. Outreach lists
-  uncontacted ready leads in a left column (`w-60` from `sm`). The open
+  uncontacted ready leads in a left column (`w-60` from `sm`, `30rem` from `lg`,
+  taken from the draft column). The open
   lead’s facts and draft (or call) sit on the right; facts and draft are
   side by side from `lg` (`minmax(16rem, 24rem)`, wider at `xl`). Previous
   / next sit centered in the top bar. **Next** and **Send and next** sit

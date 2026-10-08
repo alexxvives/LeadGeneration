@@ -4,6 +4,9 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-08 — Outreach lead list is 30rem
+- From `lg` the To contact column is `30rem` (double `w-60`). The draft stays `1fr`, so the extra width comes out of the email column. Below `lg` the list stays `w-60` so the draft is still readable beside the sidebar.
+
 ### 2026-10-08 — Outreach opens from a left list
 - Uncontacted ready leads (drafted email, or phone-only) are a vertical list on the left. Clicking a row opens that lead’s facts and draft on the right. Previous / next stay centered in the top bar, across the whole view, so they are no longer pinned to the facts card.
 - The list is windowed (`VirtualColumnList`) because a board can hold thousands of ready rows. `activeIndex` scrolls the selected row into view when previous / next moves it.
