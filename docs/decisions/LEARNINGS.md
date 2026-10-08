@@ -4,6 +4,12 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-08 — LUMIA dead Canva link put back in the queue
+- Prod D1 `lodestar-prod`, board `board_0d0b6430692147b5af04`. 476 sent rows whose body contained `https://canva.link/wq0yjgxt6lhutcs` (439 Contacted + 37 New) are drafts again: CRM `new`, lead status `queued`, `email` removed from `contact_method`. Other channels (form, Instagram, WhatsApp) stayed on 23 of them. Body link is now `https://canva.link/lzea65apqk0cl0l`.
+- 4 in conversation and 4 not interested were not reopened. Their stored sent body still has the dead link.
+- 70 other unsent drafts on that board had only the URL swapped. 64 of those stay Contacted, so they are not in the Outreach queue.
+- Moving a lead back to New in the app is not enough while `outreach.status` is `sent`. The queue treats sent, or an `email` contact mark, as already contacted.
+
 ### 2026-10-08 — Outreach lead list is 30rem
 - From `lg` the To contact column is `30rem` (double `w-60`). The draft stays `1fr`, so the extra width comes out of the email column. Below `lg` the list stays `w-60` so the draft is still readable beside the sidebar.
 

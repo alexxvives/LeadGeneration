@@ -9,21 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-08 (Outreach list width)
+## ⏱️ Status — updated 2026-10-08 (LUMIA broken Canva link)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
-**Deploy:** Not deployed. Prod still opens one lead with previous / next on the facts card.
+**Deploy:** Not deployed. This pass wrote prod D1 only.
 
 ### This pass
-- Outreach lists uncontacted ready leads on the left (`30rem` from `lg`, twice the old `15rem`). That width comes out of the draft column. Clicking a row opens facts and the draft (or call) on the right.
-- Previous / next sit centered in the top bar, across the whole view. **Next** and **Send and next** stay centered under the draft.
-- The list is windowed. Send is still one click per lead.
-- LUMIA Spain import is unchanged: board `board_0d0b6430692147b5af04` at 3,503 leads. No email was sent.
+- On LUMIA (`board_0d0b6430692147b5af04`), 476 sent emails that used `https://canva.link/wq0yjgxt6lhutcs` are back in the send queue. Outreach is `draft`, CRM stage is `new`, lead status is `queued`, and `email` is off the contact mark. The body now uses `https://canva.link/lzea65apqk0cl0l`.
+- Left alone: 4 in conversation and 4 not interested. Those sent bodies still contain the dead link, which is the copy that actually went out.
+- 70 unsent drafts on the same board had the dead link swapped too. Their stage did not change, including 64 that stay Contacted.
 
 ### Next
-1. Review leads from the Outreach list.
-2. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` when asked.
+1. Re-send the 476 from Outreach. The drawer may still show an older “Email sent” note.
+2. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` when asked. Outreach layout from earlier today is still local until then.
 
 ---
 
