@@ -147,10 +147,11 @@ Search  →  Enrich  →  Draft  →  Send
     like Calendar). **Add Task** in a lead or collaborator drawer still writes
     the green journal line and creates the matching `Task` row.
 
-  - **Outreach** (`?view=outreach`) — one lead at a time on desktop and phone.
-    The company sits on the left (address or phone, location, website, about).
-    The draft sits on the right (to, subject, body). The lead column runs up
-    to 33rem. Previous and next sit centered above the lead card. **Send and
+  - **Outreach** (`?view=outreach`) — uncontacted ready leads in a list on
+    the left. Click one to open it on the right: company facts (address or
+    phone, location, website, about) and the draft (to, subject, body).
+    Facts and draft sit side by side from `lg`. Previous and next sit
+    centered in the top bar, across the whole view. **Send and
     next** and **Next** sit centered under the draft. **Send and next** sends
     that email and opens the following lead. **Next** skips without sending.
     Phone-only leads show the number and a call button instead of a draft.
@@ -379,7 +380,7 @@ Board hydrate is **progressive + card-sized**: **100 leads per Pipeline /
 Outreach lane** (CRM New still pages as needs-draft vs ready-to-send, then
 Contacted / In Conversation / Closed / Not Interested), then the same
 100-per-lane again in the background until the board is complete. The
-Outreach screen is one lead at a time, not those lanes. D1 `SELECT`s only
+Outreach screen shows that ready queue as a list and opens one lead, not those lanes. D1 `SELECT`s only
 card columns (no about/notes/tags/fit/source). Rows on the wire omit
 email bodies, blurbs, notes, tags, fit, source URL, and
 journal note text (`detailLoaded: false`). Subject stays on the card.

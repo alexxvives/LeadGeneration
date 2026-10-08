@@ -18,6 +18,7 @@ import { isOutreachReadyStatus } from "@/lib/lead-lanes";
 import { PitchEditor } from "./PitchEditor";
 import { Lockable, useBoardLockUi } from "./board-lock";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
+import { VirtualColumnList } from "./virtual-list";
 
 type OutreachBucket = "review" | "ready" | "contacted";
 /** Send-list contact-channel filter. */
@@ -166,8 +167,9 @@ function contactedDayHint(sentToday: number, softCap: number): string {
 }
 
 /**
- * One lead at a time: facts on the left, draft (or call) on the right.
- * Undrafted emails stay out until Draft remaining.
+ * Uncontacted ready leads in a list on the left. The open lead’s facts and
+ * draft (or call) sit on the right. Previous / next are centered on the top
+ * bar. Undrafted emails stay out until Draft remaining.
  * Send is the per-lead human gate (ADR 0029). A successful send leaves this view.
  */
 export function OutreachView({
@@ -328,7 +330,8 @@ export function OutreachView({
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+      <div className="grid shrink-0 grid-cols-1 items-center gap-2 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+        <div className="min-w-0 justify-self-start">
         <div
           className="inline-flex rounded-full border border-white/10 bg-ink-900/60 p-1"
           role="group"
@@ -359,7 +362,18 @@ export function OutreachView({
             );
           })}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
+        </div>
+        <div className="flex justify-center">
+          {lead ? (
+            <LeadPager
+              index={index}
+              total={rows.length}
+              onPrev={() => go(-1)}
+              onNext={() => go(1)}
+            />
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-1.5 lg:justify-self-end">
           {redraftAllAvailable ? (
             <Lockable>
               <button
@@ -450,14 +464,17 @@ export function OutreachView({
             </div>
           </div>
         ) : (
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(24rem,33rem)_minmax(0,1fr)]">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row">
+            <LeadQueue
+              rows={rows}
+              focusId={lead.id}
+              activeIndex={index}
+              onSelect={setFocusId}
+            />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden lg:grid lg:grid-cols-[minmax(16rem,24rem)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] xl:grid-cols-[minmax(20rem,28rem)_minmax(0,1fr)]">
             <LeadFacts
               lead={lead}
-              index={index}
-              total={rows.length}
               onOpenInfo={() => onOpenInfo(lead.id)}
-              onPrev={() => go(-1)}
-              onNext={() => go(1)}
             />
             <ReviewAction
               lead={lead}
@@ -474,6 +491,7 @@ export function OutreachView({
               onLogCall={onLogCall ? () => onLogCall(lead.id) : undefined}
               onSkip={() => go(1)}
             />
+            </div>
           </div>
         )}
       </section>
@@ -481,53 +499,129 @@ export function OutreachView({
   );
 }
 
-function LeadFacts({
-  lead,
+function LeadPager({
   index,
   total,
-  onOpenInfo,
   onPrev,
   onNext,
 }: {
-  lead: LeadWithOutreach;
   index: number;
   total: number;
-  onOpenInfo: () => void;
   onPrev: () => void;
   onNext: () => void;
+}) {
+  return (
+    <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-ink-900/60 px-1 py-0.5">
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={index <= 0}
+        aria-label="Previous lead"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full text-mist-300 hover:bg-white/5 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+      >
+        <ChevronLeftIcon className="h-4 w-4" />
+      </button>
+      <p className="min-w-[4.5rem] text-center text-xs tabular-nums text-mist-400">
+        {index + 1} of {total}
+      </p>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={index >= total - 1}
+        aria-label="Next lead"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full text-mist-300 hover:bg-white/5 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+      >
+        <ChevronRightIcon className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function queueSubtitle(lead: LeadWithOutreach): string {
+  return lead.contactName?.trim() || leadEmail(lead) || leadPhone(lead) || "";
+}
+
+function LeadQueue({
+  rows,
+  focusId,
+  activeIndex,
+  onSelect,
+}: {
+  rows: LeadWithOutreach[];
+  focusId: string;
+  activeIndex: number;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <aside
+      aria-label="Leads to contact"
+      className="flex max-h-56 min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 sm:max-h-none sm:w-60"
+    >
+      <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-white/5 px-3 py-2.5">
+        <span className="h-2 w-2 shrink-0 rounded-full bg-aurora-400" aria-hidden />
+        <h2 className="truncate text-sm font-semibold leading-none text-mist-100">
+          To contact
+        </h2>
+        <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
+          {rows.length}
+        </span>
+      </div>
+      <VirtualColumnList
+        items={rows}
+        estimateSize={52}
+        padding={8}
+        gap={4}
+        itemClassName="px-2"
+        activeIndex={activeIndex}
+        renderItem={(row) => {
+          const selected = row.id === focusId;
+          const email = leadEmail(row);
+          const subtitle = queueSubtitle(row);
+          return (
+            <button
+              type="button"
+              onClick={() => onSelect(row.id)}
+              aria-current={selected ? "true" : undefined}
+              className={`flex w-full min-h-11 flex-col items-start justify-center gap-0.5 rounded-lg border-l-2 px-2.5 py-1.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70 ${
+                selected
+                  ? "border-aurora-400 bg-aurora-400/15 text-mist-100"
+                  : "border-transparent text-mist-200 hover:bg-white/5"
+              }`}
+            >
+              <span className="flex w-full min-w-0 items-center gap-1.5">
+                {email ? (
+                  <MailIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" />
+                ) : (
+                  <PhoneIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" />
+                )}
+                <span className="truncate text-sm font-medium">{row.company}</span>
+              </span>
+              {subtitle ? (
+                <span className="w-full truncate pl-5 text-xs text-mist-400">
+                  {subtitle}
+                </span>
+              ) : null}
+            </button>
+          );
+        }}
+      />
+    </aside>
+  );
+}
+
+function LeadFacts({
+  lead,
+  onOpenInfo,
+}: {
+  lead: LeadWithOutreach;
+  onOpenInfo: () => void;
 }) {
   const email = leadEmail(lead);
   const phone = leadPhone(lead);
   const about = lead.aboutBlurb?.trim();
   return (
-    <div className="flex min-h-0 min-w-0 flex-col gap-2">
-      <div className="flex shrink-0 justify-center">
-        <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-ink-900/60 px-1 py-0.5">
-          <button
-            type="button"
-            onClick={onPrev}
-            disabled={index <= 0}
-            aria-label="Previous lead"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-mist-300 hover:bg-white/5 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
-          >
-            <ChevronLeftIcon className="h-4 w-4" />
-          </button>
-          <p className="min-w-[4.5rem] text-center text-xs tabular-nums text-mist-400">
-            {index + 1} of {total}
-          </p>
-          <button
-            type="button"
-            onClick={onNext}
-            disabled={index >= total - 1}
-            aria-label="Next lead"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-mist-300 hover:bg-white/5 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
-          >
-            <ChevronRightIcon className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-      <aside className="flex max-h-56 min-h-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 lg:max-h-none">
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+    <aside className="flex max-h-56 min-h-0 shrink-0 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 lg:h-full lg:max-h-none lg:min-h-0">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <p className="kicker">Lead</p>
         <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-mist-100">
           {lead.company}
@@ -580,7 +674,6 @@ function LeadFacts({
         </button>
       </div>
     </aside>
-    </div>
   );
 }
 
@@ -647,7 +740,7 @@ function ReviewAction({
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
 
   return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 lg:h-full">
       {email && lead.outreach ? (
         lead.detailLoaded === true ? (
           <EmailComposer

@@ -2430,7 +2430,7 @@ export function Studio() {
                   : view === "leads"
                     ? "All prospects on this board — filter, edit, and export."
                     : view === "outreach"
-                      ? "One lead at a time — read the draft, send it, or skip to the next."
+                      ? "Pick a lead on the left, then read the draft and send it."
                       : view === "conversations"
                         ? "Active dialogues — step, waiting, and recent notes."
                         : view === "contacts"

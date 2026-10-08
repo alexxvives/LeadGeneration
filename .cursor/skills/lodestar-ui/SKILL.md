@@ -116,10 +116,13 @@ token becomes the page color in light mode).
   Search is the top-bar icon. Do not stack Export / Add / Table-Map /
   stage as full-width rows. Desktop toolbar stays split.
 - **Kanban / multi-column queues** (Pipeline, Tasks): keep columns at `lg+`.
-  Below `lg`, use stage/bucket **tabs** + a single list. Outreach is one
-  lead at a time at every width: facts on the left (`minmax(24rem, 33rem)`
-  at `lg+`), draft or call on the right. Previous / next sit centered above
-  the lead card. **Next** and **Send and next** sit centered under the draft.
+  Below `lg`, use stage/bucket **tabs** + a single list. Outreach lists
+  uncontacted ready leads in a left column (`w-60` from `sm`). The open
+  lead’s facts and draft (or call) sit on the right; facts and draft are
+  side by side from `lg` (`minmax(16rem, 24rem)`, wider at `xl`). Previous
+  / next sit centered in the top bar. **Next** and **Send and next** sit
+  centered under the draft. Below `sm` the list stacks above the open lead
+  with a capped height.
   Phone Pipeline tabs stay on one row and scroll
   (`flex-nowrap overflow-x-auto`) so Closed / Not interested stay reachable.
   Do not put `@dnd-kit` `useDraggable` on cards that render outside
@@ -149,7 +152,7 @@ token becomes the page color in light mode).
 ## Studio standards
 Reuse these. Do not invent a second version.
 
-- **Section label:** `.kicker` (uppercase, mist-500). Kanban column titles are sentence case: colored dot, `text-sm font-semibold`, display count in `text-aurora-300`. Pipeline and Tasks share that header. Outreach is a one-lead review (facts + draft), not a kanban.
+- **Section label:** `.kicker` (uppercase, mist-500). Kanban column titles are sentence case: colored dot, `text-sm font-semibold`, display count in `text-aurora-300`. Pipeline and Tasks share that header. Outreach uses the same header on the **To contact** list. The open lead is facts + draft, not a kanban.
 - **Page empty:** `EmptyState` (dashed `rounded-xl2`, spark, display title). Filter empties use the same dashed frame without the spark. Load failures use `ErrorBanner`.
 - **Stage color:** `CRM_STAGE_DOT` / `.pill-*` — new mist, contacted amber, in conversation sky, closed aurora, not interested rose. Conversation steps use amber, sky, aurora, and mist. Violet is the follow-up reminder only. Rose clock is unresponsive.
 - **Chips:** one `flex-nowrap overflow-x-auto` row. Do not wrap lead-info, stage, or note-action chips. Card titles use `MarqueeText` or `truncate`.

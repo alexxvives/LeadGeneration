@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-08 — Outreach opens from a left list
+- Uncontacted ready leads (drafted email, or phone-only) are a vertical list on the left. Clicking a row opens that lead’s facts and draft on the right. Previous / next stay centered in the top bar, across the whole view, so they are no longer pinned to the facts card.
+- The list is windowed (`VirtualColumnList`) because a board can hold thousands of ready rows. `activeIndex` scrolls the selected row into view when previous / next moves it.
+
 ### 2026-10-04 — Outreach desk: wider lead, centered controls, one type spelling
 - **First N → Review** is removed. The queue is every ready lead.
 - Previous / next sit centered above the lead card. **Next** and **Send and next** sit centered under the draft. The lead column max is 33rem (about half again the old 22rem).

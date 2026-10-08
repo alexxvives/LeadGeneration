@@ -483,18 +483,29 @@ export function OutreachSkeleton() {
         <Bone className="h-9 w-56 rounded-full" />
       </div>
       <Bone className="h-3 w-52" />
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
-        <div className="rounded-xl2 border border-white/10 bg-ink-950/40 p-4">
-          <Bone className="h-3 w-12" />
-          <Bone className="mt-3 h-8 w-40" />
-          <Bone className="mt-4 h-3 w-48" />
-          <Bone className="mt-2 h-3 w-32" />
+      <div className="flex shrink-0 justify-center">
+        <Bone className="h-10 w-36 rounded-full" />
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row">
+        <div className="flex max-h-56 w-full shrink-0 flex-col gap-2 rounded-xl2 border border-white/10 bg-ink-950/40 p-3 sm:max-h-none sm:w-60">
+          <Bone className="h-4 w-24" />
+          <Bone className="h-11 w-full rounded-lg" />
+          <Bone className="h-11 w-full rounded-lg" />
+          <Bone className="h-11 w-full rounded-lg" />
         </div>
-        <div className="flex min-h-48 flex-col rounded-xl2 border border-white/10 bg-ink-950/40 p-4">
-          <Bone className="h-3 w-12" />
-          <Bone className="mt-3 h-10 w-full rounded-lg" />
-          <Bone className="mt-3 h-10 w-full rounded-lg" />
-          <Bone className="mt-3 min-h-32 flex-1 rounded-lg" />
+        <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(16rem,24rem)_minmax(0,1fr)]">
+          <div className="rounded-xl2 border border-white/10 bg-ink-950/40 p-4">
+            <Bone className="h-3 w-12" />
+            <Bone className="mt-3 h-8 w-40" />
+            <Bone className="mt-4 h-3 w-48" />
+            <Bone className="mt-2 h-3 w-32" />
+          </div>
+          <div className="flex min-h-48 flex-col rounded-xl2 border border-white/10 bg-ink-950/40 p-4">
+            <Bone className="h-3 w-12" />
+            <Bone className="mt-3 h-10 w-full rounded-lg" />
+            <Bone className="mt-3 h-10 w-full rounded-lg" />
+            <Bone className="mt-3 min-h-32 flex-1 rounded-lg" />
+          </div>
         </div>
       </div>
     </div>

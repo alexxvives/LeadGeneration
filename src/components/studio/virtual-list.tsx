@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 const measureEl =
@@ -17,6 +17,7 @@ export function VirtualColumnList<T extends { id: string }>({
   gap = 8,
   className = "",
   itemClassName = "px-3",
+  activeIndex = null,
   renderItem,
 }: {
   items: T[];
@@ -26,6 +27,8 @@ export function VirtualColumnList<T extends { id: string }>({
   gap?: number;
   className?: string;
   itemClassName?: string;
+  /** Keep this row in view when previous / next changes the selection. */
+  activeIndex?: number | null;
   renderItem: (item: T, index: number) => ReactNode;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
@@ -39,6 +42,13 @@ export function VirtualColumnList<T extends { id: string }>({
     getItemKey: (index) => items[index]?.id ?? index,
     measureElement: measureEl,
   });
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+
+  useEffect(() => {
+    if (activeIndex == null || activeIndex < 0) return;
+    virtualizerRef.current.scrollToIndex(activeIndex, { align: "auto" });
+  }, [activeIndex]);
 
   return (
     <div
