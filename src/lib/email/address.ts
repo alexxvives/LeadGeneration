@@ -18,7 +18,14 @@ const JUNK_EMAIL_HINTS = [
   "domain.com",
   "yourdomain.com",
   "email.com",
+  // Booksy prints its own support inbox on every salon page.
+  "booksy.com",
 ];
+
+/** Booksy Spain support (`help.es@booksy.com`) — not the business. */
+function isBooksySupportLocal(local: string): boolean {
+  return local === "help.es";
+}
 
 export function isSendableEmail(email: string): boolean {
   const e = email.trim().toLowerCase();
@@ -39,6 +46,7 @@ export function isSendableEmail(email: string): boolean {
     return false;
   }
   if (PLACEHOLDER_LOCAL_RE.test(local)) return false;
+  if (isBooksySupportLocal(local)) return false;
   if (JUNK_EMAIL_HINTS.some((j) => e.includes(j))) return false;
   return true;
 }

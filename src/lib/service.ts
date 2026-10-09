@@ -2867,7 +2867,7 @@ export async function importLeads(
         ? sanitizeCompanyName(r.company)
         : "",
       website: normalizeWebsiteUrl(r.website) ?? null,
-      emails: (r.emails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean),
+      emails: sanitizeEmailList(r.emails ?? []),
       phones: (r.phones ?? []).map((p) => p.trim()).filter(Boolean),
       contactName: sanitizeContactName(r.contactName?.trim() || null),
       location: r.location?.trim() || null,

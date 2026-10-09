@@ -229,6 +229,8 @@ export function OutreachView({
   const skipReadyChannelPersist = useRef(true);
   const [focusId, setFocusId] = useState<string | null>(null);
   const pendingFocus = useRef<string | null>(null);
+  const focusIdRef = useRef(focusId);
+  focusIdRef.current = focusId;
 
   // Keep channel filter across tab switches / Settings (session only).
   useEffect(() => {
@@ -324,8 +326,10 @@ export function OutreachView({
     if (next) setFocusId(next.id);
   };
 
-  const advanceAfterSend = (ok: boolean) => {
+  const advanceAfterSend = (ok: boolean, sentLeadId: string) => {
     if (!ok) return;
+    // The user opened another lead while this send was in flight. Stay there.
+    if (focusIdRef.current !== sentLeadId) return;
     const nextId = rows[index + 1]?.id ?? rows[index - 1]?.id ?? null;
     pendingFocus.current = nextId;
     setFocusId(nextId);
@@ -786,7 +790,7 @@ function ReviewAction({
     opts?: { silent?: boolean },
   ) => Promise<void>;
   onSend: (outreachId: string) => Promise<boolean>;
-  onAdvance: (ok: boolean) => void;
+  onAdvance: (ok: boolean, sentLeadId: string) => void;
   onMarkContacted: (
     leadId: string,
     method: ContactMethod,
@@ -891,7 +895,7 @@ function EmailComposer({
     opts?: { silent?: boolean },
   ) => Promise<void>;
   onSend: (outreachId: string) => Promise<boolean>;
-  onAdvance: (ok: boolean) => void;
+  onAdvance: (ok: boolean, sentLeadId: string) => void;
   onSkip: () => void;
 }) {
   const outreach = lead.outreach!;
@@ -933,7 +937,7 @@ function EmailComposer({
       return;
     }
     const ok = await onSend(outreach.id);
-    onAdvance(ok);
+    onAdvance(ok, lead.id);
   };
 
   return (

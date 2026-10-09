@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-09 — Send stays put if you leave the lead; Booksy support is not an email
+- **Send and next** only moves the queue when the open lead is still the one that was sending. A click to another row during the request wins.
+- `help.es@booksy.com` (and any `@booksy.com` address) is the platform inbox, not the business. `isSendableEmail` drops it, so a lead whose only address was that has no email. Prod D1 had 16 such leads, each with a phone; those addresses were cleared.
+
 ### 2026-10-09 — Outreach queue rows can delete a lead
 - The To contact row is no longer one button. The name selects the lead; the trash asks once, then calls the same `deleteLead` path as the drawer. A nested button would have been invalid HTML.
 - Deleting the open lead moves the selection to the next row (or the previous one at the end) before the row leaves the list.

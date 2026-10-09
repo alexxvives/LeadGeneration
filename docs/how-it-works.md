@@ -154,7 +154,9 @@ Search  →  Enrich  →  Draft  →  Send
     Facts and draft sit side by side from `lg`. Previous and next sit
     centered in the top bar, across the whole view. **Send and
     next** and **Next** sit centered under the draft. **Send and next** sends
-    that email and opens the following lead. **Next** skips without sending.
+    that email and opens the following lead, unless another lead was opened
+    while the send was in flight — then the queue stays on that lead.
+    **Next** skips without sending.
     Phone-only leads show the number and a call button instead of a draft.
     **Save** or **Skip details** marks the call connected and the lead leaves;
     **Missed call** journals the miss and the lead stays. The same miss path

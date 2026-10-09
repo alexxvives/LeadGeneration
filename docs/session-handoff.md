@@ -9,19 +9,20 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-09 (Outreach queue delete)
+## ⏱️ Status — updated 2026-10-09 (Send focus + Booksy emails)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
-**Deploy:** Not deployed. This pass is local UI only.
+**Deploy:** Not deployed. Send-focus and the Booksy filter stay local until a deploy is asked for.
 
 ### This pass
-- Each To contact row has a trash icon. It asks once, then deletes that lead through the existing delete path. The open lead moves to the next row.
-- LUMIA broken-link reset from 2026-10-08 is unchanged on prod D1.
+- **Send and next** stays on the lead you opened while a send was in flight.
+- `help.es@booksy.com` is treated as generic. 16 prod leads that only had that address now have no email (they still have a phone).
 
 ### Next
 1. Re-send the reset LUMIA queue from Outreach. The drawer may still show an older “Email sent” note.
-2. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` when asked. Outreach layout and this delete control are still local until then.
+2. On AKADEMO, **Draft remaining**. The October 3 import added 417 email leads with no draft, so Outreach does not list them.
+3. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` when asked.
 
 ---
 
