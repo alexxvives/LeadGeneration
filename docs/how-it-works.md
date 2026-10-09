@@ -148,7 +148,8 @@ Search  →  Enrich  →  Draft  →  Send
     the green journal line and creates the matching `Task` row.
 
   - **Outreach** (`?view=outreach`) — uncontacted ready leads in a list on
-    the left. Click one to open it on the right: company facts (address or
+    the left. Each row has a trash icon; it asks once, then deletes that
+    lead. Click one to open it on the right: company facts (address or
     phone, location, website, about) and the draft (to, subject, body).
     Facts and draft sit side by side from `lg`. Previous and next sit
     centered in the top bar, across the whole view. **Send and

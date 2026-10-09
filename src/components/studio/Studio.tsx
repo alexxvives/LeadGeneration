@@ -2957,6 +2957,7 @@ export function Studio() {
               onDraftAll={onDraftAllOutreach}
               onMarkContacted={onMarkContacted}
               onLogCall={onLogCall}
+              onDeleteLead={onDeleteLead}
             />
           )}
         </div>

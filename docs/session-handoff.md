@@ -9,20 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-08 (LUMIA broken Canva link)
+## ⏱️ Status — updated 2026-10-09 (Outreach queue delete)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
-**Deploy:** Not deployed. This pass wrote prod D1 only.
+**Deploy:** Not deployed. This pass is local UI only.
 
 ### This pass
-- On LUMIA (`board_0d0b6430692147b5af04`), 476 sent emails that used `https://canva.link/wq0yjgxt6lhutcs` are back in the send queue. Outreach is `draft`, CRM stage is `new`, lead status is `queued`, and `email` is off the contact mark. The body now uses `https://canva.link/lzea65apqk0cl0l`.
-- Left alone: 4 in conversation and 4 not interested. Those sent bodies still contain the dead link, which is the copy that actually went out.
-- 70 unsent drafts on the same board had the dead link swapped too. Their stage did not change, including 64 that stay Contacted.
+- Each To contact row has a trash icon. It asks once, then deletes that lead through the existing delete path. The open lead moves to the next row.
+- LUMIA broken-link reset from 2026-10-08 is unchanged on prod D1.
 
 ### Next
-1. Re-send the 476 from Outreach. The drawer may still show an older “Email sent” note.
-2. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` when asked. Outreach layout from earlier today is still local until then.
+1. Re-send the reset LUMIA queue from Outreach. The drawer may still show an older “Email sent” note.
+2. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` when asked. Outreach layout and this delete control are still local until then.
 
 ---
 

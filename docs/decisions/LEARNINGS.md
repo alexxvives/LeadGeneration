@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-09 — Outreach queue rows can delete a lead
+- The To contact row is no longer one button. The name selects the lead; the trash asks once, then calls the same `deleteLead` path as the drawer. A nested button would have been invalid HTML.
+- Deleting the open lead moves the selection to the next row (or the previous one at the end) before the row leaves the list.
+
 ### 2026-10-08 — LUMIA dead Canva link put back in the queue
 - Prod D1 `lodestar-prod`, board `board_0d0b6430692147b5af04`. 476 sent rows whose body contained `https://canva.link/wq0yjgxt6lhutcs` (439 Contacted + 37 New) are drafts again: CRM `new`, lead status `queued`, `email` removed from `contact_method`. Other channels (form, Instagram, WhatsApp) stayed on 23 of them. Body link is now `https://canva.link/lzea65apqk0cl0l`.
 - 4 in conversation and 4 not interested were not reopened. Their stored sent body still has the dead link.

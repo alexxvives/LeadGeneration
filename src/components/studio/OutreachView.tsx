@@ -12,6 +12,7 @@ import {
   PencilIcon,
   PhoneIcon,
   SendIcon,
+  TrashIcon,
 } from "@/components/icons";
 import { Bone, useStableDuringLoad } from "./skeletons";
 import { isOutreachReadyStatus } from "@/lib/lead-lanes";
@@ -188,6 +189,7 @@ export function OutreachView({
   onDraftAll,
   onMarkContacted,
   onLogCall,
+  onDeleteLead,
 }: {
   leads: LeadWithOutreach[];
   /** Workspace DB count of emails sent from this board’s mailbox today. */
@@ -218,6 +220,7 @@ export function OutreachView({
   ) => Promise<void>;
   /** Phone-only: open the call log without leaving the queue yet. */
   onLogCall?: (leadId: string) => void;
+  onDeleteLead: (leadId: string) => Promise<void> | void;
 }) {
   const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const busySet = useMemo(() => new Set(busyIds), [busyIds]);
@@ -470,6 +473,14 @@ export function OutreachView({
               focusId={lead.id}
               activeIndex={index}
               onSelect={setFocusId}
+              onDelete={(id) => {
+                if (id === focusId) {
+                  const nextId =
+                    rows[index + 1]?.id ?? rows[index - 1]?.id ?? null;
+                  setFocusId(nextId);
+                }
+                void onDeleteLead(id);
+              }}
             />
             <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden lg:grid lg:grid-cols-[minmax(16rem,24rem)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] xl:grid-cols-[minmax(20rem,28rem)_minmax(0,1fr)]">
             <LeadFacts
@@ -546,12 +557,16 @@ function LeadQueue({
   focusId,
   activeIndex,
   onSelect,
+  onDelete,
 }: {
   rows: LeadWithOutreach[];
   focusId: string;
   activeIndex: number;
   onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   return (
     <aside
       aria-label="Leads to contact"
@@ -577,31 +592,77 @@ function LeadQueue({
           const selected = row.id === focusId;
           const email = leadEmail(row);
           const subtitle = queueSubtitle(row);
+          const confirming = confirmId === row.id;
           return (
-            <button
-              type="button"
-              onClick={() => onSelect(row.id)}
-              aria-current={selected ? "true" : undefined}
-              className={`flex w-full min-h-11 flex-col items-start justify-center gap-0.5 rounded-lg border-l-2 px-2.5 py-1.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70 ${
+            <div
+              className={`flex w-full min-h-11 items-center rounded-lg border-l-2 pr-1 transition-colors ${
                 selected
                   ? "border-aurora-400 bg-aurora-400/15 text-mist-100"
                   : "border-transparent text-mist-200 hover:bg-white/5"
               }`}
             >
-              <span className="flex w-full min-w-0 items-center gap-1.5">
-                {email ? (
-                  <MailIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" />
-                ) : (
-                  <PhoneIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" />
-                )}
-                <span className="truncate text-sm font-medium">{row.company}</span>
-              </span>
-              {subtitle ? (
-                <span className="w-full truncate pl-5 text-xs text-mist-400">
-                  {subtitle}
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirmId === row.id) setConfirmId(null);
+                  onSelect(row.id);
+                }}
+                aria-current={selected ? "true" : undefined}
+                className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center gap-0.5 px-2.5 py-1.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+              >
+                <span className="flex w-full min-w-0 items-center gap-1.5">
+                  {email ? (
+                    <MailIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" />
+                  ) : (
+                    <PhoneIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" />
+                  )}
+                  <span className="truncate text-sm font-medium">{row.company}</span>
                 </span>
-              ) : null}
-            </button>
+                {subtitle ? (
+                  <span className="w-full truncate pl-5 text-xs text-mist-400">
+                    {subtitle}
+                  </span>
+                ) : null}
+              </button>
+              {confirming ? (
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmId(null);
+                      onDelete(row.id);
+                    }}
+                    className="inline-flex min-h-8 items-center rounded-full bg-rose-400 px-2.5 text-xs font-medium text-on-accent hover:bg-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400/60"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmId(null)}
+                    aria-label={`Cancel delete ${row.company}`}
+                    className="inline-flex min-h-8 items-center rounded-full px-2 text-xs text-mist-400 hover:text-mist-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <Lockable>
+                  <button
+                    type="button"
+                    disabled={editLocked}
+                    onClick={() => {
+                      onSelect(row.id);
+                      setConfirmId(row.id);
+                    }}
+                    aria-label={editLocked ? lockHint : `Delete ${row.company}`}
+                    title={editLocked ? lockHint : "Delete lead"}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-mist-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400/60 disabled:opacity-50"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </Lockable>
+              )}
+            </div>
           );
         }}
       />
