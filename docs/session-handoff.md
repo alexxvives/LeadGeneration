@@ -13,7 +13,7 @@ first, and update the top block at the end of any session that changes state.**
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
-**Deploy:** Not deployed. Send-focus and the Booksy filter stay local until a deploy is asked for.
+**Deploy:** Not deployed. `npm run cf:build` fails: Windows Application Control blocks `node_modules/@ast-grep/napi-win32-x64-msvc/ast-grep-napi.win32-x64-msvc.node`. Send-focus is on `master` only. The Booksy address cleanup is already on prod D1.
 
 ### This pass
 - **Send and next** stays on the lead you opened while a send was in flight.
@@ -22,7 +22,7 @@ first, and update the top block at the end of any session that changes state.**
 ### Next
 1. Re-send the reset LUMIA queue from Outreach. The drawer may still show an older “Email sent” note.
 2. On AKADEMO, **Draft remaining**. The October 3 import added 417 email leads with no draft, so Outreach does not list them.
-3. `npm run cf:build` then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy` when asked.
+3. Deploy once the ast-grep native module is allowed to load: `npm run cf:build`, then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
 
 ---
 
