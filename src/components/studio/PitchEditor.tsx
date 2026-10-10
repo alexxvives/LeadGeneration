@@ -14,45 +14,6 @@ import {
   sanitizePitchHtml,
 } from "@/lib/outreach/rich-text";
 
-/** Character offset of the caret within the editor (text nodes only). */
-function caretTextOffset(root: HTMLElement): number | null {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return null;
-  const range = sel.getRangeAt(0);
-  if (!root.contains(range.startContainer)) return null;
-  const pre = range.cloneRange();
-  pre.selectNodeContents(root);
-  pre.setEnd(range.startContainer, range.startOffset);
-  return pre.toString().length;
-}
-
-function setCaretTextOffset(root: HTMLElement, offset: number) {
-  const sel = window.getSelection();
-  if (!sel) return;
-  let remaining = offset;
-  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let node = walk.nextNode() as Text | null;
-  while (node) {
-    const len = node.textContent?.length ?? 0;
-    if (remaining <= len) {
-      const range = document.createRange();
-      range.setStart(node, remaining);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-      return;
-    }
-    remaining -= len;
-    node = walk.nextNode() as Text | null;
-  }
-  // Past end — place at end.
-  const range = document.createRange();
-  range.selectNodeContents(root);
-  range.collapse(false);
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
-
 /**
  * Lightweight rich pitch editor (bold / italic / underline + bullets).
  * Pastes are sanitized (no white backgrounds / forced colors).
@@ -93,25 +54,26 @@ export function PitchEditor({
     lastExternal.current = asHtml;
   }, [value]);
 
-  const emit = (opts?: { rehighlight?: boolean }) => {
+  /**
+   * Read the DOM and notify the parent. Do not write innerHTML here.
+   * Assigning innerHTML clears the browser undo stack, so Ctrl+Z stopped
+   * working after the first keystroke once `{company}` was tinted.
+   * Placeholder tint is applied only when the field is not being edited.
+   */
+  const emit = () => {
     if (disabled) return;
     const el = ref.current;
     if (!el) return;
     const html = sanitizePitchHtml(el.innerHTML);
-    onChange(html);
     const tinted = highlightTemplatePlaceholders(html);
     lastExternal.current = tinted;
-    if (opts?.rehighlight && el.innerHTML !== tinted) {
-      const caret = caretTextOffset(el);
-      el.innerHTML = tinted;
-      if (caret != null) setCaretTextOffset(el, caret);
-    }
+    onChange(html);
   };
 
   const cmd = (command: string, arg?: string) => {
     ref.current?.focus();
     document.execCommand(command, false, arg);
-    emit({ rehighlight: true });
+    emit();
   };
 
   const onPaste = (e: ClipboardEvent<HTMLDivElement>) => {
@@ -131,7 +93,7 @@ export function PitchEditor({
         plainToRich(text.replace(/\r\n/g, "\n")),
       );
     }
-    emit({ rehighlight: true });
+    emit();
   };
 
   return (
@@ -197,9 +159,6 @@ export function PitchEditor({
             el.focus();
             document.execCommand("selectAll", false);
             document.execCommand("removeFormat", false);
-            el.innerHTML = highlightTemplatePlaceholders(
-              sanitizePitchHtml(el.innerHTML),
-            );
             emit();
           }}
         >
@@ -219,7 +178,7 @@ export function PitchEditor({
           focused.current = true;
           onFocus?.();
         }}
-        onInput={() => emit({ rehighlight: true })}
+        onInput={() => emit()}
         onPaste={onPaste}
         onBlur={() => {
           focused.current = false;

@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-10 — Ctrl+Z died in the email body template
+- The pitch field is a `contenteditable`, not a textarea. Every keystroke rewrote `innerHTML` to tint `{company}` / `{lead_name}` / `{location}`.
+- Browsers drop the editing undo stack when script assigns `innerHTML`, so Ctrl+Z did nothing after the first character.
+- Tint now runs when the field is idle (load and blur). Typing, paste, and bold/italic stay on the native undo stack.
+
 ### 2026-10-10 — Undrafted emails never entered the board list
 - D1 lane paging used `o.status IN ('draft', …)`. A lead with no outreach row has NULL status, and `NULL IN (...)` is NULL, so `AND NOT NULL` matched no lane.
 - Those rows stayed in `COUNT(*)` (AKADEMO shows 916) and out of every page. Phone-only imports still loaded, because `NOT hasEmail AND hasPhone` is true. The 417 October 3 emails, including Avante Oposiciones, did not.

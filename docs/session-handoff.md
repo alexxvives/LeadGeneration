@@ -9,19 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-10 (undrafted emails load on the board)
+## ⏱️ Status — updated 2026-10-10 (email template undo)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Version:** `b81cb596-534c-4c1e-84e0-56f4b08103cd`  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.
 
 ### This pass
-- AKADEMO’s 417 October 3 emails were in D1 and missing from Leads. A missing outreach row made `o.status IN (...)` NULL, so those leads matched no hydrate lane. Phone-only imports still loaded. Search “Avante” only found the older Davante rows.
-- `COALESCE(o.status, '')` is deployed. Hard-refresh AKADEMO Leads; Avante Oposiciones (`info@avanteoposiciones.com`) should appear. Outreach can then **Draft all**.
+- Ctrl+Z in Email body template failed because placeholder tint rewrote the editor DOM on each key. Tint is now on blur/load only. Not deployed.
 
 ### Next
-1. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.
-2. Re-send the reset LUMIA queue from Outreach. The drawer may still show an older “Email sent” note.
+1. Deploy when asked so production Settings gets Ctrl+Z.
+2. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.
+3. Re-send the reset LUMIA queue from Outreach. The drawer may still show an older “Email sent” note.
 
 ---
 
