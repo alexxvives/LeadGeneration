@@ -37,10 +37,10 @@ Search  →  Enrich  →  Draft  →  Send
    Status flows `draft → sending → sent` (or `failed`; retry Send). Successful
    send advances CRM stage to **Contacted** and that lead leaves Outreach.
    Nothing sends without that click. Search still writes a draft as each lead
-   arrives. Imports do not. **Draft remaining** on Outreach writes those
-   missing drafts into the queue; **Re-draft all** rewrites queued drafts and
-   drafts anything still remaining. **Send stays per-lead** (Art. I.1 / ADR 0029) — Send
-   and next still sends only the lead on screen.
+   arrives. Imports do not. Those emails stay in the Outreach queue, and
+   **Draft all** writes the missing drafts. **Re-draft all** rewrites queued
+   drafts and drafts anything still remaining. **Send stays per-lead**
+   (Art. I.1 / ADR 0029) — Send and next still sends only the lead on screen.
 
 ## 3. Screens
 
@@ -162,10 +162,11 @@ Search  →  Enrich  →  Draft  →  Send
     **Missed call** journals the miss and the lead stays. The same miss path
     exists from the lead’s **Notes**. **All / Email / Phone** filters who is
     in the queue. **All types** merges spellings that differ only by case.
-    Undrafted email leads are not in the queue. **Draft
-    remaining (N)** shows in the toolbar only when some exist; they join after
-    it runs. **Re-draft all** is the secondary toolbar action: it rewrites
-    queued drafts and drafts anything still remaining. After a successful send
+    Undrafted email leads stay in the queue, ahead of drafted ones. Opening
+    one asks to **Draft all (N)** instead of an empty send pane. **Draft
+    remaining (N)** in the toolbar does the same write. **Re-draft all** is
+    the secondary toolbar action: it rewrites queued drafts and drafts
+    anything still remaining. After a successful send
     the lead leaves. Sent history stays on Pipeline, Leads, Calendar, and the
     lead drawer. The board picker activates that board’s linked outreach
     profile. **N sent today · ~Y/day suggest** is a status line for that

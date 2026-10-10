@@ -140,24 +140,25 @@ function byCompany(a: LeadWithOutreach, b: LeadWithOutreach): number {
 function emptyCopy(
   leads: LeadWithOutreach[],
   channel: ReadyChannelFilter,
-  draftRemaining: number,
 ): string {
   if (channel === "phone") {
     return "No phone-only leads to call. Switch to All or Email.";
   }
   if (channel === "email") {
-    if (draftRemaining > 0) {
-      return "No drafted emails yet. Draft remaining adds them to this list.";
-    }
-    return "No drafted emails to send.";
-  }
-  if (draftRemaining > 0) {
-    return "Nothing to send yet. Draft remaining writes the emails that are still waiting.";
+    return "No emails to send for this search or type.";
   }
   if (leads.length === 0) {
     return "Nothing to send for this search or type.";
   }
   return "Nothing to send.";
+}
+
+/** Undrafted emails first, then everyone else, each group by company. */
+function byQueue(a: LeadWithOutreach, b: LeadWithOutreach): number {
+  const rank = (lead: LeadWithOutreach) => (needsOutreachDraft(lead) ? 0 : 1);
+  const diff = rank(a) - rank(b);
+  if (diff !== 0) return diff;
+  return byCompany(a, b);
 }
 
 function contactedDayHint(sentToday: number, softCap: number): string {
@@ -168,9 +169,10 @@ function contactedDayHint(sentToday: number, softCap: number): string {
 }
 
 /**
- * Uncontacted ready leads in a list on the left. The open lead’s facts and
- * draft (or call) sit on the right. Previous / next are centered on the top
- * bar. Undrafted emails stay out until Draft remaining.
+ * Uncontacted leads in a list on the left. The open lead’s facts and
+ * draft (or call) sit on the right. An email with no draft yet stays in the
+ * list, and the draft pane asks to write all of them. Previous / next are
+ * centered on the top bar.
  * Send is the per-lead human gate (ADR 0029). A successful send leaves this view.
  */
 export function OutreachView({
@@ -268,7 +270,9 @@ export function OutreachView({
   const groupedReady = useMemo(() => {
     const ready: LeadWithOutreach[] = [];
     for (const lead of leads) {
-      if (bucketOf(lead) === "ready") ready.push(lead);
+      const bucket = bucketOf(lead);
+      // Undrafted emails stay visible. Phone-only and drafted emails are ready.
+      if (bucket === "ready" || bucket === "review") ready.push(lead);
     }
     if (readyChannel === "email") {
       return ready.filter((l) => Boolean(leadEmail(l)));
@@ -279,7 +283,7 @@ export function OutreachView({
     return ready;
   }, [leads, readyChannel]);
 
-  const rows = useStableDuringLoad(groupedReady, byCompany, backfilling);
+  const rows = useStableDuringLoad(groupedReady, byQueue, backfilling);
 
   useEffect(() => {
     if (rows.length === 0) return;
@@ -412,7 +416,7 @@ export function OutreachView({
                 title={
                   editLocked
                     ? lockHint
-                    : "Write the emails that still need a first draft. They join this list when it finishes."
+                    : "Write a draft for every email that does not have one yet. Nothing sends until you click Send."
                 }
                 className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-amber-400 px-3.5 text-sm font-medium text-on-accent disabled:opacity-50"
               >
@@ -462,13 +466,19 @@ export function OutreachView({
       >
         {rows.length === 0 || !lead ? (
           <div className="m-0 flex flex-1 items-center justify-center rounded-xl2 border border-dashed border-white/10 px-6 py-10 text-center">
-            <div>
+            {draftRemainingCount > 0 && readyChannel !== "phone" && !backfilling ? (
+              <DraftAllPrompt
+                count={draftRemainingCount}
+                drafting={drafting === "remaining" || draftBusy}
+                onDraft={() => void runDraft("remaining")}
+              />
+            ) : (
               <p className="text-sm text-mist-300">
                 {backfilling
                   ? "Loading the queue…"
-                  : emptyCopy(leads, readyChannel, draftRemainingCount)}
+                  : emptyCopy(leads, readyChannel)}
               </p>
-            </div>
+            )}
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row">
@@ -499,6 +509,9 @@ export function OutreachView({
               }
               canSendEmail={canSendEmail}
               hasNext={index < rows.length - 1}
+              draftRemainingCount={draftRemainingCount}
+              draftingAll={drafting === "remaining" || draftBusy}
+              onDraftAll={() => void runDraft("remaining")}
               onSaveDraft={onSaveDraft}
               onSend={onSend}
               onAdvance={advanceAfterSend}
@@ -768,11 +781,51 @@ function Fact({
   );
 }
 
+function DraftAllPrompt({
+  count,
+  drafting,
+  onDraft,
+}: {
+  count: number;
+  drafting: boolean;
+  onDraft: () => void;
+}) {
+  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-8 text-center">
+      <p className="kicker">Draft</p>
+      <p className="mt-2 max-w-sm text-sm text-mist-100">
+        {count === 1
+          ? "This email isn’t written yet."
+          : `${count} emails aren’t written yet.`}
+      </p>
+      <p className="mt-2 max-w-sm text-sm text-mist-400">
+        Draft them all. Nothing sends until you click Send on each one.
+      </p>
+      <Lockable>
+        <button
+          type="button"
+          onClick={onDraft}
+          disabled={editLocked || drafting}
+          title={editLocked ? lockHint : "Write a draft for every email that does not have one yet"}
+          className="mt-5 inline-flex h-10 items-center gap-1.5 rounded-full bg-amber-400 px-5 text-sm font-medium text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/70 disabled:opacity-50"
+        >
+          {drafting ? <Spinner className="h-3.5 w-3.5" /> : null}
+          Draft all ({count})
+        </button>
+      </Lockable>
+    </div>
+  );
+}
+
 function ReviewAction({
   lead,
   busy,
   canSendEmail,
   hasNext,
+  draftRemainingCount,
+  draftingAll,
+  onDraftAll,
   onSaveDraft,
   onSend,
   onAdvance,
@@ -784,6 +837,9 @@ function ReviewAction({
   busy: boolean;
   canSendEmail: boolean;
   hasNext: boolean;
+  draftRemainingCount: number;
+  draftingAll: boolean;
+  onDraftAll: () => void;
   onSaveDraft: (
     outreachId: string,
     patch: { subject: string; body: string; toEmail: string | null },
@@ -828,6 +884,12 @@ function ReviewAction({
             <Bone className="min-h-40 w-full flex-1 rounded-lg" />
           </div>
         )
+      ) : email && needsOutreachDraft(lead) ? (
+        <DraftAllPrompt
+          count={draftRemainingCount}
+          drafting={draftingAll}
+          onDraft={onDraftAll}
+        />
       ) : phoneOnly ? (
         <div className="flex flex-1 flex-col justify-between p-5">
           <div>
