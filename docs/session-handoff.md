@@ -9,19 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-10 (Outreach shows undrafted emails)
+## ⏱️ Status — updated 2026-10-10 (Outreach undrafted emails deployed)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.  
-**Deploy:** Not deployed. `npm run cf:build` fails: Windows Application Control blocks `node_modules/@ast-grep/napi-win32-x64-msvc/ast-grep-napi.win32-x64-msvc.node`.
+**Version:** `2c655b0e-3b73-456b-8b52-39a83fe6a56b`  
+**Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.
 
 ### This pass
-- Undrafted email leads stay in the Outreach queue. The draft pane asks to **Draft all (N)** instead of saying there is nothing to send.
-- AKADEMO still has 417 imported emails with no draft. They show up after this UI is deployed.
+- Deployed the Outreach change: undrafted email leads stay in the queue and the pane asks to **Draft all (N)**.
+- Live app chunk includes that copy. Hard-refresh AKADEMO Outreach (Email or All). The October 3 emails have no draft, so they show the draft prompt. **All types** does not change the Email / Phone channel.
 
 ### Next
-1. Re-send the reset LUMIA queue from Outreach. The drawer may still show an older “Email sent” note.
-2. Deploy once the ast-grep native module is allowed to load: `npm run cf:build`, then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
+1. On AKADEMO, hard-refresh Outreach and use **Draft all**. Nothing sends until **Send** on each lead.
+2. Re-send the reset LUMIA queue from Outreach. The drawer may still show an older “Email sent” note.
 
 ---
 
