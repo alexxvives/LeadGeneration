@@ -9,18 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-10 (Outreach undrafted emails deployed)
+## ⏱️ Status — updated 2026-10-10 (undrafted emails were missing from the list)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Version:** `2c655b0e-3b73-456b-8b52-39a83fe6a56b`  
+**Version:** `2c655b0e-3b73-456b-8b52-39a83fe6a56b` (does not include this fix yet)  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.
 
 ### This pass
-- Deployed the Outreach change: undrafted email leads stay in the queue and the pane asks to **Draft all (N)**.
-- Live app chunk includes that copy. Hard-refresh AKADEMO Outreach (Email or All). The October 3 emails have no draft, so they show the draft prompt. **All types** does not change the Email / Phone channel.
+- AKADEMO’s 417 October 3 emails are in D1 (Avante Oposiciones is `lead_ffaf5291dc694e668926`) and were absent from Leads search. Lane SQL treated a missing outreach status as NULL, so those rows matched no page. Phone-only imports still loaded.
+- `COALESCE(o.status, '')` puts an email with no outreach row in the needs-draft lane. Needs a deploy before the live board shows them.
 
 ### Next
-1. On AKADEMO, hard-refresh Outreach and use **Draft all**. Nothing sends until **Send** on each lead.
+1. Deploy this fix, then hard-refresh AKADEMO Leads and search Avante Oposiciones.
 2. Re-send the reset LUMIA queue from Outreach. The drawer may still show an older “Email sent” note.
 
 ---

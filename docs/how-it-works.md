@@ -381,7 +381,8 @@ and uses `D1Store` instead. Pipeline/Leads respect the sidebar board filter
 (**All** by default). Boards are user-created (ADR 0014 / 0023).
 
 Board hydrate is **progressive + card-sized**: **100 leads per Pipeline /
-Outreach lane** (CRM New still pages as needs-draft vs ready-to-send, then
+Outreach lane** (CRM New still pages as needs-draft vs ready-to-send — an email
+with no outreach row is needs-draft — then
 Contacted / In Conversation / Closed / Not Interested), then the same
 100-per-lane again in the background until the board is complete. The
 Outreach screen shows that ready queue as a list and opens one lead, not those lanes. D1 `SELECT`s only

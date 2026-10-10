@@ -49,7 +49,9 @@ export function hydrateLaneSql(lane: LeadHydrateLane): string {
   const stage = `COALESCE(NULLIF(l.crm_stage, ''), 'new')`;
   const hasEmail = `(TRIM(COALESCE(o.to_email, '')) != '' OR (l.emails IS NOT NULL AND l.emails NOT IN ('', '[]', 'null')))`;
   const hasPhone = `(l.phones IS NOT NULL AND l.phones NOT IN ('', '[]', 'null'))`;
-  const isReady = `(o.status IN ('draft', 'approved', 'sending', 'failed') OR (NOT ${hasEmail} AND ${hasPhone}))`;
+  // A lead with no outreach row has NULL status. `NULL IN (...)` is NULL, and
+  // `AND NOT NULL` then matches no lane, so those rows never hydrate.
+  const isReady = `(COALESCE(o.status, '') IN ('draft', 'approved', 'sending', 'failed') OR (NOT ${hasEmail} AND ${hasPhone}))`;
   if (lane === "draft") return `${stage} = 'new' AND NOT ${isReady}`;
   if (lane === "ready") return `${stage} = 'new' AND ${isReady}`;
   const crm: CrmStage = lane;

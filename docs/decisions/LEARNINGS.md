@@ -4,6 +4,11 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-10 — Undrafted emails never entered the board list
+- D1 lane paging used `o.status IN ('draft', …)`. A lead with no outreach row has NULL status, and `NULL IN (...)` is NULL, so `AND NOT NULL` matched no lane.
+- Those rows stayed in `COUNT(*)` (AKADEMO shows 916) and out of every page. Phone-only imports still loaded, because `NOT hasEmail AND hasPhone` is true. The 417 October 3 emails, including Avante Oposiciones, did not.
+- `COALESCE(o.status, '')` makes a missing row “not ready”. The JSON store already used the JS lane helper, which treated missing outreach as needs-draft.
+
 ### 2026-10-10 — Undrafted emails stay in the Outreach queue
 - Imports still do not write a draft. Those leads were omitted from the queue, so Email could say “No drafted emails to send” while hundreds of addresses sat on the board.
 - An email with no outreach row now stays in To contact, listed before drafted rows. The draft pane and the empty queue both offer **Draft all (N)**. Send is still one click per lead.
