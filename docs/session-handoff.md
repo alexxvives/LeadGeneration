@@ -9,18 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-10 (undrafted emails were missing from the list)
+## ⏱️ Status — updated 2026-10-10 (undrafted emails load on the board)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Version:** `2c655b0e-3b73-456b-8b52-39a83fe6a56b` (does not include this fix yet)  
+**Version:** `b81cb596-534c-4c1e-84e0-56f4b08103cd`  
 **Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.
 
 ### This pass
-- AKADEMO’s 417 October 3 emails are in D1 (Avante Oposiciones is `lead_ffaf5291dc694e668926`) and were absent from Leads search. Lane SQL treated a missing outreach status as NULL, so those rows matched no page. Phone-only imports still loaded.
-- `COALESCE(o.status, '')` puts an email with no outreach row in the needs-draft lane. Needs a deploy before the live board shows them.
+- AKADEMO’s 417 October 3 emails were in D1 and missing from Leads. A missing outreach row made `o.status IN (...)` NULL, so those leads matched no hydrate lane. Phone-only imports still loaded. Search “Avante” only found the older Davante rows.
+- `COALESCE(o.status, '')` is deployed. Hard-refresh AKADEMO Leads; Avante Oposiciones (`info@avanteoposiciones.com`) should appear. Outreach can then **Draft all**.
 
 ### Next
-1. Deploy this fix, then hard-refresh AKADEMO Leads and search Avante Oposiciones.
+1. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.
 2. Re-send the reset LUMIA queue from Outreach. The drawer may still show an older “Email sent” note.
 
 ---
