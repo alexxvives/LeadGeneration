@@ -19,6 +19,7 @@ import {
   todayIsoDate,
 } from "@/lib/follow-ups";
 import { contactMethodLabel, rememberDroppedContactMethods } from "@/lib/contact-methods";
+import { ONBOARDING_FIELD } from "@/lib/onboarding-path";
 import {
   droppedFollowUpIdSet,
   mergeMutationIntoCached,
@@ -224,9 +225,9 @@ export function Studio() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pipelineFocus, setPipelineFocus] = useState<"stages" | "conversation">(
-    "stages",
-  );
+  const [pipelineFocus, setPipelineFocus] = useState<
+    "stages" | "conversation" | "onboarding"
+  >("stages");
   const hasLoadedRef = useRef(false);
 
   const [running, setRunning] = useState(false);
@@ -2042,7 +2043,9 @@ export function Studio() {
         ...(l.emails ?? []),
         ...(l.phones ?? []),
         ...(l.tags ?? []),
-        ...Object.values(l.customFields ?? {}),
+        ...Object.entries(l.customFields ?? {})
+          .filter(([key]) => key !== ONBOARDING_FIELD)
+          .map(([, value]) => value),
         ...(l.followUps ?? []).map((f) => f.note),
       ]
         .filter(Boolean)
@@ -2707,6 +2710,9 @@ export function Studio() {
                 focus={pipelineFocus}
                 onFocusChange={setPipelineFocus}
                 onSetConversationStep={onSetConversationStep}
+                onSetOnboarding={(leadId, customFields) =>
+                  void onUpdateLeadCrm(leadId, { customFields })
+                }
               />
             </>
           )}

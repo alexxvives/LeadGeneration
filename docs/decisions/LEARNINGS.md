@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-18 — Onboarding checklist is a reserved custom field
+- Path A / Path B checkboxes store step ids as JSON in `customFields.__onboarding`. Lead search skips that key so the blob does not match queries.
+- The board only includes conversation steps `onboarding` and `reviewing_contract`.
+
 ### 2026-10-10 — Ctrl+Z died in the email body template
 - The pitch field is a `contenteditable`, not a textarea. Every keystroke rewrote `innerHTML` to tint `{company}` / `{lead_name}` / `{location}`.
 - Browsers drop the editing undo stack when script assigns `innerHTML`, so Ctrl+Z did nothing after the first character.
