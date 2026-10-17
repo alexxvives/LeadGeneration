@@ -12,7 +12,7 @@ first, and update the top block at the end of any session that changes state.**
 ## ⏱️ Status — updated 2026-10-18 (onboarding tree)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Version:** deploying this pass.  
+**Version:** `a4e67263-6cd8-4821-bcb4-113c39b17a1d`  
 **Migrations:** none. Checklist stays in `customFields.__onboarding`.
 
 ### This pass
