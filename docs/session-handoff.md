@@ -9,31 +9,18 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-18 (onboarding tree)
+## ⏱️ Status — updated 2026-10-18 (onboarding tiles)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Version:** `a4e67263-6cd8-4821-bcb4-113c39b17a1d`  
-**Migrations:** none. Checklist stays in `customFields.__onboarding`.
+**Version:** deploying this pass.  
+**Migrations:** none.
 
 ### This pass
-- Onboarding is a selectable decision tree.
-- That tab loads only `reviewing_contract` and `onboarding` via `GET /api/leads?steps=`.
+- Onboarding tree uses named tiles and wavy connectors. No Path A / Path B labels.
 
 ### Next
 1. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.
 2. Re-send the reset LUMIA queue from Outreach.
-
-**Live:** https://leadgeneration.alexxvives.workers.dev  
-**Version:** `b81cb596-534c-4c1e-84e0-56f4b08103cd`  
-**Migrations:** 0021–**0040** applied on prod D1. No new migration this pass.
-
-### This pass
-- Ctrl+Z in Email body template failed because placeholder tint rewrote the editor DOM on each key. Tint is now on blur/load only. Not deployed.
-
-### Next
-1. Deploy when asked so production Settings gets Ctrl+Z.
-2. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.
-3. Re-send the reset LUMIA queue from Outreach. The drawer may still show an older “Email sent” note.
 
 ---
 
