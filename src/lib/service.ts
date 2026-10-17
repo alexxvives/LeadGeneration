@@ -1011,6 +1011,29 @@ export async function getRunWithLeads(
   return { run, leads: withOutreach };
 }
 
+/** Leads sitting on the last in-conversation steps (contract + onboarding). */
+export async function listLeadsInSteps(
+  ctx: Ctx,
+  boardId: string | null | undefined,
+  steps: string[],
+): Promise<LeadWithOutreach[]> {
+  const clean = steps.filter((s) => s.trim().length > 0);
+  if (clean.length === 0) return [];
+  let db = ctx.db;
+  const scoped = boardId && boardId !== "all" ? boardId : null;
+  if (scoped) {
+    const access = await resolveBoardAccess(ctx, scoped);
+    if (!access) return [];
+    db = access.db;
+  }
+  const leads = await db.listLeads({
+    boardId: scoped ?? undefined,
+    conversationSteps: clean,
+    columns: "card",
+  });
+  return attachOutreach(db, leads, { slim: true });
+}
+
 /**
  * Studio board view. `boardId` null/"all" → all leads; otherwise filter.
  * Still returns the latest completed run for search-context chrome.

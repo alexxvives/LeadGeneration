@@ -916,6 +916,13 @@ export class JsonStore implements LeadRepository {
       if (!this.inScope(l)) return false;
       if (filter?.runId && l.runId !== filter.runId) return false;
       if (filter?.boardId && (l.boardId || "") !== filter.boardId) return false;
+      if (
+        filter?.conversationSteps &&
+        filter.conversationSteps.length > 0 &&
+        !filter.conversationSteps.includes(l.conversationStep ?? "")
+      ) {
+        return false;
+      }
       return true;
     });
     const dataFull = data;

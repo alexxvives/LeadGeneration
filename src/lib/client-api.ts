@@ -164,6 +164,14 @@ export const api = {
     return jsonFetch<BoardResponse>(`/api/board?${params.toString()}`);
   },
 
+  /** Contract + onboarding rows only — does not page the whole board. */
+  leadsInSteps: (boardId: string | null | undefined, steps: string[]) => {
+    const params = new URLSearchParams();
+    if (boardId && boardId !== "all") params.set("boardId", boardId);
+    params.set("steps", steps.join(","));
+    return jsonFetch<{ leads: LeadWithOutreach[] }>(`/api/leads?${params.toString()}`);
+  },
+
   /** Background lead pages after the first board paint. */
   boardLeadsChunk: (
     boardId: string | null | undefined,

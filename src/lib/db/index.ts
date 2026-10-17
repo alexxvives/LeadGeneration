@@ -52,6 +52,8 @@ export interface LeadListFilter {
    * Default `full` for import dedupe / board-move (needs every column).
    */
   columns?: "card" | "full";
+  /** Keep leads whose conversation step is one of these. */
+  conversationSteps?: string[];
 }
 
 export interface LeadRepository {

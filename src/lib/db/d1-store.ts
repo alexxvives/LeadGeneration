@@ -1818,6 +1818,10 @@ export class D1Store implements LeadRepository {
     if (filter?.lane) {
       where += ` AND (${hydrateLaneSql(filter.lane)})`;
     }
+    if (filter?.conversationSteps && filter.conversationSteps.length > 0) {
+      where += ` AND l.conversation_step IN (${filter.conversationSteps.map(() => "?").join(", ")})`;
+      bind.push(...filter.conversationSteps);
+    }
     const cols = filter?.columns === "card" ? CARD_LEAD_SELECT : "l.*";
     const { results } = await this.db
       .prepare(

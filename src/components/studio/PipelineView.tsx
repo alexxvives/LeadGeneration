@@ -276,6 +276,8 @@ export function PipelineView({
   onMoveStage,
   onSetConversationStep,
   onSetOnboarding,
+  onboardingLeads,
+  onboardingLoading,
   onCompleteTask,
   onCompleteFollowUp,
 }: {
@@ -301,6 +303,8 @@ export function PipelineView({
   ) => void;
   onSetConversationStep?: (leadId: string, step: ConversationStep) => void;
   onSetOnboarding?: (leadId: string, customFields: Record<string, string>) => void;
+  onboardingLeads?: LeadWithOutreach[];
+  onboardingLoading?: boolean;
 }) {
   const { locked: editLocked } = useBoardLockUi();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -411,7 +415,8 @@ export function PipelineView({
       ) : null}
       {focus === "onboarding" ? (
         <OnboardingBoard
-          leads={leads}
+          leads={onboardingLeads ?? []}
+          loading={onboardingLoading}
           onOpen={openIfClick}
           onSetDone={(id, fields) => onSetOnboarding?.(id, fields)}
         />

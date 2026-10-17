@@ -9,15 +9,15 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-18 (onboarding deployed)
+## ⏱️ Status — updated 2026-10-18 (onboarding tree)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Version:** `138719e3-2638-47c9-9ddc-7b91617313d0`  
-**Migrations:** none this pass. Checklist lives in `customFields.__onboarding`.
+**Version:** deploying this pass.  
+**Migrations:** none. Checklist stays in `customFields.__onboarding`.
 
 ### This pass
-- Pipeline focus toggle gains **Onboarding**. Deployed.
-- Standing rule: deploy the Worker after every completed change.
+- Onboarding is a selectable decision tree.
+- That tab loads only `reviewing_contract` and `onboarding` via `GET /api/leads?steps=`.
 
 ### Next
 1. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.

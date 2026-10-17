@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
-import { createManualLead } from "@/lib/service";
+import { createManualLead, listLeadsInSteps } from "@/lib/service";
 import {
   isBoardLockedError,
   isNotFoundError,
@@ -10,6 +10,30 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const STEP_IDS = [
+  "evaluating_pre_demo",
+  "waiting_on_demo",
+  "evaluating_post_demo",
+  "reviewing_contract",
+  "onboarding",
+] as const;
+
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const steps = (url.searchParams.get("steps") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s): s is (typeof STEP_IDS)[number] =>
+      (STEP_IDS as readonly string[]).includes(s),
+    );
+  if (steps.length === 0) {
+    return NextResponse.json({ error: "steps required" }, { status: 400 });
+  }
+  const ctx = await getCtx();
+  const leads = await listLeadsInSteps(ctx, url.searchParams.get("boardId"), steps);
+  return NextResponse.json({ leads });
+}
 
 const BodySchema = z.object({
   boardId: z.string().min(1).max(80).optional().nullable(),

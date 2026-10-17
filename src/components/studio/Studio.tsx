@@ -228,7 +228,29 @@ export function Studio() {
   const [pipelineFocus, setPipelineFocus] = useState<
     "stages" | "conversation" | "onboarding"
   >("stages");
+  const [onboardingLeads, setOnboardingLeads] = useState<LeadWithOutreach[]>([]);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
   const hasLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (view !== "pipeline" || pipelineFocus !== "onboarding") return;
+    let cancelled = false;
+    setOnboardingLoading(true);
+    void api
+      .leadsInSteps(filterBoardId, ["reviewing_contract", "onboarding"])
+      .then((res) => {
+        if (!cancelled) setOnboardingLeads(res.leads);
+      })
+      .catch(() => {
+        if (!cancelled) setOnboardingLeads([]);
+      })
+      .finally(() => {
+        if (!cancelled) setOnboardingLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [view, pipelineFocus, filterBoardId]);
 
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -2675,7 +2697,30 @@ export function Studio() {
           }
           aria-hidden={view !== "pipeline"}
         >
-          {loading || leadsHydrating || !board ? (
+          {pipelineFocus === "onboarding" ? (
+            <div className="flex h-full min-h-0 flex-col">
+              <PipelineView
+                leads={onboardingLeads}
+                focus="onboarding"
+                onboardingLeads={onboardingLeads}
+                onboardingLoading={onboardingLoading}
+                filterActive={false}
+                tasksByLeadId={tasksByLeadId}
+                onOpen={openInfo}
+                onCompleteTask={onCompletePendingTask}
+                onCompleteFollowUp={onCompletePendingFollowUp}
+                onMoveStage={onMoveStage}
+                onFocusChange={setPipelineFocus}
+                onSetConversationStep={onSetConversationStep}
+                onSetOnboarding={(leadId, customFields) => {
+                  setOnboardingLeads((rows) =>
+                    rows.map((l) => (l.id === leadId ? { ...l, customFields } : l)),
+                  );
+                  void onUpdateLeadCrm(leadId, { customFields });
+                }}
+              />
+            </div>
+          ) : loading || leadsHydrating || !board ? (
             <div role="status" aria-busy="true" aria-label="Loading pipeline">
               <PipelineSkeleton />
             </div>
@@ -2710,9 +2755,14 @@ export function Studio() {
                 focus={pipelineFocus}
                 onFocusChange={setPipelineFocus}
                 onSetConversationStep={onSetConversationStep}
-                onSetOnboarding={(leadId, customFields) =>
-                  void onUpdateLeadCrm(leadId, { customFields })
-                }
+                onboardingLeads={onboardingLeads}
+                onboardingLoading={onboardingLoading}
+                onSetOnboarding={(leadId, customFields) => {
+                  setOnboardingLeads((rows) =>
+                    rows.map((l) => (l.id === leadId ? { ...l, customFields } : l)),
+                  );
+                  void onUpdateLeadCrm(leadId, { customFields });
+                }}
               />
             </>
           )}
