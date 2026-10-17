@@ -4,6 +4,10 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-18 — Onboarding tree lives on the lead card
+- The pipeline no longer has an Onboarding tab. A tree icon beside delete opens a vertical dialog for that lead.
+- Tiles are short and click-to-fill. Teal is a task, amber is a decision, rose is “no le interesa”.
+
 ### 2026-10-18 — Onboarding does not page the board
 - `GET /api/leads?steps=reviewing_contract,onboarding` returns only those conversation steps. The tree does not wait on lane backfill.
 

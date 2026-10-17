@@ -15,8 +15,10 @@ import {
   PinIcon,
   SparkIcon,
   TrashIcon,
+  TreeIcon,
   XIcon,
 } from "@/components/icons";
+import { OnboardingTreeDialog } from "./OnboardingBoard";
 import { CONVERSATION_STEPS } from "@/lib/conversation-steps";
 import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
@@ -105,6 +107,7 @@ interface DrawerProps {
       demoDone?: boolean;
       conversationStep?: ConversationStep | null;
       conversationStepAt?: string | null;
+      customFields?: Record<string, string>;
     },
   ) => Promise<void>;
   /** Parent-owned note-delete undo (survives drawer remounts). */
@@ -272,6 +275,7 @@ export function LeadDrawer(props: DrawerProps) {
     false | "call" | "missed" | "email"
   >(promptNote);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [treeOpen, setTreeOpen] = useState(false);
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
   const notesPaneRef = useRef<HTMLElement | null>(null);
   const companyInputRef = useRef<HTMLInputElement | null>(null);
@@ -960,6 +964,17 @@ export function LeadDrawer(props: DrawerProps) {
                   </button>
                 </Lockable>
               )
+            ) : null}
+            {mode === "info" ? (
+              <button
+                type="button"
+                onClick={() => setTreeOpen(true)}
+                className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-white/5 hover:text-aurora-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+                aria-label="Onboarding tree"
+                title="Onboarding"
+              >
+                <TreeIcon className="h-5 w-5" />
+              </button>
             ) : null}
             <button
               type="button"
@@ -1759,6 +1774,15 @@ export function LeadDrawer(props: DrawerProps) {
           )}
         </div>
       </aside>
+      {treeOpen ? (
+        <OnboardingTreeDialog
+          lead={lead}
+          onClose={() => setTreeOpen(false)}
+          onSetDone={(customFields) => {
+            void props.onUpdateCrm(lead.id, { customFields });
+          }}
+        />
+      ) : null}
     </div>
   );
 }

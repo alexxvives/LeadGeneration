@@ -9,14 +9,15 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-18 (onboarding tiles)
+## ⏱️ Status — updated 2026-10-18 (onboarding dialog)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Version:** `b62e1046-17e4-47a2-b48d-193d429efb0b`  
+**Version:** pending deploy  
 **Migrations:** none.
 
 ### This pass
-- Onboarding tree uses named tiles and wavy connectors. No Path A / Path B labels.
+- Onboarding left the pipeline toggle. Tree icon on the lead card opens a scrollable dialog.
+- Shorter tiles: teal task, amber decision, rose for “no le interesa”. Header centered.
 
 ### Next
 1. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.

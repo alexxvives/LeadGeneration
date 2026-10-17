@@ -120,6 +120,19 @@ export function PencilIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function TreeIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path d="M12 21V10" strokeLinecap="round" />
+      <path d="M12 14c-3.2 0-5 1.4-5 3.2" strokeLinecap="round" />
+      <path d="M12 12c3 0 4.6 1.2 4.6 2.8" strokeLinecap="round" />
+      <circle cx="12" cy="6.5" r="2.2" />
+      <circle cx="6.2" cy="17.2" r="1.7" />
+      <circle cx="17.2" cy="15.2" r="1.7" />
+    </svg>
+  );
+}
+
 export function TrashIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>

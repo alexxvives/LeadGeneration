@@ -19,7 +19,6 @@ import {
   todayIsoDate,
 } from "@/lib/follow-ups";
 import { contactMethodLabel, rememberDroppedContactMethods } from "@/lib/contact-methods";
-import { ONBOARDING_FIELD } from "@/lib/onboarding-path";
 import {
   droppedFollowUpIdSet,
   mergeMutationIntoCached,
@@ -42,6 +41,7 @@ import { VerifyLimitModal } from "./VerifyLimitModal";
 import { crmStageLabel, Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
+import { ONBOARDING_FIELD } from "@/lib/onboarding-path";
 import { PipelineFocusToggle, PipelineView } from "./PipelineView";
 import {
   OutreachView,
@@ -225,32 +225,10 @@ export function Studio() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pipelineFocus, setPipelineFocus] = useState<
-    "stages" | "conversation" | "onboarding"
-  >("stages");
-  const [onboardingLeads, setOnboardingLeads] = useState<LeadWithOutreach[]>([]);
-  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [pipelineFocus, setPipelineFocus] = useState<"stages" | "conversation">(
+    "stages",
+  );
   const hasLoadedRef = useRef(false);
-
-  useEffect(() => {
-    if (view !== "pipeline" || pipelineFocus !== "onboarding") return;
-    let cancelled = false;
-    setOnboardingLoading(true);
-    void api
-      .leadsInSteps(filterBoardId, ["reviewing_contract", "onboarding"])
-      .then((res) => {
-        if (!cancelled) setOnboardingLeads(res.leads);
-      })
-      .catch(() => {
-        if (!cancelled) setOnboardingLeads([]);
-      })
-      .finally(() => {
-        if (!cancelled) setOnboardingLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [view, pipelineFocus, filterBoardId]);
 
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -2697,30 +2675,7 @@ export function Studio() {
           }
           aria-hidden={view !== "pipeline"}
         >
-          {pipelineFocus === "onboarding" ? (
-            <div className="flex h-full min-h-0 flex-col">
-              <PipelineView
-                leads={onboardingLeads}
-                focus="onboarding"
-                onboardingLeads={onboardingLeads}
-                onboardingLoading={onboardingLoading}
-                filterActive={false}
-                tasksByLeadId={tasksByLeadId}
-                onOpen={openInfo}
-                onCompleteTask={onCompletePendingTask}
-                onCompleteFollowUp={onCompletePendingFollowUp}
-                onMoveStage={onMoveStage}
-                onFocusChange={setPipelineFocus}
-                onSetConversationStep={onSetConversationStep}
-                onSetOnboarding={(leadId, customFields) => {
-                  setOnboardingLeads((rows) =>
-                    rows.map((l) => (l.id === leadId ? { ...l, customFields } : l)),
-                  );
-                  void onUpdateLeadCrm(leadId, { customFields });
-                }}
-              />
-            </div>
-          ) : loading || leadsHydrating || !board ? (
+          {loading || leadsHydrating || !board ? (
             <div role="status" aria-busy="true" aria-label="Loading pipeline">
               <PipelineSkeleton />
             </div>
@@ -2755,14 +2710,6 @@ export function Studio() {
                 focus={pipelineFocus}
                 onFocusChange={setPipelineFocus}
                 onSetConversationStep={onSetConversationStep}
-                onboardingLeads={onboardingLeads}
-                onboardingLoading={onboardingLoading}
-                onSetOnboarding={(leadId, customFields) => {
-                  setOnboardingLeads((rows) =>
-                    rows.map((l) => (l.id === leadId ? { ...l, customFields } : l)),
-                  );
-                  void onUpdateLeadCrm(leadId, { customFields });
-                }}
               />
             </>
           )}

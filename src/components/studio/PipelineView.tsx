@@ -30,7 +30,6 @@ import {
   resolveFollowUpKind,
 } from "@/lib/follow-ups";
 import { Bone, useStableDuringLoad } from "./skeletons";
-import { OnboardingBoard } from "./OnboardingBoard";
 import { VirtualColumnList } from "./virtual-list";
 import { useBoardLockUi } from "./board-lock";
 
@@ -226,8 +225,8 @@ export function PipelineFocusToggle({
   onChange,
   className = "",
 }: {
-  value: "stages" | "conversation" | "onboarding";
-  onChange: (next: "stages" | "conversation" | "onboarding") => void;
+  value: "stages" | "conversation";
+  onChange: (next: "stages" | "conversation") => void;
   className?: string;
 }) {
   return (
@@ -240,7 +239,6 @@ export function PipelineFocusToggle({
         [
           ["stages", "Stages"],
           ["conversation", "In conversation"],
-          ["onboarding", "Onboarding"],
         ] as const
       ).map(([id, label]) => {
         const on = value === id;
@@ -275,9 +273,6 @@ export function PipelineView({
   onOpen,
   onMoveStage,
   onSetConversationStep,
-  onSetOnboarding,
-  onboardingLeads,
-  onboardingLoading,
   onCompleteTask,
   onCompleteFollowUp,
 }: {
@@ -288,10 +283,10 @@ export function PipelineView({
   backfilling?: boolean;
   /** Search is filtering — don't treat empty columns as still paging. */
   filterActive?: boolean;
-  /** Stages = CRM kanban. Conversation = in-conversation buckets. Onboarding = contract tree. */
-  focus?: "stages" | "conversation" | "onboarding";
+  /** Stages = CRM kanban. Conversation = in-conversation buckets. */
+  focus?: "stages" | "conversation";
   /** Phone title row is hidden — the toggle sits on the board instead. */
-  onFocusChange?: (next: "stages" | "conversation" | "onboarding") => void;
+  onFocusChange?: (next: "stages" | "conversation") => void;
   tasksByLeadId?: Map<string, Task[]>;
   onOpen: (id: string) => void;
   onCompleteTask?: (leadId: string) => void;
@@ -302,9 +297,6 @@ export function PipelineView({
     contactMethods?: ContactMethod[] | null,
   ) => void;
   onSetConversationStep?: (leadId: string, step: ConversationStep) => void;
-  onSetOnboarding?: (leadId: string, customFields: Record<string, string>) => void;
-  onboardingLeads?: LeadWithOutreach[];
-  onboardingLoading?: boolean;
 }) {
   const { locked: editLocked } = useBoardLockUi();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -413,14 +405,6 @@ export function PipelineView({
           className="self-start lg:hidden"
         />
       ) : null}
-      {focus === "onboarding" ? (
-        <OnboardingBoard
-          leads={onboardingLeads ?? []}
-          loading={onboardingLoading}
-          onOpen={openIfClick}
-          onSetDone={(id, fields) => onSetOnboarding?.(id, fields)}
-        />
-      ) : (
       <>
       <p className="shrink-0 text-xs uppercase tracking-widest text-mist-500">
         <span className="font-semibold text-mist-200">{headCount}</span>{" "}
@@ -606,7 +590,6 @@ export function PipelineView({
       </DndContext>
       </div>
       </>
-      )}
     </div>
     </PipelineCardActions.Provider>
   );
