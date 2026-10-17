@@ -17,7 +17,7 @@ first, and update the top block at the end of any session that changes state.**
 
 ### This pass
 - Onboarding left the pipeline toggle. Tree icon on the lead card opens a scrollable dialog.
-- Shorter tiles: teal task, amber decision, rose for “no le interesa”. Header centered.
+- Shorter tiles: teal task, amber decision, rose only once “no le interesa” is selected. Header centered.
 
 ### Next
 1. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.

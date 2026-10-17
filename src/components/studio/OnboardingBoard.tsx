@@ -245,9 +245,7 @@ function Tile({
         : "border-aurora-300 bg-aurora-400 text-on-accent"
     : tone === "decision"
       ? "border-amber-400/40 bg-ink-900/90 text-amber-100 hover:border-amber-300/70"
-      : tone === "reject"
-        ? "border-rose-400/40 bg-ink-900/90 text-rose-100 hover:border-rose-300/70"
-        : "border-white/15 bg-ink-900/90 text-mist-100 hover:border-white/30";
+      : "border-white/15 bg-ink-900/90 text-mist-100 hover:border-white/30";
   return (
     <button
       type="button"
