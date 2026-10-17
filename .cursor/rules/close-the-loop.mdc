@@ -1,5 +1,5 @@
 ---
-description: Finish a change by reading the repo, proving it with tools, clicking the running app when UI changed, writing the handoff, then committing and pushing. Never force-push. Do not deploy unless asked.
+description: Finish a change by reading the repo, proving it with tools, clicking the running app when UI changed, writing the handoff, committing, pushing, and deploying the Worker. Never force-push.
 alwaysApply: true
 ---
 
@@ -43,11 +43,11 @@ Do not add MCP servers. Cloudflare and Stripe MCPs stay for those tasks only.
 - A real decision with alternatives → an ADR in [`docs/decisions/`](docs/decisions/)
   ([`.cursor/skills/adr-skill/SKILL.md`](.cursor/skills/adr-skill/SKILL.md)).
 
-## 5. Commit and push — do not deploy unless asked
+## 5. Commit, push, and deploy
 
 - Commit and `git push` to the current branch. Integration branch is **master**.
-- Never force-push. Skip only when the user explicitly says not to.
+- Never force-push. Skip commit/push only when the user explicitly says not to.
 - See [`.cursor/rules/git-commit-push.mdc`](.cursor/rules/git-commit-push.mdc).
-- Do not deploy the Worker unless the task says to deploy.
+- Deploy the Worker after every completed change. Skip only when the user explicitly says not to.
 - Deploy stays: `npm run cf:build`, then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
 - Cursor stop hook (`.cursor/hooks.json`) nudges once if git is still dirty.

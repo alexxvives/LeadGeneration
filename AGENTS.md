@@ -14,8 +14,8 @@ this repository. Read it first. It is intentionally short: the details live in
 >
 > **Ship:** close the loop — [`.cursor/rules/close-the-loop.mdc`](.cursor/rules/close-the-loop.mdc).
 > Prove with tools, click UI in **cursor-ide-browser** when the screen changed,
-> write the handoff, then commit and `git push`. Never force-push. Do not deploy
-> unless asked. Skip commit/push only when the user explicitly says not to.
+> write the handoff, then commit and `git push`, then deploy the Worker.
+> Never force-push. Skip commit/push or deploy only when the user explicitly says not to.
 
 ---
 
@@ -98,7 +98,7 @@ A Cursor **stop hook** (`.cursor/hooks.json`) nudges once if git is still dirty.
 | Prove with tools, not a story: `npx tsc --noEmit`, `npm run lint`, `npm run smoke` when the flow changed and dev is up. | Commands below; constitution Art. III.4 |
 | UI: click the changed flow in **cursor-ide-browser** (http://localhost:3000). A static screenshot is not validation. Auth is production-only. | [`.cursor/skills/dogfood/SKILL.md`](.cursor/skills/dogfood/SKILL.md), [`.cursor/skills/accessibility/SKILL.md`](.cursor/skills/accessibility/SKILL.md) |
 | Update session-handoff in the same change. Findings → LEARNINGS. A real decision → ADR. | [`docs/decisions/`](docs/decisions/), [`.cursor/skills/adr-skill/SKILL.md`](.cursor/skills/adr-skill/SKILL.md) |
-| Commit and `git push` to the current branch (`master` is integration). Never force-push. Do not deploy unless the task says to. | [`.cursor/rules/git-commit-push.mdc`](.cursor/rules/git-commit-push.mdc) |
+| Commit and `git push` to the current branch (`master` is integration). Never force-push. Deploy the Worker after every change. | [`.cursor/rules/git-commit-push.mdc`](.cursor/rules/git-commit-push.mdc) |
 
 Deploy stays: `npm run cf:build`, then `$env:OPEN_NEXT_DEPLOY='true'; npx wrangler deploy`.
 

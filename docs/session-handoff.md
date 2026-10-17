@@ -9,18 +9,19 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-18 (onboarding tree)
+## ⏱️ Status — updated 2026-10-18 (onboarding deployed)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Migrations:** none this pass. Checklist lives in `customFields.__onboarding`. Not deployed.
+**Version:** `138719e3-2638-47c9-9ddc-7b91617313d0`  
+**Migrations:** none this pass. Checklist lives in `customFields.__onboarding`.
 
 ### This pass
-- Pipeline focus toggle gains **Onboarding**. It lists leads in Onboarding or Reviewing contract and a Path A / Path B checkbox tree.
+- Pipeline focus toggle gains **Onboarding**. Deployed.
+- Standing rule: deploy the Worker after every completed change.
 
 ### Next
-1. Deploy when asked.
-2. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.
-3. Re-send the reset LUMIA queue from Outreach.
+1. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.
+2. Re-send the reset LUMIA queue from Outreach.
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
 **Version:** `b81cb596-534c-4c1e-84e0-56f4b08103cd`  
