@@ -304,6 +304,7 @@ export function PipelineView({
   const [parkedOpen, setParkedOpen] = useState<Record<string, boolean>>({
     not_interested: false,
   });
+  const [unresponsiveOpen, setUnresponsiveOpen] = useState(false);
   const [narrowStage, setNarrowStage] = useState<CrmStage>("new");
   const [narrowBucket, setNarrowBucket] = useState<string>(CONVERSATION_STEPS[0]!.id);
 
@@ -361,10 +362,24 @@ export function PipelineView({
     () => leads.filter((l) => (l.crmStage ?? "new") === "in_conversation"),
     [leads],
   );
+  const unresponsiveLeads = useMemo(() => {
+    return inConversation
+      .filter((lead) =>
+        isConversationUnresponsive(lead, tasksByLeadId?.get(lead.id)),
+      )
+      .sort((a, b) =>
+        a.company.localeCompare(b.company, undefined, { sensitivity: "base" }),
+      );
+  }, [inConversation, tasksByLeadId]);
+  const unresponsiveIds = useMemo(
+    () => new Set(unresponsiveLeads.map((lead) => lead.id)),
+    [unresponsiveLeads],
+  );
   const byBucket = useMemo(() => {
     const groups = new Map<string, LeadWithOutreach[]>();
     for (const col of CONVERSATION_COLUMNS) groups.set(col.id, []);
     for (const lead of inConversation) {
+      if (unresponsiveIds.has(lead.id)) continue;
       const bucket = conversationBucket(lead);
       groups.get(bucket)?.push(lead);
     }
@@ -374,17 +389,27 @@ export function PipelineView({
       );
     }
     return groups;
-  }, [inConversation]);
+  }, [inConversation, unresponsiveIds]);
   const narrowBucketCol =
     CONVERSATION_COLUMNS.find((c) => c.id === narrowBucket) ??
     CONVERSATION_COLUMNS[0]!;
-  const narrowBucketLeads = byBucket.get(narrowBucketCol.id) ?? [];
+  const showingUnresponsive =
+    focus === "conversation" && narrowBucket === "unresponsive";
+  const narrowBucketLeads = showingUnresponsive
+    ? unresponsiveLeads
+    : (byBucket.get(narrowBucketCol.id) ?? []);
   const headCount = focus === "conversation" ? inConversation.length : leads.length;
   const mobileLeads = focus === "conversation" ? narrowBucketLeads : narrowLeads;
-  const mobileTitle =
-    focus === "conversation" ? narrowBucketCol.title : narrowCol.title;
-  const mobileEmpty =
-    focus === "conversation" ? narrowBucketCol.empty : narrowCol.empty;
+  const mobileTitle = showingUnresponsive
+    ? "Unresponsive"
+    : focus === "conversation"
+      ? narrowBucketCol.title
+      : narrowCol.title;
+  const mobileEmpty = showingUnresponsive
+    ? "No one has gone quiet for 14 days."
+    : focus === "conversation"
+      ? narrowBucketCol.empty
+      : narrowCol.empty;
   const mobileCount =
     focus === "conversation" ? narrowBucketLeads.length : narrowCount;
 
@@ -449,7 +474,24 @@ export function PipelineView({
                     <span className="tabular-nums opacity-80">{count}</span>
                   </button>
                 );
-              })
+              }).concat([
+                <button
+                  key="unresponsive"
+                  type="button"
+                  role="tab"
+                  aria-selected={narrowBucket === "unresponsive"}
+                  onClick={() => setNarrowBucket("unresponsive")}
+                  className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors ${
+                    narrowBucket === "unresponsive"
+                      ? "bg-aurora-400 text-on-accent"
+                      : "border border-white/10 bg-ink-900/60 text-mist-300 hover:text-mist-100"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full bg-rose-400 ${narrowBucket === "unresponsive" ? "ring-1 ring-ink-950/40" : ""}`} />
+                  Unresponsive
+                  <span className="tabular-nums opacity-80">{unresponsiveLeads.length}</span>
+                </button>,
+              ])
             : ALL_STAGE_TABS.map((col) => {
             const count = filterActive
               ? leads.filter((l) => l.crmStage === col.stage).length
@@ -555,7 +597,18 @@ export function PipelineView({
             ))}
           </div>
 
-          {focus === "conversation" ? null : (
+          {focus === "conversation" ? (
+          <ParkedStrip
+            title="Unresponsive"
+            empty="No one has gone quiet for 14 days."
+            color="bg-rose-400"
+            leads={unresponsiveLeads}
+            open={unresponsiveOpen}
+            onToggle={() => setUnresponsiveOpen((open) => !open)}
+            onOpen={openIfClick}
+            activeId={activeId}
+          />
+          ) : (
           <div className="grid shrink-0 gap-2 sm:grid-cols-1">
             {PARKED_COLUMNS.map((col) => (
               <ParkedStageColumn
@@ -592,6 +645,71 @@ export function PipelineView({
       </>
     </div>
     </PipelineCardActions.Provider>
+  );
+}
+
+function ParkedStrip({
+  title,
+  empty,
+  color,
+  leads,
+  open,
+  onToggle,
+  onOpen,
+  activeId,
+}: {
+  title: string;
+  empty: string;
+  color: string;
+  leads: LeadWithOutreach[];
+  open: boolean;
+  onToggle: () => void;
+  onOpen: (id: string) => void;
+  activeId: string | null;
+}) {
+  return (
+    <div className="flex min-w-0 shrink-0 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`flex min-h-[2.75rem] w-full shrink-0 items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.03] sm:px-4 ${
+          open ? "border-b border-white/5" : ""
+        }`}
+      >
+        <span className={`h-2 w-2 shrink-0 rounded-full ${color}`} />
+        <span className="truncate text-sm font-semibold leading-none text-mist-100">
+          {title}
+        </span>
+        <span className="ml-auto font-display text-lg leading-none tabular-nums text-aurora-300">
+          {leads.length}
+        </span>
+        <span className="text-xs text-mist-600">{open ? "▾" : "▸"}</span>
+      </button>
+      {open ? (
+        <div className="max-h-[28vh] min-h-0">
+          {leads.length === 0 ? (
+            <p className="px-2 py-6 text-center text-xs leading-relaxed text-mist-500">
+              {empty}
+            </p>
+          ) : (
+            <VirtualColumnList
+              items={leads}
+              estimateSize={72}
+              padding={12}
+              gap={8}
+              className="max-h-[28vh]"
+              renderItem={(l) => (
+                <DraggablePipelineCard
+                  lead={l}
+                  onOpen={onOpen}
+                  isDragging={l.id === activeId}
+                />
+              )}
+            />
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

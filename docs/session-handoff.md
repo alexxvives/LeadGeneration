@@ -9,15 +9,14 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-18 (onboarding dialog)
+## ⏱️ Status — updated 2026-10-19 (conversation unresponsive)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Version:** `a28f4e08-e95c-454e-8f4f-35ed094f932c`  
+**Version:** pending deploy  
 **Migrations:** none.
 
 ### This pass
-- Onboarding left the pipeline toggle. Tree icon on the lead card opens a scrollable dialog.
-- Shorter tiles: teal task, amber decision, rose only once “no le interesa” is selected. Header centered.
+- In conversation parks quiet leads in an Unresponsive bar under the columns, like Not interested under Stages.
 
 ### Next
 1. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.

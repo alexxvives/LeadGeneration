@@ -4,6 +4,9 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 
 ---
 
+### 2026-10-19 — Unresponsive is a parked conversation strip
+- Leads quiet for 14 days leave the step columns and sit in a collapsed Unresponsive bar. Dragging them does not clear the clock; a real touch does.
+
 ### 2026-10-18 — Onboarding tree lives on the lead card
 - The pipeline no longer has an Onboarding tab. A tree icon beside delete opens a vertical dialog for that lead.
 - Tiles are short and click-to-fill. Teal is a task, amber is a decision, rose is “no le interesa”.
