@@ -12,7 +12,7 @@ first, and update the top block at the end of any session that changes state.**
 ## ⏱️ Status — updated 2026-10-19 (conversation unresponsive)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Version:** pending deploy  
+**Version:** `500a2db1-4333-42fb-8da0-6eed60cb0713`  
 **Migrations:** none.
 
 ### This pass
