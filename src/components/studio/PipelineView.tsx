@@ -364,22 +364,15 @@ export function PipelineView({
   );
   const unresponsiveLeads = useMemo(() => {
     return inConversation
-      .filter((lead) =>
-        isConversationUnresponsive(lead, tasksByLeadId?.get(lead.id)),
-      )
+      .filter((lead) => lead.conversationStep === "unresponsive")
       .sort((a, b) =>
         a.company.localeCompare(b.company, undefined, { sensitivity: "base" }),
       );
-  }, [inConversation, tasksByLeadId]);
-  const unresponsiveIds = useMemo(
-    () => new Set(unresponsiveLeads.map((lead) => lead.id)),
-    [unresponsiveLeads],
-  );
+  }, [inConversation]);
   const byBucket = useMemo(() => {
     const groups = new Map<string, LeadWithOutreach[]>();
     for (const col of CONVERSATION_COLUMNS) groups.set(col.id, []);
     for (const lead of inConversation) {
-      if (unresponsiveIds.has(lead.id)) continue;
       const bucket = conversationBucket(lead);
       groups.get(bucket)?.push(lead);
     }
@@ -389,7 +382,7 @@ export function PipelineView({
       );
     }
     return groups;
-  }, [inConversation, unresponsiveIds]);
+  }, [inConversation]);
   const narrowBucketCol =
     CONVERSATION_COLUMNS.find((c) => c.id === narrowBucket) ??
     CONVERSATION_COLUMNS[0]!;
@@ -406,7 +399,7 @@ export function PipelineView({
       ? narrowBucketCol.title
       : narrowCol.title;
   const mobileEmpty = showingUnresponsive
-    ? "No one has gone quiet for 14 days."
+    ? "Drag a conversation here when they go quiet."
     : focus === "conversation"
       ? narrowBucketCol.empty
       : narrowCol.empty;
@@ -600,7 +593,7 @@ export function PipelineView({
           {focus === "conversation" ? (
           <ParkedStrip
             title="Unresponsive"
-            empty="No one has gone quiet for 14 days."
+            empty="Drag a conversation here when they go quiet."
             color="bg-rose-400"
             leads={unresponsiveLeads}
             open={unresponsiveOpen}
@@ -667,8 +660,16 @@ function ParkedStrip({
   onOpen: (id: string) => void;
   activeId: string | null;
 }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "unresponsive" });
   return (
-    <div className="flex min-w-0 shrink-0 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40">
+    <div
+      ref={setNodeRef}
+      className={`flex min-w-0 shrink-0 flex-col overflow-hidden rounded-xl2 border transition-colors ${
+        isOver
+          ? "border-rose-400/50 bg-rose-400/10"
+          : "border-white/10 bg-ink-950/40"
+      }`}
+    >
       <button
         type="button"
         onClick={onToggle}

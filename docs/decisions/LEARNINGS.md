@@ -5,7 +5,7 @@ Append dated entries. Newest at top. Keep each entry short and factual.
 ---
 
 ### 2026-10-19 — Unresponsive is a parked conversation strip
-- Leads quiet for 14 days leave the step columns and sit in a collapsed Unresponsive bar. Dragging them does not clear the clock; a real touch does.
+- The bar starts empty. A lead lands there only when someone drops it on Unresponsive. The 14-day clock still paints the red mark on the card.
 
 ### 2026-10-18 — Onboarding tree lives on the lead card
 - The pipeline no longer has an Onboarding tab. A tree icon beside delete opens a vertical dialog for that lead.

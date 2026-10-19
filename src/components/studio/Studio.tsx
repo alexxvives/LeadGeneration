@@ -201,6 +201,37 @@ function queryForView(next: StudioView, boardId?: string | null): string {
 
 // ─── Studio root ─────────────────────────────────────────────────────────────
 
+function LeadLoadRing({ loaded, total }: { loaded: number; total: number }) {
+  const pct = total > 0 ? Math.min(1, loaded / total) : 0;
+  const turn = 2 * Math.PI * 14;
+  return (
+    <div
+      className="inline-flex items-center gap-2"
+      role="status"
+      aria-live="polite"
+      aria-label={`Loading leads, ${loaded} of ${total}`}
+      title={`${loaded} of ${total} leads loaded`}
+    >
+      <svg viewBox="0 0 36 36" className="h-8 w-8 -rotate-90" aria-hidden>
+        <circle cx="18" cy="18" r="14" fill="none" strokeWidth="3" className="stroke-white/10" />
+        <circle
+          cx="18"
+          cy="18"
+          r="14"
+          fill="none"
+          strokeWidth="3"
+          strokeLinecap="round"
+          className="stroke-aurora-400 transition-[stroke-dasharray] duration-300"
+          strokeDasharray={`${pct * turn} ${turn}`}
+        />
+      </svg>
+      <span className="text-[11px] tabular-nums text-mist-400">
+        {loaded}/{total}
+      </span>
+    </div>
+  );
+}
+
 export function Studio() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2507,6 +2538,12 @@ export function Studio() {
         ) : null}
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+          {leadsBackfilling && (board?.leadsTotal ?? 0) > 0 ? (
+            <LeadLoadRing
+              loaded={board?.leads.length ?? 0}
+              total={board?.leadsTotal ?? 0}
+            />
+          ) : null}
           {view === "dashboard" && boards.length > 0 ? (
             <label className="inline-flex items-center">
               <span className="sr-only">Filter by board</span>
@@ -2683,20 +2720,6 @@ export function Studio() {
             <EmptyState actionHref={searchHref} />
           ) : (
             <>
-              {leadsBackfilling ? (
-                <p
-                  className="mb-2 text-[11px] text-mist-500"
-                  role="status"
-                  aria-live="polite"
-                >
-                  Loading more{" "}
-                  <span className="tabular-nums text-mist-300">
-                    {board.leads.length}
-                    {board.leadsTotal != null ? `/${board.leadsTotal}` : ""}
-                  </span>
-                  … top cards first
-                </p>
-              ) : null}
               <PipelineView
                 leads={searchFilteredLeads}
                 stageCounts={board.crmStageCounts}
@@ -2802,18 +2825,6 @@ export function Studio() {
                   </>
                 ) : null}{" "}
                 leads
-                {leadsBackfilling ? (
-                  <span className="ml-2 normal-case tracking-normal text-mist-500">
-                    · loading{" "}
-                    <span className="tabular-nums text-mist-300">
-                      {board?.leads.length ?? 0}
-                      {board?.leadsTotal != null
-                        ? `/${board.leadsTotal}`
-                        : ""}
-                    </span>
-                    …
-                  </span>
-                ) : null}
               </p>
               {board ? (
                 <Lockable>

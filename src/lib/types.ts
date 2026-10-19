@@ -36,15 +36,16 @@ export type CrmStage =
   | "not_interested"; // lost — prospect declined
 
 /**
- * Where an in-conversation lead sits. Unresponsive is not a step — it is a
- * flag when the latest touch is more than 14 days old and no task is open.
+ * Where an in-conversation lead sits. `unresponsive` is a parked bucket people
+ * drag into by hand. The red clock is still the 14-day quiet flag.
  */
 export type ConversationStep =
   | "evaluating_pre_demo"
   | "waiting_on_demo"
   | "evaluating_post_demo"
   | "reviewing_contract"
-  | "onboarding";
+  | "onboarding"
+  | "unresponsive";
 
 const CONVERSATION_STEPS: readonly ConversationStep[] = [
   "evaluating_pre_demo",
@@ -52,6 +53,7 @@ const CONVERSATION_STEPS: readonly ConversationStep[] = [
   "evaluating_post_demo",
   "reviewing_contract",
   "onboarding",
+  "unresponsive",
 ] as const;
 
 /** Older stored ids, read as the closest current step. */

@@ -70,7 +70,16 @@ export const CONVERSATION_STEPS: readonly {
 
 const STEP_BY_ID = new Map(CONVERSATION_STEPS.map((s) => [s.id, s]));
 
+const UNRESPONSIVE_META = {
+  id: "unresponsive" as const,
+  label: "Unresponsive",
+  hint: "Parked by hand.",
+  bubbleClass: "bg-rose-400/20 text-rose-200 ring-1 ring-rose-400/40",
+  dotClass: "bg-rose-400",
+};
+
 export function conversationStepMeta(step: ConversationStep) {
+  if (step === "unresponsive") return UNRESPONSIVE_META;
   return STEP_BY_ID.get(step) ?? CONVERSATION_STEPS[0]!;
 }
 

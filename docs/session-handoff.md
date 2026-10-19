@@ -9,14 +9,15 @@ first, and update the top block at the end of any session that changes state.**
 
 ---
 
-## ⏱️ Status — updated 2026-10-19 (conversation unresponsive)
+## ⏱️ Status — updated 2026-10-19 (manual unresponsive)
 
 **Live:** https://leadgeneration.alexxvives.workers.dev  
-**Version:** `500a2db1-4333-42fb-8da0-6eed60cb0713`  
+**Version:** pending deploy  
 **Migrations:** none.
 
 ### This pass
-- In conversation parks quiet leads in an Unresponsive bar under the columns, like Not interested under Stages.
+- Unresponsive stays empty until a lead is dragged onto it.
+- Board backfill shows a progress ring in the header instead of the loading sentence.
 
 ### Next
 1. Confirm Avante Oposiciones shows on AKADEMO after a hard refresh.

@@ -50,6 +50,7 @@ const PatchSchema = z.object({
       "evaluating_post_demo",
       "reviewing_contract",
       "onboarding",
+      "unresponsive",
     ])
     .nullable()
     .optional(),
