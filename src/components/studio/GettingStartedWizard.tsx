@@ -402,8 +402,9 @@ export function GettingStartedWizard({
     let cancelled = false;
     void (async () => {
       try {
-        const data = await api.board(null);
-        if (cancelled || (data.leads?.length ?? 0) > 0) return;
+        // Lite: we only need "are there any leads?" — not every lead row.
+        const data = await api.board(null, { lite: true });
+        if (cancelled || (data.leadsTotal ?? data.leads?.length ?? 0) > 0) return;
         const existing = data.boards?.[0]?.id ?? null;
         let boardId = existing;
         if (!boardId) {

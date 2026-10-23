@@ -209,7 +209,19 @@ const defaultBoardOrphansChecked = new Set<string>();
  * Returns a fallback board (oldest remaining) or null when empty.
  * Users create boards at search/import time (ADR 0023).
  */
-export async function ensureDefaultBoard(ctx: Ctx): Promise<Board | null> {
+/** One maintenance pass per request (board GET used to run it twice). */
+const ensureDefaultBoardByCtx = new WeakMap<Ctx, Promise<Board | null>>();
+
+export function ensureDefaultBoard(ctx: Ctx): Promise<Board | null> {
+  const cached = ensureDefaultBoardByCtx.get(ctx);
+  if (cached) return cached;
+  const p = ensureDefaultBoardUncached(ctx);
+  ensureDefaultBoardByCtx.set(ctx, p);
+  p.catch(() => ensureDefaultBoardByCtx.delete(ctx));
+  return p;
+}
+
+async function ensureDefaultBoardUncached(ctx: Ctx): Promise<Board | null> {
   const { db } = ctx;
   let boards = await db.listBoards();
 
@@ -217,10 +229,15 @@ export async function ensureDefaultBoard(ctx: Ctx): Promise<Board | null> {
     await db.updateBoard(b.id, { isDefault: false, updatedAt: nowIso() });
   }
 
-  const counts = await db.countLeadsByBoard();
-  const runBoardIds = new Set(
-    (await db.listRuns()).map((r) => r.boardId).filter(Boolean),
+  // Only a board literally named "Default" can be pruned — skip the
+  // full-table lead count + run list when there is none (the common case).
+  const hasDefaultName = boards.some(
+    (b) => b.name.trim().toLowerCase() === "default",
   );
+  const [counts, runs] = hasDefaultName
+    ? await Promise.all([db.countLeadsByBoard(), db.listRuns()])
+    : [{} as Record<string, { total: number }>, []];
+  const runBoardIds = new Set(runs.map((r) => r.boardId).filter(Boolean));
   const emptyDefaults = boards.filter((b) => {
     if (b.name.trim().toLowerCase() !== "default") return false;
     const leads = counts[b.id]?.total ?? 0;
@@ -1155,13 +1172,13 @@ export async function getLatestBoard(
     };
   }
 
-  await ensureDefaultBoard(ctx);
-  const boards = await listBoardSummaries(ctx);
+  // Summaries (sidebar) run alongside the lead queries instead of before them.
+  const boardsP = ensureDefaultBoard(ctx).then(() => listBoardSummaries(ctx));
+  boardsP.catch(() => undefined);
 
   // Resolve by id so a collaborator never lists their empty workspace when
   // someone else holds the lock (summaries must not gate the lead query).
   let leadDb = ctx.db;
-  let boardLock: BoardLock | null = null;
   let active: string | null = null;
   if (boardId && boardId !== "all") {
     const access = await resolveBoardAccess(ctx, boardId);
@@ -1170,17 +1187,25 @@ export async function getLatestBoard(
       leadDb = access.db;
     }
   }
-  if (active) {
-    boardLock = await getBoardLockStatus(ctx, active);
-  }
+  // Same rule as getBoardLockStatus, without re-resolving access.
+  const boardLockP: Promise<BoardLock | null> = active
+    ? ctx.db
+        .getBoardLock(active)
+        .then((lock) =>
+          !lock || (ctx.userId && lock.userId === ctx.userId) ? null : lock,
+        )
+    : Promise.resolve(null);
+  boardLockP.catch(() => undefined);
 
   const includeLeads = opts?.includeLeads !== false;
   const filter = active ? { boardId: active } : undefined;
 
   if (!includeLeads) {
-    const [leadsTotal, summary] = await Promise.all([
+    const [leadsTotal, summary, boards, boardLock] = await Promise.all([
       leadDb.countLeads(filter),
       leadDb.summarizeLeads(filter),
+      boardsP,
+      boardLockP,
     ]);
     return {
       run: null,
@@ -1194,18 +1219,31 @@ export async function getLatestBoard(
     };
   }
 
-  const run =
-    (active
-      ? await leadDb.getLatestRun({ boardId: active, status: "complete" })
-      : null) ??
-    (await leadDb.getLatestRun({ status: "complete" })) ??
-    (await leadDb.getLatestRun());
+  // Same fallback order as before, but the three lookups run concurrently.
+  const runP = Promise.all([
+    active
+      ? leadDb.getLatestRun({ boardId: active, status: "complete" })
+      : Promise.resolve(null),
+    leadDb.getLatestRun({ status: "complete" }),
+    leadDb.getLatestRun(),
+  ]).then(([a, b, c]) => a ?? b ?? c ?? null);
 
-  const [leadsTotal, summary, listed] = await Promise.all([
-    leadDb.countLeads(filter),
-    leadDb.summarizeLeads(filter),
-    listPagedLeads(leadDb, filter),
-  ]);
+  const listedWithOutreachP = listPagedLeads(leadDb, filter).then(
+    async (listed) => ({
+      listed,
+      leads: await attachOutreach(leadDb, listed.raw, { slim: true }),
+    }),
+  );
+
+  const [run, leadsTotal, summary, { listed, leads }, boards, boardLock] =
+    await Promise.all([
+      runP,
+      leadDb.countLeads(filter),
+      leadDb.summarizeLeads(filter),
+      listedWithOutreachP,
+      boardsP,
+      boardLockP,
+    ]);
   const leadsHasMore =
     perLane != null
       ? listed.hasMore
@@ -1216,7 +1254,7 @@ export async function getLatestBoard(
     run,
     // Card list: no blurb/notes/body/journal text — drawer GET on open.
     // Subject stays for the Outreach send list.
-    leads: await attachOutreach(leadDb, listed.raw, { slim: true }),
+    leads,
     leadsTotal,
     leadsHasMore,
     crmStageCounts: toStageCounts(summary.byCrmStage),

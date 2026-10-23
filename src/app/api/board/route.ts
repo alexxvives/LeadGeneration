@@ -33,6 +33,13 @@ export async function GET(req: Request) {
       ? Math.max(0, Number.parseInt(laneOffsetRaw, 10) || 0)
       : 0;
 
+  const chunkReq = chunkOnly && !lite;
+  // Chrome lookups don't depend on the lead queries — start them together.
+  const workspaceP = chunkReq ? null : getWorkspaceSummary(ctx);
+  const wsP = chunkReq ? null : ctx.db.getWorkspace(ctx.workspaceId);
+  workspaceP?.catch(() => undefined);
+  wsP?.catch(() => undefined);
+
   const board = await getLatestBoard(ctx, boardParam, {
     includeLeads: !lite,
     leadLimit: lite ? undefined : leadLimit,
@@ -52,7 +59,7 @@ export async function GET(req: Request) {
     });
   }
 
-  const workspace = await getWorkspaceSummary(ctx);
+  const [workspace, ws] = await Promise.all([workspaceP!, wsP!]);
   // Client passes local-midnight ISO so “sent today” matches the user’s day.
   const dayStartRaw = url.searchParams.get("dayStart")?.trim() ?? "";
   const dayStart =
@@ -71,7 +78,6 @@ export async function GET(req: Request) {
   const sendsToday = await sendDb.countSentSince(dayStart, {
     boardId: board.activeBoardId,
   });
-  const ws = await ctx.db.getWorkspace(ctx.workspaceId);
   const caps = getCapabilities();
   // Easy path only (Resend / Maileroo / SMTP / platform). Connected mailbox is
   // not a send transport while resolveSendPath() stays "easy".

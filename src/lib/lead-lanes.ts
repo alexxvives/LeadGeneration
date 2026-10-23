@@ -20,8 +20,9 @@ export type LeadHydrateLane = (typeof LEAD_HYDRATE_LANES)[number];
 export const LEAD_PAGE_PER_LANE = 100;
 
 /** Background pages after the first paint: bigger pages, fetched in parallel. */
-export const LEAD_BACKFILL_PER_LANE = 300;
-export const LEAD_BACKFILL_CONCURRENCY = 3;
+export const LEAD_BACKFILL_PER_LANE = 500;
+/** Max chunks in flight per wave; a wave is sized from the largest lane. */
+export const LEAD_BACKFILL_CONCURRENCY = 6;
 
 /** CRM New + a saved draft (or phone-only) → Outreach Ready to Contact. */
 export function isOutreachReadyStatus(

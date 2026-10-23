@@ -256,6 +256,11 @@ function LeadLoadRing({ loaded, total }: { loaded: number; total: number }) {
   );
 }
 
+/** Largest CRM stage count (upper bound for any hydrate lane). */
+function largestStage(data: { crmStageCounts?: Record<string, number> }): number {
+  return Math.max(0, ...Object.values(data.crmStageCounts ?? {}));
+}
+
 export function Studio() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -578,7 +583,12 @@ export function Studio() {
       loadInFlightRef.current = true;
     }
 
-    const beginBackfill = (g: number, key: string | null) => {
+    const beginBackfill = (
+      g: number,
+      key: string | null,
+      /** Biggest CRM stage count — sizes the first wave so most boards finish in one. */
+      largestLane = 0,
+    ) => {
       if (leadsBackfillingRef.current) return;
       leadsBackfillingRef.current = true;
       setLeadsBackfilling(true);
@@ -591,11 +601,20 @@ export function Studio() {
         try {
           while (true) {
             if (stale()) return;
+            // Fire every page the largest lane still needs at once (capped),
+            // instead of fixed serial waves.
+            const wave = Math.max(
+              1,
+              Math.min(
+                LEAD_BACKFILL_CONCURRENCY,
+                Math.ceil((largestLane - offset) / LEAD_BACKFILL_PER_LANE),
+              ),
+            );
             const offsets = Array.from(
-              { length: LEAD_BACKFILL_CONCURRENCY },
+              { length: wave },
               (_, i) => offset + i * LEAD_BACKFILL_PER_LANE,
             );
-            offset += LEAD_BACKFILL_CONCURRENCY * LEAD_BACKFILL_PER_LANE;
+            offset += wave * LEAD_BACKFILL_PER_LANE;
             const chunks = await Promise.all(
               offsets.map((laneOffset) =>
                 api.boardLeadsChunk(key, {
@@ -683,7 +702,7 @@ export function Studio() {
             leadsHasMore: !!data.leadsHasMore,
           };
         });
-        if (data.leadsHasMore) beginBackfill(gen, null);
+        if (data.leadsHasMore) beginBackfill(gen, null, largestStage(data));
         else {
           leadsBackfillingRef.current = false;
           setLeadsBackfilling(false);
@@ -776,7 +795,7 @@ export function Studio() {
       });
 
       if (replaceList && data.leadsHasMore) {
-        beginBackfill(gen, boardKey);
+        beginBackfill(gen, boardKey, largestStage(data));
       } else if (replaceList) {
         leadsBackfillingRef.current = false;
         setLeadsBackfilling(false);
