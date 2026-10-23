@@ -151,3 +151,35 @@ export function SearchProgress({ running }: { running: boolean }) {
     </div>
   );
 }
+
+/** Shown when a resource failed to load — never render failures as "empty". */
+export function LoadError({
+  message,
+  onRetry,
+  what = "data",
+}: {
+  message?: string | null;
+  onRetry: () => void;
+  what?: string;
+}) {
+  return (
+    <div
+      role="alert"
+      className="rounded-xl2 border border-dashed border-red-400/30 px-6 py-10 text-center sm:px-8"
+    >
+      <h2 className="font-display text-lg font-semibold text-mist-100">
+        Couldn&apos;t load {what}
+      </h2>
+      {message ? (
+        <p className="mx-auto mt-2 max-w-md text-sm text-mist-300">{message}</p>
+      ) : null}
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-5 inline-flex items-center justify-center rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-[1.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70"
+      >
+        Retry
+      </button>
+    </div>
+  );
+}

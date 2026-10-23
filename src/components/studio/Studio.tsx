@@ -3,10 +3,12 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
 import {
   api,
   LEAD_PAGE_PER_LANE,
+  isAbortError,
   QuotaExceededError,
   RateLimitedError,
   type BoardResponse,
@@ -33,9 +35,7 @@ import {
 } from "./board-lock";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadTable } from "./LeadTable";
-import { LeadMap } from "./LeadMap";
 import { prefetchLeadGeocodes } from "@/lib/geocode-client";
-import { LeadDrawer } from "./LeadDrawer";
 import { UpgradeModal } from "./UpgradeModal";
 import { VerifyLimitModal } from "./VerifyLimitModal";
 import { crmStageLabel, Spinner } from "@/components/ui";
@@ -48,14 +48,13 @@ import {
   canRedraftOutreach,
   needsOutreachDraft,
 } from "./OutreachView";
-import { CalendarView } from "./CalendarView";
 import { ConversationsView } from "./ConversationsView";
 import { ContactDrawer } from "./ContactDrawer";
 import { ContactsView } from "./ContactsView";
 import { TasksView } from "./TasksView";
 import { RunsView } from "./RunsView";
 import { ImportLeadsPanel } from "./ImportLeadsPanel";
-import { LayoutToggle, EmptyState, SearchProgress } from "./StudioHelpers";
+import { LayoutToggle, EmptyState, LoadError, SearchProgress } from "./StudioHelpers";
 import {
   StudioViewSkeleton,
   LeadsLayoutSkeleton,
@@ -64,6 +63,9 @@ import {
   CalendarSkeleton,
   ConversationsSkeleton,
   ContactsSkeleton,
+  MapSkeleton,
+  AdminPlatformSkeleton,
+  AdminUsersSkeleton,
   useDeferredLoading,
 } from "./skeletons";
 import { recordWarmupSend } from "@/lib/email/warmup";
@@ -78,8 +80,6 @@ import {
 } from "@/lib/sender-profile";
 import { BoardAssignModal, type BoardDestination } from "./BoardAssignModal";
 import { DashboardView } from "./DashboardView";
-import { AdminPlatformView } from "./AdminPlatformView";
-import { AdminUsersView } from "./AdminUsersView";
 import { BoardsView } from "./BoardsView";
 import { loadStoredBoardFilter, storeBoardFilter } from "./BoardPicker";
 import { BOARD_REFRESH_EVENT } from "./GettingStartedWizard";
@@ -102,6 +102,30 @@ import { quotaPressure, useQuotaHint } from "./quota-hint";
 import { useMinBreakpoint } from "./use-min-breakpoint";
 import { PlusIcon } from "@/components/icons";
 import type { BoardSummary, ImportLeadRow } from "@/lib/types";
+// Heavy views/panels load on first use instead of in the main Studio chunk.
+const LeadMap = dynamic(() => import("./LeadMap").then((m) => m.LeadMap), {
+  ssr: false,
+  loading: () => <MapSkeleton />,
+});
+const LeadDrawer = dynamic(() =>
+  import("./LeadDrawer").then((m) => m.LeadDrawer),
+);
+const CalendarView = dynamic(
+  () => import("./CalendarView").then((m) => m.CalendarView),
+  { loading: () => <CalendarSkeleton /> },
+);
+const AdminPlatformView = dynamic(
+  () => import("./AdminPlatformView").then((m) => m.AdminPlatformView),
+  { loading: () => <AdminPlatformSkeleton /> },
+);
+const AdminUsersView = dynamic(
+  () => import("./AdminUsersView").then((m) => m.AdminUsersView),
+  { loading: () => <AdminUsersSkeleton /> },
+);
+import {
+  LEAD_BACKFILL_CONCURRENCY,
+  LEAD_BACKFILL_PER_LANE,
+} from "@/lib/lead-lanes";
 
 const CRM_STAGE_FILTERS: CrmStage[] = [
   "new",
@@ -265,8 +289,16 @@ export function Studio() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsReady, setContactsReady] = useState(false);
+  const [contactsError, setContactsError] = useState<string | null>(null);
+  const [contactsReloadKey, setContactsReloadKey] = useState(0);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksReady, setTasksReady] = useState(false);
+  const [tasksError, setTasksError] = useState<string | null>(null);
+  /** Board leads could not load (first page) — show Retry instead of empty. */
+  const [boardError, setBoardError] = useState<string | null>(null);
+  const [boardReloadKey, setBoardReloadKey] = useState(0);
+  /** Mirrors boardLiteRef so effects re-run when a lite (no-leads) board lands. */
+  const [boardLite, setBoardLite] = useState(false);
   const [boardPeople, setBoardPeople] = useState<BoardPerson[]>([]);
   const [tasksAddOpen, setTasksAddOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
@@ -296,6 +328,8 @@ export function Studio() {
   /** Skip the first persist pass so we don’t overwrite sessionStorage with defaults. */
   const skipUiPrefsPersistRef = useRef(true);
   const [leadsHydrating, setLeadsHydrating] = useState(false);
+  /** Latest board load wins: only it may clear loading / hydrating flags. */
+  const loadTokenRef = useRef(0);
   /** Background pages after first paint — UI stays interactive. */
   const [leadsBackfilling, setLeadsBackfilling] = useState(false);
   const [editLocked, setEditLocked] = useState(false);
@@ -489,13 +523,27 @@ export function Studio() {
     // Only reuse leads when the sidebar board filter matches — otherwise a board
     // switch poisons activeBoardId while leaving the previous board's rows.
     if (lite) {
+      // A full load started while this lite request was in flight must win:
+      // never let a late lite response overwrite its leads (H1 race).
+      const genAtStart = leadsGenRef.current;
       const data = await api.board(boardKey, { lite: true });
+      if (filterBoardIdRef.current !== boardKey) return data;
       setBoards(data.boards ?? []);
+      if (leadsGenRef.current !== genAtStart || loadInFlightRef.current) {
+        return data;
+      }
+      const prevBoard = boardRef.current;
+      const prevSame =
+        (prevBoard?.activeBoardId ?? null) === (boardKey ?? null);
+      const liteNow =
+        prevSame && prevBoard?.leads?.length
+          ? prevBoard.leadsHasMore !== false
+          : true;
+      boardLiteRef.current = liteNow;
+      setBoardLite(liteNow);
       setBoard((prev) => {
         const sameBoard = (prev?.activeBoardId ?? null) === (boardKey ?? null);
         if (sameBoard && prev?.leads?.length) {
-          const complete = prev.leadsHasMore === false;
-          boardLiteRef.current = !complete;
           return {
             ...data,
             leads: omitDroppedLeadIds(prev.leads, droppedLeadIdsRef.current),
@@ -503,7 +551,6 @@ export function Studio() {
             leadsHasMore: prev.leadsHasMore ?? false,
           };
         }
-        boardLiteRef.current = true;
         return {
           ...data,
           leads: omitDroppedLeadIds(
@@ -535,38 +582,60 @@ export function Studio() {
       if (leadsBackfillingRef.current) return;
       leadsBackfillingRef.current = true;
       setLeadsBackfilling(true);
+      const ctrl = new AbortController();
+      const stale = () =>
+        leadsGenRef.current !== g || filterBoardIdRef.current !== key;
       void (async () => {
+        // Bigger pages, a few in flight at once (was 100/lane strictly serial).
         let offset = LEAD_PAGE_PER_LANE;
         try {
           while (true) {
-            if (leadsGenRef.current !== g) return;
-            if (filterBoardIdRef.current !== key) return;
-            const chunk = await api.boardLeadsChunk(key, {
-              perLane: LEAD_PAGE_PER_LANE,
-              laneOffset: offset,
-            });
-            if (leadsGenRef.current !== g) return;
-            if (filterBoardIdRef.current !== key) return;
+            if (stale()) return;
+            const offsets = Array.from(
+              { length: LEAD_BACKFILL_CONCURRENCY },
+              (_, i) => offset + i * LEAD_BACKFILL_PER_LANE,
+            );
+            offset += LEAD_BACKFILL_CONCURRENCY * LEAD_BACKFILL_PER_LANE;
+            const chunks = await Promise.all(
+              offsets.map((laneOffset) =>
+                api.boardLeadsChunk(key, {
+                  perLane: LEAD_BACKFILL_PER_LANE,
+                  laneOffset,
+                  signal: ctrl.signal,
+                }),
+              ),
+            );
+            if (stale()) return;
+            const last = chunks[chunks.length - 1];
+            const done = chunks.some(
+              (c) => !c.leadsHasMore || c.leads.length === 0,
+            );
             setBoard((b) => {
-              if (!b || leadsGenRef.current !== g) return b;
-              if (filterBoardIdRef.current !== key) return b;
+              if (!b || stale()) return b;
+              let leads = b.leads;
+              for (const c of chunks) {
+                leads = appendUnseenLeads(leads, c.leads, droppedLeadIdsRef.current);
+              }
               return {
                 ...b,
-                leads: appendUnseenLeads(
-                  b.leads,
-                  chunk.leads,
-                  droppedLeadIdsRef.current,
-                ),
-                leadsTotal: chunk.leadsTotal,
-                leadsHasMore: chunk.leadsHasMore,
+                leads,
+                leadsTotal: last.leadsTotal,
+                leadsHasMore: !done,
               };
             });
-            offset += LEAD_PAGE_PER_LANE;
-            if (!chunk.leadsHasMore || chunk.leads.length === 0) break;
+            if (done) break;
           }
-        } catch {
-          /* keep partial list */
+        } catch (e) {
+          if (!isAbortError(e) && !stale()) {
+            toast(
+              "err",
+              "Some leads could not be loaded. Refresh to try again.",
+              6000,
+              "leads-backfill",
+            );
+          }
         } finally {
+          ctrl.abort();
           if (leadsGenRef.current === g) {
             leadsBackfillingRef.current = false;
             setLeadsBackfilling(false);
@@ -582,6 +651,7 @@ export function Studio() {
       if (leadsGenRef.current !== gen) return data;
 
       boardLiteRef.current = false;
+      setBoardLite(false);
       setBoards(data.boards ?? []);
 
       // Requested board gone (deleted) — drop sticky filter + hard-replace leads.
@@ -717,35 +787,58 @@ export function Studio() {
         loadInFlightRef.current = false;
       }
     }
-  }, []);
+  }, [toast]);
 
   boardRef.current = board;
 
   useEffect(() => {
-    let cancelled = false;
+    const ctrl = new AbortController();
     const boardId = filterBoardId;
+    setContactsReady(false);
+    setContactsError(null);
     void api
-      .listContacts(boardId)
+      .listContacts(boardId, ctrl.signal)
       .then(({ contacts: rows }) => {
-        if (!cancelled) setContacts(rows);
+        if (ctrl.signal.aborted) return;
+        setContacts(rows);
+        setContactsReady(true);
       })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setContactsReady(true);
+      .catch((e) => {
+        if (ctrl.signal.aborted || isAbortError(e)) return;
+        setContactsError((e as Error).message || "Could not load contacts.");
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [filterBoardId, view]);
+    return () => ctrl.abort();
+  }, [filterBoardId, contactsReloadKey]);
 
+  /** Cancel the previous tasks fetch so board A's tasks never land on board B. */
+  const tasksAbortRef = useRef<AbortController | null>(null);
+  const tasksBoardRef = useRef<string | null | undefined>(undefined);
   const refreshTasks = useCallback(() => {
     const boardId = filterBoardId;
+    tasksAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    tasksAbortRef.current = ctrl;
+    if (tasksBoardRef.current !== boardId) {
+      // Different board: never flash the previous board's tasks.
+      tasksBoardRef.current = boardId;
+      setTasks([]);
+      setTasksReady(false);
+    }
+    setTasksError(null);
     void api
-      .listTasks(boardId)
-      .then(({ tasks: rows }) => setTasks(rows))
-      .catch(() => undefined)
-      .finally(() => setTasksReady(true));
+      .listTasks(boardId, ctrl.signal)
+      .then(({ tasks: rows }) => {
+        if (ctrl.signal.aborted) return;
+        setTasks(rows);
+        setTasksReady(true);
+      })
+      .catch((e) => {
+        if (ctrl.signal.aborted || isAbortError(e)) return;
+        setTasksError((e as Error).message || "Could not load tasks.");
+      });
   }, [filterBoardId]);
+
+  useEffect(() => () => tasksAbortRef.current?.abort(), []);
 
   useEffect(() => {
     if (view !== "tasks" && view !== "calendar") return;
@@ -828,16 +921,24 @@ export function Studio() {
     const first = !hasLoadedRef.current;
     if (first) setLoading(true);
     else setLeadsHydrating(true);
+    setBoardError(null);
+    const token = ++loadTokenRef.current;
     void refresh({ replace: true })
       .then(() => {
         hasLoadedRef.current = true;
       })
-      .catch((e) => toast("err", e.message))
+      .catch((e) => {
+        if (loadTokenRef.current !== token) return;
+        setBoardError((e as Error).message || "Could not load this board.");
+      })
       .finally(() => {
-        if (first) setLoading(false);
-        else setLeadsHydrating(false);
+        // A newer load owns the flags; clearing them here showed "No leads"
+        // while the winning request was still in flight (H2).
+        if (loadTokenRef.current !== token) return;
+        setLoading(false);
+        setLeadsHydrating(false);
       });
-  }, [filterBoardId, boardParam, refresh, toast]);
+  }, [filterBoardId, boardParam, refresh, boardReloadKey]);
 
   // Import/search board picker must see boards created on the Boards page.
   useEffect(() => {
@@ -858,18 +959,24 @@ export function Studio() {
       view === "calendar" ||
       view === "board" ||
       view === "runs";
-    if (!needsLeads || !boardLiteRef.current) return;
-    let cancelled = false;
+    // `boardLite` is state (not just the ref) so this re-runs when a lite
+    // response lands after the user already navigated here (H1 race).
+    if (!needsLeads || !boardLite || !boardLiteRef.current) return;
+    if (loadInFlightRef.current) return;
     setLeadsHydrating(true);
+    setBoardError(null);
+    const token = ++loadTokenRef.current;
     void refresh({ forceFull: true })
-      .catch(() => {})
+      .catch((e) => {
+        if (loadTokenRef.current !== token) return;
+        setBoardError((e as Error).message || "Could not load leads.");
+      })
       .finally(() => {
-        if (!cancelled) setLeadsHydrating(false);
+        if (loadTokenRef.current !== token) return;
+        setLoading(false);
+        setLeadsHydrating(false);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [view, refresh]);
+  }, [view, refresh, boardLite]);
 
   // Keep Pipeline / Outreach / Leads mounted after first visit (instant re-entry).
   useEffect(() => {
@@ -886,10 +993,21 @@ export function Studio() {
   useEffect(() => {
     if (view !== "pipeline") return;
     const id = window.setInterval(() => {
+      // Don't burn Worker/D1 requests for a background tab.
+      if (document.visibilityState === "hidden") return;
       if (loadInFlightRef.current || leadsBackfillingRef.current) return;
       void refresh().catch(() => {});
     }, 15_000);
-    return () => window.clearInterval(id);
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (loadInFlightRef.current || leadsBackfillingRef.current) return;
+      void refresh().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [view, refresh]);
 
   // Soft lock heartbeat when a specific board is selected.
@@ -933,7 +1051,9 @@ export function Studio() {
           storeBoardFilter("all");
           setEditLocked(false);
           setLockHolder(null);
-          router.replace(`/app${queryForView(view, null)}`, { scroll: false });
+          router.replace(`/app${queryForView(viewRef.current, null)}`, {
+            scroll: false,
+          });
           return;
         }
         const locked =
@@ -957,7 +1077,7 @@ export function Studio() {
       window.clearInterval(id);
       void api.releaseBoardLock(bid).catch(() => undefined);
     };
-  }, [filterBoardId, boardsReady, knownBoard, router, view]);
+  }, [filterBoardId, boardsReady, knownBoard, router]);
 
   useEffect(() => {
     takeoverRef.current = false;
@@ -2224,6 +2344,9 @@ export function Studio() {
   }, [view]);
 
   const hasLeads = (board?.leads.length ?? 0) > 0;
+  /** Lead views: skeleton until a full (non-lite) board for this filter is in. */
+  const leadsPending = loading || leadsHydrating || !board || boardLite;
+  const retryBoard = () => setBoardReloadKey((k) => k + 1);
   const searchHref = `/app${queryForView("board", filterBoardId)}`;
   const canSearchLive = board?.capabilities.canSearchLive ?? false;
   /** Pipeline / outreach / leads fill the shell; other views scroll inside it. */
@@ -2250,9 +2373,7 @@ export function Studio() {
   const layoutPaneReady = visitedLayouts.has(shownLayoutTab);
   const leadsContentPending =
     view === "leads" &&
-    (loading ||
-      leadsHydrating ||
-      !board ||
+    (leadsPending ||
       (hasLeads && (!leadsBodyReady || !layoutPaneReady)));
   const showLeadsContentSkeleton = useDeferredLoading(leadsContentPending, 0);
 
@@ -2642,6 +2763,7 @@ export function Studio() {
       {view === "boards" && (
         <BoardsView
           createRequestId={boardCreateReq}
+          initialBoards={boards}
           onBoardsChange={setBoards}
           onSelectBoard={(id) => {
             storeBoardFilter(id);
@@ -2712,7 +2834,9 @@ export function Studio() {
           }
           aria-hidden={view !== "pipeline"}
         >
-          {loading || leadsHydrating || !board ? (
+          {boardError && !board?.leads.length ? (
+            <LoadError what="leads" message={boardError} onRetry={retryBoard} />
+          ) : leadsPending ? (
             <div role="status" aria-busy="true" aria-label="Loading pipeline">
               <PipelineSkeleton />
             </div>
@@ -2877,7 +3001,9 @@ export function Studio() {
             </div>
           </div>
           <div className="relative min-h-0 flex-1 overflow-hidden">
-            {loading || leadsHydrating || !board ? (
+            {boardError && !board?.leads.length ? (
+            <LoadError what="leads" message={boardError} onRetry={retryBoard} />
+          ) : leadsPending ? (
               <LeadsLayoutSkeleton layout={shownLayoutTab} />
             ) : !hasLeads ? (
               <EmptyState actionHref={searchHref} />
@@ -2944,7 +3070,9 @@ export function Studio() {
           className={view === "outreach" ? "min-h-0 flex-1" : "hidden"}
           aria-hidden={view !== "outreach"}
         >
-          {loading || leadsHydrating || !board ? (
+          {boardError && !board?.leads.length ? (
+            <LoadError what="leads" message={boardError} onRetry={retryBoard} />
+          ) : leadsPending ? (
             <div role="status" aria-busy="true" aria-label="Loading outreach">
               <OutreachSkeleton />
             </div>
@@ -2979,7 +3107,9 @@ export function Studio() {
 
       {view === "conversations" && (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto pb-6">
-          {loading || leadsHydrating || !board ? (
+          {boardError && !board?.leads.length ? (
+            <LoadError what="leads" message={boardError} onRetry={retryBoard} />
+          ) : leadsPending ? (
             <div role="status" aria-busy="true" aria-label="Loading conversations">
               <ConversationsSkeleton />
             </div>
@@ -2997,7 +3127,9 @@ export function Studio() {
 
       {view === "tasks" && (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6">
-          {!tasksReady ? (
+          {tasksError ? (
+            <LoadError what="tasks" message={tasksError} onRetry={refreshTasks} />
+          ) : !tasksReady ? (
             <div role="status" aria-busy="true" aria-label="Loading tasks">
               <ContactsSkeleton />
             </div>
@@ -3021,7 +3153,13 @@ export function Studio() {
 
       {view === "contacts" && (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6">
-          {!contactsReady ? (
+          {contactsError ? (
+            <LoadError
+              what="collaborators"
+              message={contactsError}
+              onRetry={() => setContactsReloadKey((k) => k + 1)}
+            />
+          ) : !contactsReady ? (
             <div role="status" aria-busy="true" aria-label="Loading collaborators">
               <ContactsSkeleton />
             </div>
@@ -3042,7 +3180,9 @@ export function Studio() {
       {/* Calendar — follow-ups, sends, and calls by day */}
       {view === "calendar" && (
         <div className="flex min-h-0 flex-1 flex-col pb-6">
-          {loading || leadsHydrating || !board ? (
+          {boardError && !board?.leads.length ? (
+            <LoadError what="leads" message={boardError} onRetry={retryBoard} />
+          ) : leadsPending ? (
             <div role="status" aria-busy="true" aria-label="Loading calendar">
               <CalendarSkeleton />
             </div>

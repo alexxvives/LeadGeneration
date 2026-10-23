@@ -80,11 +80,33 @@ export class RateLimitedError extends Error {
   }
 }
 
+/** True for fetches cancelled via AbortController (board switch etc.). */
+export function isAbortError(e: unknown): boolean {
+  return e instanceof DOMException
+    ? e.name === "AbortError"
+    : (e as { name?: string } | null)?.name === "AbortError";
+}
+
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
+  const method = (init?.method ?? "GET").toUpperCase();
+  const doFetch = () =>
+    fetch(url, {
+      // Reads must never come from the HTTP cache (stale board after a write).
+      ...(method === "GET" ? { cache: "no-store" as RequestCache } : {}),
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    });
+  let res: Response;
+  try {
+    res = await doFetch();
+    // One retry for idempotent reads on transient 5xx (Worker / D1 cold start).
+    if (method === "GET" && res.status >= 500 && !init?.signal?.aborted) {
+      res = await doFetch();
+    }
+  } catch (e) {
+    if (method !== "GET" || isAbortError(e) || init?.signal?.aborted) throw e;
+    res = await doFetch();
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = data as {
@@ -175,7 +197,7 @@ export const api = {
   /** Background lead pages after the first board paint. */
   boardLeadsChunk: (
     boardId: string | null | undefined,
-    opts: { perLane: number; laneOffset: number },
+    opts: { perLane: number; laneOffset: number; signal?: AbortSignal },
   ) => {
     const params = new URLSearchParams();
     params.set(
@@ -185,7 +207,9 @@ export const api = {
     params.set("chunk", "1");
     params.set("perLane", String(opts.perLane));
     params.set("laneOffset", String(opts.laneOffset));
-    return jsonFetch<BoardLeadsChunk>(`/api/board?${params.toString()}`);
+    return jsonFetch<BoardLeadsChunk>(`/api/board?${params.toString()}`, {
+      signal: opts.signal,
+    });
   },
 
   listBoards: () => jsonFetch<{ boards: BoardSummary[] }>("/api/boards"),
@@ -522,9 +546,9 @@ export const api = {
       body: JSON.stringify({ headers }),
     }),
 
-  listContacts: (boardId?: string | null) => {
+  listContacts: (boardId?: string | null, signal?: AbortSignal) => {
     const q = boardId ? `?boardId=${encodeURIComponent(boardId)}` : "";
-    return jsonFetch<{ contacts: Contact[] }>(`/api/contacts${q}`);
+    return jsonFetch<{ contacts: Contact[] }>(`/api/contacts${q}`, { signal });
   },
 
   createContact: (input: {
@@ -559,9 +583,9 @@ export const api = {
   deleteContact: (id: string) =>
     jsonFetch<{ ok: boolean }>(`/api/contacts/${id}`, { method: "DELETE" }),
 
-  listTasks: (boardId?: string | null) => {
+  listTasks: (boardId?: string | null, signal?: AbortSignal) => {
     const q = boardId ? `?boardId=${encodeURIComponent(boardId)}` : "";
-    return jsonFetch<{ tasks: Task[] }>(`/api/tasks${q}`);
+    return jsonFetch<{ tasks: Task[] }>(`/api/tasks${q}`, { signal });
   },
 
   createTask: (input: {

@@ -19,16 +19,20 @@ export function BoardsView({
   onSelectBoard,
   onBoardsChange,
   createRequestId = 0,
+  initialBoards,
 }: {
   onSelectBoard?: (boardId: string) => void;
+  /** Boards Studio already has (from the board payload) — skips the skeleton. */
+  initialBoards?: BoardSummary[];
   /** Keep Studio sidebar / import picker in sync after create/rename/delete. */
   onBoardsChange?: (boards: BoardSummary[]) => void;
   /** Increment from parent to open the create-board prompt. */
   createRequestId?: number;
 }) {
-  const [boards, setBoards] = useState<BoardSummary[]>([]);
+  // Paint boards the parent already knows instantly; refresh in background.
+  const [boards, setBoards] = useState<BoardSummary[]>(initialBoards ?? []);
   const [invites, setInvites] = useState<BoardInvite[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialBoards?.length);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -41,8 +45,13 @@ export function BoardsView({
       api.listBoards(),
       api.listMyInvites().catch(() => ({ invites: [] as BoardInvite[] })),
     ]);
+    setBoards(list);
+    setInvites(pending);
+    // List is ready — stop the skeleton before the legacy profile backfill.
+    setLoading(false);
     // Legacy boards without a link get an empty profile named after the board.
     let next = list;
+    let changed = false;
     for (const b of list) {
       if (b.shared || b.outreachProfileId) continue;
       try {
@@ -50,6 +59,7 @@ export function BoardsView({
         const { board } = await api.updateBoard(b.id, {
           outreachProfileId: profile.id,
         });
+        changed = true;
         next = next.map((x) =>
           x.id === board.id
             ? { ...x, outreachProfileId: board.outreachProfileId }
@@ -59,8 +69,7 @@ export function BoardsView({
         /* keep board; retry next refresh */
       }
     }
-    setBoards(next);
-    setInvites(pending);
+    if (changed) setBoards(next);
     onBoardsChange?.(next);
   }, [onBoardsChange]);
 

@@ -33,7 +33,6 @@ import {
   taskStatusLabel,
 } from "@/lib/tasks";
 import { AuthorAvatar } from "@/components/studio/JournalEntries";
-import { MarqueeText } from "@/components/studio/MarqueeText";
 import { EmptyState } from "@/components/studio/StudioHelpers";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
@@ -180,11 +179,11 @@ function TaskCardFace({
           ) : null}
         </div>
         <h3
-          className={`mt-2 min-w-0 font-display text-base font-semibold leading-snug ${
+          className={`mt-2 min-w-0 whitespace-normal break-words font-display text-base font-semibold leading-snug ${
             completed ? "text-mist-500 line-through" : "text-mist-100"
           }`}
         >
-          <MarqueeText>{task.title}</MarqueeText>
+          {task.title}
         </h3>
         <AssigneeRow task={task} />
       </button>

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { isAdminSession } from "@/lib/admin";
 import { authRequired, env, getCapabilities } from "@/lib/config";
 import { StudioShell } from "@/components/studio/StudioShell";
+import { StudioViewSkeleton } from "@/components/studio/skeletons";
 
 /**
  * Studio chrome must never depend on D1/workspace resolution. Auth() is safe
@@ -26,7 +27,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <Suspense
       fallback={
-        <div className="grid min-h-screen place-items-center text-mist-500">Loading…</div>
+        // Skeleton instead of a bare "Loading…" while the shell bundle loads.
+        <div className="min-h-screen p-4 sm:p-6">
+          <StudioViewSkeleton view="pipeline" />
+        </div>
       }
     >
       <StudioShell
