@@ -9,7 +9,7 @@
     "lint": "next lint",
     "seed": "node --experimental-strip-types scripts/seed.ts",
     "smoke": "node --experimental-strip-types scripts/smoke.mjs",
-    "cf:build": "opennextjs-cloudflare build",
+    "cf:build": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion",
     "cf:preview": "opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare deploy",
     "cf:migrate": "wrangler d1 migrations apply lodestar-prod --remote",
