@@ -1096,17 +1096,19 @@ export async function getLatestBoard(
     filter: { boardId: string } | undefined,
   ) =>
     perLane != null
-      ? Promise.all(
-          LEAD_HYDRATE_LANES.map((lane) =>
-            leadDb.listLeads({
-              ...filter,
-              lane,
-              limit: perLane,
-              offset: laneOffset,
-              columns: "card",
-            }),
-          ),
-        ).then((pages) => ({
+      ? (() => {
+          const laneFilters = LEAD_HYDRATE_LANES.map((lane) => ({
+            ...filter,
+            lane,
+            limit: perLane,
+            offset: laneOffset,
+            columns: "card" as const,
+          }));
+          // D1: one batched round trip instead of one query per lane.
+          return leadDb.listLeadsMany
+            ? leadDb.listLeadsMany(laneFilters)
+            : Promise.all(laneFilters.map((f) => leadDb.listLeads(f)));
+        })().then((pages) => ({
           raw: uniqueById(pages.flat()),
           hasMore: pages.some((p) => p.length >= perLane),
         }))

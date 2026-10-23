@@ -1795,7 +1795,7 @@ export class D1Store implements LeadRepository {
     return result.meta?.changes ?? 0;
   }
 
-  async listLeads(filter?: LeadListFilter): Promise<Lead[]> {
+  private listLeadsStmt(filter?: LeadListFilter): D1PreparedStatement {
     const limit =
       filter?.limit != null && filter.limit >= 0 ? Math.floor(filter.limit) : null;
     const offset = Math.max(0, Math.floor(filter?.offset ?? 0));
@@ -1823,20 +1823,38 @@ export class D1Store implements LeadRepository {
       bind.push(...filter.conversationSteps);
     }
     const cols = filter?.columns === "card" ? CARD_LEAD_SELECT : "l.*";
-    const { results } = await this.db
+    return this.db
       .prepare(
         `SELECT ${cols} FROM leads l
          LEFT JOIN outreach o ON o.lead_id = l.id
          ${where}
          ${orderSql}${pageSql}`,
       )
-      .bind(...bind, ...pageBind)
-      .all<LeadRow>();
+      .bind(...bind, ...pageBind);
+  }
+
+  private async finishListedLeads(results: LeadRow[]): Promise<Lead[]> {
     const dedupes = results
       .map((row) => emailDedupeUpdate(this.db, this.workspaceId, row.id, row.follow_ups))
       .filter((stmt): stmt is D1PreparedStatement => stmt != null);
     if (dedupes.length > 0) await this.db.batch(dedupes);
     return results.map(rowToLead);
+  }
+
+  async listLeads(filter?: LeadListFilter): Promise<Lead[]> {
+    const { results } = await this.listLeadsStmt(filter).all<LeadRow>();
+    return this.finishListedLeads(results);
+  }
+
+  /** Several lead lists in one D1 round trip (per-lane board hydrate). */
+  async listLeadsMany(filters: LeadListFilter[]): Promise<Lead[][]> {
+    if (filters.length === 0) return [];
+    const res = await this.db.batch<LeadRow>(
+      filters.map((f) => this.listLeadsStmt(f)),
+    );
+    const all = res.map((r) => r.results ?? []);
+    await this.finishListedLeads(all.flat());
+    return all.map((rows) => rows.map(rowToLead));
   }
 
   async countLeads(filter?: LeadListFilter): Promise<number> {
@@ -2084,18 +2102,22 @@ export class D1Store implements LeadRepository {
          CASE WHEN status = 'failed' THEN error ELSE NULL END AS error,
          created_at, updated_at`
       : "*";
+    // One D1 round trip for every chunk (was one sequential query per 50 ids).
+    const stmts: D1PreparedStatement[] = [];
     for (let i = 0; i < ids.length; i += CHUNK) {
       const chunk = ids.slice(i, i + CHUNK);
       const placeholders = chunk.map(() => "?").join(",");
-      const { results } = await this.db
-        .prepare(
-          `SELECT ${cols} FROM outreach
-           WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
-        )
-        .bind(this.workspaceId, ...chunk)
-        .all<OutreachRow>();
-      out.push(...results.map(rowToOutreach));
+      stmts.push(
+        this.db
+          .prepare(
+            `SELECT ${cols} FROM outreach
+             WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
+          )
+          .bind(this.workspaceId, ...chunk),
+      );
     }
+    const pages = await this.db.batch<OutreachRow>(stmts);
+    for (const page of pages) out.push(...(page.results ?? []).map(rowToOutreach));
     return out;
   }
 

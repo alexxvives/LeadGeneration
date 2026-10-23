@@ -26,7 +26,7 @@ export async function GET(req: Request) {
       : 0;
   const leadPerLane =
     perLaneRaw != null && perLaneRaw !== ""
-      ? Math.max(1, Math.min(200, Number.parseInt(perLaneRaw, 10) || 0))
+      ? Math.max(1, Math.min(500, Number.parseInt(perLaneRaw, 10) || 0))
       : undefined;
   const leadLaneOffset =
     laneOffsetRaw != null && laneOffsetRaw !== ""

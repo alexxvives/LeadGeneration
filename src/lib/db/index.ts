@@ -152,6 +152,8 @@ export interface LeadRepository {
   ): Promise<number>;
   getLead(id: string): Promise<Lead | null>;
   listLeads(filter?: LeadListFilter): Promise<Lead[]>;
+  /** Optional: run several lead lists in one round trip (D1 batch). */
+  listLeadsMany?(filters: LeadListFilter[]): Promise<Lead[][]>;
   /** Fast count for import progress (avoids loading every lead row). */
   countLeads(filter?: LeadListFilter): Promise<number>;
   /**
