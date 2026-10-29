@@ -65,7 +65,7 @@ export function LeadTable({
   /** Bulk delete — preferred when selecting multiple. */
   onDeleteLeads?: (leadIds: string[]) => void | Promise<void>;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  const { locked: editLocked, bulkLocked, hint: lockHint } = useBoardLockUi();
   const [openId, setOpenId] = useState<string | null>(null);
   const [pipelineMenuOpen, setPipelineMenuOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -675,7 +675,7 @@ export function LeadTable({
               </p>
               <button
                 type="button"
-                disabled={deleting || editLocked}
+                disabled={deleting || bulkLocked}
                 onClick={() => void runBulkDelete()}
                 className="inline-flex items-center gap-1 rounded-full bg-rose-400 px-3 py-1.5 text-xs font-medium text-on-accent disabled:opacity-50"
               >
@@ -700,9 +700,9 @@ export function LeadTable({
               <Lockable>
                 <button
                   type="button"
-                  disabled={deleting || editLocked}
+                  disabled={deleting || bulkLocked}
                   onClick={() => setConfirmBulk(true)}
-                  aria-label={editLocked ? lockHint : "Delete selected leads"}
+                  aria-label={bulkLocked ? lockHint : "Delete selected leads"}
                   className="inline-flex items-center gap-1 rounded-full bg-rose-400/90 px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-rose-400 disabled:opacity-50"
                 >
                   <TrashIcon className="h-3 w-3" />

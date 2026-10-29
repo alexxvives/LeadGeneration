@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { cancelImportRun, importLeads } from "@/lib/service";
+import { isBoardLockedError } from "@/lib/errors";
 import { isQuotaError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -94,6 +95,9 @@ export async function POST(req: Request) {
         { error: err.message, kind: err.kind, planId: err.planId },
         { status: 402 },
       );
+    }
+    if (isBoardLockedError(err)) {
+      return NextResponse.json({ error: err.message, lockedBy: err.holderName }, { status: 423 });
     }
     const message = err instanceof Error ? err.message : "Import failed";
     return NextResponse.json({ error: message }, { status: 400 });

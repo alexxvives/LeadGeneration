@@ -91,7 +91,7 @@ import {
 } from "@/lib/contact-methods";
 import { collapseEmailSentFollowUps, emailSentFollowUpId, hasEmailSentOn, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
 import { conversationStepPatch } from "@/lib/conversation-steps";
-import { CREATED_BY_FIELD, isLockExemptLead, preserveCreatorStamp } from "@/lib/lead-ownership";
+import { CREATED_BY_FIELD, preserveCreatorStamp } from "@/lib/lead-ownership";
 import {
   appendJournalTaskLine,
   backfillTasksFromJournal,
@@ -413,6 +413,7 @@ export async function updateBoard(
   if (!access || access.access !== "owner" || access.shared) {
     throw new NotFoundError("Board not found");
   }
+  await assertBoardEditable(ctx, id);
   const next: Partial<Board> = { updatedAt: nowIso() };
   if (patch.name !== undefined) {
     const trimmed = patch.name.trim();
@@ -705,14 +706,10 @@ async function assertBoardEditable(ctx: Ctx, boardId: string): Promise<void> {
   }
 }
 
-/**
- * Lead-level edit check: the board lock holder edits everything; a
- * collaborator may still edit/delete leads they created in the last 24h.
- */
-async function assertLeadEditable(ctx: Ctx, lead: Lead): Promise<void> {
-  if (isLockExemptLead(lead)) return;
-  await assertBoardEditable(ctx, lead.boardId);
-}
+// Single-lead edits are never lock-bound: both users work at the same time and
+// optimistic concurrency (lead version + three-way merge) resolves overlaps.
+// The board lock only guards bulk delete / clear / import / Find leads and
+// board settings (assertBoardEditable).
 
 /** Resolve a boardId or create by name — never invents a Default board. */
 export async function resolveBoardId(
@@ -858,6 +855,7 @@ export async function createAndRunSearch(
     : await resolveRunLeadLimit(ctx, input.maxLeads);
   const searchInput: CreateRunInput = { ...input, maxLeads };
   const boardId = await resolveBoardId(ctx, { boardId: input.boardId });
+  await assertBoardEditable(ctx, boardId);
 
   const db = ctx.db;
   const run: Run = {
@@ -2503,7 +2501,6 @@ export async function updateWorkspaceEmailSettings(
 export async function deleteLead(ctx: Ctx, leadId: string): Promise<boolean> {
   const found = await findLeadAccess(ctx, leadId);
   if (!found) return false;
-  await assertLeadEditable(ctx, found.lead);
   return found.db.deleteLead(leadId);
 }
 
@@ -2522,9 +2519,8 @@ export async function deleteLeads(
   for (const id of ids) {
     const found = await findLeadAccess(ctx, id);
     if (!found) continue;
-    if (!isLockExemptLead(found.lead)) {
-      boardIds.add(found.lead.boardId);
-    }
+    // Bulk (2+) deletes stay behind the board lock; a single delete never does.
+    if (ids.length > 1) boardIds.add(found.lead.boardId);
     const list = byDb.get(found.db) ?? [];
     list.push(id);
     byDb.set(found.db, list);
@@ -2646,7 +2642,6 @@ export async function updateLeadCrm(
   const found = await findLeadAccess(ctx, leadId);
   if (!found) return null;
   const { lead, db } = found;
-  await assertLeadEditable(ctx, lead);
 
   const next: typeof patch & {
     fitScore?: number;
@@ -2936,6 +2931,7 @@ export async function importLeads(
     boardId: opts?.boardId,
     newBoardName: opts?.newBoardName,
   });
+  await assertBoardEditable(ctx, boardId);
 
   const { normalizeWebsiteUrl } = await import("@/lib/website");
   const { preferCrmStage } = await import("@/lib/import-crm-stage");
@@ -3611,7 +3607,6 @@ export async function createContact(
 ): Promise<Contact> {
   const access = await resolveBoardAccess(ctx, input.boardId);
   if (!access) throw new NotFoundError("Board not found");
-  await assertBoardEditable(ctx, access.board.id);
   const name = input.name.trim();
   if (!name) throw new Error("Name is required");
   const contact: Contact = {
@@ -3643,7 +3638,6 @@ export async function updateContact(
 ): Promise<Contact | null> {
   const found = await findContactAccess(ctx, contactId);
   if (!found) return null;
-  await assertBoardEditable(ctx, found.contact.boardId);
   const next: Partial<Contact> = { ...patch };
   if (next.name !== undefined) {
     const name = next.name.trim();
@@ -3687,7 +3681,6 @@ export async function deleteContact(
 ): Promise<boolean> {
   const found = await findContactAccess(ctx, contactId);
   if (!found) return false;
-  await assertBoardEditable(ctx, found.contact.boardId);
   return found.db.deleteContact(contactId);
 }
 
@@ -3721,7 +3714,6 @@ export async function addLeadDocument(
 ): Promise<LeadDocument> {
   const found = await findLeadAccess(ctx, leadId);
   if (!found) throw new NotFoundError("Lead not found");
-  await assertLeadEditable(ctx, found.lead);
   if (found.lead.crmStage !== "closed") {
     throw new Error("Documents can only be added on closed leads.");
   }
@@ -3769,7 +3761,6 @@ export async function deleteLeadDocument(
 ): Promise<boolean> {
   const found = await findLeadAccess(ctx, leadId);
   if (!found) return false;
-  await assertLeadEditable(ctx, found.lead);
   const doc = await found.db.getLeadDocument(docId);
   if (!doc || doc.leadId !== leadId) return false;
   return found.db.deleteLeadDocument(docId);
@@ -3846,22 +3837,19 @@ export async function createTask(
   if (input.leadId) {
     const leadAccess = await findLeadAccess(ctx, input.leadId);
     if (!leadAccess) throw new NotFoundError("Lead not found");
-    await assertLeadEditable(ctx, leadAccess.lead);
     db = leadAccess.db;
     workspaceId = leadAccess.lead.workspaceId;
     boardId = leadAccess.lead.boardId;
   } else if (input.contactId) {
     const contactAccess = await findContactAccess(ctx, input.contactId);
     if (!contactAccess) throw new NotFoundError("Contact not found");
-    await assertBoardEditable(ctx, contactAccess.contact.boardId);
     db = contactAccess.db;
     workspaceId = contactAccess.contact.workspaceId;
     boardId = contactAccess.contact.boardId;
   } else if (boardId) {
     const access = await resolveBoardAccess(ctx, boardId);
     if (!access) throw new NotFoundError("Board not found");
-    await assertBoardEditable(ctx, access.board.id);
-    db = access.db;
+      db = access.db;
     workspaceId = access.board.workspaceId;
   } else {
     throw new Error("Pick a board or link a lead");
@@ -3958,8 +3946,6 @@ export async function updateTask(
 ): Promise<Task | null> {
   const found = await findTaskAccess(ctx, taskId);
   if (!found) return null;
-  const boardId = found.task.boardId;
-  if (boardId) await assertBoardEditable(ctx, boardId);
 
   const next: Partial<Task> = { ...patch, updatedAt: nowIso() };
   if (next.title !== undefined) {
@@ -4036,7 +4022,6 @@ export async function deleteTask(
   const found = await findTaskAccess(ctx, taskId);
   if (!found) return false;
   if (found.task.boardId) {
-    await assertBoardEditable(ctx, found.task.boardId);
   }
 
   if (found.task.leadId) {

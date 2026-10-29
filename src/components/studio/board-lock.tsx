@@ -12,14 +12,17 @@ import {
 
 export function boardLockHint(holder: string | null | undefined): string {
   const who = holder?.trim() || "Someone else";
-  return `${who} is editing this board. Take control to make changes.`;
+  return `${who} has control of this board. Bulk delete, import and Find leads are paused — take control to use them.`;
 }
 
 const BoardLockUiContext = createContext<{
+  /** Per-lead / per-item edits: never locked (simultaneous editing). */
   locked: boolean;
+  /** Bulk delete, import, Find leads, draft-all, board settings. */
+  bulkLocked: boolean;
   holder: string | null;
   hint: string;
-}>({ locked: false, holder: null, hint: boardLockHint(null) });
+}>({ locked: false, bulkLocked: false, holder: null, hint: boardLockHint(null) });
 
 export function BoardLockUiProvider({
   locked,
@@ -32,7 +35,8 @@ export function BoardLockUiProvider({
 }) {
   const value = useMemo(
     () => ({
-      locked,
+      locked: false,
+      bulkLocked: locked,
       holder,
       hint: boardLockHint(holder),
     }),

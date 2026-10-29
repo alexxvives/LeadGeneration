@@ -224,7 +224,7 @@ export function OutreachView({
   onLogCall?: (leadId: string) => void;
   onDeleteLead: (leadId: string) => Promise<void> | void;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  const { bulkLocked: editLocked, hint: lockHint } = useBoardLockUi();
   const busySet = useMemo(() => new Set(busyIds), [busyIds]);
   const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
   const [drafting, setDrafting] = useState<null | "remaining" | "redraft">(null);
@@ -790,7 +790,7 @@ function DraftAllPrompt({
   drafting: boolean;
   onDraft: () => void;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  const { bulkLocked: editLocked, hint: lockHint } = useBoardLockUi();
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-8 text-center">
       <p className="kicker">Draft</p>

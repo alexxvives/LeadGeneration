@@ -41,7 +41,7 @@ import { VerifyLimitModal } from "./VerifyLimitModal";
 import { crmStageLabel, Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
-import { isLockExemptLead, isSystemCustomField } from "@/lib/lead-ownership";
+import { isSystemCustomField } from "@/lib/lead-ownership";
 import { PipelineFocusToggle, PipelineView } from "./PipelineView";
 import {
   OutreachView,
@@ -348,7 +348,6 @@ export function Studio() {
   const editLockedRef = useRef(false);
   editLockedRef.current = editLocked;
   const [takingOver, setTakingOver] = useState(false);
-  const lockHint = boardLockHint(lockHolder);
   const takeoverRef = useRef(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [noteUndo, setNoteUndo] = useState<{
@@ -1413,20 +1412,12 @@ export function Studio() {
   };
 
   /**
-   * Lead-level edit gate. Under someone else's board lock a collaborator can
-   * still edit leads they created in the last 24h (server enforces the same).
-   * Returns false — with a toast, never silently — when the edit is blocked.
+   * Lead-level edit gate. Single-lead edits are never lock-bound (both users
+   * work at once; the server merges or reports conflicts). Only a lead removed
+   * this session is refused.
    */
-  const canEditLeadNow = (leadId: string, opts?: { quiet?: boolean }): boolean => {
-    if (droppedLeadIdsRef.current.has(leadId)) return false;
-    if (!editLockedRef.current) return true;
-    const lead = boardRef.current?.leads.find((l) => l.id === leadId);
-    if (lead && isLockExemptLead(lead)) return true;
-    if (!opts?.quiet) {
-      toast("err", "Someone else has control of this board — take control to edit this lead.");
-    }
-    return false;
-  };
+  const canEditLeadNow = (leadId: string): boolean =>
+    !droppedLeadIdsRef.current.has(leadId);
 
   const enqueueLeadWrite = (leadId: string, fn: () => Promise<void>) => {
     const tail = leadWriteTailRef.current;
@@ -1492,7 +1483,6 @@ export function Studio() {
     leadId: string,
     opts?: { silent?: boolean },
   ): Promise<string | null> => {
-    if (editLockedRef.current) return null;
     try {
       const profile = loadSenderProfile();
       const lead = board?.leads.find((l) => l.id === leadId);
@@ -1592,7 +1582,6 @@ export function Studio() {
     outreachId: string,
     opts?: { skipVerify?: boolean },
   ): Promise<boolean> => {
-    if (editLockedRef.current) return false;
     try {
       const result = await api.send(outreachId, opts);
       const cur = boardRef.current;
@@ -2505,7 +2494,7 @@ export function Studio() {
 
   const onDeleteLeads = async (leadIds: string[]) => {
     if (leadIds.length === 0) return;
-    if (!leadIds.every((id) => canEditLeadNow(id, { quiet: true }))) {
+    if (!leadIds.every((id) => canEditLeadNow(id))) {
       toast("err", "Someone else has control of this board — take control to delete leads.");
       return;
     }
@@ -2604,11 +2593,9 @@ export function Studio() {
               <Lockable>
                 <button
                   type="button"
-                  disabled={editLocked || boards.length === 0}
+                  disabled={boards.length === 0}
                   title={
-                    editLocked
-                      ? lockHint
-                      : boards.length === 0
+                    boards.length === 0
                         ? "Create a board first"
                         : "Add collaborator"
                   }
@@ -2699,11 +2686,9 @@ export function Studio() {
               <Lockable className="self-start">
                 <button
                   type="button"
-                  disabled={editLocked || boards.length === 0}
+                  disabled={boards.length === 0}
                   title={
-                    editLocked
-                      ? lockHint
-                      : boards.length === 0
+                    boards.length === 0
                         ? "Create a board first"
                         : "Add collaborator"
                   }
@@ -2787,11 +2772,9 @@ export function Studio() {
             <Lockable>
               <button
                 type="button"
-                disabled={editLocked || boards.length === 0}
+                disabled={boards.length === 0}
                 title={
-                  editLocked
-                    ? lockHint
-                    : boards.length === 0
+                  boards.length === 0
                       ? "Create a board first"
                       : "Add task"
                 }
@@ -3412,9 +3395,7 @@ export function Studio() {
 
       {selected && board && (
         <BoardLockUiProvider
-          locked={
-            editLocked && !isLockExemptLead(selected)
-          }
+          locked={editLocked}
           holder={lockHolder}
         >
         <LeadDrawer

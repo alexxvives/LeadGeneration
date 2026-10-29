@@ -269,7 +269,7 @@ export function SearchPanel({
   /** Fired when the Search profile picker changes the active profile. */
   onProfileChange?: () => void;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  const { bulkLocked: editLocked, hint: lockHint } = useBoardLockUi();
   const [niche, setNiche] = useState("");
   const [location, setLocation] = useState("");
   const [locationConfirmed, setLocationConfirmed] = useState(true);

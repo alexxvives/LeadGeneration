@@ -381,7 +381,7 @@ export function ImportLeadsPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
+  const { bulkLocked: editLocked, hint: lockHint } = useBoardLockUi();
 
   async function handleFile(file: File | null) {
     if (!file) return;
