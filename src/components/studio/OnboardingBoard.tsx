@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { LeadWithOutreach } from "@/lib/types";
 import { XIcon } from "@/components/icons";
 import {
@@ -16,6 +16,20 @@ import {
   parseOnboardingDone,
   type OnboardingStep,
 } from "@/lib/onboarding-path";
+import {
+  BRANCH_NUEVO,
+  BRANCH_USADO,
+  COMMON,
+  NO_TRIAL,
+  NO_TRIAL_STEPS,
+  NUEVO,
+  TRIAL,
+  USADO,
+  parseTreeDone,
+  toggleTreeStep,
+  treeDonePatch,
+  type TrialBranch,
+} from "@/lib/lead-tree";
 
 type Tone = "task" | "decision" | "reject";
 
@@ -36,19 +50,12 @@ export function OnboardingTreeDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const done = new Set(parseOnboardingDone(lead.customFields));
-  const trial = done.has(CHOOSE_TRIAL.id);
-  const buyDirect = done.has(BUY_DEVICE.id);
-  const interested = done.has(PATH_A_INTERESTED.id);
-  const buying = buyDirect || interested;
-  const closing = done.has(PATH_A_NOT_INTERESTED.id);
-
-  function toggle(id: string, checked: boolean) {
-    const next = new Set(parseOnboardingDone(lead.customFields));
-    if (checked) next.add(id);
-    else next.delete(id);
-    onSetDone(onboardingDonePatch(lead.customFields, [...next]));
-  }
+  const hasLegacy = parseOnboardingDone(lead.customFields).length > 0;
+  const hasNew = parseTreeDone(lead.customFields).length > 0;
+  // Existing leads with old-tree progress open on it; everyone else gets the new tree.
+  const [view, setView] = useState<"new" | "legacy">(
+    hasLegacy && !hasNew ? "legacy" : "new",
+  );
 
   return (
     <div className="fixed inset-0 z-[1200] flex items-end justify-center sm:items-center">
@@ -74,6 +81,29 @@ export function OnboardingTreeDialog({
           >
             {lead.company}
           </h2>
+          {hasLegacy ? (
+            <div
+              className="mt-2 flex justify-center gap-1 text-[11px]"
+              role="tablist"
+            >
+              {(["new", "legacy"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="tab"
+                  aria-selected={view === v}
+                  onClick={() => setView(v)}
+                  className={`rounded-full px-3 py-1 ${
+                    view === v
+                      ? "bg-white/10 text-mist-100"
+                      : "text-mist-500 hover:text-mist-200"
+                  }`}
+                >
+                  {v === "new" ? "Árbol nuevo" : "Árbol anterior"}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
@@ -84,105 +114,337 @@ export function OnboardingTreeDialog({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8">
-          <div className="mx-auto flex w-full max-w-2xl flex-col items-center">
-            <Tile step={SEND_PRICES} on={done.has(SEND_PRICES.id)} tone="task" onToggle={toggle} />
-            <WaveFork />
+        {view === "new" ? (
+          <LeadTree lead={lead} onSetDone={onSetDone} />
+        ) : (
+          <LegacyTree lead={lead} onSetDone={onSetDone} />
+        )}
+      </div>
+    </div>
+  );
+}
 
-            <div className="grid w-full items-start gap-4 md:grid-cols-2">
+function LegacyTree({
+  lead,
+  onSetDone,
+}: {
+  lead: LeadWithOutreach;
+  onSetDone: (customFields: Record<string, string>) => void;
+}) {
+  const done = new Set(parseOnboardingDone(lead.customFields));
+  const trial = done.has(CHOOSE_TRIAL.id);
+  const buyDirect = done.has(BUY_DEVICE.id);
+  const interested = done.has(PATH_A_INTERESTED.id);
+  const buying = buyDirect || interested;
+  const closing = done.has(PATH_A_NOT_INTERESTED.id);
+
+  function toggle(id: string, checked: boolean) {
+    const next = new Set(parseOnboardingDone(lead.customFields));
+    if (checked) next.add(id);
+    else next.delete(id);
+    onSetDone(onboardingDonePatch(lead.customFields, [...next]));
+  }
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8">
+      <div className="mx-auto flex w-full max-w-2xl flex-col items-center">
+        <Tile
+          step={SEND_PRICES}
+          on={done.has(SEND_PRICES.id)}
+          tone="task"
+          onToggle={toggle}
+        />
+        <WaveFork />
+
+        <div className="grid w-full items-start gap-4 md:grid-cols-2">
+          <Column
+            live={trial}
+            head={
+              <Tile
+                step={CHOOSE_TRIAL}
+                on={trial}
+                tone="decision"
+                onToggle={toggle}
+              />
+            }
+          >
+            {PATH_A.map((step) => (
+              <Tile
+                key={step.id}
+                step={step}
+                on={done.has(step.id)}
+                tone="task"
+                dim={!trial}
+                onToggle={toggle}
+              />
+            ))}
+            <WaveFork compact />
+            <div className="grid w-full grid-cols-2 gap-2">
               <Column
-                live={trial}
+                live={closing}
                 head={
                   <Tile
-                    step={CHOOSE_TRIAL}
-                    on={trial}
-                    tone="decision"
-                    onToggle={toggle}
-                  />
-                }
-              >
-                {PATH_A.map((step) => (
-                  <Tile
-                    key={step.id}
-                    step={step}
-                    on={done.has(step.id)}
-                    tone="task"
+                    step={PATH_A_NOT_INTERESTED}
+                    on={closing}
+                    tone="reject"
                     dim={!trial}
                     onToggle={toggle}
                   />
-                ))}
-                <WaveFork compact />
-                <div className="grid w-full grid-cols-2 gap-2">
-                  <Column
-                    live={closing}
-                    head={
-                      <Tile
-                        step={PATH_A_NOT_INTERESTED}
-                        on={closing}
-                        tone="reject"
-                        dim={!trial}
-                        onToggle={toggle}
-                      />
-                    }
-                  >
-                    {PATH_A_CLOSE.map((step) => (
-                      <Tile
-                        key={step.id}
-                        step={step}
-                        on={done.has(step.id)}
-                        tone="reject"
-                        dim={!closing}
-                        onToggle={toggle}
-                      />
-                    ))}
-                    <EndTile label="Fin" on={closing && PATH_A_CLOSE.every((s) => done.has(s.id))} />
-                  </Column>
-                  <Column
-                    live={interested}
-                    head={
-                      <Tile
-                        step={PATH_A_INTERESTED}
-                        on={interested}
-                        tone="decision"
-                        dim={!trial}
-                        onToggle={toggle}
-                      />
-                    }
-                  >
-                    <p className="px-1 text-center text-[11px] leading-snug text-mist-400">
-                      Continúa en compra.
-                    </p>
-                  </Column>
-                </div>
-              </Column>
-
-              <Column
-                live={buying}
-                head={
-                  <Tile
-                    step={BUY_DEVICE}
-                    on={buyDirect}
-                    tone="decision"
-                    hint={interested && !buyDirect ? "Desde trial" : undefined}
-                    onToggle={toggle}
-                  />
                 }
               >
-                {PATH_B.map((step) => (
+                {PATH_A_CLOSE.map((step) => (
                   <Tile
                     key={step.id}
                     step={step}
                     on={done.has(step.id)}
-                    tone="task"
-                    dim={!buying}
+                    tone="reject"
+                    dim={!closing}
                     onToggle={toggle}
                   />
                 ))}
-                <EndTile label="Listo" on={buying && PATH_B.every((s) => done.has(s.id))} />
+                <EndTile
+                  label="Fin"
+                  on={closing && PATH_A_CLOSE.every((s) => done.has(s.id))}
+                />
+              </Column>
+              <Column
+                live={interested}
+                head={
+                  <Tile
+                    step={PATH_A_INTERESTED}
+                    on={interested}
+                    tone="decision"
+                    dim={!trial}
+                    onToggle={toggle}
+                  />
+                }
+              >
+                <p className="px-1 text-center text-[11px] leading-snug text-mist-400">
+                  Continúa en compra.
+                </p>
               </Column>
             </div>
-          </div>
+          </Column>
+
+          <Column
+            live={buying}
+            head={
+              <Tile
+                step={BUY_DEVICE}
+                on={buyDirect}
+                tone="decision"
+                hint={interested && !buyDirect ? "Desde trial" : undefined}
+                onToggle={toggle}
+              />
+            }
+          >
+            {PATH_B.map((step) => (
+              <Tile
+                key={step.id}
+                step={step}
+                on={done.has(step.id)}
+                tone="task"
+                dim={!buying}
+                onToggle={toggle}
+              />
+            ))}
+            <EndTile
+              label="Listo"
+              on={buying && PATH_B.every((s) => done.has(s.id))}
+            />
+          </Column>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function LeadTree({
+  lead,
+  onSetDone,
+}: {
+  lead: LeadWithOutreach;
+  onSetDone: (customFields: Record<string, string>) => void;
+}) {
+  const done = new Set(parseTreeDone(lead.customFields));
+  const toggle = (id: string, checked: boolean) => {
+    const next = toggleTreeStep(parseTreeDone(lead.customFields), id, checked);
+    onSetDone(treeDonePatch(lead.customFields, next));
+  };
+  const trial = done.has(TRIAL.id);
+  const noTrial = done.has(NO_TRIAL.id);
+  const branch = done.has(NUEVO.id)
+    ? BRANCH_NUEVO
+    : done.has(USADO.id)
+      ? BRANCH_USADO
+      : null;
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8">
+      <div className="mx-auto flex w-full max-w-2xl flex-col items-center">
+        <Column live>
+          {COMMON.map((step) => (
+            <Tile
+              key={step.id}
+              step={step}
+              on={done.has(step.id)}
+              tone="task"
+              onToggle={toggle}
+            />
+          ))}
+        </Column>
+        <WaveFork />
+        <Choice a={TRIAL} b={NO_TRIAL} done={done} onToggle={toggle} />
+        {noTrial ? (
+          <Column live>
+            {NO_TRIAL_STEPS.map((step) => (
+              <Tile
+                key={step.id}
+                step={step}
+                on={done.has(step.id)}
+                tone="task"
+                onToggle={toggle}
+              />
+            ))}
+            <EndTile
+              label="Listo"
+              on={NO_TRIAL_STEPS.every((x) => done.has(x.id))}
+            />
+          </Column>
+        ) : null}
+        {trial ? (
+          <>
+            <WaveFork compact />
+            <Choice a={NUEVO} b={USADO} done={done} onToggle={toggle} />
+            {branch ? (
+              <TrialPath branch={branch} done={done} onToggle={toggle} />
+            ) : null}
+          </>
+        ) : null}
+        {!trial && !noTrial ? (
+          <p className="mt-3 text-center text-xs text-mist-500">
+            Elige TRIAL o NO TRIAL para ver el camino.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function TrialPath({
+  branch,
+  done,
+  onToggle,
+}: {
+  branch: TrialBranch;
+  done: Set<string>;
+  onToggle: (id: string, checked: boolean) => void;
+}) {
+  const buying = done.has(branch.buyHead.id);
+  const leaving = done.has(branch.noBuyHead.id);
+  return (
+    <>
+      <Column live>
+        {branch.steps.map((step) => (
+          <Tile
+            key={step.id}
+            step={step}
+            on={done.has(step.id)}
+            tone="task"
+            onToggle={onToggle}
+          />
+        ))}
+      </Column>
+      <p className="mt-3 text-center text-[11px] uppercase tracking-[0.18em] text-amber-200/80">
+        {branch.decisionLabel}
+      </p>
+      <WaveFork compact />
+      <div className="grid w-full items-start gap-4 sm:grid-cols-2">
+        <Column
+          live={leaving}
+          head={
+            <Tile
+              step={branch.noBuyHead}
+              on={leaving}
+              tone="reject"
+              onToggle={onToggle}
+            />
+          }
+        >
+          {branch.noBuy.map((step) => (
+            <Tile
+              key={step.id}
+              step={step}
+              on={done.has(step.id)}
+              tone="reject"
+              dim={!leaving}
+              onToggle={onToggle}
+            />
+          ))}
+          <EndTile
+            label="Fin"
+            on={leaving && branch.noBuy.every((x) => done.has(x.id))}
+          />
+        </Column>
+        <Column
+          live={buying}
+          head={
+            <Tile
+              step={branch.buyHead}
+              on={buying}
+              tone="decision"
+              onToggle={onToggle}
+            />
+          }
+        >
+          {branch.buy.map((step) => (
+            <Tile
+              key={step.id}
+              step={step}
+              on={done.has(step.id)}
+              tone="task"
+              dim={!buying}
+              onToggle={onToggle}
+            />
+          ))}
+          <EndTile
+            label="Listo"
+            on={buying && branch.buy.every((x) => done.has(x.id))}
+          />
+        </Column>
+      </div>
+    </>
+  );
+}
+
+function Choice({
+  a,
+  b,
+  done,
+  onToggle,
+}: {
+  a: OnboardingStep;
+  b: OnboardingStep;
+  done: Set<string>;
+  onToggle: (id: string, checked: boolean) => void;
+}) {
+  return (
+    <div className="grid w-full max-w-md grid-cols-2 gap-3">
+      <div className="flex justify-center">
+        <Tile
+          step={a}
+          on={done.has(a.id)}
+          tone="decision"
+          onToggle={onToggle}
+        />
+      </div>
+      <div className="flex justify-center">
+        <Tile
+          step={b}
+          on={done.has(b.id)}
+          tone="decision"
+          onToggle={onToggle}
+        />
       </div>
     </div>
   );
@@ -194,7 +456,7 @@ function Column({
   children,
 }: {
   live: boolean;
-  head: ReactNode;
+  head?: ReactNode;
   children: ReactNode;
 }) {
   const items = Array.isArray(children) ? children : [children];
@@ -205,7 +467,9 @@ function Column({
         const skipWave = isFork(child) || (i > 0 && isFork(items[i - 1]));
         return (
           <div key={i} className="flex w-full flex-col items-center">
-            {skipWave ? child : (
+            {skipWave ? (
+              child
+            ) : (
               <>
                 <WaveDown hot={live} />
                 {child}
@@ -219,7 +483,12 @@ function Column({
 }
 
 function isFork(node: ReactNode): boolean {
-  return !!node && typeof node === "object" && "type" in node && node.type === WaveFork;
+  return (
+    !!node &&
+    typeof node === "object" &&
+    "type" in node &&
+    node.type === WaveFork
+  );
 }
 
 function Tile({
@@ -255,9 +524,13 @@ function Tile({
         dim && !on ? "opacity-50" : ""
       }`}
     >
-      <span className="block text-[13px] font-medium leading-tight">{step.label}</span>
+      <span className="block text-[13px] font-medium leading-tight">
+        {step.label}
+      </span>
       {hint ? (
-        <span className="mt-0.5 block text-[10px] uppercase tracking-wider opacity-80">{hint}</span>
+        <span className="mt-0.5 block text-[10px] uppercase tracking-wider opacity-80">
+          {hint}
+        </span>
       ) : null}
     </button>
   );
@@ -277,7 +550,13 @@ function EndTile({ label, on }: { label: string; on: boolean }) {
 
 function WaveDown({ hot }: { hot: boolean }) {
   return (
-    <svg width="24" height="28" viewBox="0 0 28 36" aria-hidden className="shrink-0">
+    <svg
+      width="24"
+      height="28"
+      viewBox="0 0 28 36"
+      aria-hidden
+      className="shrink-0"
+    >
       <path
         d="M14 1 C 22 8, 6 14, 14 20 C 22 26, 6 30, 14 35"
         fill="none"

@@ -140,7 +140,9 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
       canForce?: boolean;
       verifyReason?: string | null;
       locked?: boolean;
+      status?: number;
     };
+    e.status = res.status;
     if (err.undeliverableRemoved) e.undeliverableRemoved = true;
     if (err.verifyBlocked) e.verifyBlocked = true;
     if (err.canForce) e.canForce = true;

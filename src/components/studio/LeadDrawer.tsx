@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, ConversationStep, CrmStage, DeliveryStatus, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
 import { Spinner } from "@/components/ui";
@@ -1140,10 +1140,15 @@ export function LeadDrawer(props: DrawerProps) {
               disabled={editLocked}
               lockHint={lockHint}
               onSave={(raw) => {
-                const next = sanitizeEmailList(parseList(raw));
+                const typed = parseList(raw);
+                const next = sanitizeEmailList(typed);
+                const rejected = typed.filter((t) => !parseRecipientEmail(t));
                 if (next.join("\0") !== lead.emails.join("\0")) {
                   void props.onUpdateCrm(lead.id, { emails: next });
                 }
+                return rejected.length
+                  ? `Not saved — not a valid email: ${rejected.join(", ")}`
+                  : null;
               }}
             />
             <EditableInfoRow
@@ -1789,11 +1794,17 @@ export function LeadDrawer(props: DrawerProps) {
 
 // ─── Small helpers ────────────────────────────────────────────────────────────
 
+/**
+ * Controlled field with a local draft. Server/poll updates only replace the
+ * text while the user is not editing it, and a dirty draft is saved on blur,
+ * Enter, and when the drawer unmounts (Escape / switching leads skip blur).
+ * `onSave` may return a warning; the typed text then stays in the field so
+ * nothing silently disappears.
+ */
 function EditableInfoRow({
   icon,
   label,
   defaultValue,
-  fieldKey,
   placeholder,
   onSave,
   disabled = false,
@@ -1802,36 +1813,104 @@ function EditableInfoRow({
   icon: React.ReactNode;
   label: string;
   defaultValue: string;
-  fieldKey: string;
+  fieldKey?: string;
   placeholder: string;
-  onSave: (raw: string) => void;
+  onSave: (raw: string) => string | null | void;
   disabled?: boolean;
   lockHint?: string;
 }) {
+  const draft = useDraftField(defaultValue, onSave, disabled);
   return (
-    <div className="flex items-center gap-3 text-sm text-mist-100">
-      <span className="shrink-0 text-mist-500" aria-hidden>
-        {icon}
-      </span>
-      <Lockable className="min-w-0 flex-1">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-white/10 bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50">
-          <input
-            key={fieldKey}
-            defaultValue={defaultValue}
-            onBlur={(e) => {
-              if (disabled) return;
-              onSave(e.target.value);
-            }}
-            placeholder={placeholder}
-            aria-label={disabled && lockHint ? lockHint : label}
-            disabled={disabled}
-            title={disabled ? lockHint : undefined}
-            className="min-w-0 flex-1 bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-500 disabled:cursor-not-allowed disabled:opacity-70"
-          />
-        </div>
-      </Lockable>
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-3 text-sm text-mist-100">
+        <span className="shrink-0 text-mist-500" aria-hidden>
+          {icon}
+        </span>
+        <Lockable className="min-w-0 flex-1">
+          <div
+            className={`flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50 ${
+              draft.warning ? "border-rose-400/60" : "border-white/10"
+            }`}
+          >
+            <input
+              value={draft.value}
+              onChange={(e) => draft.onChange(e.target.value)}
+              onFocus={draft.onFocus}
+              onBlur={draft.onBlur}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              placeholder={placeholder}
+              aria-label={disabled && lockHint ? lockHint : label}
+              aria-invalid={draft.warning ? true : undefined}
+              disabled={disabled}
+              title={disabled ? lockHint : undefined}
+              className="min-w-0 flex-1 bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-500 disabled:cursor-not-allowed disabled:opacity-70"
+            />
+          </div>
+        </Lockable>
+      </div>
+      {draft.warning ? (
+        <p role="alert" className="pl-7 text-xs text-rose-300">
+          {draft.warning}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+function useDraftField(
+  serverValue: string,
+  onSave: (raw: string) => string | null | void,
+  disabled: boolean,
+) {
+  const [value, setValue] = useState(serverValue);
+  const [warning, setWarning] = useState<string | null>(null);
+  const focusedRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const valueRef = useRef(serverValue);
+  const saveRef = useRef(onSave);
+  saveRef.current = onSave;
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
+
+  // Adopt server value only when the user isn't mid-edit.
+  useEffect(() => {
+    if (focusedRef.current || dirtyRef.current) return;
+    valueRef.current = serverValue;
+    setValue(serverValue);
+  }, [serverValue]);
+
+  const commit = useCallback(() => {
+    if (!dirtyRef.current || disabledRef.current) return;
+    const result = saveRef.current(valueRef.current);
+    if (typeof result === "string" && result) {
+      setWarning(result);
+      return; // keep the draft visible; stay dirty
+    }
+    setWarning(null);
+    dirtyRef.current = false;
+  }, []);
+
+  // Escape / lead switch unmounts without blur — flush the draft.
+  useEffect(() => () => commit(), [commit]);
+
+  return {
+    value,
+    warning,
+    onChange: (next: string) => {
+      dirtyRef.current = true;
+      valueRef.current = next;
+      setValue(next);
+    },
+    onFocus: () => {
+      focusedRef.current = true;
+    },
+    onBlur: () => {
+      focusedRef.current = false;
+      commit();
+    },
+  };
 }
 
 function AutoGrowAbout({
@@ -1841,11 +1920,12 @@ function AutoGrowAbout({
   lockHint,
 }: {
   defaultValue: string;
-  onSave: (raw: string) => void;
+  onSave: (raw: string) => string | null | void;
   disabled?: boolean;
   lockHint?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const draft = useDraftField(defaultValue, onSave, disabled);
 
   const resize = () => {
     const el = ref.current;
@@ -1856,20 +1936,18 @@ function AutoGrowAbout({
 
   useEffect(() => {
     resize();
-  }, [defaultValue]);
+  }, [draft.value]);
 
   return (
     <Lockable className="flex w-full">
     <div className="flex w-full items-start gap-2 rounded-lg border border-white/10 bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50">
       <textarea
         ref={ref}
-        defaultValue={defaultValue}
+        value={draft.value}
         rows={1}
-        onInput={resize}
-        onBlur={(e) => {
-          if (disabled) return;
-          onSave(e.target.value);
-        }}
+        onChange={(e) => draft.onChange(e.target.value)}
+        onFocus={draft.onFocus}
+        onBlur={draft.onBlur}
         placeholder="Short blurb about this lead…"
         aria-label={disabled && lockHint ? lockHint : "About"}
         disabled={disabled}

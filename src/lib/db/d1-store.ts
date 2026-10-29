@@ -38,6 +38,7 @@ import { LOCAL_WORKSPACE_ID } from "./index";
  */
 interface D1Result<T> {
   results: T[];
+  meta?: { changes?: number };
 }
 interface D1PreparedStatement {
   bind(...values: unknown[]): D1PreparedStatement;
@@ -1414,23 +1415,16 @@ export class D1Store implements LeadRepository {
   }
 
   async deleteLead(id: string): Promise<boolean> {
-    await this.db
-      .prepare(`DELETE FROM outreach WHERE lead_id = ? AND workspace_id = ?`)
-      .bind(id, this.workspaceId)
-      .run();
-    await this.db
-      .prepare(`DELETE FROM lead_documents WHERE lead_id = ? AND workspace_id = ?`)
-      .bind(id, this.workspaceId)
-      .run();
-    await this.db
-      .prepare(`DELETE FROM tasks WHERE lead_id = ? AND workspace_id = ?`)
-      .bind(id, this.workspaceId)
-      .run();
-    const result = await this.db
-      .prepare(`DELETE FROM leads WHERE id = ? AND workspace_id = ?`)
-      .bind(id, this.workspaceId)
-      .run();
-    return (result.meta?.changes ?? 0) > 0;
+    // One atomic batch: a failure part-way can't leave the lead row behind
+    // while its outreach/tasks are already gone (or vice versa).
+    const ws = this.workspaceId;
+    const results = await this.db.batch([
+      this.db.prepare(`DELETE FROM outreach WHERE lead_id = ? AND workspace_id = ?`).bind(id, ws),
+      this.db.prepare(`DELETE FROM lead_documents WHERE lead_id = ? AND workspace_id = ?`).bind(id, ws),
+      this.db.prepare(`DELETE FROM tasks WHERE lead_id = ? AND workspace_id = ?`).bind(id, ws),
+      this.db.prepare(`DELETE FROM leads WHERE id = ? AND workspace_id = ?`).bind(id, ws),
+    ]);
+    return (results[3]?.meta?.changes ?? 0) > 0;
   }
 
   async deleteLeads(ids: string[]): Promise<number> {
@@ -1442,31 +1436,14 @@ export class D1Store implements LeadRepository {
     for (let i = 0; i < unique.length; i += CHUNK) {
       const chunk = unique.slice(i, i + CHUNK);
       const placeholders = chunk.map(() => "?").join(",");
-      await this.db
-        .prepare(
-          `DELETE FROM outreach WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
-        )
-        .bind(this.workspaceId, ...chunk)
-        .run();
-      await this.db
-        .prepare(
-          `DELETE FROM lead_documents WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
-        )
-        .bind(this.workspaceId, ...chunk)
-        .run();
-      await this.db
-        .prepare(
-          `DELETE FROM tasks WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
-        )
-        .bind(this.workspaceId, ...chunk)
-        .run();
-      const result = await this.db
-        .prepare(
-          `DELETE FROM leads WHERE workspace_id = ? AND id IN (${placeholders})`,
-        )
-        .bind(this.workspaceId, ...chunk)
-        .run();
-      deleted += result.meta?.changes ?? 0;
+      const ws = this.workspaceId;
+      const results = await this.db.batch([
+        this.db.prepare(`DELETE FROM outreach WHERE workspace_id = ? AND lead_id IN (${placeholders})`).bind(ws, ...chunk),
+        this.db.prepare(`DELETE FROM lead_documents WHERE workspace_id = ? AND lead_id IN (${placeholders})`).bind(ws, ...chunk),
+        this.db.prepare(`DELETE FROM tasks WHERE workspace_id = ? AND lead_id IN (${placeholders})`).bind(ws, ...chunk),
+        this.db.prepare(`DELETE FROM leads WHERE workspace_id = ? AND id IN (${placeholders})`).bind(ws, ...chunk),
+      ]);
+      deleted += results[3]?.meta?.changes ?? 0;
     }
     return deleted;
   }

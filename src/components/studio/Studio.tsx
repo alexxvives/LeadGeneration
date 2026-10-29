@@ -41,7 +41,7 @@ import { VerifyLimitModal } from "./VerifyLimitModal";
 import { crmStageLabel, Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
-import { ONBOARDING_FIELD } from "@/lib/onboarding-path";
+import { canEditOwnLeadUnderLock, isSystemCustomField } from "@/lib/lead-ownership";
 import { PipelineFocusToggle, PipelineView } from "./PipelineView";
 import {
   OutreachView,
@@ -269,6 +269,12 @@ export function Studio() {
     (session?.user?.name as string | undefined)?.trim() ||
     (session?.user?.email as string | undefined)?.split("@")[0] ||
     null;
+  const sessionUserId =
+    session?.userId ??
+    (session?.user as { id?: string } | undefined)?.id ??
+    null;
+  const sessionUserIdRef = useRef<string | null>(sessionUserId);
+  sessionUserIdRef.current = sessionUserId;
   const rawView = searchParams.get("view");
   const view = viewFromParams(rawView);
   const boardParam = searchParams.get("board");
@@ -1405,6 +1411,22 @@ export function Studio() {
     }
   };
 
+  /**
+   * Lead-level edit gate. Under someone else's board lock a collaborator can
+   * still edit leads they created in the last 24h (server enforces the same).
+   * Returns false — with a toast, never silently — when the edit is blocked.
+   */
+  const canEditLeadNow = (leadId: string, opts?: { quiet?: boolean }): boolean => {
+    if (droppedLeadIdsRef.current.has(leadId)) return false;
+    if (!editLockedRef.current) return true;
+    const lead = boardRef.current?.leads.find((l) => l.id === leadId);
+    if (lead && canEditOwnLeadUnderLock(lead, sessionUserIdRef.current)) return true;
+    if (!opts?.quiet) {
+      toast("err", "Someone else has control of this board — take control to edit this lead.");
+    }
+    return false;
+  };
+
   const enqueueLeadWrite = (leadId: string, fn: () => Promise<void>) => {
     const tail = leadWriteTailRef.current;
     const prev = tail.get(leadId) ?? Promise.resolve();
@@ -1804,7 +1826,7 @@ export function Studio() {
     stage: CrmStage,
     contactMethods?: ContactMethod[] | null,
   ) => {
-    if (editLockedRef.current) return;
+    if (!canEditLeadNow(leadId)) return;
     const patch: {
       crmStage: CrmStage;
       contactMethods?: ContactMethod[];
@@ -1856,7 +1878,7 @@ export function Studio() {
     leadId: string,
     step: ConversationStep,
   ) => {
-    if (editLockedRef.current) return;
+    if (!canEditLeadNow(leadId)) return;
     const conversationStepAt = todayIsoDate();
     const writeAt = patchLeadLocal(
       leadId,
@@ -1892,7 +1914,7 @@ export function Studio() {
     method: ContactMethod,
     opts?: { promptNote?: boolean; missed?: boolean },
   ) => {
-    if (editLockedRef.current) return;
+    if (!canEditLeadNow(leadId)) return;
     markOutreachBusy(leadId);
     try {
       const existing =
@@ -1938,7 +1960,7 @@ export function Studio() {
     leadId: string,
     patch: Parameters<typeof api.updateLead>[1],
   ) => {
-    if (editLockedRef.current) return;
+    if (!canEditLeadNow(leadId)) return;
     const prior = boardRef.current?.leads.find((l) => l.id === leadId);
     const droppedFollowUpIds = rememberDroppedFollowUps(
       prior,
@@ -2000,7 +2022,7 @@ export function Studio() {
   };
 
   const onCompletePendingTask = (leadId: string) => {
-    if (editLockedRef.current) return;
+    if (!canEditLeadNow(leadId)) return;
     const lead = boardRef.current?.leads.find((l) => l.id === leadId);
     if (!lead) return;
     const updated = markNewestPendingTaskDone(lead.followUps ?? []);
@@ -2009,7 +2031,7 @@ export function Studio() {
   };
 
   const onCompletePendingFollowUp = (leadId: string) => {
-    if (editLockedRef.current) return;
+    if (!canEditLeadNow(leadId)) return;
     const lead = boardRef.current?.leads.find((l) => l.id === leadId);
     if (!lead) return;
     const updated = markNewestPendingFollowUpDone(lead.followUps ?? []);
@@ -2161,7 +2183,8 @@ export function Studio() {
     void ensureLeadDetail(id);
   };
   const onAddLead = async () => {
-    if (addingLead || editLocked || !board) return;
+    // Creating a lead is allowed under someone else's lock (new row, no clash).
+    if (addingLead || !board) return;
     setAddingLead(true);
     try {
       const { lead } = await api.createLead({ boardId: filterBoardId });
@@ -2214,7 +2237,7 @@ export function Studio() {
         ...(l.phones ?? []),
         ...(l.tags ?? []),
         ...Object.entries(l.customFields ?? {})
-          .filter(([key]) => key !== ONBOARDING_FIELD)
+          .filter(([key]) => !isSystemCustomField(key))
           .map(([, value]) => value),
         ...(l.followUps ?? []).map((f) => f.note),
       ]
@@ -2439,17 +2462,26 @@ export function Studio() {
   };
 
   const onDeleteLead = async (leadId: string) => {
-    if (editLockedRef.current) return;
+    if (!canEditLeadNow(leadId)) return;
     // Stop any in-flight CSV import so rows don’t reappear after delete.
     importAbortRef.current?.abort();
     dropLeadsLocally([leadId]);
     try {
-      await api.deleteLead(leadId);
+      // Queue behind pending PATCHes for this lead (e.g. a field saved on
+      // blur as the Delete button was clicked) so nothing races the DELETE.
+      await enqueueLeadWrite(leadId, async () => {
+        try {
+          await api.deleteLead(leadId);
+        } catch (e) {
+          // Already gone on the server = deleted; anything else is a failure.
+          if ((e as { status?: number }).status !== 404) throw e;
+        }
+      });
       toast("ok", "Lead deleted.");
     } catch (e) {
       droppedLeadIdsRef.current.delete(leadId);
       await refresh();
-      toast("err", (e as Error).message);
+      toast("err", `Lead was not deleted: ${(e as Error).message}`);
     }
   };
 
@@ -2471,7 +2503,11 @@ export function Studio() {
   };
 
   const onDeleteLeads = async (leadIds: string[]) => {
-    if (editLockedRef.current) return;
+    if (leadIds.length === 0) return;
+    if (!leadIds.every((id) => canEditLeadNow(id, { quiet: true }))) {
+      toast("err", "Someone else has control of this board — take control to delete leads.");
+      return;
+    }
     const idSet = new Set(leadIds);
     const boardLeads = board?.leads ?? [];
     // Full wipe of the filtered board view → one set-based API call (avoids
@@ -2491,10 +2527,16 @@ export function Studio() {
         clearBoard: clearingBoard,
         onProgress: (done, total) => setDeleteProgress({ done, total }),
       });
-      toast(
-        "ok",
-        `Deleted ${deleted} lead${deleted === 1 ? "" : "s"}.`,
-      );
+      if (!clearingBoard && deleted < leadIds.length) {
+        // Some ids were not removed server-side — resync so the list is honest.
+        await refresh();
+        toast(
+          "err",
+          `Deleted ${deleted} of ${leadIds.length} leads — the rest were already gone or could not be deleted.`,
+        );
+      } else {
+        toast("ok", `Deleted ${deleted} lead${deleted === 1 ? "" : "s"}.`);
+      }
     } catch (e) {
       for (const id of leadIds) droppedLeadIdsRef.current.delete(id);
       await refresh();
@@ -2925,12 +2967,12 @@ export function Studio() {
             />
             {hasLeads ? <ExportButton compact /> : null}
             {board ? (
-              <Lockable>
+              <>
                 <button
                   type="button"
                   onClick={() => void onAddLead()}
                   disabled={
-                    editLocked || addingLead || loading || leadsHydrating
+                    addingLead || loading || leadsHydrating
                   }
                   aria-label="Add lead"
                   className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-aurora-300 transition-colors hover:border-white/20 disabled:opacity-50"
@@ -2941,7 +2983,7 @@ export function Studio() {
                     <PlusIcon className="h-4 w-4" />
                   )}
                 </button>
-              </Lockable>
+              </>
             ) : null}
           </div>
           <div className="hidden shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 lg:grid">
@@ -2970,12 +3012,12 @@ export function Studio() {
                 leads
               </p>
               {board ? (
-                <Lockable>
+                <>
                   <button
                     type="button"
                     onClick={() => void onAddLead()}
                     disabled={
-                      editLocked || addingLead || loading || leadsHydrating
+                      addingLead || loading || leadsHydrating
                     }
                     className="glass inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-mist-100 transition-transform hover:scale-[1.02] disabled:opacity-50"
                   >
@@ -2988,7 +3030,7 @@ export function Studio() {
                     )}
                     Add lead
                   </button>
-                </Lockable>
+                </>
               ) : null}
             </div>
             <div className="glass inline-flex items-center justify-self-start rounded-full p-1 text-sm sm:justify-self-center">
@@ -3368,7 +3410,14 @@ export function Studio() {
       ) : null}
 
       {selected && board && (
+        <BoardLockUiProvider
+          locked={
+            editLocked && !canEditOwnLeadUnderLock(selected, sessionUserId)
+          }
+          holder={lockHolder}
+        >
         <LeadDrawer
+          key={selected.id}
           lead={selected}
           mode={drawerMode}
           promptNote={drawerPromptNote}
@@ -3399,6 +3448,7 @@ export function Studio() {
             await onDeleteLead(id);
           }}
         />
+        </BoardLockUiProvider>
       )}
 
       <Modal

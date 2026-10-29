@@ -91,6 +91,7 @@ import {
 } from "@/lib/contact-methods";
 import { collapseEmailSentFollowUps, emailSentFollowUpId, hasEmailSentOn, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
 import { conversationStepPatch } from "@/lib/conversation-steps";
+import { CREATED_BY_FIELD, canEditOwnLeadUnderLock, preserveCreatorStamp } from "@/lib/lead-ownership";
 import {
   appendJournalTaskLine,
   backfillTasksFromJournal,
@@ -702,6 +703,15 @@ async function assertBoardEditable(ctx: Ctx, boardId: string): Promise<void> {
   if (lock && ctx.userId && lock.userId !== ctx.userId) {
     throw new BoardLockedError(lock.userId, lock.userName);
   }
+}
+
+/**
+ * Lead-level edit check: the board lock holder edits everything; a
+ * collaborator may still edit/delete leads they created in the last 24h.
+ */
+async function assertLeadEditable(ctx: Ctx, lead: Lead): Promise<void> {
+  if (canEditOwnLeadUnderLock(lead, ctx.userId)) return;
+  await assertBoardEditable(ctx, lead.boardId);
 }
 
 /** Resolve a boardId or create by name — never invents a Default board. */
@@ -2493,7 +2503,7 @@ export async function updateWorkspaceEmailSettings(
 export async function deleteLead(ctx: Ctx, leadId: string): Promise<boolean> {
   const found = await findLeadAccess(ctx, leadId);
   if (!found) return false;
-  await assertBoardEditable(ctx, found.lead.boardId);
+  await assertLeadEditable(ctx, found.lead);
   return found.db.deleteLead(leadId);
 }
 
@@ -2512,7 +2522,9 @@ export async function deleteLeads(
   for (const id of ids) {
     const found = await findLeadAccess(ctx, id);
     if (!found) continue;
-    boardIds.add(found.lead.boardId);
+    if (!canEditOwnLeadUnderLock(found.lead, ctx.userId)) {
+      boardIds.add(found.lead.boardId);
+    }
     const list = byDb.get(found.db) ?? [];
     list.push(id);
     byDb.set(found.db, list);
@@ -2634,7 +2646,7 @@ export async function updateLeadCrm(
   const found = await findLeadAccess(ctx, leadId);
   if (!found) return null;
   const { lead, db } = found;
-  await assertBoardEditable(ctx, lead.boardId);
+  await assertLeadEditable(ctx, lead);
 
   const next: typeof patch & {
     fitScore?: number;
@@ -2644,6 +2656,9 @@ export async function updateLeadCrm(
   } = { ...patch };
   if (next.emails) {
     next.emails = sanitizeEmailList(next.emails);
+  }
+  if (next.customFields) {
+    next.customFields = preserveCreatorStamp(lead.customFields, next.customFields);
   }
   if (next.company !== undefined) {
     next.company = sanitizeCompanyName(next.company);
@@ -2815,7 +2830,8 @@ export async function createManualLead(
     throw new Error("Pick or create a board before adding leads");
   }
 
-  await assertBoardEditable(ctx, boardId);
+  // No lock check: adding a lead never clashes with the lock holder's edits
+  // (new row, new id). The creator stamp lets them fill it in under the lock.
 
   // Manual entry is free — does not consume monthly lead credits (search/import do).
   const runs = await db.listRuns();
@@ -2865,7 +2881,7 @@ export async function createManualLead(
     contactedByName: null,
     notes: null,
     followUps: [],
-    customFields: {},
+    customFields: ctx.userId ? { [CREATED_BY_FIELD]: ctx.userId } : {},
     waitingOnUs: false,
     demoDone: false,
     conversationStep: null,
@@ -3705,7 +3721,7 @@ export async function addLeadDocument(
 ): Promise<LeadDocument> {
   const found = await findLeadAccess(ctx, leadId);
   if (!found) throw new NotFoundError("Lead not found");
-  await assertBoardEditable(ctx, found.lead.boardId);
+  await assertLeadEditable(ctx, found.lead);
   if (found.lead.crmStage !== "closed") {
     throw new Error("Documents can only be added on closed leads.");
   }
@@ -3753,7 +3769,7 @@ export async function deleteLeadDocument(
 ): Promise<boolean> {
   const found = await findLeadAccess(ctx, leadId);
   if (!found) return false;
-  await assertBoardEditable(ctx, found.lead.boardId);
+  await assertLeadEditable(ctx, found.lead);
   const doc = await found.db.getLeadDocument(docId);
   if (!doc || doc.leadId !== leadId) return false;
   return found.db.deleteLeadDocument(docId);
@@ -3830,7 +3846,7 @@ export async function createTask(
   if (input.leadId) {
     const leadAccess = await findLeadAccess(ctx, input.leadId);
     if (!leadAccess) throw new NotFoundError("Lead not found");
-    await assertBoardEditable(ctx, leadAccess.lead.boardId);
+    await assertLeadEditable(ctx, leadAccess.lead);
     db = leadAccess.db;
     workspaceId = leadAccess.lead.workspaceId;
     boardId = leadAccess.lead.boardId;
