@@ -485,6 +485,12 @@ export interface Lead {
    */
   conversationStepAt: string | null;
   createdAt: string;
+  /** Optimistic-concurrency counter; bumps on every write (0 on old rows). */
+  version?: number;
+  /** Display name of whoever last edited the lead (conflict messages). */
+  updatedByName?: string | null;
+  /** LUMIA lead-tree progress (step ids), stored apart from customFields. */
+  leadTree?: string[];
 }
 
 /**

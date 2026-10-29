@@ -38,9 +38,11 @@ import {
 } from "@/lib/plans";
 import { sumInsiderSharedUsage } from "@/lib/insider-quota";
 import { getFirecrawlRemainingCredits } from "@/lib/search/firecrawl";
+import { mergeLeadPatch, sameValue } from "@/lib/lead-merge";
 import {
   BoardLockedError,
   ForbiddenError,
+  LeadConflictError,
   NotFoundError,
   QuotaError,
 } from "@/lib/errors";
@@ -1587,6 +1589,32 @@ export async function sendApprovedOutreach(
     return { ok: false, error: "Outreach is not ready to send" };
   }
 
+  // Second guard against double-sends: the status claim above re-opens a
+  // "sending" row after 2 min (crash recovery), which could overlap a slow
+  // in-flight send. The idempotency key is held for the whole send (expires
+  // after 10 min if a worker dies); once sent, status "sent" blocks re-claims.
+  const sendKey = `send:${outreachId}`;
+  if (!(await db.claimIdempotencyKey(sendKey, "send", 10 * 60_000))) {
+    const latest = await db.getOutreach(outreachId);
+    if (latest?.status === "sent") {
+      return { ok: false, error: "Already sent", outreach: latest };
+    }
+    return { ok: false, error: "Send already in progress", outreach: latest ?? undefined };
+  }
+  try {
+    return await sendClaimedOutreach(ctx, outreachId, claimed, opts);
+  } finally {
+    await db.releaseIdempotencyKey(sendKey).catch(() => undefined);
+  }
+}
+
+async function sendClaimedOutreach(
+  ctx: Ctx,
+  outreachId: string,
+  claimed: Outreach,
+  opts?: { skipVerify?: boolean },
+): Promise<SendOutcome> {
+  const db = ctx.db;
   const releaseClaim = async (error?: string | null) => {
     await db.updateOutreach(outreachId, {
       status: "approved",
@@ -2637,11 +2665,59 @@ export async function updateLeadCrm(
     demoDone?: boolean;
     conversationStep?: ConversationStep | null;
     conversationStepAt?: string | null;
+    leadTree?: string[];
   },
+  concurrency?: LeadEditConcurrency,
 ): Promise<Lead | null> {
-  const found = await findLeadAccess(ctx, leadId);
-  if (!found) return null;
+  // Simultaneous editing: three-way merge against what this client started
+  // from, then compare-and-set on the lead's version. A concurrent write in
+  // between just re-reads and re-merges (bounded retries).
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const found = await findLeadAccess(ctx, leadId);
+    if (!found) return null;
+    const { lead } = found;
+    let merged: typeof patch = patch;
+    if (concurrency?.base && !concurrency.force) {
+      const { apply, conflicts } = mergeLeadPatch(
+        lead as unknown as Record<string, unknown>,
+        concurrency.base,
+        patch as Record<string, unknown>,
+      );
+      if (conflicts.length > 0) {
+        throw new LeadConflictError(conflicts, lead, lead.updatedByName ?? null);
+      }
+      merged = apply as typeof patch;
+    }
+    // Idempotent: a repeated stage move / duplicate click that changes
+    // nothing is a no-op (no re-stamped attribution, journal or tasks).
+    const cur = lead as unknown as Record<string, unknown>;
+    const changes = Object.entries(merged as Record<string, unknown>).filter(
+      ([k, v]) => v !== undefined && !sameValue(cur[k], v),
+    );
+    if (changes.length === 0) return lead;
+    const res = await applyLeadCrmPatch(ctx, found, merged, lead.version ?? 0);
+    if (res !== false) return res;
+  }
+  const latest = await findLeadAccess(ctx, leadId);
+  if (!latest) return null;
+  throw new LeadConflictError([], latest.lead, latest.lead.updatedByName ?? null);
+}
+
+export type LeadEditConcurrency = {
+  /** Values of the patched fields as this client last saw them. */
+  base?: Record<string, unknown>;
+  /** "Keep yours": overwrite whatever is stored now. */
+  force?: boolean;
+};
+
+async function applyLeadCrmPatch(
+  ctx: Ctx,
+  found: NonNullable<Awaited<ReturnType<typeof findLeadAccess>>>,
+  patch: Parameters<typeof updateLeadCrm>[2],
+  expectedVersion: number,
+): Promise<Lead | null | false> {
   const { lead, db } = found;
+  const leadId = lead.id;
 
   const next: typeof patch & {
     fitScore?: number;
@@ -2799,7 +2875,11 @@ export async function updateLeadCrm(
     ),
   );
 
-  return db.updateLead(leadId, next);
+  return db.updateLeadIfVersion(
+    leadId,
+    { ...next, updatedByName: ctx.userName?.trim() || ctx.userEmail?.trim() || null },
+    expectedVersion,
+  );
 }
 
 /**

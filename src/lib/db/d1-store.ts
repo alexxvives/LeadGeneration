@@ -30,6 +30,7 @@ import {
 } from "@/lib/tasks";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
+import { parseTreeDone } from "@/lib/lead-tree";
 
 /**
  * Minimal D1 type stubs — keeps this file type-safe without adding
@@ -179,6 +180,9 @@ type LeadRow = {
   notes?: string | null;
   follow_ups: string | null; // JSON-encoded FollowUp[]
   custom_fields: string | null; // JSON-encoded Record<string, string>
+  version?: number | null;
+  updated_by_name?: string | null;
+  lead_tree?: string | null;
   waiting_on_us: number | boolean | string | null;
   demo_done: number | boolean | string | null;
   conversation_step: string | null;
@@ -291,7 +295,8 @@ const CARD_LEAD_SELECT = `l.id, l.workspace_id, l.run_id, l.board_id, l.company,
          l.emails, l.phones, l.contact_name, l.location, l.company_type,
          l.status, l.crm_stage, l.contact_method, l.contacted_by_user_id,
          l.contacted_by_name, l.created_at, l.custom_fields, l.follow_ups,
-         l.waiting_on_us, l.demo_done, l.conversation_step, l.conversation_step_at`;
+         l.waiting_on_us, l.demo_done, l.conversation_step, l.conversation_step_at,
+         l.version, l.updated_by_name, l.lead_tree`;
 
 type OutreachRow = {
   id: string;
@@ -471,8 +476,21 @@ const parseCustomFields = (s: string | null | undefined): Record<string, string>
   }
 };
 
+function readLeadTree(raw: string | null | undefined, customFields: Record<string, string>): string[] {
+  if (raw != null) {
+    try {
+      const v = JSON.parse(raw) as unknown;
+      if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+    } catch {
+      /* fall through */
+    }
+  }
+  return parseTreeDone(customFields);
+}
+
 function rowToLead(r: LeadRow): Lead {
   const followUps = parseFollowUps(r.follow_ups);
+  const customFields = parseCustomFields(r.custom_fields);
   return {
     id: r.id,
     workspaceId: r.workspace_id ?? LOCAL_WORKSPACE_ID,
@@ -497,12 +515,15 @@ function rowToLead(r: LeadRow): Lead {
     contactedByName: r.contacted_by_name ?? null,
     notes: r.notes ?? null,
     followUps,
-    customFields: parseCustomFields(r.custom_fields),
+    customFields,
     waitingOnUs: hasPendingTask(followUps),
     demoDone: isSqliteOn(r.demo_done),
     conversationStep: normalizeConversationStep(r.conversation_step),
     conversationStepAt: r.conversation_step_at?.slice(0, 10) || null,
     createdAt: r.created_at,
+    version: r.version ?? 0,
+    updatedByName: r.updated_by_name ?? null,
+    leadTree: readLeadTree(r.lead_tree, customFields),
   };
 }
 
@@ -1360,6 +1381,8 @@ export class D1Store implements LeadRepository {
       );
     }
     if ("customFields" in patch) row.custom_fields = JSON.stringify(patch.customFields ?? {});
+    if ("leadTree" in patch) row.lead_tree = JSON.stringify(patch.leadTree ?? []);
+    if ("updatedByName" in patch) row.updated_by_name = patch.updatedByName ?? null;
     if ("waitingOnUs" in patch) row.waiting_on_us = patch.waitingOnUs ? 1 : 0;
     if ("demoDone" in patch) row.demo_done = patch.demoDone ? 1 : 0;
     if ("conversationStep" in patch) {
@@ -1377,10 +1400,58 @@ export class D1Store implements LeadRepository {
     if (Object.keys(row).length === 0) return this.getLead(id);
     const { clause, values } = buildSet(row);
     await this.db
-      .prepare(`UPDATE leads SET ${clause} WHERE id = ? AND workspace_id = ?`)
+      .prepare(
+        `UPDATE leads SET ${clause}, version = COALESCE(version, 0) + 1 WHERE id = ? AND workspace_id = ?`,
+      )
       .bind(...values, id, this.workspaceId)
       .run();
     return this.getLead(id);
+  }
+
+  async updateLeadIfVersion(
+    id: string,
+    patch: Partial<Lead>,
+    expectedVersion: number,
+  ): Promise<Lead | null | false> {
+    const row = this.leadPatchToRow(patch);
+    const { clause, values } = buildSet(row);
+    const set = clause ? `${clause}, ` : "";
+    const res = await this.db
+      .prepare(
+        `UPDATE leads SET ${set}version = COALESCE(version, 0) + 1
+         WHERE id = ? AND workspace_id = ? AND COALESCE(version, 0) = ?`,
+      )
+      .bind(...values, id, this.workspaceId, expectedVersion)
+      .run();
+    if ((res?.meta?.changes ?? 0) === 0) {
+      const exists = await this.getLead(id);
+      return exists ? false : null;
+    }
+    return this.getLead(id);
+  }
+
+  async claimIdempotencyKey(key: string, scope: string, ttlMs?: number): Promise<boolean> {
+    const now = new Date();
+    // A held key older than ttlMs is treated as abandoned and re-claimed.
+    const staleBefore = ttlMs
+      ? new Date(now.getTime() - ttlMs).toISOString()
+      : "";
+    const res = await this.db
+      .prepare(
+        `INSERT INTO idempotency_keys (workspace_id, key, scope, created_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(workspace_id, key) DO UPDATE SET created_at = excluded.created_at
+         WHERE idempotency_keys.created_at < ?`,
+      )
+      .bind(this.workspaceId, key, scope, now.toISOString(), staleBefore)
+      .run();
+    return (res?.meta?.changes ?? 0) > 0;
+  }
+
+  async releaseIdempotencyKey(key: string): Promise<void> {
+    await this.db
+      .prepare(`DELETE FROM idempotency_keys WHERE workspace_id = ? AND key = ?`)
+      .bind(this.workspaceId, key)
+      .run();
   }
 
   async updateLeads(
@@ -1394,7 +1465,9 @@ export class D1Store implements LeadRepository {
       const { clause, values } = buildSet(row);
       stmts.push(
         this.db
-          .prepare(`UPDATE leads SET ${clause} WHERE id = ? AND workspace_id = ?`)
+          .prepare(
+            `UPDATE leads SET ${clause}, version = COALESCE(version, 0) + 1 WHERE id = ? AND workspace_id = ?`,
+          )
           .bind(...values, id, this.workspaceId),
       );
     }

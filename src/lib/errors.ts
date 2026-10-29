@@ -103,3 +103,23 @@ export class ForbiddenError extends Error {
 export function isForbiddenError(err: unknown): err is ForbiddenError {
   return err instanceof ForbiddenError;
 }
+
+/** Same-field edit collision on a lead (HTTP 409). */
+export class LeadConflictError extends Error {
+  constructor(
+    readonly conflicts: { field: string; yours: unknown; theirs: unknown }[],
+    readonly current: unknown,
+    readonly changedBy: string | null,
+  ) {
+    super(
+      changedBy
+        ? `Changed by ${changedBy} while you were editing.`
+        : "This lead changed while you were editing.",
+    );
+    this.name = "LeadConflictError";
+  }
+}
+
+export function isLeadConflictError(e: unknown): e is LeadConflictError {
+  return e instanceof LeadConflictError || (e as Error | null)?.name === "LeadConflictError";
+}

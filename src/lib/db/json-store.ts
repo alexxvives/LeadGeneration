@@ -690,9 +690,40 @@ export class JsonStore implements LeadRepository {
     return this.mutate((data) => {
       const idx = data.leads.findIndex((l) => l.id === id && this.inScope(l));
       if (idx === -1) return { data, result: null };
-      data.leads[idx] = { ...data.leads[idx], ...patch };
+      data.leads[idx] = {
+        ...data.leads[idx],
+        ...patch,
+        version: (data.leads[idx].version ?? 0) + 1,
+      };
       return { data, result: data.leads[idx] };
     });
+  }
+
+  updateLeadIfVersion(
+    id: string,
+    patch: Partial<Lead>,
+    expectedVersion: number,
+  ): Promise<Lead | null | false> {
+    return this.mutate<Lead | null | false>((data) => {
+      const idx = data.leads.findIndex((l) => l.id === id && this.inScope(l));
+      if (idx === -1) return { data, result: null };
+      const cur = data.leads[idx];
+      if ((cur.version ?? 0) !== expectedVersion) return { data, result: false as const };
+      data.leads[idx] = { ...cur, ...patch, version: (cur.version ?? 0) + 1 };
+      return { data, result: data.leads[idx] };
+    });
+  }
+
+  private idemKeys = new Set<string>();
+
+  async claimIdempotencyKey(key: string): Promise<boolean> {
+    if (this.idemKeys.has(key)) return false;
+    this.idemKeys.add(key);
+    return true;
+  }
+
+  async releaseIdempotencyKey(key: string): Promise<void> {
+    this.idemKeys.delete(key);
   }
 
   updateLeads(

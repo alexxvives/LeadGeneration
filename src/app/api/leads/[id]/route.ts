@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { deleteLead, getLeadWithOutreach, updateLeadCrm } from "@/lib/service";
-import { isBoardLockedError } from "@/lib/errors";
+import { isBoardLockedError, isLeadConflictError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +76,9 @@ const PatchSchema = z.object({
     )
     .optional(),
   customFields: z.record(z.string(), z.string()).optional(),
+  leadTree: z.array(z.string().max(80)).max(200).optional(),
+  base: z.record(z.string(), z.unknown()).optional(),
+  force: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -101,10 +104,23 @@ export async function PATCH(
 
   try {
     const ctx = await getCtx();
-    const lead = await updateLeadCrm(ctx, id, parsed.data);
+    const { base, force, ...patch } = parsed.data;
+    const lead = await updateLeadCrm(ctx, id, patch, { base, force });
     if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     return NextResponse.json({ lead });
   } catch (err) {
+    if (isLeadConflictError(err)) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          conflict: true,
+          conflicts: err.conflicts,
+          changedBy: err.changedBy,
+          lead: err.current,
+        },
+        { status: 409 },
+      );
+    }
     if (isBoardLockedError(err)) {
       return NextResponse.json({ error: err.message }, { status: 423 });
     }

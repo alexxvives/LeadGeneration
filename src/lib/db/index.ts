@@ -146,6 +146,18 @@ export interface LeadRepository {
   // Leads
   createLeads(leads: Lead[]): Promise<Lead[]>;
   updateLead(id: string, patch: Partial<Lead>): Promise<Lead | null>;
+  /**
+   * Compare-and-set write: applies only when the stored version still equals
+   * `expectedVersion`. Returns false on a version mismatch, null when gone.
+   */
+  updateLeadIfVersion(
+    id: string,
+    patch: Partial<Lead>,
+    expectedVersion: number,
+  ): Promise<Lead | null | false>;
+  /** True the first time `key` is claimed in this workspace (idempotency). */
+  claimIdempotencyKey(key: string, scope: string, ttlMs?: number): Promise<boolean>;
+  releaseIdempotencyKey(key: string): Promise<void>;
   /** Batch patch (one write / D1 batch) — used by chunked import merges. */
   updateLeads(
     patches: Array<{ id: string; patch: Partial<Lead> }>,
