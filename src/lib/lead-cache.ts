@@ -156,6 +156,9 @@ export function mergeSlimIntoCached(
   const customFields = stale
     ? prev.customFields
     : (incoming.customFields ?? prev.customFields);
+  // Tree ticks are optimistic: a poll or an older PATCH response that left
+  // before the latest tick must not revert them (the "deselect" bug).
+  const leadTree = stale ? prev.leadTree : (incoming.leadTree ?? prev.leadTree);
   const status = stale ? prev.status : incoming.status;
   const contactedByName = stale
     ? (prev.contactedByName ?? incoming.contactedByName)
@@ -192,6 +195,7 @@ export function mergeSlimIntoCached(
     location,
     companyType,
     customFields,
+    leadTree,
     status,
     contactedByName,
     contactedByUserId,

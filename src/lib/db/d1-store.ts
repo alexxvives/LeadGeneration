@@ -30,7 +30,6 @@ import {
 } from "@/lib/tasks";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
-import { parseTreeDone } from "@/lib/lead-tree";
 
 /**
  * Minimal D1 type stubs — keeps this file type-safe without adding
@@ -476,7 +475,7 @@ const parseCustomFields = (s: string | null | undefined): Record<string, string>
   }
 };
 
-function readLeadTree(raw: string | null | undefined, customFields: Record<string, string>): string[] {
+function readLeadTree(raw: string | null | undefined): string[] {
   if (raw != null) {
     try {
       const v = JSON.parse(raw) as unknown;
@@ -485,7 +484,8 @@ function readLeadTree(raw: string | null | undefined, customFields: Record<strin
       /* fall through */
     }
   }
-  return parseTreeDone(customFields);
+  // Legacy customFields tree progress is intentionally ignored (fresh start).
+  return [];
 }
 
 function rowToLead(r: LeadRow): Lead {
@@ -523,7 +523,7 @@ function rowToLead(r: LeadRow): Lead {
     createdAt: r.created_at,
     version: r.version ?? 0,
     updatedByName: r.updated_by_name ?? null,
-    leadTree: readLeadTree(r.lead_tree, customFields),
+    leadTree: readLeadTree(r.lead_tree),
   };
 }
 
