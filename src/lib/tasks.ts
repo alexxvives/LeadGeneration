@@ -113,7 +113,17 @@ export function leadWaitingOnUs(
   followUps: FollowUp[] | undefined,
   linkedTasks: Task[] | undefined,
 ): boolean {
-  if (linkedTasks?.some((t) => t.status !== "completed")) return true;
+  // Scheduled post-sale follow-ups (highlight) only count once they're due.
+  const today = todayIsoDate();
+  if (
+    linkedTasks?.some(
+      (t) =>
+        t.status !== "completed" &&
+        !(t.highlight && t.deadline && t.deadline > today),
+    )
+  ) {
+    return true;
+  }
   const mirrored = new Set(
     (linkedTasks ?? [])
       .map((t) => t.journalFollowUpId)

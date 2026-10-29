@@ -5,6 +5,8 @@
  * but are never read as this tree's state.
  */
 
+import { FOLLOW_UP_PLAN } from "@/lib/activation-follow-ups";
+
 export const LEAD_TREE_FIELD = "__lead_tree";
 
 export type TreeStep = { id: string; label: string };
@@ -24,13 +26,6 @@ export const NO_TRIAL = s("no_trial", "NO TRIAL");
 export const NUEVO = s("t_nuevo", "LUMIA NUEVO");
 export const USADO = s("t_usado", "LUMIA USADO");
 
-const followUpsAfterPurchase = (p: string): TreeStep[] => [
-  s(`${p}_f_w1`, "Seguimiento semana 1"),
-  s(`${p}_f_m1`, "Seguimiento mes 1"),
-  s(`${p}_f_m6`, "Seguimiento mes 6"),
-  s(`${p}_f_y1`, "Seguimiento año 1"),
-];
-
 const noBuy = (p: string): TreeStep[] => [
   s(`${p}_nb_return`, "Devolución del producto"),
   s(`${p}_nb_review`, "Revisión del producto"),
@@ -38,113 +33,180 @@ const noBuy = (p: string): TreeStep[] => [
   s(`${p}_nb_doc`, "Documento enviado de retorno de depósito"),
 ];
 
-const buy = (p: string, withDeviceReturn: boolean): TreeStep[] => [
-  ...(withDeviceReturn ? [s(`${p}_b_device_return`, "Devolución del dispositivo")] : []),
-  s(`${p}_b_contract`, "Enviar contrato con depósito descuento"),
-  s(`${p}_b_paid`, "Pago recibido"),
-  s(`${p}_b_direct_debit`, "Domiciliación hecha"),
-  s(`${p}_b_ship`, "Envío dispositivo"),
-  ...followUpsAfterPurchase(`${p}_b`),
-];
-
 const trialSteps = (p: string, withActivation: boolean): TreeStep[] => [
   s(`${p}_contract`, "Contrato enviado"),
   s(`${p}_deposit`, "Depósito cobrado"),
   s(`${p}_deposit_doc`, "Documento depósito recibido enviado"),
   s(`${p}_shipped`, "LUMIA enviado"),
-  ...(withActivation ? [s(`${p}_activate`, "Activar software")] : []),
+  ...(withActivation
+    ? [s(`${p}_activate`, "Activar software"), s(`${p}_creds`, "Enviar credenciales")]
+    : []),
   s(`${p}_w1`, "Seguimiento semana 1"),
   s(`${p}_w3`, "Seguimiento semana 3"),
 ];
+
+/**
+ * Purchase tree, shared by NO TRIAL and both trial "Compra" branches (one
+ * definition, distinct step ids per prefix). A plan choice (one row, one of
+ * two), then "Añadir productos / extra" splits into three lanes running in
+ * parallel: the center line is always on; customización (left) and
+ * complementos (right) are optional toggles whose steps diverge from and
+ * merge back into the center line. Follow-up dates come from the lead's
+ * activation date (activation-follow-ups.ts).
+ */
+export type PurchaseTree = {
+  prefix: string;
+  /** Steps before the plan pick (USADO: device return + review). */
+  pre: TreeStep[];
+  planVar: TreeStep;
+  planFix: TreeStep;
+  products: TreeStep;
+  laneCustom: TreeStep;
+  laneCompl: TreeStep;
+  contract: TreeStep;
+  paid: TreeStep;
+  sepa: TreeStep;
+  /** Enviar LUMIA → Activar dispositivo → Enviar credenciales (absent when the trial already did it). */
+  device: { ship: TreeStep; activate: TreeStep; creds: TreeStep } | null;
+  customExcel: TreeStep;
+  customPay: TreeStep;
+  customBecon: TreeStep;
+  complExcel: TreeStep;
+  complAmazon: TreeStep;
+  complProduct: TreeStep;
+  followUps: TreeStep[];
+};
+
+function purchaseTree(
+  p: string,
+  opts: { contractLabel: string; withDevice: boolean; pre?: TreeStep[] },
+): PurchaseTree {
+  return {
+    prefix: p,
+    pre: opts.pre ?? [],
+    planVar: s(`${p}_plan_var`, "Plan variable"),
+    planFix: s(`${p}_plan_fix`, "Plan fijo"),
+    products: s(`${p}_products`, "Añadir productos / extra"),
+    laneCustom: s(`${p}_lane_custom`, "Añadir customización"),
+    laneCompl: s(`${p}_lane_compl`, "Añadir complementos"),
+    contract: s(`${p}_contract`, opts.contractLabel),
+    paid: s(`${p}_paid`, "Pago recibido"),
+    sepa: s(`${p}_sepa`, "SEPA recibido"),
+    device: opts.withDevice
+      ? {
+          ship: s(`${p}_ship`, "Enviar LUMIA"),
+          activate: s(`${p}_activate`, "Activar dispositivo"),
+          creds: s(`${p}_creds`, "Enviar credenciales"),
+        }
+      : null,
+    customExcel: s(`${p}c_excel`, "Enviar excel a cliente"),
+    customPay: s(`${p}c_pay`, "Pagar customización"),
+    customBecon: s(`${p}c_becon`, "Enviar excel a Becon"),
+    complExcel: s(`${p}m_excel`, "Enviar excel a cliente"),
+    complAmazon: s(`${p}m_amazon`, "Pagar Amazon"),
+    complProduct: s(`${p}m_product`, "Enviar producto"),
+    followUps: FOLLOW_UP_PLAN.map((f) => s(`${p}_f_${f.key}`, f.label)),
+  };
+}
+
+export function purchaseTreeSteps(t: PurchaseTree): TreeStep[] {
+  return [
+    ...t.pre, t.planVar, t.planFix, t.products, t.laneCustom, t.laneCompl,
+    t.contract, t.paid, t.sepa,
+    ...(t.device ? [t.device.ship, t.device.activate, t.device.creds] : []),
+    t.customExcel, t.customPay, t.customBecon,
+    t.complExcel, t.complAmazon, t.complProduct,
+    ...t.followUps,
+  ];
+}
+
+/** Steps on the active path of a purchase tree, in order (lanes only when on). */
+export function purchaseActiveSteps(t: PurchaseTree, done: ReadonlySet<string>): TreeStep[] {
+  const custom = done.has(t.laneCustom.id);
+  const compl = done.has(t.laneCompl.id);
+  return [
+    ...t.pre,
+    t.products,
+    ...(custom ? [t.customExcel] : []),
+    ...(compl ? [t.complExcel] : []),
+    t.contract, t.paid, t.sepa,
+    ...(compl ? [t.complAmazon, t.complProduct] : []),
+    ...(t.device ? [t.device.ship] : []),
+    ...(custom ? [t.customPay, t.customBecon] : []),
+    ...(t.device ? [t.device.activate, t.device.creds] : []),
+    ...t.followUps,
+  ];
+}
+
+function purchaseCursor(t: PurchaseTree, done: ReadonlySet<string>): string {
+  const pre = firstOpen(t.pre, done);
+  if (pre) return pre;
+  if (!done.has(t.planVar.id) && !done.has(t.planFix.id)) return "¿Plan variable o fijo?";
+  return firstOpen(purchaseActiveSteps(t, done), done) ?? "Listo";
+}
 
 export type TrialBranch = {
   head: TreeStep;
   steps: TreeStep[];
   decisionLabel: string;
   buyHead: TreeStep;
-  buy: TreeStep[];
+  buy: PurchaseTree;
   noBuyHead: TreeStep;
   noBuy: TreeStep[];
 };
 
-function trialBranch(head: TreeStep, p: string, nuevo: boolean): TrialBranch {
-  return {
-    head,
-    steps: trialSteps(p, nuevo),
-    decisionLabel: "Decisión: ¿compra?",
-    buyHead: s(`${p}_buy`, "Compra"),
-    buy: buy(p, !nuevo),
-    noBuyHead: s(`${p}_nobuy`, "No compra"),
-    noBuy: noBuy(p),
-  };
-}
+/** NO TRIAL keeps its original `d` ids so existing ticks stay valid. */
+export const NO_TRIAL_TREE = purchaseTree("d", {
+  contractLabel: "Enviar contrato + factura",
+  withDevice: true,
+});
 
-export const BRANCH_NUEVO = trialBranch(NUEVO, "n", true);
-export const BRANCH_USADO = trialBranch(USADO, "u", false);
+export const BRANCH_NUEVO: TrialBranch = {
+  head: NUEVO,
+  steps: trialSteps("n", true),
+  decisionLabel: "Decisión: ¿compra?",
+  buyHead: s("n_buy", "Compra"),
+  // The trial already shipped, activated and sent credentials.
+  buy: purchaseTree("np", { contractLabel: "Enviar contrato + factura", withDevice: false }),
+  noBuyHead: s("n_nobuy", "No compra"),
+  noBuy: noBuy("n"),
+};
 
-/**
- * NO TRIAL path. A plan choice (one row, one of two), then "Añadir productos /
- * extra" splits into three lanes that run in parallel: the center line is
- * always on; customización (left) and complementos (right) are optional
- * toggles whose steps diverge from and merge back into the center line.
- */
-export const PLAN_VARIABLE = s("d_plan_var", "Plan variable");
-export const PLAN_FIJO = s("d_plan_fix", "Plan fijo");
-export const NT_PRODUCTS = s("d_products", "Añadir productos / extra");
-export const LANE_CUSTOM = s("d_lane_custom", "Añadir customización");
-export const LANE_COMPL = s("d_lane_compl", "Añadir complementos");
+export const BRANCH_USADO: TrialBranch = {
+  head: USADO,
+  steps: trialSteps("u", false),
+  decisionLabel: "Decisión: ¿compra?",
+  buyHead: s("u_buy", "Compra"),
+  buy: purchaseTree("up", {
+    contractLabel: "Enviar contrato con depósito descuento",
+    withDevice: true,
+    pre: [
+      s("up_device_return", "Devolución del dispositivo"),
+      s("up_device_review", "Revisión del dispositivo"),
+    ],
+  }),
+  noBuyHead: s("u_nobuy", "No compra"),
+  noBuy: noBuy("u"),
+};
 
-export const NT = {
-  contract: s("d_contract", "Enviar contrato + factura"),
-  paid: s("d_paid", "Pago recibido"),
-  sepa: s("d_sepa", "SEPA recibido"),
-  ship: s("d_ship", "Enviar dispositivo"),
-  activate: s("d_activate", "Activar dispositivo"),
-  creds: s("d_creds", "Enviar credenciales"),
-  w1: s("d_f_w1", "Seguimiento semana 1"),
-  m1: s("d_f_m1", "Seguimiento mes 1"),
-  m6: s("d_f_m6", "Seguimiento mes 6"),
-  y1: s("d_f_y1", "Seguimiento año 1"),
-  customExcel: s("dc_excel", "Enviar excel a cliente"),
-  customPay: s("dc_pay", "Pagar customización"),
-  customBecon: s("dc_becon", "Enviar excel a Becon"),
-  complExcel: s("dm_excel", "Enviar excel a cliente"),
-  complAmazon: s("dm_amazon", "Pagar Amazon"),
-  complProduct: s("dm_product", "Enviar producto + enviar dispositivo"),
-} as const;
-
-export const NO_TRIAL_CENTER: readonly TreeStep[] = [
-  NT.contract, NT.paid, NT.sepa, NT.ship, NT.activate, NT.creds, NT.w1, NT.m1, NT.m6, NT.y1,
+export const PURCHASE_TREES: readonly PurchaseTree[] = [
+  NO_TRIAL_TREE,
+  BRANCH_NUEVO.buy,
+  BRANCH_USADO.buy,
 ];
-export const NO_TRIAL_CUSTOM: readonly TreeStep[] = [NT.customExcel, NT.customPay, NT.customBecon];
-export const NO_TRIAL_COMPL: readonly TreeStep[] = [NT.complExcel, NT.complAmazon, NT.complProduct];
 
-/** Steps on the active NO TRIAL path, in order (lanes only when toggled on). */
-export function noTrialActiveSteps(done: ReadonlySet<string>): TreeStep[] {
-  const custom = done.has(LANE_CUSTOM.id);
-  const compl = done.has(LANE_COMPL.id);
-  return [
-    ...(custom ? [NT.customExcel] : []),
-    ...(compl ? [NT.complExcel] : []),
-    NT.contract, NT.paid, NT.sepa,
-    ...(compl ? [NT.complAmazon, NT.complProduct] : []),
-    NT.ship,
-    ...(custom ? [NT.customPay, NT.customBecon] : []),
-    NT.activate, NT.creds, NT.w1, NT.m1, NT.m6, NT.y1,
-  ];
-}
-
-export const NO_TRIAL_STEPS: readonly TreeStep[] = [
-  PLAN_VARIABLE, PLAN_FIJO, NT_PRODUCTS, LANE_CUSTOM, LANE_COMPL,
-  ...NO_TRIAL_CENTER, ...NO_TRIAL_CUSTOM, ...NO_TRIAL_COMPL,
-];
+/** Ticking any of these asks for the software activation date. */
+export const CREDENTIALS_STEP_IDS: ReadonlySet<string> = new Set([
+  ...PURCHASE_TREES.flatMap((t) => (t.device ? [t.device.creds.id] : [])),
+  "n_creds",
+]);
 
 function branchIds(b: TrialBranch): string[] {
   return [
     b.head.id,
     ...b.steps.map((x) => x.id),
     b.buyHead.id,
-    ...b.buy.map((x) => x.id),
+    ...purchaseTreeSteps(b.buy).map((x) => x.id),
     b.noBuyHead.id,
     ...b.noBuy.map((x) => x.id),
   ];
@@ -156,7 +218,7 @@ export const ALL_TREE_IDS: ReadonlySet<string> = new Set([
   NO_TRIAL.id,
   ...branchIds(BRANCH_NUEVO),
   ...branchIds(BRANCH_USADO),
-  ...NO_TRIAL_STEPS.map((x) => x.id),
+  ...purchaseTreeSteps(NO_TRIAL_TREE).map((x) => x.id),
 ]);
 
 /** Mutually exclusive choices: picking one clears its sibling (not the sibling's steps). */
@@ -165,7 +227,7 @@ const EXCLUSIVE: ReadonlyArray<[string, string]> = [
   [NUEVO.id, USADO.id],
   [BRANCH_NUEVO.buyHead.id, BRANCH_NUEVO.noBuyHead.id],
   [BRANCH_USADO.buyHead.id, BRANCH_USADO.noBuyHead.id],
-  [PLAN_VARIABLE.id, PLAN_FIJO.id],
+  ...PURCHASE_TREES.map((t): [string, string] => [t.planVar.id, t.planFix.id]),
 ];
 
 export function parseTreeDone(customFields: Record<string, string> | undefined): string[] {
@@ -213,7 +275,7 @@ export function treeDonePatch(
   return next;
 }
 
-function firstOpen(steps: readonly TreeStep[], done: Set<string>): string | null {
+function firstOpen(steps: readonly TreeStep[], done: ReadonlySet<string>): string | null {
   return steps.find((x) => !done.has(x.id))?.label ?? null;
 }
 
@@ -223,16 +285,14 @@ export function treeCursor(doneIds: readonly string[]): string {
   const common = firstOpen(COMMON, done);
   if (common) return common;
   if (done.has(NO_TRIAL.id)) {
-    if (!done.has(PLAN_VARIABLE.id) && !done.has(PLAN_FIJO.id)) return "¿Plan variable o fijo?";
-    if (!done.has(NT_PRODUCTS.id)) return NT_PRODUCTS.label;
-    return firstOpen(noTrialActiveSteps(done), done) ?? "Listo";
+    return purchaseCursor(NO_TRIAL_TREE, done);
   }
   if (!done.has(TRIAL.id)) return "¿TRIAL o NO TRIAL?";
   const branch = done.has(NUEVO.id) ? BRANCH_NUEVO : done.has(USADO.id) ? BRANCH_USADO : null;
   if (!branch) return "¿LUMIA NUEVO o USADO?";
   const open = firstOpen(branch.steps, done);
   if (open) return open;
-  if (done.has(branch.buyHead.id)) return firstOpen(branch.buy, done) ?? "Listo";
+  if (done.has(branch.buyHead.id)) return purchaseCursor(branch.buy, done);
   if (done.has(branch.noBuyHead.id)) return firstOpen(branch.noBuy, done) ?? "Fin";
   return branch.decisionLabel;
 }

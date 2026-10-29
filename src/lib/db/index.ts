@@ -213,6 +213,8 @@ export interface LeadRepository {
   deleteTasksByLead(leadId: string): Promise<number>;
   deleteTasksByContact(contactId: string): Promise<number>;
   deleteTasksByBoard(boardId: string): Promise<number>;
+  /** Idempotent insert-or-update by id (title, deadline, highlight only). */
+  upsertHighlightTask(task: Task): Promise<void>;
 
   // Closed-lead documents (ADR 0038)
   listLeadDocuments(leadId: string): Promise<LeadDocument[]>;

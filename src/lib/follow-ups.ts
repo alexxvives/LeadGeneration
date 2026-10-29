@@ -451,6 +451,8 @@ export interface CalendarEvent {
   kind: FollowUpKind;
   /** Task row status when source === "task". */
   taskStatus?: Task["status"];
+  /** Highlighted task: shown red on the calendar. */
+  highlight?: boolean;
 }
 
 export function calendarEventsFromLeads(
@@ -531,6 +533,7 @@ export function calendarEventsFromTasks(
       done: task.status === "completed",
       kind: "task",
       taskStatus: task.status,
+      highlight: !!task.highlight,
     });
   }
   return out;

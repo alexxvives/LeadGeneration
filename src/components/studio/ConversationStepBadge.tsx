@@ -17,14 +17,6 @@ function StepGlyph({
       </svg>
     );
   }
-  if (step === "reviewing_contract") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
-        <path d="M7 3.5h7l4 4V20a1.5 1.5 0 0 1-1.5 1.5h-9.5A1.5 1.5 0 0 1 5.5 20V5A1.5 1.5 0 0 1 7 3.5Z" />
-        <path d="M14 3.5V8h4.5M8 12h8M8 16h5" strokeLinecap="round" />
-      </svg>
-    );
-  }
   if (step === "onboarding") {
     return (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>

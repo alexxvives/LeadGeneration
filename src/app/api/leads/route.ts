@@ -15,7 +15,6 @@ const STEP_IDS = [
   "evaluating_pre_demo",
   "waiting_on_demo",
   "evaluating_post_demo",
-  "reviewing_contract",
   "onboarding",
 ] as const;
 

@@ -53,13 +53,6 @@ export const CONVERSATION_STEPS: readonly {
     dotClass: "bg-aurora-500",
   },
   {
-    id: "reviewing_contract",
-    label: "Reviewing contract",
-    hint: "Proposal or contract is with them.",
-    bubbleClass: "bg-mist-500/15 text-mist-200 ring-1 ring-mist-500/35",
-    dotClass: "bg-mist-400",
-  },
-  {
     id: "onboarding",
     label: "Onboarding",
     hint: "Excel and invoice.",

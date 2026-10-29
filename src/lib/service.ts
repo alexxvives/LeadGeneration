@@ -1,5 +1,11 @@
 import type { LeadRepository } from "@/lib/db";
 import { newId, nowIso } from "@/lib/id";
+import {
+  FOLLOW_UP_PLAN,
+  activationDateOf,
+  followUpDates,
+  followUpTaskId,
+} from "@/lib/activation-follow-ups";
 import { runSearch, SearchUnavailableError } from "@/lib/search";
 import { generateDraft, stripLegacyCompliance } from "@/lib/outreach/draft";
 import { mapPool, personalizeDraftForLead } from "@/lib/ai/generate";
@@ -2696,11 +2702,50 @@ export async function updateLeadCrm(
     );
     if (changes.length === 0) return lead;
     const res = await applyLeadCrmPatch(ctx, found, merged, lead.version ?? 0);
-    if (res !== false) return res;
+    if (res !== false) {
+      if (res) await syncActivationFollowUps(found.db, lead, res);
+      return res;
+    }
   }
   const latest = await findLeadAccess(ctx, leadId);
   if (!latest) return null;
   throw new LeadConflictError([], latest.lead, latest.lead.updatedByName ?? null);
+}
+
+/**
+ * When the lead's activation date is set or changed, (re)write its post-sale
+ * follow-up tasks. Ids are deterministic per lead + follow-up, so re-entering
+ * the date moves the existing tasks instead of duplicating them.
+ */
+export async function syncActivationFollowUps(
+  db: Pick<LeadRepository, "upsertHighlightTask">,
+  before: Pick<Lead, "customFields">,
+  after: Pick<Lead, "id" | "boardId" | "company" | "customFields">,
+): Promise<number> {
+  const date = activationDateOf(after.customFields);
+  if (!date || date === activationDateOf(before.customFields)) return 0;
+  const dates = followUpDates(date);
+  const now = nowIso();
+  for (const f of FOLLOW_UP_PLAN) {
+    await db.upsertHighlightTask({
+      id: followUpTaskId(after.id, f.key),
+      workspaceId: "",
+      boardId: after.boardId ?? null,
+      title: `${f.label} · ${after.company}`,
+      ownerUserId: null,
+      ownerName: null,
+      assignees: [],
+      deadline: dates[f.key],
+      status: "todo",
+      leadId: after.id,
+      contactId: null,
+      journalFollowUpId: null,
+      highlight: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  return FOLLOW_UP_PLAN.length;
 }
 
 export type LeadEditConcurrency = {

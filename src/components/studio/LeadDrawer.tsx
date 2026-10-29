@@ -19,6 +19,7 @@ import {
   XIcon,
 } from "@/components/icons";
 import { OnboardingTreeDialog } from "./OnboardingBoard";
+import { ACTIVATION_FIELD } from "@/lib/activation-follow-ups";
 import { CONVERSATION_STEPS } from "@/lib/conversation-steps";
 import { newId } from "@/lib/id";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
@@ -1784,8 +1785,19 @@ export function LeadDrawer(props: DrawerProps) {
         <OnboardingTreeDialog
           lead={lead}
           onClose={() => setTreeOpen(false)}
-          onSetDone={(leadTree) => {
-            void props.onUpdateCrm(lead.id, { leadTree });
+          onSetDone={(leadTree, activationDate) => {
+            void props.onUpdateCrm(
+              lead.id,
+              activationDate
+                ? {
+                    leadTree,
+                    customFields: {
+                      ...(lead.customFields ?? {}),
+                      [ACTIVATION_FIELD]: activationDate,
+                    },
+                  }
+                : { leadTree },
+            );
           }}
         />
       ) : null}

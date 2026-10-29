@@ -346,7 +346,8 @@ function DayTextList({
   return (
     <span className="mt-1 flex min-h-0 w-full min-w-0 flex-1 flex-col justify-start gap-0.5 overflow-hidden [mask-image:linear-gradient(to_bottom,#000_0%,#000_78%,transparent_100%)] lg:gap-1">
       {lines.map((ev) => {
-        const overdue = isTaskOverdue(ev, today);
+        // Highlighted tasks (post-sale follow-ups) are always red.
+        const overdue = isTaskOverdue(ev, today) || (!!ev.highlight && !ev.done);
         const done = ev.kind === "task" && ev.done;
         return (
           <span
@@ -804,7 +805,8 @@ function DayGroup({
           const isMissed = ev.kind === "phone" && isMissedCallNote(ev.note);
           const overdue =
             (ev.kind === "follow_up" && isOverdueFollowUp(ev.date, ev.done)) ||
-            isTaskOverdue(ev, todayIsoDate());
+            isTaskOverdue(ev, todayIsoDate()) ||
+            (!!ev.highlight && !ev.done);
           return (
           <li key={`${ev.source}-${ev.contactId ?? ev.leadId}-${ev.id}`}>
             <div

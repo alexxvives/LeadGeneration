@@ -41,7 +41,6 @@ import { FolderKanbanIcon } from "@/components/lucide-animated/folder-kanban";
 import { MailboxIcon } from "@/components/lucide-animated/mailbox";
 import { CalendarDaysIcon } from "@/components/lucide-animated/calendar-days";
 import { ListChecksIcon } from "@/components/lucide-animated/list-checks";
-import { MessagesSquareIcon } from "@/components/lucide-animated/messages-square";
 import { ContactIcon } from "@/components/lucide-animated/contact";
 import { LayersIcon } from "@/components/lucide-animated/layers";
 import { HistoryIcon } from "@/components/lucide-animated/history";
@@ -587,12 +586,6 @@ export function StudioShell({
           label: "Pipeline",
           icon: FolderKanbanIcon,
           active: onApp && displayView === "pipeline",
-        },
-        {
-          href: "/app?view=conversations",
-          label: "Conversations",
-          icon: MessagesSquareIcon,
-          active: onApp && displayView === "conversations",
         },
         {
           href: "/app?view=outreach",

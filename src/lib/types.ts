@@ -43,7 +43,6 @@ export type ConversationStep =
   | "evaluating_pre_demo"
   | "waiting_on_demo"
   | "evaluating_post_demo"
-  | "reviewing_contract"
   | "onboarding"
   | "unresponsive";
 
@@ -51,7 +50,6 @@ const CONVERSATION_STEPS: readonly ConversationStep[] = [
   "evaluating_pre_demo",
   "waiting_on_demo",
   "evaluating_post_demo",
-  "reviewing_contract",
   "onboarding",
   "unresponsive",
 ] as const;
@@ -60,6 +58,8 @@ const CONVERSATION_STEPS: readonly ConversationStep[] = [
 const LEGACY_CONVERSATION_STEPS: Readonly<Record<string, ConversationStep>> = {
   evaluating: "evaluating_pre_demo",
   pending_delivery: "onboarding",
+  // Step removed; its leads moved to the preceding step (migration 0044).
+  reviewing_contract: "evaluating_post_demo",
 };
 
 export function normalizeConversationStep(raw: unknown): ConversationStep | null {
@@ -549,6 +549,8 @@ export interface Task {
   contactId: string | null;
   /** FollowUp.id when mirrored from lead/contact journal. */
   journalFollowUpId: string | null;
+  /** Highlighted (red on the calendar), e.g. post-sale follow-ups. */
+  highlight?: boolean;
   createdAt: string;
   updatedAt: string;
 }

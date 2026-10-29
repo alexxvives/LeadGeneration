@@ -877,6 +877,19 @@ export class JsonStore implements LeadRepository {
     });
   }
 
+  upsertHighlightTask(task: Task): Promise<void> {
+    return this.mutate((data) => {
+      const i = data.tasks.findIndex((t) => t.id === task.id && this.inScope(t));
+      if (i >= 0) {
+        const cur = data.tasks[i]!;
+        data.tasks[i] = { ...cur, title: task.title, deadline: task.deadline, highlight: true, updatedAt: task.updatedAt };
+      } else {
+        data.tasks.push({ ...task, workspaceId: this.workspaceId, highlight: true });
+      }
+      return { data, result: undefined };
+    });
+  }
+
   deleteTasksByBoard(boardId: string): Promise<number> {
     return this.mutate((data) => {
       const before = data.tasks.length;

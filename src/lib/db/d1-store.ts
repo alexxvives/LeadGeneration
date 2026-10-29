@@ -225,6 +225,7 @@ type TaskRow = {
   lead_id: string | null;
   contact_id: string | null;
   journal_follow_up_id: string | null;
+  highlight?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -260,6 +261,7 @@ function rowToTask(r: TaskRow): Task {
     leadId: r.lead_id,
     contactId: r.contact_id,
     journalFollowUpId: r.journal_follow_up_id,
+    highlight: !!r.highlight,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -1672,6 +1674,41 @@ export class D1Store implements LeadRepository {
       .bind(...values, id, this.workspaceId)
       .run();
     return this.getTask(id);
+  }
+
+  /**
+   * Insert or update by id (idempotent): keeps status/assignees of an existing
+   * row and only refreshes title, deadline and highlight.
+   */
+  async upsertHighlightTask(task: Task): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO tasks
+         (id, workspace_id, board_id, title, owner_user_id, owner_name, assignees_json,
+          deadline, status, lead_id, contact_id, journal_follow_up_id, highlight, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           title = excluded.title,
+           deadline = excluded.deadline,
+           highlight = 1,
+           updated_at = excluded.updated_at
+         WHERE tasks.workspace_id = excluded.workspace_id`,
+      )
+      .bind(
+        task.id,
+        this.workspaceId,
+        task.boardId,
+        task.title,
+        task.ownerUserId,
+        task.ownerName,
+        assigneesToJson(task.assignees ?? []),
+        task.deadline,
+        task.status,
+        task.leadId,
+        task.createdAt,
+        task.updatedAt,
+      )
+      .run();
   }
 
   async deleteTask(id: string): Promise<boolean> {

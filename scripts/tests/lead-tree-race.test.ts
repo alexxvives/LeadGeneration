@@ -6,7 +6,8 @@
 import assert from "node:assert";
 import { mergeMutationIntoCached, mergeSlimIntoCached } from "@/lib/lead-cache";
 import { mergeLeadPatch } from "@/lib/lead-merge";
-import { NT, NT_PRODUCTS, PLAN_FIJO, PLAN_VARIABLE, toggleTreeStep, treeCursor } from "@/lib/lead-tree";
+import { NO_TRIAL_TREE as NT, toggleTreeStep, treeCursor } from "@/lib/lead-tree";
+const PLAN_VARIABLE = NT.planVar, PLAN_FIJO = NT.planFix, NT_PRODUCTS = NT.products;
 import type { Lead, LeadWithOutreach } from "@/lib/types";
 
 const base = {

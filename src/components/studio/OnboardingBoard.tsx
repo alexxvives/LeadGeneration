@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { LeadWithOutreach } from "@/lib/types";
 import { XIcon } from "@/components/icons";
 import type { OnboardingStep } from "@/lib/onboarding-path";
@@ -8,20 +8,26 @@ import {
   BRANCH_NUEVO,
   BRANCH_USADO,
   COMMON,
+  CREDENTIALS_STEP_IDS,
   NO_TRIAL,
-  LANE_COMPL,
-  LANE_CUSTOM,
-  NT,
-  NT_PRODUCTS,
-  PLAN_FIJO,
-  PLAN_VARIABLE,
-  noTrialActiveSteps,
+  NO_TRIAL_TREE,
   NUEVO,
   TRIAL,
   USADO,
+  purchaseActiveSteps,
   toggleTreeStep,
+  type PurchaseTree,
+  type TreeStep,
   type TrialBranch,
 } from "@/lib/lead-tree";
+import {
+  FOLLOW_UP_PLAN,
+  activationDateOf,
+  followUpDates,
+  followUpKeyOfStep,
+  isIsoDate,
+} from "@/lib/activation-follow-ups";
+import { todayIsoDate } from "@/lib/follow-ups";
 
 type Tone = "task" | "decision" | "reject";
 
@@ -32,7 +38,7 @@ export function OnboardingTreeDialog({
 }: {
   lead: LeadWithOutreach;
   onClose: () => void;
-  onSetDone: (leadTree: string[]) => void;
+  onSetDone: (leadTree: string[], activationDate?: string) => void;
 }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -87,16 +93,30 @@ function LeadTree({
   onSetDone,
 }: {
   lead: LeadWithOutreach;
-  onSetDone: (leadTree: string[]) => void;
+  onSetDone: (leadTree: string[], activationDate?: string) => void;
 }) {
   // Tree progress has its own column (lead.leadTree), so ticking steps never
   // overwrites a teammate's custom-field edit. Every lead starts from zero:
   // legacy custom-field progress is never read.
   const current = lead.leadTree ?? [];
   const done = new Set(current);
+  const activation = activationDateOf(lead.customFields);
+  // Ticking "Enviar credenciales" asks for the activation date first; null =
+  // closed, "" = edit the date without ticking anything.
+  const [askDate, setAskDate] = useState<string | null>(null);
   const toggle = (id: string, checked: boolean) => {
+    if (checked && CREDENTIALS_STEP_IDS.has(id)) {
+      setAskDate(id);
+      return;
+    }
     onSetDone(toggleTreeStep(current, id, checked));
   };
+  const saveDate = (date: string) => {
+    const next = askDate ? toggleTreeStep(current, askDate, true) : [...current];
+    setAskDate(null);
+    onSetDone(next, date);
+  };
+  const editActivation = () => setAskDate("");
   const trial = done.has(TRIAL.id);
   const noTrial = done.has(NO_TRIAL.id);
   const branch = done.has(NUEVO.id)
@@ -121,13 +141,27 @@ function LeadTree({
         </Column>
         <WaveFork />
         <Choice a={TRIAL} b={NO_TRIAL} done={done} onToggle={toggle} />
-        {noTrial ? <NoTrialPath done={done} onToggle={toggle} /> : null}
+        {noTrial ? (
+          <PurchasePath
+            tree={NO_TRIAL_TREE}
+            done={done}
+            onToggle={toggle}
+            activation={activation}
+            onEditActivation={editActivation}
+          />
+        ) : null}
         {trial ? (
           <>
             <WaveFork compact />
             <Choice a={NUEVO} b={USADO} done={done} onToggle={toggle} />
             {branch ? (
-              <TrialPath branch={branch} done={done} onToggle={toggle} />
+              <TrialPath
+                branch={branch}
+                done={done}
+                onToggle={toggle}
+                activation={activation}
+                onEditActivation={editActivation}
+              />
             ) : null}
           </>
         ) : null}
@@ -137,6 +171,13 @@ function LeadTree({
           </p>
         ) : null}
       </div>
+      {askDate !== null ? (
+        <ActivationDialog
+          initial={activation ?? todayIsoDate()}
+          onCancel={() => setAskDate(null)}
+          onSave={saveDate}
+        />
+      ) : null}
     </div>
   );
 }
@@ -145,10 +186,14 @@ function TrialPath({
   branch,
   done,
   onToggle,
+  activation,
+  onEditActivation,
 }: {
   branch: TrialBranch;
   done: Set<string>;
   onToggle: (id: string, checked: boolean) => void;
+  activation: string | null;
+  onEditActivation: () => void;
 }) {
   const buying = done.has(branch.buyHead.id);
   const leaving = done.has(branch.noBuyHead.id);
@@ -169,60 +214,42 @@ function TrialPath({
         {branch.decisionLabel}
       </p>
       <WaveFork compact />
-      <div className="grid w-full items-start gap-4 sm:grid-cols-2">
-        <Column
-          live={leaving}
-          head={
-            <Tile
-              step={branch.noBuyHead}
-              on={leaving}
-              tone="reject"
-              onToggle={onToggle}
-            />
-          }
-        >
+      <div className="grid w-full max-w-md grid-cols-2 gap-3">
+        <div className="flex justify-center">
+          <Tile step={branch.noBuyHead} on={leaving} tone="reject" onToggle={onToggle} />
+        </div>
+        <div className="flex justify-center">
+          <Tile step={branch.buyHead} on={buying} tone="decision" onToggle={onToggle} />
+        </div>
+      </div>
+      {leaving ? (
+        <Column live>
           {branch.noBuy.map((step) => (
             <Tile
               key={step.id}
               step={step}
               on={done.has(step.id)}
               tone="reject"
-              dim={!leaving}
               onToggle={onToggle}
             />
           ))}
-          <EndTile
-            label="Fin"
-            on={leaving && branch.noBuy.every((x) => done.has(x.id))}
-          />
+          <EndTile label="Fin" on={branch.noBuy.every((x) => done.has(x.id))} />
         </Column>
-        <Column
-          live={buying}
-          head={
-            <Tile
-              step={branch.buyHead}
-              on={buying}
-              tone="decision"
-              onToggle={onToggle}
-            />
-          }
-        >
-          {branch.buy.map((step) => (
-            <Tile
-              key={step.id}
-              step={step}
-              on={done.has(step.id)}
-              tone="task"
-              dim={!buying}
-              onToggle={onToggle}
-            />
-          ))}
-          <EndTile
-            label="Listo"
-            on={buying && branch.buy.every((x) => done.has(x.id))}
-          />
-        </Column>
-      </div>
+      ) : null}
+      {buying ? (
+        <PurchasePath
+          tree={branch.buy}
+          done={done}
+          onToggle={onToggle}
+          activation={activation}
+          onEditActivation={onEditActivation}
+        />
+      ) : null}
+      {!leaving && !buying ? (
+        <p className="mt-3 text-center text-xs text-mist-500">
+          Elige Compra o No compra para ver el camino.
+        </p>
+      ) : null}
     </>
   );
 }
@@ -232,21 +259,29 @@ type Lane = "left" | "center" | "right";
 const LANE_X: Record<Lane, number> = { left: 50, center: 150, right: 250 };
 
 /**
- * NO TRIAL: plan pick (one row, one of two) → "Añadir productos / extra" →
+ * Purchase tree (NO TRIAL and both trial "Compra" branches share it): optional
+ * pre-steps → plan pick (one row, one of two) → "Añadir productos / extra" →
  * three parallel lanes. Center is always on; customización (left) and
- * complementos (right) are optional and dim when off.
+ * complementos (right) are optional and dim when off. Follow-ups show the
+ * date computed from the activation date.
  */
-function NoTrialPath({
+export function PurchasePath({
+  tree: t,
   done,
   onToggle,
+  activation,
+  onEditActivation,
 }: {
+  tree: PurchaseTree;
   done: Set<string>;
   onToggle: (id: string, checked: boolean) => void;
+  activation: string | null;
+  onEditActivation: () => void;
 }) {
-  const custom = done.has(LANE_CUSTOM.id);
-  const compl = done.has(LANE_COMPL.id);
+  const custom = done.has(t.laneCustom.id);
+  const compl = done.has(t.laneCompl.id);
   const on: Record<Lane, boolean> = { left: custom, center: true, right: compl };
-  const tile = (step: typeof NT.contract, lane: Lane) => (
+  const tile = (step: TreeStep, lane: Lane) => (
     <Tile
       step={step}
       on={done.has(step.id)}
@@ -269,61 +304,175 @@ function NoTrialPath({
     </div>
   );
   const allDone =
-    done.has(NT_PRODUCTS.id) &&
-    (done.has(PLAN_VARIABLE.id) || done.has(PLAN_FIJO.id)) &&
-    noTrialActiveSteps(done).every((x) => done.has(x.id));
+    (done.has(t.planVar.id) || done.has(t.planFix.id)) &&
+    purchaseActiveSteps(t, done).every((x) => done.has(x.id));
+  const dates = activation ? followUpDates(activation) : null;
+  const dev = t.device;
 
   return (
     <div className="flex w-full flex-col items-center">
+      {t.pre.length ? (
+        <Column live>
+          {t.pre.map((step) => (
+            <Tile key={step.id} step={step} on={done.has(step.id)} tone="task" onToggle={onToggle} />
+          ))}
+        </Column>
+      ) : null}
       <WaveDown hot />
       <div
         role="radiogroup"
         aria-label="Plan"
         className="grid w-full max-w-sm grid-cols-2 gap-1 rounded-2xl border border-amber-400/30 bg-ink-950/40 p-1"
       >
-        {[PLAN_VARIABLE, PLAN_FIJO].map((p) => (
-          <Tile
-            key={p.id}
-            step={p}
-            on={done.has(p.id)}
-            tone="decision"
-            onToggle={onToggle}
-          />
+        {[t.planVar, t.planFix].map((p) => (
+          <Tile key={p.id} step={p} on={done.has(p.id)} tone="decision" onToggle={onToggle} />
         ))}
       </div>
       <WaveDown hot />
-      <Tile step={NT_PRODUCTS} on={done.has(NT_PRODUCTS.id)} tone="task" onToggle={onToggle} />
+      <Tile step={t.products} on={done.has(t.products.id)} tone="task" onToggle={onToggle} />
       {link("diverge", "down", "diverge")}
       {row(
-        <Tile step={LANE_CUSTOM} on={custom} tone="decision" compact hint="Opcional" onToggle={onToggle} />,
+        <Tile step={t.laneCustom} on={custom} tone="decision" compact hint="Opcional" onToggle={onToggle} />,
         pass,
-        <Tile step={LANE_COMPL} on={compl} tone="decision" compact hint="Opcional" onToggle={onToggle} />,
+        <Tile step={t.laneCompl} on={compl} tone="decision" compact hint="Opcional" onToggle={onToggle} />,
       )}
       {link("down", "down", "down")}
-      {row(tile(NT.customExcel, "left"), pass, tile(NT.complExcel, "right"))}
+      {row(tile(t.customExcel, "left"), pass, tile(t.complExcel, "right"))}
       {link("merge", "down", "merge")}
-      {row(null, tile(NT.contract, "center"), null)}
+      {row(null, tile(t.contract, "center"), null)}
       {link(null, "down", null)}
-      {row(null, tile(NT.paid, "center"), null)}
+      {row(null, tile(t.paid, "center"), null)}
       {link(null, "down", null)}
-      {row(null, tile(NT.sepa, "center"), null)}
+      {row(null, tile(t.sepa, "center"), null)}
       {link(null, "down", "diverge")}
-      {row(null, pass, tile(NT.complAmazon, "right"))}
+      {row(null, pass, tile(t.complAmazon, "right"))}
       {link(null, "down", "down")}
-      {row(null, pass, tile(NT.complProduct, "right"))}
-      {link(null, "down", "merge")}
-      {row(null, tile(NT.ship, "center"), null)}
-      {link("diverge", "down", null)}
-      {row(tile(NT.customPay, "left"), tile(NT.activate, "center"), null)}
-      {link("down", "down", null)}
-      {row(tile(NT.customBecon, "left"), tile(NT.creds, "center"), null)}
+      {row(null, pass, tile(t.complProduct, "right"))}
+      {dev ? (
+        <>
+          {link(null, "down", "merge")}
+          {row(null, tile(dev.ship, "center"), null)}
+          {link("diverge", "down", null)}
+          {row(tile(t.customPay, "left"), tile(dev.activate, "center"), null)}
+          {link("down", "down", null)}
+          {row(tile(t.customBecon, "left"), tile(dev.creds, "center"), null)}
+        </>
+      ) : (
+        <>
+          {link("diverge", "down", "merge")}
+          {row(tile(t.customPay, "left"), pass, null)}
+          {link("down", "down", null)}
+          {row(tile(t.customBecon, "left"), pass, null)}
+        </>
+      )}
       {link("merge", "down", null)}
+      <button
+        type="button"
+        onClick={onEditActivation}
+        className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-mist-300 hover:border-white/30 hover:text-mist-100"
+      >
+        {activation
+          ? `Activado el ${formatEs(activation)} · Editar`
+          : "Fecha de activación · Añadir"}
+      </button>
       <Column live>
-        {[NT.w1, NT.m1, NT.m6, NT.y1].map((step) => (
-          <Tile key={step.id} step={step} on={done.has(step.id)} tone="task" onToggle={onToggle} />
-        ))}
+        {t.followUps.map((step) => {
+          const key = followUpKeyOfStep(step.id);
+          const date = dates && key ? dates[key] : null;
+          return (
+            <Tile
+              key={step.id}
+              step={step}
+              on={done.has(step.id)}
+              tone="task"
+              meta={date ? formatEs(date) : undefined}
+              onToggle={onToggle}
+            />
+          );
+        })}
         <EndTile label="Listo" on={allDone} />
       </Column>
+    </div>
+  );
+}
+
+function formatEs(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/** Asks for the software activation date (default today). */
+export function ActivationDialog({
+  initial,
+  onCancel,
+  onSave,
+}: {
+  initial: string;
+  onCancel: () => void;
+  onSave: (date: string) => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const valid = isIsoDate(value);
+  const preview = valid ? followUpDates(value) : null;
+  return (
+    <div className="fixed inset-0 z-[1300] flex items-end justify-center sm:items-center">
+      <button
+        type="button"
+        aria-label="Cancelar"
+        className="absolute inset-0 bg-ink-950/70"
+        onClick={onCancel}
+      />
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="activation-title"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (valid) onSave(value);
+        }}
+        className="relative w-full max-w-sm rounded-t-3xl border border-white/10 bg-ink-900 p-5 shadow-2xl sm:rounded-3xl"
+      >
+        <h3 id="activation-title" className="font-display text-lg text-mist-100">
+          ¿Cuándo se activó el software?
+        </h3>
+        <p className="mt-1 text-xs text-mist-400">
+          Los seguimientos se calculan desde esta fecha y se crean como tareas destacadas en el calendario.
+        </p>
+        <input
+          type="date"
+          required
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="mt-4 w-full rounded-xl border border-white/15 bg-ink-950/60 px-3 py-2 text-sm text-mist-100 [color-scheme:dark]"
+        />
+        {preview ? (
+          <ul className="mt-3 space-y-1 text-xs text-mist-300">
+            {FOLLOW_UP_PLAN.map((f) => (
+              <li key={f.key} className="flex justify-between gap-3">
+                <span>{f.label}</span>
+                <span className="font-medium text-rose-300">{formatEs(preview[f.key])}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-xl px-3 py-2 text-sm text-mist-300 hover:bg-white/5"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={!valid}
+            className="rounded-xl bg-aurora-400 px-4 py-2 text-sm font-medium text-on-accent disabled:opacity-50"
+          >
+            Guardar
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -462,6 +611,7 @@ function Tile({
   hint,
   compact = false,
   disabled = false,
+  meta,
 }: {
   step: OnboardingStep;
   on: boolean;
@@ -471,6 +621,8 @@ function Tile({
   hint?: string;
   compact?: boolean;
   disabled?: boolean;
+  /** Small secondary line, e.g. a computed follow-up date. */
+  meta?: string;
 }) {
   const face = on
     ? tone === "decision"
@@ -500,6 +652,13 @@ function Tile({
       >
         {step.label}
       </span>
+      {meta ? (
+        <span
+          className={`mt-0.5 block text-[11px] font-semibold ${on ? "" : "text-rose-300"}`}
+        >
+          {meta}
+        </span>
+      ) : null}
       {hint ? (
         <span className="mt-0.5 block text-[10px] uppercase tracking-wider opacity-80">
           {hint}

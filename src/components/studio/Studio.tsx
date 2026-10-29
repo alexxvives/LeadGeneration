@@ -2014,7 +2014,8 @@ export function Studio() {
         }
         const { lead } = await api.updateLead(leadId, body, { base });
         applyServerLead(leadId, lead, body, writeAt);
-        if (body.followUps) refreshTasks();
+        // Activation date → server upserts the follow-up tasks.
+        if (body.followUps || body.customFields) refreshTasks();
       });
     } catch (e) {
       const conflict = (e as { conflict?: { changedBy: string | null; fields: string[] } })
