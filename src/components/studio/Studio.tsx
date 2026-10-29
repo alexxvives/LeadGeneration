@@ -41,7 +41,7 @@ import { VerifyLimitModal } from "./VerifyLimitModal";
 import { crmStageLabel, Spinner } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 import { ExportButton } from "./ExportButton";
-import { canEditOwnLeadUnderLock, isSystemCustomField } from "@/lib/lead-ownership";
+import { isLockExemptLead, isSystemCustomField } from "@/lib/lead-ownership";
 import { PipelineFocusToggle, PipelineView } from "./PipelineView";
 import {
   OutreachView,
@@ -1016,13 +1016,14 @@ export function Studio() {
 
   // Pipeline: pick up webhook reply → In Conversation without a manual refresh.
   useEffect(() => {
-    if (view !== "pipeline") return;
+    // Also Leads/Outreach, so a lead the other user adds shows up within ~10s.
+    if (view !== "pipeline" && view !== "leads" && view !== "outreach") return;
     const id = window.setInterval(() => {
       // Don't burn Worker/D1 requests for a background tab.
       if (document.visibilityState === "hidden") return;
       if (loadInFlightRef.current || leadsBackfillingRef.current) return;
       void refresh().catch(() => {});
-    }, 15_000);
+    }, 10_000);
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       if (loadInFlightRef.current || leadsBackfillingRef.current) return;
@@ -1420,7 +1421,7 @@ export function Studio() {
     if (droppedLeadIdsRef.current.has(leadId)) return false;
     if (!editLockedRef.current) return true;
     const lead = boardRef.current?.leads.find((l) => l.id === leadId);
-    if (lead && canEditOwnLeadUnderLock(lead, sessionUserIdRef.current)) return true;
+    if (lead && isLockExemptLead(lead)) return true;
     if (!opts?.quiet) {
       toast("err", "Someone else has control of this board — take control to edit this lead.");
     }
@@ -3412,7 +3413,7 @@ export function Studio() {
       {selected && board && (
         <BoardLockUiProvider
           locked={
-            editLocked && !canEditOwnLeadUnderLock(selected, sessionUserId)
+            editLocked && !isLockExemptLead(selected)
           }
           holder={lockHolder}
         >

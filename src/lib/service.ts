@@ -91,7 +91,7 @@ import {
 } from "@/lib/contact-methods";
 import { collapseEmailSentFollowUps, emailSentFollowUpId, hasEmailSentOn, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
 import { conversationStepPatch } from "@/lib/conversation-steps";
-import { CREATED_BY_FIELD, canEditOwnLeadUnderLock, preserveCreatorStamp } from "@/lib/lead-ownership";
+import { CREATED_BY_FIELD, isLockExemptLead, preserveCreatorStamp } from "@/lib/lead-ownership";
 import {
   appendJournalTaskLine,
   backfillTasksFromJournal,
@@ -710,7 +710,7 @@ async function assertBoardEditable(ctx: Ctx, boardId: string): Promise<void> {
  * collaborator may still edit/delete leads they created in the last 24h.
  */
 async function assertLeadEditable(ctx: Ctx, lead: Lead): Promise<void> {
-  if (canEditOwnLeadUnderLock(lead, ctx.userId)) return;
+  if (isLockExemptLead(lead)) return;
   await assertBoardEditable(ctx, lead.boardId);
 }
 
@@ -2522,7 +2522,7 @@ export async function deleteLeads(
   for (const id of ids) {
     const found = await findLeadAccess(ctx, id);
     if (!found) continue;
-    if (!canEditOwnLeadUnderLock(found.lead, ctx.userId)) {
+    if (!isLockExemptLead(found.lead)) {
       boardIds.add(found.lead.boardId);
     }
     const list = byDb.get(found.db) ?? [];

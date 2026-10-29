@@ -1,21 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import type { LeadWithOutreach } from "@/lib/types";
 import { XIcon } from "@/components/icons";
-import {
-  BUY_DEVICE,
-  CHOOSE_TRIAL,
-  PATH_A,
-  PATH_A_CLOSE,
-  PATH_A_INTERESTED,
-  PATH_A_NOT_INTERESTED,
-  PATH_B,
-  SEND_PRICES,
-  onboardingDonePatch,
-  parseOnboardingDone,
-  type OnboardingStep,
-} from "@/lib/onboarding-path";
+import type { OnboardingStep } from "@/lib/onboarding-path";
 import {
   BRANCH_NUEVO,
   BRANCH_USADO,
@@ -50,13 +38,6 @@ export function OnboardingTreeDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const hasLegacy = parseOnboardingDone(lead.customFields).length > 0;
-  const hasNew = parseTreeDone(lead.customFields).length > 0;
-  // Existing leads with old-tree progress open on it; everyone else gets the new tree.
-  const [view, setView] = useState<"new" | "legacy">(
-    hasLegacy && !hasNew ? "legacy" : "new",
-  );
-
   return (
     <div className="fixed inset-0 z-[1200] flex items-end justify-center sm:items-center">
       <button
@@ -81,29 +62,6 @@ export function OnboardingTreeDialog({
           >
             {lead.company}
           </h2>
-          {hasLegacy ? (
-            <div
-              className="mt-2 flex justify-center gap-1 text-[11px]"
-              role="tablist"
-            >
-              {(["new", "legacy"] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  role="tab"
-                  aria-selected={view === v}
-                  onClick={() => setView(v)}
-                  className={`rounded-full px-3 py-1 ${
-                    view === v
-                      ? "bg-white/10 text-mist-100"
-                      : "text-mist-500 hover:text-mist-200"
-                  }`}
-                >
-                  {v === "new" ? "Árbol nuevo" : "Árbol anterior"}
-                </button>
-              ))}
-            </div>
-          ) : null}
           <button
             type="button"
             onClick={onClose}
@@ -114,146 +72,7 @@ export function OnboardingTreeDialog({
           </button>
         </div>
 
-        {view === "new" ? (
-          <LeadTree lead={lead} onSetDone={onSetDone} />
-        ) : (
-          <LegacyTree lead={lead} onSetDone={onSetDone} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function LegacyTree({
-  lead,
-  onSetDone,
-}: {
-  lead: LeadWithOutreach;
-  onSetDone: (customFields: Record<string, string>) => void;
-}) {
-  const done = new Set(parseOnboardingDone(lead.customFields));
-  const trial = done.has(CHOOSE_TRIAL.id);
-  const buyDirect = done.has(BUY_DEVICE.id);
-  const interested = done.has(PATH_A_INTERESTED.id);
-  const buying = buyDirect || interested;
-  const closing = done.has(PATH_A_NOT_INTERESTED.id);
-
-  function toggle(id: string, checked: boolean) {
-    const next = new Set(parseOnboardingDone(lead.customFields));
-    if (checked) next.add(id);
-    else next.delete(id);
-    onSetDone(onboardingDonePatch(lead.customFields, [...next]));
-  }
-
-  return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8">
-      <div className="mx-auto flex w-full max-w-2xl flex-col items-center">
-        <Tile
-          step={SEND_PRICES}
-          on={done.has(SEND_PRICES.id)}
-          tone="task"
-          onToggle={toggle}
-        />
-        <WaveFork />
-
-        <div className="grid w-full items-start gap-4 md:grid-cols-2">
-          <Column
-            live={trial}
-            head={
-              <Tile
-                step={CHOOSE_TRIAL}
-                on={trial}
-                tone="decision"
-                onToggle={toggle}
-              />
-            }
-          >
-            {PATH_A.map((step) => (
-              <Tile
-                key={step.id}
-                step={step}
-                on={done.has(step.id)}
-                tone="task"
-                dim={!trial}
-                onToggle={toggle}
-              />
-            ))}
-            <WaveFork compact />
-            <div className="grid w-full grid-cols-2 gap-2">
-              <Column
-                live={closing}
-                head={
-                  <Tile
-                    step={PATH_A_NOT_INTERESTED}
-                    on={closing}
-                    tone="reject"
-                    dim={!trial}
-                    onToggle={toggle}
-                  />
-                }
-              >
-                {PATH_A_CLOSE.map((step) => (
-                  <Tile
-                    key={step.id}
-                    step={step}
-                    on={done.has(step.id)}
-                    tone="reject"
-                    dim={!closing}
-                    onToggle={toggle}
-                  />
-                ))}
-                <EndTile
-                  label="Fin"
-                  on={closing && PATH_A_CLOSE.every((s) => done.has(s.id))}
-                />
-              </Column>
-              <Column
-                live={interested}
-                head={
-                  <Tile
-                    step={PATH_A_INTERESTED}
-                    on={interested}
-                    tone="decision"
-                    dim={!trial}
-                    onToggle={toggle}
-                  />
-                }
-              >
-                <p className="px-1 text-center text-[11px] leading-snug text-mist-400">
-                  Continúa en compra.
-                </p>
-              </Column>
-            </div>
-          </Column>
-
-          <Column
-            live={buying}
-            head={
-              <Tile
-                step={BUY_DEVICE}
-                on={buyDirect}
-                tone="decision"
-                hint={interested && !buyDirect ? "Desde trial" : undefined}
-                onToggle={toggle}
-              />
-            }
-          >
-            {PATH_B.map((step) => (
-              <Tile
-                key={step.id}
-                step={step}
-                on={done.has(step.id)}
-                tone="task"
-                dim={!buying}
-                onToggle={toggle}
-              />
-            ))}
-            <EndTile
-              label="Listo"
-              on={buying && PATH_B.every((s) => done.has(s.id))}
-            />
-          </Column>
-        </div>
+        <LeadTree lead={lead} onSetDone={onSetDone} />
       </div>
     </div>
   );

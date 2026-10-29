@@ -144,6 +144,12 @@ export function toggleTreeStep(done: readonly string[], id: string, checked: boo
   } else {
     next.delete(id);
   }
+  // NUEVO/USADO only exist under TRIAL: leaving TRIAL (e.g. switching to NO TRIAL)
+  // must not keep a hidden branch pick.
+  if (!next.has(TRIAL.id)) {
+    next.delete(NUEVO.id);
+    next.delete(USADO.id);
+  }
   return [...next];
 }
 
