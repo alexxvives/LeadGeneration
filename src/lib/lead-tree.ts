@@ -1,7 +1,8 @@
 /**
- * LUMIA lead tree (v2). Checked step ids live on the lead as JSON in
- * `customFields[LEAD_TREE_FIELD]`. The old onboarding tree keeps its own
- * field (`__onboarding`) untouched, so existing progress is never rewritten.
+ * LUMIA lead tree (v2). Checked step ids live in the lead's `lead_tree`
+ * column (`lead.leadTree`). Every lead starts this tree from zero: the legacy
+ * `customFields.__lead_tree` / `__onboarding` values stay in the DB untouched
+ * but are never read as this tree's state.
  */
 
 export const LEAD_TREE_FIELD = "__lead_tree";
@@ -81,14 +82,61 @@ function trialBranch(head: TreeStep, p: string, nuevo: boolean): TrialBranch {
 export const BRANCH_NUEVO = trialBranch(NUEVO, "n", true);
 export const BRANCH_USADO = trialBranch(USADO, "u", false);
 
+/**
+ * NO TRIAL path. A plan choice (one row, one of two), then "Añadir productos /
+ * extra" splits into three lanes that run in parallel: the center line is
+ * always on; customización (left) and complementos (right) are optional
+ * toggles whose steps diverge from and merge back into the center line.
+ */
+export const PLAN_VARIABLE = s("d_plan_var", "Plan variable");
+export const PLAN_FIJO = s("d_plan_fix", "Plan fijo");
+export const NT_PRODUCTS = s("d_products", "Añadir productos / extra");
+export const LANE_CUSTOM = s("d_lane_custom", "Añadir customización");
+export const LANE_COMPL = s("d_lane_compl", "Añadir complementos");
+
+export const NT = {
+  contract: s("d_contract", "Enviar contrato + factura"),
+  paid: s("d_paid", "Pago recibido"),
+  sepa: s("d_sepa", "SEPA recibido"),
+  ship: s("d_ship", "Enviar dispositivo"),
+  activate: s("d_activate", "Activar dispositivo"),
+  creds: s("d_creds", "Enviar credenciales"),
+  w1: s("d_f_w1", "Seguimiento semana 1"),
+  m1: s("d_f_m1", "Seguimiento mes 1"),
+  m6: s("d_f_m6", "Seguimiento mes 6"),
+  y1: s("d_f_y1", "Seguimiento año 1"),
+  customExcel: s("dc_excel", "Enviar excel a cliente"),
+  customPay: s("dc_pay", "Pagar customización"),
+  customBecon: s("dc_becon", "Enviar excel a Becon"),
+  complExcel: s("dm_excel", "Enviar excel a cliente"),
+  complAmazon: s("dm_amazon", "Pagar Amazon"),
+  complProduct: s("dm_product", "Enviar producto + enviar dispositivo"),
+} as const;
+
+export const NO_TRIAL_CENTER: readonly TreeStep[] = [
+  NT.contract, NT.paid, NT.sepa, NT.ship, NT.activate, NT.creds, NT.w1, NT.m1, NT.m6, NT.y1,
+];
+export const NO_TRIAL_CUSTOM: readonly TreeStep[] = [NT.customExcel, NT.customPay, NT.customBecon];
+export const NO_TRIAL_COMPL: readonly TreeStep[] = [NT.complExcel, NT.complAmazon, NT.complProduct];
+
+/** Steps on the active NO TRIAL path, in order (lanes only when toggled on). */
+export function noTrialActiveSteps(done: ReadonlySet<string>): TreeStep[] {
+  const custom = done.has(LANE_CUSTOM.id);
+  const compl = done.has(LANE_COMPL.id);
+  return [
+    ...(custom ? [NT.customExcel] : []),
+    ...(compl ? [NT.complExcel] : []),
+    NT.contract, NT.paid, NT.sepa,
+    ...(compl ? [NT.complAmazon, NT.complProduct] : []),
+    NT.ship,
+    ...(custom ? [NT.customPay, NT.customBecon] : []),
+    NT.activate, NT.creds, NT.w1, NT.m1, NT.m6, NT.y1,
+  ];
+}
+
 export const NO_TRIAL_STEPS: readonly TreeStep[] = [
-  s("d_plan", "¿Plan variable o fijo?"),
-  s("d_products", "¿Añadir productos? ¿Algún extra?"),
-  s("d_contract", "Enviar contrato + factura"),
-  s("d_paid", "Pago recibido"),
-  s("d_sepa", "SEPA recibido"),
-  s("d_ship", "Enviar dispositivo"),
-  ...followUpsAfterPurchase("d"),
+  PLAN_VARIABLE, PLAN_FIJO, NT_PRODUCTS, LANE_CUSTOM, LANE_COMPL,
+  ...NO_TRIAL_CENTER, ...NO_TRIAL_CUSTOM, ...NO_TRIAL_COMPL,
 ];
 
 function branchIds(b: TrialBranch): string[] {
@@ -117,6 +165,7 @@ const EXCLUSIVE: ReadonlyArray<[string, string]> = [
   [NUEVO.id, USADO.id],
   [BRANCH_NUEVO.buyHead.id, BRANCH_NUEVO.noBuyHead.id],
   [BRANCH_USADO.buyHead.id, BRANCH_USADO.noBuyHead.id],
+  [PLAN_VARIABLE.id, PLAN_FIJO.id],
 ];
 
 export function parseTreeDone(customFields: Record<string, string> | undefined): string[] {
@@ -173,7 +222,11 @@ export function treeCursor(doneIds: readonly string[]): string {
   const done = new Set(doneIds);
   const common = firstOpen(COMMON, done);
   if (common) return common;
-  if (done.has(NO_TRIAL.id)) return firstOpen(NO_TRIAL_STEPS, done) ?? "Listo";
+  if (done.has(NO_TRIAL.id)) {
+    if (!done.has(PLAN_VARIABLE.id) && !done.has(PLAN_FIJO.id)) return "¿Plan variable o fijo?";
+    if (!done.has(NT_PRODUCTS.id)) return NT_PRODUCTS.label;
+    return firstOpen(noTrialActiveSteps(done), done) ?? "Listo";
+  }
   if (!done.has(TRIAL.id)) return "¿TRIAL o NO TRIAL?";
   const branch = done.has(NUEVO.id) ? BRANCH_NUEVO : done.has(USADO.id) ? BRANCH_USADO : null;
   if (!branch) return "¿LUMIA NUEVO o USADO?";
