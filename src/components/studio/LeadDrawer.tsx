@@ -108,6 +108,7 @@ interface DrawerProps {
       conversationStep?: ConversationStep | null;
       conversationStepAt?: string | null;
       customFields?: Record<string, string>;
+      leadTree?: string[];
     },
   ) => Promise<void>;
   /** Parent-owned note-delete undo (survives drawer remounts). */
@@ -1783,8 +1784,8 @@ export function LeadDrawer(props: DrawerProps) {
         <OnboardingTreeDialog
           lead={lead}
           onClose={() => setTreeOpen(false)}
-          onSetDone={(customFields) => {
-            void props.onUpdateCrm(lead.id, { customFields });
+          onSetDone={(leadTree) => {
+            void props.onUpdateCrm(lead.id, { leadTree });
           }}
         />
       ) : null}

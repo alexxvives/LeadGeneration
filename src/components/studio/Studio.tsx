@@ -31,7 +31,6 @@ import {
   BoardLiveChip,
   BoardLockUiProvider,
   Lockable,
-  boardLockHint,
 } from "./board-lock";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadTable } from "./LeadTable";
@@ -1952,6 +1951,16 @@ export function Studio() {
   ) => {
     if (!canEditLeadNow(leadId)) return;
     const prior = boardRef.current?.leads.find((l) => l.id === leadId);
+    // Simultaneous editing: send what this field looked like before the edit
+    // so the server can merge around teammates' changes (lead-merge.ts).
+    const base: Record<string, unknown> | undefined = prior
+      ? Object.fromEntries(
+          Object.keys(patch).map((k) => [
+            k,
+            (prior as unknown as Record<string, unknown>)[k] ?? null,
+          ]),
+        )
+      : undefined;
     const droppedFollowUpIds = rememberDroppedFollowUps(
       prior,
       patch.followUps,
@@ -1998,15 +2007,44 @@ export function Studio() {
               body.conversationStep = latest.conversationStep;
             } else if (key === "conversationStepAt") {
               body.conversationStepAt = latest.conversationStepAt;
+            } else if (key === "leadTree") {
+              body.leadTree = latest.leadTree;
             }
           }
         }
-        const { lead } = await api.updateLead(leadId, body);
+        const { lead } = await api.updateLead(leadId, body, { base });
         applyServerLead(leadId, lead, body, writeAt);
         if (body.followUps) refreshTasks();
       });
     } catch (e) {
+      const conflict = (e as { conflict?: { changedBy: string | null; fields: string[] } })
+        .conflict;
       await refresh();
+      if (conflict) {
+        // Theirs is on screen now (refresh); "Keep yours" re-applies this edit.
+        const who = conflict.changedBy || "a teammate";
+        toast(
+          "err",
+          `Changed by ${who} — showing theirs. Keep yours instead?`,
+          12000,
+          `conflict-${leadId}`,
+          {
+            label: "Keep yours",
+            onClick: () => {
+              void (async () => {
+                try {
+                  const { lead } = await api.updateLead(leadId, patch, { force: true });
+                  applyServerLead(leadId, lead, patch, patchLeadLocal(leadId, {}));
+                  toast("ok", "Kept your version.");
+                } catch (err) {
+                  toast("err", (err as Error).message);
+                }
+              })();
+            },
+          },
+        );
+        return;
+      }
       toast("err", (e as Error).message);
     }
   };

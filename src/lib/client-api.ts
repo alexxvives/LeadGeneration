@@ -111,6 +111,10 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const err = data as {
       error?: string;
+      conflict?: boolean;
+      changedBy?: string | null;
+      conflicts?: unknown;
+      lead?: unknown;
       quota?: { kind: "leads" | "sends" | "verifies"; planId: PlanId };
       undeliverableRemoved?: boolean;
       verifyBlocked?: boolean;
@@ -141,8 +145,22 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
       verifyReason?: string | null;
       locked?: boolean;
       status?: number;
+      conflict?: {
+        changedBy: string | null;
+        fields: string[];
+        lead: Lead | null;
+      };
     };
     e.status = res.status;
+    if (res.status === 409 && err.conflict) {
+      e.conflict = {
+        changedBy: (err.changedBy as string | null) ?? null,
+        fields: Array.isArray(err.conflicts)
+          ? (err.conflicts as { field: string }[]).map((c) => c.field)
+          : [],
+        lead: (err.lead as Lead | null) ?? null,
+      };
+    }
     if (err.undeliverableRemoved) e.undeliverableRemoved = true;
     if (err.verifyBlocked) e.verifyBlocked = true;
     if (err.canForce) e.canForce = true;
@@ -458,8 +476,14 @@ export const api = {
       demoDone?: boolean;
       conversationStep?: ConversationStep | null;
       conversationStepAt?: string | null;
+      leadTree?: string[];
     },
-  ) => jsonFetch<{ lead: Lead }>(`/api/leads/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+    concurrency?: { base?: Record<string, unknown>; force?: boolean },
+  ) =>
+    jsonFetch<{ lead: Lead }>(`/api/leads/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ ...patch, ...(concurrency ?? {}) }),
+    }),
 
   deleteLead: (id: string) =>
     jsonFetch<{ ok: boolean }>(`/api/leads/${id}`, { method: "DELETE" }),

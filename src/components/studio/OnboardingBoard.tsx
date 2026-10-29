@@ -15,7 +15,6 @@ import {
   USADO,
   parseTreeDone,
   toggleTreeStep,
-  treeDonePatch,
   type TrialBranch,
 } from "@/lib/lead-tree";
 
@@ -28,7 +27,7 @@ export function OnboardingTreeDialog({
 }: {
   lead: LeadWithOutreach;
   onClose: () => void;
-  onSetDone: (customFields: Record<string, string>) => void;
+  onSetDone: (leadTree: string[]) => void;
 }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -83,12 +82,15 @@ function LeadTree({
   onSetDone,
 }: {
   lead: LeadWithOutreach;
-  onSetDone: (customFields: Record<string, string>) => void;
+  onSetDone: (leadTree: string[]) => void;
 }) {
-  const done = new Set(parseTreeDone(lead.customFields));
+  // Tree progress has its own column (lead.leadTree), so ticking steps never
+  // overwrites a teammate's custom-field edit. Older leads fall back to the
+  // legacy "__lead_tree" custom field until first ticked.
+  const current = lead.leadTree ?? parseTreeDone(lead.customFields);
+  const done = new Set(current);
   const toggle = (id: string, checked: boolean) => {
-    const next = toggleTreeStep(parseTreeDone(lead.customFields), id, checked);
-    onSetDone(treeDonePatch(lead.customFields, next));
+    onSetDone(toggleTreeStep(current, id, checked));
   };
   const trial = done.has(TRIAL.id);
   const noTrial = done.has(NO_TRIAL.id);
