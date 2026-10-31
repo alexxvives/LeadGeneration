@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTimeEu } from "@/lib/date-format";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { Run } from "@/lib/types";
@@ -94,7 +95,7 @@ export function RunsView({
                     ) : null}
                   </p>
                   <p className="mt-0.5 text-xs text-mist-500">
-                    {new Date(r.createdAt).toLocaleString()} · {r.provider} · {r.mode}
+                    {formatDateTimeEu(r.createdAt)} · {r.provider} · {r.mode}
                   </p>
                 </div>
                 <span className="text-sm tabular-nums text-mist-300 sm:text-right">

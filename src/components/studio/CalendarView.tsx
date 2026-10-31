@@ -334,6 +334,23 @@ function DayCountMarks({ counts }: { counts: Record<FollowUpKind, number> }) {
   );
 }
 
+/** Solid red flag chip for highlighted (post-sale) follow-up tasks. */
+function FlagMark() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="h-3 w-3 shrink-0"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path d="M3 1.5a.75.75 0 0 1 .75.75V3h8.69a.5.5 0 0 1 .4.8L11.25 6l1.59 2.2a.5.5 0 0 1-.4.8H3.75v5.25a.75.75 0 0 1-1.5 0V2.25A.75.75 0 0 1 3 1.5Z" />
+    </svg>
+  );
+}
+
+/** Chips shown in a day cell before collapsing into "+N more". */
+const CELL_MAX_LINES = 2;
+
 function DayTextList({
   events,
   today,
@@ -341,32 +358,57 @@ function DayTextList({
   events: CalendarEvent[];
   today: string;
 }) {
-  const lines = events.filter((ev) => ev.kind === "note" || ev.kind === "task");
+  const lines = events
+    .filter((ev) => ev.kind === "note" || ev.kind === "task")
+    // Highlighted follow-ups first so the red flags never hide behind "+N".
+    .sort((a, b) => Number(!!b.highlight && !b.done) - Number(!!a.highlight && !a.done));
   if (lines.length === 0) return null;
+  // Chips per cell scale with viewport height so nothing clips on laptops:
+  // 1 chip on short screens, 2 from 780px tall, 3 from 960px tall.
+  const TIER_CHIP = ["flex", "hidden [@media(min-height:780px)]:flex", "hidden [@media(min-height:960px)]:flex"];
+  const TIER_MORE = [
+    "inline [@media(min-height:780px)]:hidden",
+    "hidden [@media(min-height:780px)]:inline [@media(min-height:960px)]:hidden",
+    "hidden [@media(min-height:960px)]:inline",
+  ];
+  const shown = lines.slice(0, CELL_MAX_LINES + 1);
   return (
-    <span className="mt-1 flex min-h-0 w-full min-w-0 flex-1 flex-col justify-start gap-0.5 overflow-hidden [mask-image:linear-gradient(to_bottom,#000_0%,#000_78%,transparent_100%)] lg:gap-1">
-      {lines.map((ev) => {
-        // Highlighted tasks (post-sale follow-ups) are always red.
-        const overdue = isTaskOverdue(ev, today) || (!!ev.highlight && !ev.done);
+    <span className="mt-1 flex min-h-0 w-full min-w-0 flex-1 flex-col justify-start gap-0.5 overflow-hidden lg:gap-1">
+      {shown.map((ev, i) => {
+        const alert = !!ev.highlight && !ev.done;
+        const overdue = !alert && isTaskOverdue(ev, today);
         const done = ev.kind === "task" && ev.done;
+        const label = eventChipLabel(ev);
         return (
           <span
             key={`${ev.source}-${ev.id}`}
-            className={`flex min-h-[1.35rem] min-w-0 items-center gap-1 rounded-md px-1 py-0.5 text-left lg:min-h-[1.6rem] lg:px-1.5 lg:py-1 ${
-              overdue ? "bg-rose-400/20 text-rose-100" : KIND_CHIP[ev.kind]
+            title={`${label}${ev.company && !label.includes(ev.company) ? ` · ${ev.company}` : ""} — ${formatNoteDate(ev.date)}`}
+            className={`min-h-[1.35rem] min-w-0 shrink-0 items-center gap-1 rounded-md px-1 py-0.5 text-left lg:min-h-[1.5rem] lg:px-1.5 ${TIER_CHIP[i]} ${
+              alert ? "cal-chip-alert" : overdue ? "cal-chip-overdue" : KIND_CHIP[ev.kind]
             } ${done ? "opacity-55" : ""}`}
           >
-            <KindMark kind={ev.kind} />
+            {alert ? <FlagMark /> : <KindMark kind={ev.kind} />}
             <span
-              className={`min-w-0 flex-1 truncate text-[10px] font-medium leading-tight lg:text-[11px] xl:text-xs ${
-                done ? "line-through" : ""
-              }`}
+              className={`min-w-0 flex-1 truncate text-[10px] leading-tight lg:text-[11px] xl:text-xs ${
+                alert ? "font-semibold" : "font-medium"
+              } ${done ? "line-through" : ""}`}
             >
-              {eventChipLabel(ev)}
+              {label}
             </span>
           </span>
         );
       })}
+      {lines.length > 1 ? (
+        <span className="shrink-0 px-1 text-[10px] font-medium leading-tight text-mist-400 lg:text-[11px]">
+          {TIER_MORE.map((cls, i) =>
+            lines.length - (i + 1) > 0 ? (
+              <span key={i} className={cls}>
+                +{lines.length - (i + 1)} more
+              </span>
+            ) : null,
+          )}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -551,9 +593,9 @@ export function CalendarView({
           <div
             role="grid"
             aria-label={`Calendar for ${monthLabel(cursor.year, cursor.month)}`}
-            className="grid min-w-0 grid-cols-7 gap-px sm:gap-1 lg:min-h-0 lg:flex-1"
+            className="grid min-w-0 grid-cols-7 gap-px [--cal-row-min:4.75rem] sm:gap-1 lg:min-h-0 lg:flex-1 lg:[--cal-row-min:3.25rem]"
             style={{
-              gridTemplateRows: `auto repeat(${weekRows}, minmax(4.75rem, 1fr))`,
+              gridTemplateRows: `auto repeat(${weekRows}, minmax(var(--cal-row-min), 1fr))`,
             }}
           >
             {WEEKDAYS.map((d) => (
@@ -596,7 +638,7 @@ export function CalendarView({
                     overdue ? ", overdue follow-up" : ""
                   }${missed ? `, ${missed} missed call${missed === 1 ? "" : "s"}` : ""}`}
                   onClick={() => setSelected(cell.iso)}
-                  className={`flex min-h-[4.75rem] min-w-0 flex-col items-stretch overflow-hidden rounded-md px-1 py-1 text-left transition-colors sm:min-h-[6.5rem] sm:rounded-xl sm:px-1.5 sm:py-1.5 md:min-h-[7.25rem] lg:h-full lg:min-h-0 ${
+                  className={`flex min-h-[4.75rem] min-w-0 flex-col items-stretch overflow-hidden rounded-md px-1 py-1 text-left transition-colors sm:min-h-[6.5rem] sm:rounded-xl sm:px-1.5 sm:py-1.5 md:min-h-[7.25rem] lg:h-full lg:min-h-0 lg:py-1 ${
                     isSelected
                       ? overdue
                         ? "bg-rose-400/20 ring-2 ring-rose-400/70"
@@ -664,6 +706,11 @@ export function CalendarView({
               aria-hidden
             />
           </LegendItem>
+          <LegendItem label="Seguimiento">
+            <span className="cal-chip-alert inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm" aria-hidden>
+              <FlagMark />
+            </span>
+          </LegendItem>
           <LegendItem label="Overdue">
             <span
               className="h-3.5 w-3.5 rounded-sm bg-rose-400/20 ring-1 ring-rose-400/50"
@@ -673,7 +720,7 @@ export function CalendarView({
         </ul>
       </section>
 
-      <aside className="glass flex min-h-0 w-full shrink-0 flex-col self-stretch rounded-xl2 p-3 sm:p-5 lg:w-[min(22rem,36%)] lg:min-w-[16rem] lg:max-w-sm lg:overflow-hidden">
+      <aside className="glass flex min-h-0 w-full shrink-0 flex-col self-stretch rounded-xl2 p-3 sm:p-5 lg:w-[min(19rem,32%)] lg:min-w-[15rem] lg:max-w-sm xl:w-[min(22rem,34%)] lg:overflow-hidden">
         <p className="text-[11px] uppercase tracking-wider text-mist-500">
           {selected === today ? "Today" : formatNoteDate(selected)}
         </p>
@@ -811,7 +858,9 @@ function DayGroup({
           <li key={`${ev.source}-${ev.contactId ?? ev.leadId}-${ev.id}`}>
             <div
               className={`flex items-start gap-2 rounded-xl border p-2.5 ${
-                overdue
+                ev.highlight && !ev.done
+                  ? "cal-row-alert"
+                  : overdue
                   ? "border-rose-400/40 bg-rose-400/10"
                   : "border-white/5 bg-ink-950/40"
               }`}

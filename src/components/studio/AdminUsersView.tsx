@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateEu } from "@/lib/date-format";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { AdminUserRow, PlanId } from "@/lib/types";
@@ -389,7 +390,7 @@ export function AdminUsersView() {
                       .join(" · ") || "—"}
                   </td>
                   <td className="px-4 py-3 text-xs text-mist-500 whitespace-nowrap">
-                    {new Date(u.createdAt).toLocaleDateString()}
+                    {formatDateEu(u.createdAt)}
                   </td>
                   <td className="px-2 py-3">
                     <button

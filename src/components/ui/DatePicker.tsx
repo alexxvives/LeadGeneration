@@ -35,12 +35,8 @@ function mondayOffset(jsSundayZero: number): number {
 
 function formatField(iso: string): string {
   const p = parseIso(iso);
-  if (!p) return iso || "Pick a date";
-  return new Date(p.y, p.m, p.d).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  if (!p) return iso || "dd/mm/aaaa";
+  return `${String(p.d).padStart(2, "0")}/${String(p.m + 1).padStart(2, "0")}/${p.y}`;
 }
 
 function monthTitle(y: number, m: number): string {
@@ -53,7 +49,7 @@ function monthTitle(y: number, m: number): string {
 /**
  * Branded date field — glass trigger + mini month popover (portaled so
  * drawer overflow does not clip it). Replaces native `type="date"`.
- * Popover is `z-[1200]`: above Lead/Contact drawers (`z-[1100]`), below
+ * Popover is `z-[1400]`: above drawers (`z-[1100]`) and dialogs (`z-[1300]`), below
  * toasts (`z-[2000]`).
  */
 export function DatePicker({
@@ -173,7 +169,7 @@ export function DatePicker({
             ref={popRef}
             role="dialog"
             aria-label={monthTitle(cursor.y, cursor.m)}
-            className="fixed z-[1200] w-[17.5rem] rounded-xl2 border border-white/10 bg-ink-900 p-3 shadow-xl"
+            className="fixed z-[1400] w-[17.5rem] rounded-xl2 border border-white/10 bg-ink-900 p-3 shadow-xl"
             style={{ top: pos.top, left: pos.left }}
           >
             <div className="mb-2 flex items-center justify-between gap-2">

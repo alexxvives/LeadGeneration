@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateEu } from "@/lib/date-format";
 import { useMemo, useState } from "react";
 import type { BoardSummary, Contact } from "@/lib/types";
 import {
@@ -13,13 +14,7 @@ import { AuthorAvatar } from "@/components/studio/JournalEntries";
 import { EmptyState } from "@/components/studio/StudioHelpers";
 
 function formatCreated(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDateEu(iso);
 }
 
 export function ContactsView({

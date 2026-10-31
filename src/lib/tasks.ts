@@ -1,3 +1,4 @@
+import { formatDayMonthEu } from "@/lib/date-format";
 import type { FollowUp, Task, TaskAssignee, TaskStatus } from "@/lib/types";
 import {
   followUpIsDone,
@@ -145,10 +146,7 @@ export function formatTaskDeadline(
 ): { label: string; overdue: boolean; softOverdue: boolean } {
   if (!deadline) return { label: "", overdue: false, softOverdue: false };
   if (deadline === today) return { label: "Today", overdue: false, softOverdue: false };
-  const d = new Date(`${deadline}T12:00:00`);
-  const label = Number.isNaN(d.getTime())
-    ? deadline
-    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const label = formatDayMonthEu(deadline);
   if (deadline < today) {
     return { label: "Overdue", overdue: true, softOverdue: true };
   }

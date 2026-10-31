@@ -1,6 +1,8 @@
 import type { Contact, FollowUp, FollowUpKind, LeadWithOutreach, Task } from "@/lib/types";
 
 /** Local calendar day (YYYY-MM-DD), not UTC — follow-ups are “today” in the user’s timezone. */
+import { formatDateEu, formatDateTimeEu } from "@/lib/date-format";
+
 export function todayIsoDate(d = new Date()): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -15,21 +17,9 @@ export function addDaysIso(days: number, d = new Date()): string {
   );
 }
 
-/** "1st March 2025" style for note journal lines. */
+/** dd/mm/yyyy for note journal lines and calendar headings. */
 export function formatNoteDate(iso: string): string {
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  const day = d.getDate();
-  const ord =
-    day % 10 === 1 && day !== 11
-      ? "st"
-      : day % 10 === 2 && day !== 12
-        ? "nd"
-        : day % 10 === 3 && day !== 13
-          ? "rd"
-          : "th";
-  const month = d.toLocaleString("en-GB", { month: "long" });
-  return `${day}${ord} ${month} ${d.getFullYear()}`;
+  return formatDateEu(iso);
 }
 
 /** True for "Email sent" and "Email sent by …". */
@@ -304,21 +294,7 @@ export function formatLastContact(
 ): string {
   const { at, precision } = lastContactTimestamp(lead);
   if (!at) return "";
-  const d = new Date(at);
-  if (precision === "date") {
-    return d.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  }
-  return d.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return precision === "date" ? formatDateEu(new Date(at)) : formatDateTimeEu(new Date(at));
 }
 
 const TITLE_RE = /^(dr|dra|mr|mrs|ms|miss|prof|sr|sra|srta)\.?$/i;

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateEu } from "@/lib/date-format";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BoardSummary, Contact, FollowUp } from "@/lib/types";
 import { newId } from "@/lib/id";
@@ -27,13 +28,7 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { JournalEntries } from "@/components/studio/JournalEntries";
 
 function formatCreated(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDateEu(iso);
 }
 
 function EditableInfoRow({

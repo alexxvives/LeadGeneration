@@ -236,6 +236,27 @@ html[data-theme="light"] {
     background-color: rgba(12, 21, 36, 0.2);
   }
 
+  /* Calendar: highlighted post-sale follow-ups — solid red, AA in both themes
+     (white on #b91c1c ≈ 6.5:1). Overdue: tinted with dark/light-aware text. */
+  .cal-chip-alert {
+    background-color: #b91c1c;
+    color: #ffffff;
+  }
+  .cal-chip-overdue {
+    background-color: rgba(220, 38, 38, 0.16);
+    color: #fecaca;
+    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.5);
+  }
+  html[data-theme="light"] .cal-chip-overdue {
+    background-color: rgba(220, 38, 38, 0.08);
+    color: #991b1b;
+  }
+  .cal-row-alert {
+    border-color: rgba(220, 38, 38, 0.55);
+    background-color: rgba(220, 38, 38, 0.12);
+    box-shadow: inset 3px 0 0 #dc2626;
+  }
+
   /* Toggle switch — visible track in both themes */
   .switch-track {
     background-color: rgba(255, 255, 255, 0.22);

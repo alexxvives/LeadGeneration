@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateEu, formatDayMonthEu } from "@/lib/date-format";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/client-api";
 import type { AdminPlatformStats, AdminUserRow, PlanId } from "@/lib/types";
@@ -110,7 +111,7 @@ function signupSeries(users: AdminUserRow[], days = 14): { label: string; n: num
     const key = d.toISOString().slice(0, 10);
     buckets.push({
       key,
-      label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      label: formatDayMonthEu(key),
       n: 0,
     });
   }
@@ -505,7 +506,7 @@ export function AdminPlatformView() {
                     </p>
                   </div>
                   <time className="shrink-0 text-xs text-mist-500">
-                    {new Date(u.createdAt).toLocaleDateString()}
+                    {formatDateEu(u.createdAt)}
                   </time>
                 </li>
               ))

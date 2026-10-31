@@ -77,3 +77,12 @@ await test("task upsert idempotent (real migrations + SQL)", async () => {
   assert.equal(rows[0]!.status, "completed"); // status survives a date edit
   assert.equal(rows[5]!.deadline, "2029-03-01");
 });
+
+await test("european date format", async () => {
+  const { formatDateEu, formatDayMonthEu, formatDateTimeEu } = await import("@/lib/date-format");
+  assert.equal(formatDateEu("2026-11-04"), "04/11/2026");
+  assert.equal(formatDayMonthEu("2026-11-04"), "04/11");
+  assert.equal(formatDateEu(new Date(2027, 0, 9)), "09/01/2027");
+  assert.equal(formatDateTimeEu(new Date(2027, 0, 9, 7, 5)), "09/01/2027 07:05");
+  assert.equal(formatDateEu(""), "");
+});

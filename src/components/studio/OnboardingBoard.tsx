@@ -1,5 +1,7 @@
 "use client";
 
+import { DatePicker } from "@/components/ui/DatePicker";
+import { formatDateEu } from "@/lib/date-format";
 import { useEffect, useState, type ReactNode } from "react";
 import type { LeadWithOutreach } from "@/lib/types";
 import { XIcon } from "@/components/icons";
@@ -372,7 +374,7 @@ export function PurchasePath({
         className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-mist-300 hover:border-white/30 hover:text-mist-100"
       >
         {activation
-          ? `Activado el ${formatEs(activation)} · Editar`
+          ? `Activado el ${formatDateEu(activation)} · Editar`
           : "Fecha de activación · Añadir"}
       </button>
       <Column live>
@@ -385,7 +387,7 @@ export function PurchasePath({
               step={step}
               on={done.has(step.id)}
               tone="task"
-              meta={date ? formatEs(date) : undefined}
+              meta={date ? formatDateEu(date) : undefined}
               onToggle={onToggle}
             />
           );
@@ -396,10 +398,6 @@ export function PurchasePath({
   );
 }
 
-function formatEs(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-}
 
 /** Asks for the software activation date (default today). */
 export function ActivationDialog({
@@ -438,20 +436,15 @@ export function ActivationDialog({
         <p className="mt-1 text-xs text-mist-400">
           Los seguimientos se calculan desde esta fecha y se crean como tareas destacadas en el calendario.
         </p>
-        <input
-          type="date"
-          required
-          autoFocus
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="mt-4 w-full rounded-xl border border-white/15 bg-ink-950/60 px-3 py-2 text-sm text-mist-100 [color-scheme:dark]"
-        />
+        <div className="mt-4">
+          <DatePicker value={value} onChange={setValue} label="Fecha de activación" />
+        </div>
         {preview ? (
           <ul className="mt-3 space-y-1 text-xs text-mist-300">
             {FOLLOW_UP_PLAN.map((f) => (
               <li key={f.key} className="flex justify-between gap-3">
                 <span>{f.label}</span>
-                <span className="font-medium text-rose-300">{formatEs(preview[f.key])}</span>
+                <span className="font-medium text-rose-300">{formatDateEu(preview[f.key])}</span>
               </li>
             ))}
           </ul>

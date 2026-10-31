@@ -1,3 +1,4 @@
+import { formatDateTimeEu } from "@/lib/date-format";
 import { env, getCapabilities, authRequired } from "@/lib/config";
 import { HelpIcon, SparkIcon } from "@/components/icons";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -247,7 +248,7 @@ export default async function SettingsPage() {
                 <p className="mt-2 text-xs text-mist-500">
                   Email checks reset daily (midnight UTC)
                   {usage.verifiesResetsAt
-                    ? ` · next reset ${new Date(usage.verifiesResetsAt).toLocaleString()}`
+                    ? ` · next reset ${formatDateTimeEu(usage.verifiesResetsAt)}`
                     : ""}
                   .
                 </p>
