@@ -2,6 +2,7 @@ import type {
   Board,
   BoardInvite,
   BoardLock,
+  Deletion,
   BoardMember,
   BoardMemberRole,
   Lead,
@@ -1181,6 +1182,80 @@ export class D1Store implements LeadRepository {
     // Holder vanished between the two statements — take it.
     await this.upsertBoardLock(lock);
     return null;
+  }
+
+  async renewBoardLock(boardId: string, userId: string, expiresAt: string): Promise<boolean> {
+    const res = await this.db
+      .prepare(`UPDATE board_locks SET expires_at = ? WHERE board_id = ? AND user_id = ?`)
+      .bind(expiresAt, boardId, userId)
+      .run();
+    return res.meta.changes > 0;
+  }
+
+  async recordDeletions(rows: Deletion[], pruneBeforeIso: string): Promise<void> {
+    await this.db
+      .prepare(`DELETE FROM deletions WHERE deleted_at <= ?`)
+      .bind(pruneBeforeIso)
+      .run();
+    // 8 params/row; D1 caps bound params at 100 per statement.
+    for (let i = 0; i < rows.length; i += 12) {
+      const chunk = rows.slice(i, i + 12);
+      await this.db
+        .prepare(
+          `INSERT OR REPLACE INTO deletions (id, entity_type, entity_id, entity_name, board_id, deleted_by_id, deleted_by_name, deleted_at)
+           VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
+        )
+        .bind(
+          ...chunk.flatMap((r) => [
+            `${r.entityType}:${r.entityId}`,
+            r.entityType,
+            r.entityId,
+            r.entityName,
+            r.boardId,
+            r.deletedById,
+            r.deletedByName,
+            r.deletedAt,
+          ]),
+        )
+        .run();
+    }
+  }
+
+  async listDeletions(filter: {
+    boardIds?: string[];
+    entityIds?: string[];
+    sinceIso: string;
+  }): Promise<Deletion[]> {
+    const boardIds = (filter.boardIds ?? []).filter(Boolean).slice(0, 80);
+    const entityIds = (filter.entityIds ?? []).filter(Boolean).slice(0, 15);
+    if (boardIds.length === 0 && entityIds.length === 0) return [];
+    const ors: string[] = [];
+    if (boardIds.length) ors.push(`board_id IN (${boardIds.map(() => "?").join(", ")})`);
+    if (entityIds.length) ors.push(`entity_id IN (${entityIds.map(() => "?").join(", ")})`);
+    const { results } = await this.db
+      .prepare(
+        `SELECT * FROM deletions WHERE deleted_at > ? AND (${ors.join(" OR ")})
+         ORDER BY deleted_at DESC LIMIT 300`,
+      )
+      .bind(filter.sinceIso, ...boardIds, ...entityIds)
+      .all<{
+        entity_type: string;
+        entity_id: string;
+        entity_name: string | null;
+        board_id: string | null;
+        deleted_by_id: string | null;
+        deleted_by_name: string | null;
+        deleted_at: string;
+      }>();
+    return (results ?? []).map((r) => ({
+      entityType: r.entity_type as Deletion["entityType"],
+      entityId: r.entity_id,
+      entityName: r.entity_name,
+      boardId: r.board_id,
+      deletedById: r.deleted_by_id,
+      deletedByName: r.deleted_by_name,
+      deletedAt: r.deleted_at,
+    }));
   }
 
   async clearBoardLock(boardId: string, userId?: string): Promise<boolean> {

@@ -7,6 +7,7 @@ import {
   type Board,
   type BoardInvite,
   type BoardLock,
+  type Deletion,
   type BoardMember,
   type BoardMemberRole,
   type Contact,
@@ -45,6 +46,7 @@ interface DbShape {
   boardMembers: BoardMember[];
   boardInvites: BoardInvite[];
   boardLocks: BoardLock[];
+  deletions: Deletion[];
 }
 
 /** Back-fills email setting fields added in migration 0006 to workspace rows from older JSON files. */
@@ -240,6 +242,7 @@ const EMPTY: DbShape = {
   boardMembers: [],
   boardInvites: [],
   boardLocks: [],
+  deletions: [],
 };
 
 // A single, process-wide write chain shared by ALL JsonStore instances. Stores
@@ -279,6 +282,7 @@ export class JsonStore implements LeadRepository {
         boardMembers: parsed.boardMembers ?? [],
         boardInvites: parsed.boardInvites ?? [],
         boardLocks: parsed.boardLocks ?? [],
+        deletions: parsed.deletions ?? [],
       };
     } catch {
       return structuredClone(EMPTY);
@@ -610,6 +614,43 @@ export class JsonStore implements LeadRepository {
       else data.boardLocks[idx] = lock;
       return { data, result: lock };
     });
+  }
+
+  renewBoardLock(boardId: string, userId: string, expiresAt: string): Promise<boolean> {
+    return this.mutate((data) => {
+      const held = data.boardLocks.find((l) => l.boardId === boardId && l.userId === userId);
+      if (held) held.expiresAt = expiresAt;
+      return { data, result: Boolean(held) };
+    });
+  }
+
+  recordDeletions(rows: Deletion[], pruneBeforeIso: string): Promise<void> {
+    return this.mutate((data) => {
+      const key = (d: Deletion) => `${d.entityType}:${d.entityId}`;
+      const fresh = new Set(rows.map(key));
+      data.deletions = [
+        ...data.deletions.filter((d) => d.deletedAt > pruneBeforeIso && !fresh.has(key(d))),
+        ...rows,
+      ];
+      return { data, result: undefined };
+    });
+  }
+
+  async listDeletions(filter: {
+    boardIds?: string[];
+    entityIds?: string[];
+    sinceIso: string;
+  }): Promise<Deletion[]> {
+    const boards = new Set(filter.boardIds ?? []);
+    const ids = new Set(filter.entityIds ?? []);
+    const data = await this.read();
+    return data.deletions
+      .filter(
+        (d) =>
+          d.deletedAt > filter.sinceIso &&
+          ((d.boardId != null && boards.has(d.boardId)) || ids.has(d.entityId)),
+      )
+      .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
   }
 
   tryAcquireBoardLock(lock: BoardLock, nowIso: string): Promise<BoardLock | null> {

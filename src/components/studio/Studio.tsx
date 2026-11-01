@@ -1,5 +1,13 @@
 "use client";
 
+import { startBulkLockKeepalive } from "@/lib/bulk-lock-keepalive";
+import {
+  deletionNoticeText,
+  findBoardDeletion,
+  findLeadDeletion,
+} from "@/lib/deletion-notice";
+import type { Deletion } from "@/lib/types";
+import { DeletedNotice } from "@/components/studio/DeletedNotice";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -297,6 +305,8 @@ export function Studio() {
 
   const [running, setRunning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Board the user is on, deleted by someone else (tombstone from the poll).
+  const [deletedBoard, setDeletedBoard] = useState<Deletion | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsReady, setContactsReady] = useState(false);
   const [contactsError, setContactsError] = useState<string | null>(null);
@@ -532,6 +542,10 @@ export function Studio() {
       const data = await api.board(boardKey, { lite: true });
       if (filterBoardIdRef.current !== boardKey) return data;
       setBoards(data.boards ?? []);
+      {
+        const gone = findBoardDeletion(data.deletions, boardKey);
+        if (gone) setDeletedBoard(gone);
+      }
       if (leadsGenRef.current !== genAtStart || loadInFlightRef.current) {
         return data;
       }
@@ -679,6 +693,22 @@ export function Studio() {
         data.activeBoardId !== boardKey &&
         !(data.boards ?? []).some((b) => b.id === boardKey)
       ) {
+        // Deleted by another user: say so (who + when) and let them go back,
+        // instead of silently swapping in "all boards".
+        const gone = findBoardDeletion(data.deletions, boardKey);
+        if (gone) {
+          setDeletedBoard(gone);
+          setBoard((b) => ({
+            ...data,
+            boards: data.boards ?? b?.boards ?? [],
+            leads: [],
+            leadsTotal: 0,
+            leadsHasMore: false,
+          }));
+          leadsBackfillingRef.current = false;
+          setLeadsBackfilling(false);
+          return data;
+        }
         storeBoardFilter("");
         if (typeof window !== "undefined") {
           const next = `/app${queryForView(viewRef.current, null)}`;
@@ -1118,6 +1148,8 @@ export function Studio() {
 
   const executeSearch = async (v: SearchValues, boardId: string) => {
     setRunning(true);
+    // Heartbeat + release-on-tab-close for the short Find leads lock.
+    const stopLock = boardId ? startBulkLockKeepalive(boardId) : null;
     try {
       activeRunIdRef.current = null;
       setActiveRunId(null);
@@ -1145,6 +1177,7 @@ export function Studio() {
     } catch (e) {
       handleError(e);
     } finally {
+      stopLock?.();
       setRunning(false);
     }
   };
@@ -1207,6 +1240,26 @@ export function Studio() {
 
     setImportProgress({ done: 0, total });
 
+    // Short import lock: renewed every ~20s while chunks run; on tab close we
+    // finalize the run (rows already imported stay saved) and release it.
+    let stopLock: (() => void) | null = null;
+    const startLock = (bid: string) => {
+      if (stopLock) return;
+      stopLock = startBulkLockKeepalive(bid, {
+        onPageHide: () => {
+          const rid = importRunIdRef.current;
+          if (!rid) return;
+          void fetch("/api/leads/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ leads: [], runId: rid, finalize: true }),
+            keepalive: true,
+          }).catch(() => undefined);
+        },
+      });
+    };
+    if (dest.boardId) startLock(dest.boardId);
+
     // Soft progress: ease toward the next chunk ceiling while a request is in flight.
     const softTimer = window.setInterval(() => {
       if (ac.signal.aborted) return;
@@ -1258,6 +1311,7 @@ export function Studio() {
         runId = data.run?.id ?? runId;
         importRunIdRef.current = runId ?? null;
         boardIdOut = data.boardId ?? boardIdOut;
+        if (boardIdOut) startLock(boardIdOut);
         imported += data.imported ?? 0;
         merged += data.merged ?? 0;
         skipped += data.skipped ?? 0;
@@ -1306,6 +1360,7 @@ export function Studio() {
       }
       throw e;
     } finally {
+      (stopLock as (() => void) | null)?.();
       window.clearInterval(softTimer);
       if (importAbortRef.current === ac) importAbortRef.current = null;
       importRunIdRef.current = null;
@@ -1492,6 +1547,17 @@ export function Studio() {
       if (opts?.silent) throw e;
     }
   };
+
+  const backToAllBoards = useCallback(() => {
+    setDeletedBoard(null);
+    storeBoardFilter("");
+    router.replace(`/app${queryForView(viewRef.current, "all")}`, { scroll: false });
+  }, [router]);
+
+  // Notice belongs to the deleted board only.
+  useEffect(() => {
+    setDeletedBoard((d) => (d && d.entityId !== filterBoardId ? null : d));
+  }, [filterBoardId]);
 
   const closeLeadDrawer = useCallback(() => {
     setDrawerPromptNote(false);
@@ -2160,6 +2226,23 @@ export function Studio() {
   };
 
   const selected = board?.leads.find((l) => l.id === selectedId) ?? null;
+  // Remember the open lead so we can explain it if a refresh drops it.
+  const openLeadRef = useRef<{ id: string; boardId: string | null; openedAt: string } | null>(null);
+  if (selected) {
+    if (openLeadRef.current?.id !== selected.id) {
+      openLeadRef.current = {
+        id: selected.id,
+        boardId: selected.boardId ?? null,
+        openedAt: new Date().toISOString(),
+      };
+    }
+  } else if (!selectedId) {
+    openLeadRef.current = null;
+  }
+  const openLeadDeletion =
+    selectedId && !selected && openLeadRef.current?.id === selectedId
+      ? findLeadDeletion(board?.deletions, openLeadRef.current, openLeadRef.current.openedAt)
+      : null;
   const selectedContact =
     contacts.find((c) => c.id === selectedContactId) ?? null;
 
@@ -2743,6 +2826,16 @@ export function Studio() {
         />
       )}
 
+      {deletedBoard && deletedBoard.entityId === filterBoardId ? (
+        <div className="mx-auto mb-4 w-full max-w-3xl">
+          <DeletedNotice
+            text={deletionNoticeText(deletedBoard, "board")}
+            actionLabel="Back to all boards"
+            onAction={backToAllBoards}
+          />
+        </div>
+      ) : null}
+
       {/* Search view — always show the full panel */}
       {view === "board" && (
         <div className="mx-auto mb-8 w-full max-w-3xl">
@@ -3317,6 +3410,15 @@ export function Studio() {
             }
           }}
         />
+      ) : null}
+
+      {openLeadDeletion ? (
+        <div className="fixed inset-x-3 bottom-4 z-50 mx-auto max-w-lg sm:right-4 sm:left-auto">
+          <DeletedNotice
+            text={deletionNoticeText(openLeadDeletion, "lead")}
+            onDismiss={closeLeadDrawer}
+          />
+        </div>
       ) : null}
 
       {selected && board && (

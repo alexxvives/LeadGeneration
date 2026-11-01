@@ -309,6 +309,18 @@ export interface BoardLock {
   expiresAt: string;
 }
 
+/** Tombstone for "Deleted by X just now" notices (pruned after ~1 day). */
+export type DeletionEntityType = "board" | "lead" | "board_leads";
+export interface Deletion {
+  entityType: DeletionEntityType;
+  entityId: string;
+  entityName: string | null;
+  boardId: string | null;
+  deletedById: string | null;
+  deletedByName: string | null;
+  deletedAt: string;
+}
+
 /** Pending until accepted or revoked — no TTL (ADR 0028). */
 export interface BoardInvite {
   id: string;

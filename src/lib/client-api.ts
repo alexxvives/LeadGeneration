@@ -5,6 +5,7 @@ import type {
   Board,
   BoardInvite,
   BoardLock,
+  Deletion,
   BoardMember,
   BoardPerson,
   BoardSummary,
@@ -42,6 +43,8 @@ export interface BoardResponse {
   boards: BoardSummary[];
   activeBoardId: string | null;
   boardLock: BoardLock | null;
+  /** Other users' recent deletions ("Deleted by X just now"). */
+  deletions?: Deletion[];
   capabilities: Capabilities;
   workspace: WorkspaceSummary;
 }

@@ -59,6 +59,8 @@ import type {
   BoardInvite,
   BoardLock,
   BulkLockKind,
+  Deletion,
+  DeletionEntityType,
   BoardMember,
   BoardMemberRole,
   BoardPerson,
@@ -123,9 +125,17 @@ import {
 } from "@/lib/lead-text";
 
 /** Bulk-lock TTLs: fallback only; locks are released on finish/error. */
-const IMPORT_LOCK_TTL_MS = 3 * 60_000; // per chunk; refreshed by each chunk
-const SEARCH_LOCK_TTL_MS = 10 * 60_000;
-const DELETE_LOCK_TTL_MS = 2 * 60_000;
+/**
+ * Bulk locks are short: the client renews import / Find leads locks with a
+ * ~20s heartbeat and releases them on tab close (pagehide beacon), so a
+ * crashed tab frees the board within a minute at most.
+ */
+export const BULK_LOCK_TTL_MS = 60_000;
+const IMPORT_LOCK_TTL_MS = BULK_LOCK_TTL_MS;
+const SEARCH_LOCK_TTL_MS = BULK_LOCK_TTL_MS;
+const DELETE_LOCK_TTL_MS = BULK_LOCK_TTL_MS;
+/** Tombstones for "Deleted by X just now" live ~1 day. */
+export const DELETION_TTL_MS = 24 * 60 * 60_000;
 
 function uniqueById<T extends { id: string }>(rows: T[]): T[] {
   if (rows.length < 2) return rows;
@@ -489,6 +499,9 @@ export async function deleteBoard(ctx: Ctx, id: string): Promise<void> {
     ]);
   }
   await ctx.db.deleteBoard(id);
+  await recordDeletions(ctx, [
+    { entityType: "board", entityId: id, entityName: existing.name, boardId: id },
+  ]);
 }
 
 export async function inviteToBoard(
@@ -662,10 +675,22 @@ export async function acquireBulkLock(
   boardId: string,
   kind: BulkLockKind,
   ttlMs: number,
-): Promise<BoardLock | null> {
+): Promise<BulkLockHandle> {
   // Anonymous/demo contexts have no second user to coordinate with.
-  if (!ctx.userId) return null;
+  if (!ctx.userId) return { lock: null, nested: false, release: async () => {} };
   const now = new Date();
+  // Nested: this user already runs a DIFFERENT bulk action here (e.g. bulk
+  // delete during their own import). Ride on that lock and never release it,
+  // so the outer action keeps the board.
+  const existing = await ctx.db.getBoardLock(boardId);
+  if (
+    existing &&
+    existing.userId === ctx.userId &&
+    (existing.kind ?? null) !== kind &&
+    existing.expiresAt > now.toISOString()
+  ) {
+    return { lock: existing, nested: true, release: async () => {} };
+  }
   const lock: BoardLock = {
     boardId,
     userId: ctx.userId,
@@ -678,7 +703,66 @@ export async function acquireBulkLock(
   if (holder) {
     throw new BoardLockedError(holder.userId, holder.userName, holder.kind ?? kind);
   }
-  return lock;
+  return { lock, nested: false, release: () => releaseBulkLock(ctx, boardId) };
+}
+
+export interface BulkLockHandle {
+  lock: BoardLock | null;
+  /** True when riding on the same user's other bulk lock (release is a no-op). */
+  nested: boolean;
+  release: () => Promise<void>;
+}
+
+/** Heartbeat from the tab running an import / Find leads. */
+export async function renewBulkLock(ctx: Ctx, boardId: string): Promise<boolean> {
+  if (!ctx.userId) return false;
+  return ctx.db.renewBoardLock(
+    boardId,
+    ctx.userId,
+    new Date(Date.now() + BULK_LOCK_TTL_MS).toISOString(),
+  );
+}
+
+/** Best-effort tombstones; never fails the delete itself. */
+export async function recordDeletions(
+  ctx: Ctx,
+  rows: { entityType: DeletionEntityType; entityId: string; entityName?: string | null; boardId?: string | null }[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const now = Date.now();
+  const at = new Date(now).toISOString();
+  try {
+    await ctx.db.recordDeletions(
+      rows.map((r) => ({
+        entityType: r.entityType,
+        entityId: r.entityId,
+        entityName: r.entityName ?? null,
+        boardId: r.boardId ?? null,
+        deletedById: ctx.userId,
+        deletedByName: ctx.userName ?? ctx.userEmail ?? null,
+        deletedAt: at,
+      })),
+      new Date(now - DELETION_TTL_MS).toISOString(),
+    );
+  } catch {
+    /* notices are cosmetic */
+  }
+}
+
+/** Recent deletions by OTHER users, for the 10s refresh. */
+export async function listRecentDeletions(
+  ctx: Ctx,
+  filter: { boardIds?: string[]; entityIds?: string[] },
+): Promise<Deletion[]> {
+  try {
+    const rows = await ctx.db.listDeletions({
+      ...filter,
+      sinceIso: new Date(Date.now() - DELETION_TTL_MS).toISOString(),
+    });
+    return rows.filter((d) => !ctx.userId || d.deletedById !== ctx.userId);
+  } catch {
+    return [];
+  }
 }
 
 export async function releaseBulkLock(ctx: Ctx, boardId: string): Promise<void> {
@@ -834,7 +918,7 @@ export async function createAndRunSearch(
     : await resolveRunLeadLimit(ctx, input.maxLeads);
   const searchInput: CreateRunInput = { ...input, maxLeads };
   const boardId = await resolveBoardId(ctx, { boardId: input.boardId });
-  await acquireBulkLock(ctx, boardId, "search", SEARCH_LOCK_TTL_MS);
+  const searchLock = await acquireBulkLock(ctx, boardId, "search", SEARCH_LOCK_TTL_MS);
   try {
 
     const db = ctx.db;
@@ -997,7 +1081,7 @@ export async function createAndRunSearch(
       throw err instanceof Error ? err : new Error(message);
     }
   } finally {
-    await releaseBulkLock(ctx, boardId);
+    await searchLock.release();
   }
 }
 
@@ -1072,6 +1156,8 @@ export async function getLatestBoard(
   boards: BoardSummary[];
   activeBoardId: string | null;
   boardLock: BoardLock | null;
+  /** Other users' recent deletions on the visible board(s) / requested board. */
+  deletions: Deletion[];
 }> {
   const emptyStageCounts = (): Record<CrmStage, number> => ({
     new: 0,
@@ -1160,6 +1246,7 @@ export async function getLatestBoard(
       boards: [],
       activeBoardId: active,
       boardLock: null,
+      deletions: [],
     };
   }
 
@@ -1187,6 +1274,21 @@ export async function getLatestBoard(
         )
     : Promise.resolve(null);
   boardLockP.catch(() => undefined);
+  // Board you're on deleted by someone else → its tombstone (only that row
+  // when you no longer have access). Otherwise lead/board-clear tombstones
+  // for the visible board(s), so an open drawer can say who deleted it.
+  const requested = boardId && boardId !== "all" ? boardId : null;
+  const deletionsP: Promise<Deletion[]> = (
+    requested && !active
+      ? listRecentDeletions(ctx, { entityIds: [requested] }).then((rows) =>
+          rows.filter((d) => d.entityType === "board" && d.entityId === requested),
+        )
+      : active
+        ? listRecentDeletions(ctx, { boardIds: [active] })
+        : boardsP.then((bs) =>
+            listRecentDeletions(ctx, { boardIds: bs.map((b) => b.id) }),
+          )
+  ).catch(() => []);
 
   const includeLeads = opts?.includeLeads !== false;
   const filter = active ? { boardId: active } : undefined;
@@ -1207,6 +1309,7 @@ export async function getLatestBoard(
       boards,
       activeBoardId: active,
       boardLock,
+      deletions: await deletionsP,
     };
   }
 
@@ -1252,6 +1355,7 @@ export async function getLatestBoard(
     boards,
     activeBoardId: active,
     boardLock,
+    deletions: await deletionsP,
   };
 }
 
@@ -2510,7 +2614,18 @@ export async function updateWorkspaceEmailSettings(
 export async function deleteLead(ctx: Ctx, leadId: string): Promise<boolean> {
   const found = await findLeadAccess(ctx, leadId);
   if (!found) return false;
-  return found.db.deleteLead(leadId);
+  const ok = await found.db.deleteLead(leadId);
+  if (ok) {
+    await recordDeletions(ctx, [
+      {
+        entityType: "lead",
+        entityId: leadId,
+        entityName: found.lead.company ?? null,
+        boardId: found.lead.boardId ?? null,
+      },
+    ]);
+  }
+  return ok;
 }
 
 /**
@@ -2524,30 +2639,41 @@ export async function deleteLeads(
   const ids = [...new Set(leadIds.map((id) => id.trim()).filter(Boolean))];
   if (ids.length === 0) return { deleted: 0 };
   const byDb = new Map<LeadRepository, string[]>();
+  const foundLeads = new Map<string, Lead>();
   const boardIds = new Set<string>();
   for (const id of ids) {
     const found = await findLeadAccess(ctx, id);
     if (!found) continue;
+    foundLeads.set(id, found.lead);
     // Bulk (2+) deletes stay behind the board lock; a single delete never does.
     if (ids.length > 1) boardIds.add(found.lead.boardId);
     const list = byDb.get(found.db) ?? [];
     list.push(id);
     byDb.set(found.db, list);
   }
-  const locked: string[] = [];
+  const locked: BulkLockHandle[] = [];
   try {
     for (const boardId of boardIds) {
-      await acquireBulkLock(ctx, boardId, "delete", DELETE_LOCK_TTL_MS);
-      locked.push(boardId);
+      locked.push(await acquireBulkLock(ctx, boardId, "delete", DELETE_LOCK_TTL_MS));
     }
-    await cancelRunningImportRuns(ctx);
+    // Don't abort the user's own import when the delete rides on its lock.
+    if (!locked.some((h) => h.nested)) await cancelRunningImportRuns(ctx);
     let deleted = 0;
     for (const [db, chunkIds] of byDb) {
       deleted += await db.deleteLeads(chunkIds);
     }
+    await recordDeletions(
+      ctx,
+      [...foundLeads.values()].map((l) => ({
+        entityType: "lead" as const,
+        entityId: l.id,
+        entityName: l.company ?? null,
+        boardId: l.boardId ?? null,
+      })),
+    );
     return { deleted };
   } finally {
-    for (const boardId of locked) await releaseBulkLock(ctx, boardId);
+    for (const h of locked) await h.release();
   }
 }
 
@@ -2561,13 +2687,16 @@ export async function clearBoardLeads(
 ): Promise<{ deleted: number }> {
   const access = await resolveBoardAccess(ctx, boardId);
   if (!access) throw new Error("Board not found");
-  await acquireBulkLock(ctx, boardId, "delete", DELETE_LOCK_TTL_MS);
+  const lock = await acquireBulkLock(ctx, boardId, "delete", DELETE_LOCK_TTL_MS);
   try {
-    await cancelRunningImportRuns(ctx);
+    if (!lock.nested) await cancelRunningImportRuns(ctx);
     const deleted = await access.db.deleteLeadsByBoard(boardId);
+    await recordDeletions(ctx, [
+      { entityType: "board_leads", entityId: boardId, boardId },
+    ]);
     return { deleted };
   } finally {
-    await releaseBulkLock(ctx, boardId);
+    await lock.release();
   }
 }
 
@@ -3041,7 +3170,7 @@ export async function importLeads(
     boardId: opts?.boardId,
     newBoardName: opts?.newBoardName,
   });
-  await acquireBulkLock(ctx, boardId, "import", IMPORT_LOCK_TTL_MS);
+  const importLock = await acquireBulkLock(ctx, boardId, "import", IMPORT_LOCK_TTL_MS);
   let importOk = false;
   try {
 
@@ -3422,7 +3551,7 @@ export async function importLeads(
     // Chunked uploads keep the lock between chunks; drop it on the last
     // chunk or on any error (TTL is the fallback if the client vanishes).
     if (!importOk || opts?.finalize !== false) {
-      await releaseBulkLock(ctx, boardId);
+      await importLock.release();
     }
   }
 }

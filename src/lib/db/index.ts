@@ -2,6 +2,7 @@ import type {
   Board,
   BoardInvite,
   BoardLock,
+  Deletion,
   BoardMember,
   BoardMemberRole,
   Contact,
@@ -126,6 +127,16 @@ export interface LeadRepository {
    */
   tryAcquireBoardLock(lock: BoardLock, nowIso: string): Promise<BoardLock | null>;
   clearBoardLock(boardId: string, userId?: string): Promise<boolean>;
+  /** Extend the caller's own lock (heartbeat). False when it is no longer theirs. */
+  renewBoardLock(boardId: string, userId: string, expiresAt: string): Promise<boolean>;
+  /** Append tombstones and prune rows older than `pruneBeforeIso`. */
+  recordDeletions(rows: Deletion[], pruneBeforeIso: string): Promise<void>;
+  /** Tombstones newer than `sinceIso` for the given boards and/or entity ids. */
+  listDeletions(filter: {
+    boardIds?: string[];
+    entityIds?: string[];
+    sinceIso: string;
+  }): Promise<Deletion[]>;
   /**
    * Per-board lead counts for the current workspace (GROUP BY — no full row load).
    */
