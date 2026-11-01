@@ -348,6 +348,48 @@ function FlagMark() {
   );
 }
 
+/** Icon + count chips for narrow cells; tooltip lists every item. */
+function DayCompactList({ events, today }: { events: CalendarEvent[]; today: string }) {
+  const lines = events.filter((ev) => ev.kind === "note" || ev.kind === "task");
+  if (lines.length === 0) return null;
+  const alerts = lines.filter((ev) => !!ev.highlight && !ev.done);
+  const others = lines.filter((ev) => !(ev.highlight && !ev.done));
+  const overdue = others.some((ev) => isTaskOverdue(ev, today));
+  const tip = (list: CalendarEvent[]) =>
+    list
+      .map((ev) => {
+        const label = eventChipLabel(ev);
+        return `• ${label}${ev.company && !label.includes(ev.company) ? ` · ${ev.company}` : ""}`;
+      })
+      .join("\n");
+  return (
+    <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1 @[7rem]:hidden">
+      {alerts.length > 0 ? (
+        <span
+          title={`${alerts.length} seguimiento${alerts.length === 1 ? "" : "s"}\n${tip(alerts)}`}
+          aria-label={`${alerts.length} follow-up${alerts.length === 1 ? "" : "s"}`}
+          className="cal-chip-alert inline-flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[11px] font-semibold tabular-nums leading-none"
+        >
+          <FlagMark />
+          {alerts.length}
+        </span>
+      ) : null}
+      {others.length > 0 ? (
+        <span
+          title={`${others.length} item${others.length === 1 ? "" : "s"}\n${tip(others)}`}
+          aria-label={`${others.length} other item${others.length === 1 ? "" : "s"}`}
+          className={`inline-flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[11px] font-medium tabular-nums leading-none ${
+            overdue ? "cal-chip-overdue" : KIND_CHIP[others[0].kind]
+          }`}
+        >
+          <KindMark kind={others[0].kind} />
+          {others.length}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 /** Chips shown in a day cell before collapsing into "+N more". */
 const CELL_MAX_LINES = 2;
 
@@ -638,7 +680,7 @@ export function CalendarView({
                     overdue ? ", overdue follow-up" : ""
                   }${missed ? `, ${missed} missed call${missed === 1 ? "" : "s"}` : ""}`}
                   onClick={() => setSelected(cell.iso)}
-                  className={`flex min-h-[4.75rem] min-w-0 flex-col items-stretch overflow-hidden rounded-md px-1 py-1 text-left transition-colors sm:min-h-[6.5rem] sm:rounded-xl sm:px-1.5 sm:py-1.5 md:min-h-[7.25rem] lg:h-full lg:min-h-0 lg:py-1 ${
+                  className={`@container flex min-h-[4.75rem] min-w-0 flex-col items-stretch overflow-hidden rounded-md px-1 py-1 text-left transition-colors sm:min-h-[6.5rem] sm:rounded-xl sm:px-1.5 sm:py-1.5 md:min-h-[7.25rem] lg:h-full lg:min-h-0 lg:py-1 ${
                     isSelected
                       ? overdue
                         ? "bg-rose-400/20 ring-2 ring-rose-400/70"
@@ -672,7 +714,11 @@ export function CalendarView({
                     </span>
                     <DayCountMarks counts={kindCounts(dayEvs)} />
                   </span>
-                  <DayTextList events={dayEvs} today={today} />
+                  {/* Cell width decides: text chips when ≥7rem (112px) wide, icon+count otherwise. */}
+                  <span className="hidden min-h-0 flex-1 flex-col @[7rem]:flex">
+                    <DayTextList events={dayEvs} today={today} />
+                  </span>
+                  <DayCompactList events={dayEvs} today={today} />
                   {pending > 0 ? (
                     <span className="sr-only">
                       {pending} open follow-up{pending === 1 ? "" : "s"}
