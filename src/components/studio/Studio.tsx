@@ -28,9 +28,9 @@ import {
   rememberDroppedFollowUps,
 } from "@/lib/lead-cache";
 import {
-  BoardLiveChip,
+  BulkActivityChip,
   BoardLockUiProvider,
-  Lockable,
+  type BulkLockKind,
 } from "./board-lock";
 import { SearchPanel, type SearchValues } from "./SearchPanel";
 import { LeadTable } from "./LeadTable";
@@ -342,12 +342,6 @@ export function Studio() {
   const loadTokenRef = useRef(0);
   /** Background pages after first paint — UI stays interactive. */
   const [leadsBackfilling, setLeadsBackfilling] = useState(false);
-  const [editLocked, setEditLocked] = useState(false);
-  const [lockHolder, setLockHolder] = useState<string | null>(null);
-  const editLockedRef = useRef(false);
-  editLockedRef.current = editLocked;
-  const [takingOver, setTakingOver] = useState(false);
-  const takeoverRef = useRef(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [noteUndo, setNoteUndo] = useState<{
     leadId: string;
@@ -1034,87 +1028,14 @@ export function Studio() {
     };
   }, [view, refresh]);
 
-  // Soft lock heartbeat when a specific board is selected.
-  const boardsReady = boards.length > 0;
-  const knownBoard = Boolean(
-    filterBoardId && boards.some((b) => b.id === filterBoardId),
-  );
-  useEffect(() => {
-    const bid = filterBoardId;
-    if (!bid) {
-      setEditLocked(false);
-      setLockHolder(null);
-      return;
-    }
-    // Wait for board list so we don't heartbeat a stale id from another session.
-    if (!boardsReady) return;
-    if (!knownBoard) return;
-    let cancelled = false;
-    const beat = async () => {
-      try {
-        const { lock, acquired } = await api.heartbeatBoardLock(bid);
-        if (!cancelled) {
-          if (acquired !== false) {
-            setEditLocked(false);
-            setLockHolder(null);
-          } else {
-            takeoverRef.current = false;
-            setEditLocked(true);
-            setLockHolder(
-              lock.userName ||
-                boardRef.current?.boardLock?.userName ||
-                "Someone else",
-            );
-          }
-        }
-      } catch (e) {
-        if (cancelled) return;
-        const msg = e instanceof Error ? e.message : "";
-        const notFound = /not found/i.test(msg);
-        if (notFound) {
-          storeBoardFilter("all");
-          setEditLocked(false);
-          setLockHolder(null);
-          router.replace(`/app${queryForView(viewRef.current, null)}`, {
-            scroll: false,
-          });
-          return;
-        }
-        const locked =
-          (e as Error & { locked?: boolean }).locked ||
-          /working on this board|paused/i.test(msg);
-        if (locked) {
-          takeoverRef.current = false;
-          setEditLocked(true);
-          setLockHolder(
-            msg.split(" is working")[0] ||
-              boardRef.current?.boardLock?.userName ||
-              "Someone else",
-          );
-        }
-      }
-    };
-    void beat();
-    const id = window.setInterval(() => void beat(), 20_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-      void api.releaseBoardLock(bid).catch(() => undefined);
-    };
-  }, [filterBoardId, boardsReady, knownBoard, router]);
-
-  useEffect(() => {
-    takeoverRef.current = false;
-  }, [filterBoardId]);
-
-  useEffect(() => {
-    if (takeoverRef.current) return;
-    const lock = board?.boardLock;
-    if (lock) {
-      setEditLocked(true);
-      setLockHolder(lock.userName ?? "Someone else");
-    }
-  }, [board?.boardLock]);
+  // Short bulk lock: the board GET reports it only while ANOTHER user is
+  // running an import / Find leads / bulk delete. Normal edits never lock.
+  const otherBulkLock = filterBoardId ? board?.boardLock ?? null : null;
+  const editLocked = Boolean(otherBulkLock);
+  const lockHolder = otherBulkLock?.userName ?? (otherBulkLock ? "Someone else" : null);
+  const lockKind = (otherBulkLock?.kind ?? null) as BulkLockKind | null;
+  const editLockedRef = useRef(false);
+  editLockedRef.current = editLocked;
 
   // Daily verify cap hit → warn once until usage resets.
   useEffect(() => {
@@ -2514,27 +2435,10 @@ export function Studio() {
     }
   };
 
-  const onTakeControl = async () => {
-    if (!filterBoardId || takingOver) return;
-    setTakingOver(true);
-    try {
-      await api.takeoverBoardLock(filterBoardId);
-      takeoverRef.current = true;
-      setEditLocked(false);
-      setLockHolder(null);
-      toast("ok", "You have control of this board.");
-    } catch (e) {
-      takeoverRef.current = false;
-      toast("err", (e as Error).message);
-    } finally {
-      setTakingOver(false);
-    }
-  };
-
   const onDeleteLeads = async (leadIds: string[]) => {
     if (leadIds.length === 0) return;
     if (!leadIds.every((id) => canEditLeadNow(id))) {
-      toast("err", "Someone else has control of this board — take control to delete leads.");
+      toast("err", "Those leads were just removed — refresh and try again.");
       return;
     }
     const idSet = new Set(leadIds);
@@ -2577,7 +2481,7 @@ export function Studio() {
   };
 
   return (
-    <BoardLockUiProvider locked={editLocked} holder={lockHolder}>
+    <BoardLockUiProvider locked={editLocked} holder={lockHolder} kind={lockKind}>
     <main className="flex h-full min-w-0 w-full flex-col overflow-hidden px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-4 sm:pt-8 lg:px-6 lg:pt-8">
       <div
         className={`flex min-w-0 shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between lg:gap-3 ${
@@ -2629,7 +2533,6 @@ export function Studio() {
               </button>
             ) : null}
             {view === "contacts" ? (
-              <Lockable>
                 <button
                   type="button"
                   disabled={boards.length === 0}
@@ -2646,26 +2549,19 @@ export function Studio() {
                 >
                   Add collaborator
                 </button>
-              </Lockable>
             ) : null}
             {view === "leads" && hasLeads ? (
               <span className="inline-flex">
                 <ExportButton />
               </span>
             ) : null}
-            {editLocked && filterBoardId ? (
-              <BoardLiveChip
-                holder={lockHolder}
-                takingOver={takingOver}
-                onTakeControl={() => void onTakeControl()}
-              />
-            ) : null}
+            {editLocked ? <BulkActivityChip holder={lockHolder} kind={lockKind} /> : null}
           </div>
           <p className="mt-0.5 text-sm text-mist-500">
             {view === "dashboard"
               ? "Overview of leads and activity across your boards."
               : view === "boards"
-                ? "Named lists for campaigns or niches. Invite collaborators; take control if someone else is live."
+                ? "Named lists for campaigns or niches. Invite collaborators to work on them together."
                 : view === "pipeline"
                   ? pipelineFocus === "conversation"
                     ? "In-conversation leads, from pre-demo through onboarding. A red clock means unresponsive."
@@ -2691,14 +2587,9 @@ export function Studio() {
                             : "Find prospects by niche and location."}
           </p>
         </div>
-        {editLocked && filterBoardId ? (
+        {editLocked ? (
           <PhoneTopBarSlot id="studio-phone-live">
-            <BoardLiveChip
-              variant="dot"
-              holder={lockHolder}
-              takingOver={takingOver}
-              onTakeControl={() => void onTakeControl()}
-            />
+            <BulkActivityChip holder={lockHolder} kind={lockKind} />
           </PhoneTopBarSlot>
         ) : null}
         {showLeadSearch ? (
@@ -2722,7 +2613,6 @@ export function Studio() {
               </button>
             ) : null}
             {view === "contacts" ? (
-              <Lockable className="self-start">
                 <button
                   type="button"
                   disabled={boards.length === 0}
@@ -2739,7 +2629,6 @@ export function Studio() {
                 >
                   Add collaborator
                 </button>
-              </Lockable>
             ) : null}
           </div>
         ) : null}
@@ -2808,7 +2697,6 @@ export function Studio() {
             </div>
           ) : null}
           {view === "tasks" ? (
-            <Lockable>
               <button
                 type="button"
                 disabled={boards.length === 0}
@@ -2822,7 +2710,6 @@ export function Studio() {
               >
                 Add task
               </button>
-            </Lockable>
           ) : null}
         </div>
       </div>
@@ -3436,6 +3323,7 @@ export function Studio() {
         <BoardLockUiProvider
           locked={editLocked}
           holder={lockHolder}
+          kind={lockKind}
         >
         <LeadDrawer
           key={selected.id}

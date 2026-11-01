@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContactMethod, ConversationStep, CrmStage, DeliveryStatus, FollowUp, FollowUpKind, LeadWithOutreach } from "@/lib/types";
 import type { Capabilities } from "@/lib/config";
 import { Spinner } from "@/components/ui";
@@ -46,8 +46,8 @@ import {
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
 import { Bone, LeadDrawerPendingSkeleton } from "@/components/studio/skeletons";
-import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 import { LeadDocuments } from "@/components/studio/LeadDocuments";
+import { useDraftField } from "@/components/studio/use-draft-field";
 import { JournalEntries } from "@/components/studio/JournalEntries";
 import { parseRecipientEmail, sanitizeEmailList } from "@/lib/email/address";
 import {
@@ -150,25 +150,22 @@ function ConversationStepChips({
   selected,
   onSelect,
   disabled,
-  lockHint,
 }: {
   selected: ConversationStep;
   onSelect: (step: ConversationStep) => void;
-  disabled: boolean;
-  lockHint: string;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
       {CONVERSATION_STEPS.map((step) => {
         const on = selected === step.id;
         return (
-          <Lockable key={step.id}>
-            <button
+            <button key={step.id}
               type="button"
               disabled={disabled}
               aria-pressed={on}
               onClick={() => onSelect(step.id)}
-              title={disabled ? lockHint : step.label}
+              title={step.label}
               className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-60 ${
                 on
                   ? "bg-aurora-400/20 text-aurora-200 ring-1 ring-aurora-400/40"
@@ -177,7 +174,6 @@ function ConversationStepChips({
             >
               {step.label}
             </button>
-          </Lockable>
         );
       })}
     </div>
@@ -188,13 +184,11 @@ function ContactMethodChips({
   selected,
   onToggle,
   disabled,
-  lockHint,
   emphasize = false,
 }: {
   selected: ContactMethod[];
   onToggle: (method: ContactMethod) => void;
-  disabled: boolean;
-  lockHint: string;
+  disabled?: boolean;
   emphasize?: boolean;
 }) {
   return (
@@ -202,12 +196,11 @@ function ContactMethodChips({
       {CONTACT_METHODS.map(({ method, label }) => {
         const on = selected.includes(method);
         return (
-          <Lockable key={method}>
-            <button
+            <button key={method}
               type="button"
               disabled={disabled}
               onClick={() => onToggle(method)}
-              title={disabled ? lockHint : label}
+              title={label}
               className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-60 ${
                 on
                   ? emphasize
@@ -220,7 +213,6 @@ function ContactMethodChips({
             >
               {label}
             </button>
-          </Lockable>
         );
       })}
     </div>
@@ -231,7 +223,6 @@ function ContactMethodChips({
 
 export function LeadDrawer(props: DrawerProps) {
   const { lead, capabilities, onClose } = props;
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const mode = props.mode ?? "info";
   const promptNote = props.promptNote ?? false;
   const actorName =
@@ -559,7 +550,6 @@ export function LeadDrawer(props: DrawerProps) {
 
   /** Persist composer fields before send so edits aren't lost. */
   const persistIfDirty = async () => {
-    if (editLocked) return;
     if (!outreach || !dirty) return;
     await props.onSaveDraft(
       outreach.id,
@@ -576,7 +566,6 @@ export function LeadDrawer(props: DrawerProps) {
 
   // ── CRM stage change ──
   const handleStageClick = (stage: CrmStage) => {
-    if (editLocked) return;
     // Moving to New clears methods; Contacted no longer forces a method popup.
     const nextMethods = stage === "new" ? [] : contactMethods;
     void commitStage(stage, nextMethods);
@@ -593,7 +582,6 @@ export function LeadDrawer(props: DrawerProps) {
 
   /** Toggle a contact method (multi-select). Phone/email open a journal composer. */
   const toggleMethod = async (method: ContactMethod) => {
-    if (editLocked) return;
     if (method === "email") {
       if (!contactMethods.includes("email")) {
         const next: ContactMethod[] = [...contactMethods, "email"];
@@ -643,7 +631,6 @@ export function LeadDrawer(props: DrawerProps) {
   const promptingChannel = promptingCall || promptingEmail;
 
   const openComposer = (kind: "note" | "follow_up" | "task") => {
-    if (editLocked) return;
     setShowAddNote(true);
     setCallPrompt(false);
     setComposerKind(kind);
@@ -658,7 +645,6 @@ export function LeadDrawer(props: DrawerProps) {
 
   /** Dismiss the post-contact note prompt and put the lead back in New. */
   const cancelContactPrompt = async () => {
-    if (editLocked) return;
     setShowAddNote(false);
     setCallPrompt(false);
     setComposerKind("note");
@@ -674,7 +660,6 @@ export function LeadDrawer(props: DrawerProps) {
 
   // ── Dated notes (journal) ──
   const addNote = async (variant?: "call" | "missed" | "email") => {
-    if (editLocked) return;
     const callMode = variant ?? (callPrompt || (promptNote ? promptNote : false));
     let text = newNoteText.trim();
     if (callMode === "missed") {
@@ -771,7 +756,6 @@ export function LeadDrawer(props: DrawerProps) {
   };
 
   const deleteFollowUp = async (fuId: string) => {
-    if (editLocked) return;
     const removed = followUps.find((f) => f.id === fuId);
     if (!removed) return;
     const previous = followUps;
@@ -787,7 +771,6 @@ export function LeadDrawer(props: DrawerProps) {
   };
 
   const toggleFollowUpDone = async (fu: FollowUp) => {
-    if (editLocked) return;
     const nextDone = !followUpIsDone(fu.done);
     const updated = followUps.map((f) =>
       f.id === fu.id ? { ...f, done: nextDone } : f,
@@ -797,14 +780,13 @@ export function LeadDrawer(props: DrawerProps) {
   };
 
   const startEditFollowUp = (fu: FollowUp) => {
-    if (editLocked) return;
     setEditingId(fu.id);
     setEditDate(fu.date);
     setEditText(fu.note);
   };
 
   const saveEditFollowUp = async () => {
-    if (editLocked || !editingId || !editDate) return;
+    if (!editingId || !editDate) return;
     const updated = followUps.map((f) =>
       f.id === editingId
         ? {
@@ -872,8 +854,6 @@ export function LeadDrawer(props: DrawerProps) {
                   key={`${lead.id}-company-${lead.company}`}
                   defaultValue={lead.company}
                   placeholder="Company name"
-                  disabled={editLocked}
-                  title={editLocked ? lockHint : undefined}
                   aria-invalid={companyInvalid}
                   aria-required
                   onChange={(e) => {
@@ -882,7 +862,6 @@ export function LeadDrawer(props: DrawerProps) {
                     }
                   }}
                   onBlur={(e) => {
-                    if (editLocked) return;
                     const next = e.target.value.trim();
                     if (!next) {
                       // Don't shake on blur — only on submit (Enter / close).
@@ -899,7 +878,6 @@ export function LeadDrawer(props: DrawerProps) {
                   onKeyDown={(e) => {
                     if (e.key !== "Enter") return;
                     e.preventDefault();
-                    if (editLocked) return;
                     const next = e.currentTarget.value.trim();
                     if (!next) {
                       flashCompanyRequired();
@@ -911,7 +889,7 @@ export function LeadDrawer(props: DrawerProps) {
                       void props.onUpdateCrm(lead.id, { company: next });
                     }
                   }}
-                  aria-label={editLocked ? lockHint : "Company name"}
+                  aria-label="Company name"
                   onAnimationEnd={() => setCompanyShaking(false)}
                   className={`w-full min-w-0 rounded-md py-0.5 font-display text-xl font-semibold tracking-tight outline-none sm:text-2xl ${
                     companyInvalid
@@ -931,7 +909,7 @@ export function LeadDrawer(props: DrawerProps) {
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {props.onDeleteLead ? (
-              confirmDelete && !editLocked ? (
+              confirmDelete ? (
                 <div className="mr-1 flex items-center gap-1.5">
                   <button
                     type="button"
@@ -951,20 +929,17 @@ export function LeadDrawer(props: DrawerProps) {
                   </button>
                 </div>
               ) : (
-                <Lockable>
                   <button
                     type="button"
-                    disabled={editLocked}
                     onClick={() => setConfirmDelete(true)}
                     className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400/60 disabled:opacity-50"
                     aria-label={
-                      editLocked ? lockHint : `Delete ${lead.company}`
+                      `Delete ${lead.company}`
                     }
-                    title={editLocked ? lockHint : "Delete lead"}
+                    title="Delete lead"
                   >
                     <TrashIcon className="h-5 w-5" />
                   </button>
-                </Lockable>
               )
             ) : null}
             {mode === "info" ? (
@@ -1006,12 +981,9 @@ export function LeadDrawer(props: DrawerProps) {
             <SectionLabel>Sales stage</SectionLabel>
             <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
               {CRM_STAGES.map(({ stage, label, color }) => (
-                <Lockable key={stage} className="shrink-0">
-                  <button
+                  <button key={stage}
                     type="button"
-                    disabled={editLocked}
                     onClick={() => handleStageClick(stage)}
-                    title={editLocked ? lockHint : undefined}
                     className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition-all disabled:opacity-60 ${
                       crmStage === stage
                         ? color
@@ -1020,7 +992,6 @@ export function LeadDrawer(props: DrawerProps) {
                   >
                     {label}
                   </button>
-                </Lockable>
               ))}
             </div>
 
@@ -1044,8 +1015,6 @@ export function LeadDrawer(props: DrawerProps) {
                   <ContactMethodChips
                     selected={contactMethods}
                     onToggle={(m) => void toggleMethod(m)}
-                    disabled={editLocked}
-                    lockHint={lockHint}
                     emphasize={needsMethod}
                   />
                 </div>
@@ -1058,8 +1027,6 @@ export function LeadDrawer(props: DrawerProps) {
                 <div className="mt-1.5">
                   <ConversationStepChips
                     selected={conversationStep}
-                    disabled={editLocked}
-                    lockHint={lockHint}
                     onSelect={(next) => {
                       setConversationStep(next);
                       void props.onUpdateCrm(lead.id, {
@@ -1108,8 +1075,6 @@ export function LeadDrawer(props: DrawerProps) {
                 defaultValue={lead.website ?? ""}
                 fieldKey={`${lead.id}-website-${lead.website ?? ""}`}
                 placeholder="https://…"
-                disabled={editLocked}
-                lockHint={lockHint}
                 onSave={(raw) => {
                   const next = raw.trim() || null;
                   if (next !== (lead.website ?? null)) {
@@ -1124,8 +1089,6 @@ export function LeadDrawer(props: DrawerProps) {
               defaultValue={lead.companyType ?? ""}
               fieldKey={`${lead.id}-ctype-${lead.companyType ?? ""}`}
               placeholder="Company type — e.g. Pharmacy"
-              disabled={editLocked}
-              lockHint={lockHint}
               onSave={(raw) => {
                 const next = raw.trim() || null;
                 if (next !== (lead.companyType ?? null)) {
@@ -1139,8 +1102,6 @@ export function LeadDrawer(props: DrawerProps) {
               defaultValue={lead.emails.join(", ")}
               fieldKey={`${lead.id}-emails-${lead.emails.join(",")}`}
               placeholder="name@company.com"
-              disabled={editLocked}
-              lockHint={lockHint}
               onSave={(raw) => {
                 const typed = parseList(raw);
                 const next = sanitizeEmailList(typed);
@@ -1159,8 +1120,6 @@ export function LeadDrawer(props: DrawerProps) {
               defaultValue={lead.phones.join(", ")}
               fieldKey={`${lead.id}-phones-${lead.phones.join(",")}`}
               placeholder="Phone number"
-              disabled={editLocked}
-              lockHint={lockHint}
               onSave={(raw) => {
                 const next = parseList(raw);
                 if (next.join("\0") !== lead.phones.join("\0")) {
@@ -1174,8 +1133,6 @@ export function LeadDrawer(props: DrawerProps) {
               defaultValue={lead.location ?? ""}
               fieldKey={`${lead.id}-loc-${lead.location ?? ""}`}
               placeholder="City, region"
-              disabled={editLocked}
-              lockHint={lockHint}
               onSave={(raw) => {
                 const next = raw.trim() || null;
                 if (next !== (lead.location ?? null)) {
@@ -1192,8 +1149,6 @@ export function LeadDrawer(props: DrawerProps) {
               <AutoGrowAbout
                 key={`${lead.id}-about-${lead.aboutBlurb ?? ""}`}
                 defaultValue={lead.aboutBlurb ?? ""}
-                disabled={editLocked}
-                lockHint={lockHint}
                 onSave={(raw) => {
                   const next = raw.trim() || null;
                   if (next !== (lead.aboutBlurb ?? null)) {
@@ -1206,8 +1161,6 @@ export function LeadDrawer(props: DrawerProps) {
           {crmStage === "closed" ? (
             <LeadDocuments
               leadId={lead.id}
-              disabled={editLocked}
-              lockHint={lockHint}
             />
           ) : null}
           </div>
@@ -1220,50 +1173,34 @@ export function LeadDrawer(props: DrawerProps) {
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/5 px-4 py-3">
               <SectionLabel className="mb-0 shrink-0">Notes</SectionLabel>
               <div className={noteActionRowClass}>
-                <Lockable>
                   <button
                     type="button"
-                    disabled={editLocked}
                     onClick={() => openComposer("note")}
-                    title={editLocked ? lockHint : undefined}
                     className={noteActionClass("amber")}
                   >
                     Add Note
                   </button>
-                </Lockable>
-                <Lockable>
                   <button
                     type="button"
-                    disabled={editLocked}
                     onClick={() => openComposer("follow_up")}
-                    title={editLocked ? lockHint : undefined}
                     className={noteActionClass("violet")}
                   >
                     Follow up
                   </button>
-                </Lockable>
-                <Lockable>
                   <button
                     type="button"
-                    disabled={editLocked}
                     onClick={() => openComposer("task")}
-                    title={editLocked ? lockHint : undefined}
                     className={noteActionClass("aurora")}
                   >
                     Add Task
                   </button>
-                </Lockable>
-                <Lockable>
                   <button
                     type="button"
-                    disabled={editLocked}
                     onClick={() => void addNote("missed")}
-                    title={editLocked ? lockHint : undefined}
                     className={noteActionClass("mist")}
                   >
                     Missed call
                   </button>
-                </Lockable>
               </div>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
@@ -1356,31 +1293,25 @@ export function LeadDrawer(props: DrawerProps) {
                     className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60"
                   />
                   <div className="flex flex-wrap gap-2">
-                    <Lockable>
                       <button
                         type="button"
                         onClick={() => void addNote()}
                         disabled={
-                          editLocked || !newNoteDate || !newNoteText.trim()
+                          !newNoteDate || !newNoteText.trim()
                         }
-                        title={editLocked ? lockHint : undefined}
                         className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent disabled:opacity-40"
                       >
                         Save
                       </button>
-                    </Lockable>
                     {promptingCall ? (
-                      <Lockable>
                         <button
                           type="button"
                           onClick={() => void addNote("missed")}
-                          disabled={editLocked || !newNoteDate}
-                          title={editLocked ? lockHint : undefined}
+                          disabled={!newNoteDate}
                           className="rounded-full border border-white/15 px-3 py-1 text-xs font-medium text-mist-400 hover:bg-white/5 disabled:opacity-40"
                         >
                           Missed call
                         </button>
-                      </Lockable>
                     ) : null}
                     {promptingChannel ? (
                       <>
@@ -1402,14 +1333,12 @@ export function LeadDrawer(props: DrawerProps) {
                         </button>
                         <button
                           type="button"
-                          disabled={editLocked || busy === "undo-contact"}
+                          disabled={busy === "undo-contact"}
                           onClick={() =>
                             void run("undo-contact", () => cancelContactPrompt())
                           }
                           title={
-                            editLocked
-                              ? lockHint
-                              : "Cancel and move lead back to New"
+                            "Cancel and move lead back to New"
                           }
                           className="ml-auto rounded-full border border-rose-400/35 px-3 py-1 text-xs font-medium text-rose-200 hover:bg-rose-400/10 disabled:opacity-50"
                         >
@@ -1474,8 +1403,6 @@ export function LeadDrawer(props: DrawerProps) {
                   onCancelEdit={() => setEditingId(null)}
                   onDelete={(id) => void deleteFollowUp(id)}
                   onToggleDone={(fu) => void toggleFollowUpDone(fu)}
-                  disabled={editLocked}
-                  lockHint={lockHint}
                 />
               )}
                 </>
@@ -1493,21 +1420,19 @@ export function LeadDrawer(props: DrawerProps) {
                 {registerOnly ? "Outreach log" : "Email"}
               </h3>
               {outreach && !sent && !registerOnly ? (
-                <Lockable>
                   <button
                     onClick={() =>
                       run("draft", async () => {
                         await props.onDraft(lead.id);
                       })
                     }
-                    disabled={busy === "draft" || editLocked}
-                    title={editLocked ? lockHint : "Rewrite this draft"}
+                    disabled={busy === "draft"}
+                    title="Rewrite this draft"
                     className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-xs text-mist-300 transition-colors hover:bg-white/5 disabled:opacity-40"
                   >
                   {busy === "draft" ? <Spinner className="h-3 w-3" /> : <SparkIcon className="h-3.5 w-3.5" />}
                   Regenerate
                 </button>
-                </Lockable>
               ) : null}
             </div>
 
@@ -1537,8 +1462,6 @@ export function LeadDrawer(props: DrawerProps) {
                     <ContactMethodChips
                       selected={contactMethods}
                       onToggle={(m) => void toggleMethod(m)}
-                      disabled={editLocked}
-                      lockHint={lockHint}
                       emphasize={needsMethod}
                     />
                   </div>
@@ -1552,21 +1475,18 @@ export function LeadDrawer(props: DrawerProps) {
                 <p className="text-sm text-mist-300">
                   No draft yet. Generate a personalized first email for this lead.
                 </p>
-                <Lockable>
                   <button
                     onClick={() =>
                       run("draft", async () => {
                         await props.onDraft(lead.id);
                       })
                     }
-                    disabled={busy === "draft" || editLocked}
-                    title={editLocked ? lockHint : undefined}
+                    disabled={busy === "draft"}
                     className="mt-4 inline-flex items-center gap-2 rounded-full bg-aurora-400 px-5 py-2.5 text-sm font-medium text-on-accent transition-transform hover:scale-105 disabled:opacity-50"
                   >
                     {busy === "draft" ? <Spinner className="h-4 w-4" /> : <SparkIcon className="h-4 w-4" />}
                     Draft outreach
                   </button>
-                </Lockable>
               </div>
             ) : lead.detailLoaded !== true ? (
               <div
@@ -1610,8 +1530,7 @@ export function LeadDrawer(props: DrawerProps) {
                         setToEmail(next);
                       }
                     }}
-                    disabled={sent || editLocked}
-                    title={editLocked ? lockHint : undefined}
+                    disabled={sent}
                     placeholder="name@company.com"
                     className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none focus:border-aurora-400/60 disabled:opacity-60"
                   />
@@ -1626,8 +1545,7 @@ export function LeadDrawer(props: DrawerProps) {
                   <input
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    disabled={sent || editLocked}
-                    title={editLocked ? lockHint : undefined}
+                    disabled={sent}
                     className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none focus:border-aurora-400/60 disabled:opacity-60"
                   />
                 </FieldMini>
@@ -1640,14 +1558,11 @@ export function LeadDrawer(props: DrawerProps) {
                       }}
                     />
                   ) : (
-                    <Lockable className="w-full">
                       <PitchEditor
                         value={body}
                         onChange={(html) => setBody(html)}
                         placeholder="Email body…"
-                        disabled={editLocked}
                       />
-                    </Lockable>
                   )}
                 </FieldMini>
 
@@ -1666,11 +1581,9 @@ export function LeadDrawer(props: DrawerProps) {
                         ).map((opt) => {
                           const active = (outreach.deliveryStatus ?? "unknown") === opt.id;
                           return (
-                            <Lockable key={opt.id}>
-                              <button
+                              <button key={opt.id}
                                 type="button"
-                                disabled={busy === "delivery" || editLocked}
-                                title={editLocked ? lockHint : undefined}
+                                disabled={busy === "delivery"}
                                 onClick={() =>
                                   run("delivery", () =>
                                     props.onSetDelivery(outreach.id, opt.id),
@@ -1686,7 +1599,6 @@ export function LeadDrawer(props: DrawerProps) {
                               >
                                 {opt.label}
                               </button>
-                            </Lockable>
                           );
                         })}
                       </div>
@@ -1714,7 +1626,6 @@ export function LeadDrawer(props: DrawerProps) {
 
                 {!sent && !registerOnly && (
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                    <Lockable>
                       <button
                         type="button"
                         onClick={() =>
@@ -1727,20 +1638,17 @@ export function LeadDrawer(props: DrawerProps) {
                             setSavedDraft({ subject, body, toEmail });
                           })
                         }
-                        disabled={busy === "save" || editLocked}
-                        title={editLocked ? lockHint : undefined}
+                        disabled={busy === "save"}
                         className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-mist-100 transition-colors hover:bg-white/5 disabled:opacity-50"
                       >
                         {busy === "save" ? <Spinner className="h-3.5 w-3.5" /> : null}
                         Save draft
                       </button>
-                    </Lockable>
-                    <Lockable>
                       <button
                         type="button"
                         onClick={() =>
                           void (async () => {
-                            if (busy === "send" || editLocked) return;
+                            if (busy === "send") return;
                             try {
                               await persistIfDirty();
                             } catch {
@@ -1751,11 +1659,9 @@ export function LeadDrawer(props: DrawerProps) {
                             void props.onSend(outreach.id);
                           })()
                         }
-                        disabled={!canSend || busy === "send" || editLocked}
+                        disabled={!canSend || busy === "send"}
                         title={
-                          editLocked
-                            ? lockHint
-                            : !toEmail
+                          !toEmail
                               ? "Add a recipient email first"
                               : undefined
                         }
@@ -1764,7 +1670,6 @@ export function LeadDrawer(props: DrawerProps) {
                       <ArrowIcon className="h-4 w-4" />
                       {capabilities.canSendEmail ? "Send email" : "Send (simulate)"}
                     </button>
-                    </Lockable>
                   </div>
                 )}
 
@@ -1821,7 +1726,6 @@ function EditableInfoRow({
   placeholder,
   onSave,
   disabled = false,
-  lockHint,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -1830,7 +1734,6 @@ function EditableInfoRow({
   placeholder: string;
   onSave: (raw: string) => string | null | void;
   disabled?: boolean;
-  lockHint?: string;
 }) {
   const draft = useDraftField(defaultValue, onSave, disabled);
   return (
@@ -1839,7 +1742,6 @@ function EditableInfoRow({
         <span className="shrink-0 text-mist-500" aria-hidden>
           {icon}
         </span>
-        <Lockable className="min-w-0 flex-1">
           <div
             className={`flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50 ${
               draft.warning ? "border-rose-400/60" : "border-white/10"
@@ -1854,14 +1756,12 @@ function EditableInfoRow({
                 if (e.key === "Enter") e.currentTarget.blur();
               }}
               placeholder={placeholder}
-              aria-label={disabled && lockHint ? lockHint : label}
+              aria-label={label}
               aria-invalid={draft.warning ? true : undefined}
               disabled={disabled}
-              title={disabled ? lockHint : undefined}
               className="min-w-0 flex-1 bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-500 disabled:cursor-not-allowed disabled:opacity-70"
             />
           </div>
-        </Lockable>
       </div>
       {draft.warning ? (
         <p role="alert" className="pl-7 text-xs text-rose-300">
@@ -1872,70 +1772,14 @@ function EditableInfoRow({
   );
 }
 
-function useDraftField(
-  serverValue: string,
-  onSave: (raw: string) => string | null | void,
-  disabled: boolean,
-) {
-  const [value, setValue] = useState(serverValue);
-  const [warning, setWarning] = useState<string | null>(null);
-  const focusedRef = useRef(false);
-  const dirtyRef = useRef(false);
-  const valueRef = useRef(serverValue);
-  const saveRef = useRef(onSave);
-  saveRef.current = onSave;
-  const disabledRef = useRef(disabled);
-  disabledRef.current = disabled;
-
-  // Adopt server value only when the user isn't mid-edit.
-  useEffect(() => {
-    if (focusedRef.current || dirtyRef.current) return;
-    valueRef.current = serverValue;
-    setValue(serverValue);
-  }, [serverValue]);
-
-  const commit = useCallback(() => {
-    if (!dirtyRef.current || disabledRef.current) return;
-    const result = saveRef.current(valueRef.current);
-    if (typeof result === "string" && result) {
-      setWarning(result);
-      return; // keep the draft visible; stay dirty
-    }
-    setWarning(null);
-    dirtyRef.current = false;
-  }, []);
-
-  // Escape / lead switch unmounts without blur — flush the draft.
-  useEffect(() => () => commit(), [commit]);
-
-  return {
-    value,
-    warning,
-    onChange: (next: string) => {
-      dirtyRef.current = true;
-      valueRef.current = next;
-      setValue(next);
-    },
-    onFocus: () => {
-      focusedRef.current = true;
-    },
-    onBlur: () => {
-      focusedRef.current = false;
-      commit();
-    },
-  };
-}
-
 function AutoGrowAbout({
   defaultValue,
   onSave,
   disabled = false,
-  lockHint,
 }: {
   defaultValue: string;
   onSave: (raw: string) => string | null | void;
   disabled?: boolean;
-  lockHint?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const draft = useDraftField(defaultValue, onSave, disabled);
@@ -1952,7 +1796,6 @@ function AutoGrowAbout({
   }, [draft.value]);
 
   return (
-    <Lockable className="flex w-full">
     <div className="flex w-full items-start gap-2 rounded-lg border border-white/10 bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50">
       <textarea
         ref={ref}
@@ -1962,13 +1805,11 @@ function AutoGrowAbout({
         onFocus={draft.onFocus}
         onBlur={draft.onBlur}
         placeholder="Short blurb about this lead…"
-        aria-label={disabled && lockHint ? lockHint : "About"}
+        aria-label="About"
         disabled={disabled}
-        title={disabled ? lockHint : undefined}
         className="min-h-[1.5rem] min-w-0 flex-1 resize-none overflow-hidden bg-transparent py-0.5 text-sm leading-relaxed text-mist-100 outline-none placeholder:text-mist-500 disabled:cursor-not-allowed disabled:opacity-70"
       />
     </div>
-    </Lockable>
   );
 }
 

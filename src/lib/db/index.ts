@@ -119,6 +119,12 @@ export interface LeadRepository {
   /** Active (non-expired) locks for the given board ids. */
   listBoardLocks(boardIds: string[]): Promise<BoardLock[]>;
   upsertBoardLock(lock: BoardLock): Promise<BoardLock>;
+  /**
+   * Atomically take/refresh the board lock unless ANOTHER user holds an
+   * unexpired one. Purges expired rows. Returns the foreign holder on
+   * conflict, or null when `lock` was written.
+   */
+  tryAcquireBoardLock(lock: BoardLock, nowIso: string): Promise<BoardLock | null>;
   clearBoardLock(boardId: string, userId?: string): Promise<boolean>;
   /**
    * Per-board lead counts for the current workspace (GROUP BY — no full row load).

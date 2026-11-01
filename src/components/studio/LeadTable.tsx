@@ -1,15 +1,16 @@
 "use client";
-
+import { Select } from "@/components/ui/Select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ContactMethod, CrmStage, LeadWithOutreach } from "@/lib/types";
 import { CrmStagePill, StatusPill, crmStageLabel } from "@/components/ui";
-import { Select } from "@/components/ui/Select";
+
 import { CheckIcon, MailIcon, PhoneIcon, TrashIcon, XIcon } from "@/components/icons";
 import { displayWebsite } from "@/lib/website";
 import { shortLocation } from "@/lib/format-location";
 import { useLeadColumnState } from "@/components/studio/LeadColumnsMenu";
-import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
+import { BulkLockable, useBoardLockUi } from "@/components/studio/board-lock";
+import { useDraftField } from "@/components/studio/use-draft-field";
 
 const STAGE_OPTIONS: CrmStage[] = [
   "new",
@@ -65,7 +66,7 @@ export function LeadTable({
   /** Bulk delete — preferred when selecting multiple. */
   onDeleteLeads?: (leadIds: string[]) => void | Promise<void>;
 }) {
-  const { locked: editLocked, bulkLocked, hint: lockHint } = useBoardLockUi();
+  const { bulkLocked, hint: lockHint } = useBoardLockUi();
   const [openId, setOpenId] = useState<string | null>(null);
   const [pipelineMenuOpen, setPipelineMenuOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -219,25 +220,20 @@ export function LeadTable({
             <tr className="border-b border-white/10 text-left text-xs uppercase tracking-widest text-mist-500">
               {canDelete ? (
                 <th className="w-10 px-3 py-3">
-                  <Lockable>
                     <input
                       type="checkbox"
                       checked={allSelected}
-                      disabled={editLocked}
                       ref={(el) => {
                         if (el) el.indeterminate = someSelected;
                       }}
                       onChange={toggleAll}
                       aria-label={
-                        editLocked
-                          ? lockHint
-                          : allSelected
+                        allSelected
                             ? "Deselect all leads"
                             : "Select all leads"
                       }
                       className="rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40 disabled:opacity-50"
                     />
-                  </Lockable>
                 </th>
               ) : null}
               <th className="px-5 py-3 font-medium">
@@ -403,18 +399,15 @@ export function LeadTable({
                       className="px-3 py-3.5"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Lockable>
                         <input
                           type="checkbox"
                           checked={isChecked}
-                          disabled={editLocked}
                           onChange={() => toggleOne(l.id)}
                           aria-label={
-                            editLocked ? lockHint : `Select ${l.company}`
+                            `Select ${l.company}`
                           }
                           className="rounded border-white/20 bg-ink-900 text-aurora-400 focus:ring-aurora-400/40 disabled:opacity-50"
                         />
-                      </Lockable>
                     </td>
                   ) : null}
                   <td className="max-w-[14rem] px-5 py-3.5">
@@ -487,7 +480,6 @@ export function LeadTable({
                   </td>
                   <td className="relative px-5 py-3.5 whitespace-nowrap">
                     {onMoveStage ? (
-                      <Lockable>
                         <div
                           ref={openId === l.id ? menuRef : undefined}
                           className="relative inline-block"
@@ -495,7 +487,6 @@ export function LeadTable({
                         >
                           <button
                             type="button"
-                            disabled={editLocked}
                             onClick={() =>
                               setOpenId((id) => (id === l.id ? null : l.id))
                             }
@@ -503,13 +494,13 @@ export function LeadTable({
                             aria-haspopup="listbox"
                             aria-expanded={openId === l.id}
                             aria-label={
-                              editLocked ? lockHint : "Change stage"
+                              "Change stage"
                             }
-                            title={editLocked ? lockHint : "Change stage"}
+                            title="Change stage"
                           >
                             <CrmStagePill stage={stage} />
                           </button>
-                          {openId === l.id && !editLocked ? (
+                          {openId === l.id ? (
                             <ul
                               role="listbox"
                               className="absolute right-0 z-20 mt-1 min-w-[10rem] overflow-hidden rounded-xl border border-white/10 bg-ink-900 py-1 shadow-xl"
@@ -537,7 +528,6 @@ export function LeadTable({
                             </ul>
                           ) : null}
                         </div>
-                      </Lockable>
                     ) : (
                       <CrmStagePill stage={stage} />
                     )}
@@ -552,31 +542,15 @@ export function LeadTable({
                       className="max-w-[12rem] px-5 py-3.5"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {editLocked ? (
-                        <Lockable className="w-full">
-                          <input
-                            value={l.notes ?? ""}
-                            readOnly
-                            disabled
-                            placeholder="—"
-                            aria-label={lockHint}
-                            className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 opacity-70"
-                          />
-                        </Lockable>
-                      ) : (
-                        <input
-                          defaultValue={l.notes ?? ""}
-                          key={`${l.id}-notes-${l.notes ?? ""}`}
-                          onBlur={(e) => {
-                            const next = e.target.value;
+                        <DraftCellInput
+                          value={l.notes ?? ""}
+                          ariaLabel={`Notes for ${l.company}`}
+                          onSave={(next) => {
                             if (next !== (l.notes ?? "")) {
                               onUpdateLead?.(l.id, { notes: next || null });
                             }
                           }}
-                          placeholder="—"
-                          className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 hover:border-white/10 focus:border-aurora-400/50 focus:bg-ink-950/40"
                         />
-                      )}
                     </td>
                   ) : null}
                   {visibleCustom.map((c) => (
@@ -585,35 +559,7 @@ export function LeadTable({
                       className="px-5 py-3.5"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {editLocked ? (
-                        <Lockable className="w-full">
-                          {c.type === "select" ? (
-                            <Select
-                              value={fields[c.id] ?? ""}
-                              disabled
-                              aria-label={lockHint}
-                              className="w-full min-w-[6rem] py-1 text-xs opacity-70"
-                            >
-                              <option value="">—</option>
-                              {(c.options ?? []).map((opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              ))}
-                            </Select>
-                          ) : (
-                            <input
-                              type={c.type === "number" ? "number" : "text"}
-                              value={fields[c.id] ?? ""}
-                              readOnly
-                              disabled
-                              placeholder="—"
-                              aria-label={lockHint}
-                              className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 opacity-70"
-                            />
-                          )}
-                        </Lockable>
-                      ) : c.type === "select" ? (
+                      {c.type === "select" ? (
                         <Select
                           value={fields[c.id] ?? ""}
                           onChange={(e) =>
@@ -631,20 +577,17 @@ export function LeadTable({
                           ))}
                         </Select>
                       ) : (
-                        <input
+                        <DraftCellInput
                           type={c.type === "number" ? "number" : "text"}
-                          defaultValue={fields[c.id] ?? ""}
-                          key={`${l.id}-${c.id}-${fields[c.id] ?? ""}`}
-                          onBlur={(e) => {
-                            const next = e.target.value;
+                          value={fields[c.id] ?? ""}
+                          ariaLabel={`${c.name} for ${l.company}`}
+                          onSave={(next) => {
                             if (next !== (fields[c.id] ?? "")) {
                               onUpdateLead?.(l.id, {
                                 customFields: { ...fields, [c.id]: next },
                               });
                             }
                           }}
-                          placeholder="—"
-                          className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 hover:border-white/10 focus:border-aurora-400/50 focus:bg-ink-950/40"
                         />
                       )}
                     </td>
@@ -697,7 +640,7 @@ export function LeadTable({
                 <span className="font-semibold text-aurora-300">{selected.size}</span>{" "}
                 selected
               </p>
-              <Lockable>
+              <BulkLockable>
                 <button
                   type="button"
                   disabled={deleting || bulkLocked}
@@ -708,7 +651,7 @@ export function LeadTable({
                   <TrashIcon className="h-3 w-3" />
                   Delete
                 </button>
-              </Lockable>
+              </BulkLockable>
               <button
                 type="button"
                 onClick={() => {
@@ -725,5 +668,38 @@ export function LeadTable({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Inline table cell that keeps its draft across the 10s refresh: a teammate's
+ * change is adopted only when this cell isn't focused or holding unsaved text.
+ */
+function DraftCellInput({
+  value,
+  onSave,
+  ariaLabel,
+  type = "text",
+}: {
+  value: string;
+  onSave: (next: string) => void;
+  ariaLabel: string;
+  type?: "text" | "number";
+}) {
+  const draft = useDraftField(value, onSave);
+  return (
+    <input
+      type={type}
+      value={draft.value}
+      onChange={(e) => draft.onChange(e.target.value)}
+      onFocus={draft.onFocus}
+      onBlur={draft.onBlur}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+      placeholder="—"
+      aria-label={ariaLabel}
+      className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-mist-200 outline-none placeholder:text-mist-600 hover:border-white/10 focus:border-aurora-400/50 focus:bg-ink-950/40"
+    />
   );
 }

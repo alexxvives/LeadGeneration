@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Spinner } from "@/components/ui";
-import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
+import { BulkLockable, useBoardLockUi } from "@/components/studio/board-lock";
 import { api } from "@/lib/client-api";
 import type { ImportLeadRow } from "@/lib/types";
 import { parseImportCrmStage } from "@/lib/import-crm-stage";
@@ -411,7 +411,7 @@ export function ImportLeadsPanel({
             you choose which board they go to.
           </p>
         </div>
-        <Lockable>
+        <BulkLockable>
           <button
             type="button"
             disabled={busy || editLocked}
@@ -422,7 +422,7 @@ export function ImportLeadsPanel({
             {busy ? <Spinner className="h-4 w-4" /> : null}
             {busy ? "Reading…" : "Import CSV / Excel"}
           </button>
-        </Lockable>
+        </BulkLockable>
         <input
           ref={inputRef}
           type="file"

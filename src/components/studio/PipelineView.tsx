@@ -31,7 +31,6 @@ import {
 } from "@/lib/follow-ups";
 import { Bone, useStableDuringLoad } from "./skeletons";
 import { VirtualColumnList } from "./virtual-list";
-import { useBoardLockUi } from "./board-lock";
 
 // ─── CRM Pipeline columns ────────────────────────────────────────────────────
 
@@ -298,7 +297,6 @@ export function PipelineView({
   ) => void;
   onSetConversationStep?: (leadId: string, step: ConversationStep) => void;
 }) {
-  const { locked: editLocked } = useBoardLockUi();
   const [activeId, setActiveId] = useState<string | null>(null);
   const dragStartedRef = useRef(false);
   const [parkedOpen, setParkedOpen] = useState<Record<string, boolean>>({
@@ -317,7 +315,6 @@ export function PipelineView({
   const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
 
   function handleDragStart(event: DragStartEvent) {
-    if (editLocked) return;
     dragStartedRef.current = true;
     setActiveId(String(event.active.id));
   }
@@ -328,7 +325,6 @@ export function PipelineView({
     window.setTimeout(() => {
       dragStartedRef.current = false;
     }, 0);
-    if (editLocked) return;
     const { active, over } = event;
     if (!over) return;
     const lead = leads.find((l) => l.id === active.id);
@@ -429,13 +425,11 @@ export function PipelineView({
         {focus === "conversation"
           ? `conversation${headCount === 1 ? "" : "s"}`
           : `lead${headCount === 1 ? "" : "s"}`}
-        {editLocked ? null : (
           <span className="hidden lg:inline">
             {focus === "conversation"
               ? " · drag to change where they are"
               : " · drag to change stage"}
           </span>
-        )}
       </p>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:hidden">
@@ -925,7 +919,6 @@ function PipelineCardFace({
     usePipelineCardActions();
   const { pendingFollowUps, waitingOnUs, noteCount, replied, methods, missedCall, iconMethods, needsMethod, unresponsive } =
     pipelineCardChrome(lead, tasksByLeadId);
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
 
   return (
     <div
@@ -978,11 +971,9 @@ function PipelineCardFace({
           {pendingFollowUps > 0 ? (
             <button
               type="button"
-              disabled={editLocked || !onCompleteFollowUp}
+              disabled={!onCompleteFollowUp}
               title={
-                editLocked
-                  ? lockHint
-                  : pendingFollowUps === 1
+                pendingFollowUps === 1
                     ? "Mark follow-up done"
                     : `Mark ${pendingFollowUps} follow-ups done`
               }
@@ -990,7 +981,6 @@ function PipelineCardFace({
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                if (editLocked) return;
                 onCompleteFollowUp?.(lead.id);
               }}
               className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-400/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-300 ring-1 ring-violet-400/30 hover:bg-violet-400/25 disabled:opacity-50"
@@ -1004,17 +994,14 @@ function PipelineCardFace({
           {waitingOnUs ? (
             <button
               type="button"
-              disabled={editLocked || !onCompleteTask}
+              disabled={!onCompleteTask}
               title={
-                editLocked
-                  ? lockHint
-                  : "Mark task done"
+                "Mark task done"
               }
               aria-label="Mark task done"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                if (editLocked) return;
                 onCompleteTask?.(lead.id);
               }}
               className="inline-flex shrink-0 items-center rounded-full bg-aurora-400/20 px-1.5 py-0.5 text-[10px] font-medium text-aurora-200 ring-1 ring-aurora-400/35 hover:bg-aurora-400/30 disabled:opacity-50"
@@ -1064,21 +1051,16 @@ function DraggablePipelineCard({
   onOpen: (id: string) => void;
   isDragging: boolean;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const { attributes, listeners, setNodeRef } = useDraggable({
     id: lead.id,
-    disabled: editLocked,
   });
 
   return (
     <div
       ref={setNodeRef}
       {...attributes}
-      {...(editLocked ? {} : listeners)}
-      title={editLocked ? lockHint : undefined}
-      className={`${
-        editLocked ? "cursor-not-allowed" : "cursor-grab touch-pan-y active:cursor-grabbing"
-      } ${isDragging ? "opacity-30" : ""}`}
+      {...listeners}
+      className={`cursor-grab touch-pan-y active:cursor-grabbing ${isDragging ? "opacity-30" : ""}`}
     >
       <PipelineCardFace lead={lead} onOpen={onOpen} />
     </div>

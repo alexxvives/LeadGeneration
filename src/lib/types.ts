@@ -293,11 +293,18 @@ export interface Board {
 /** Access role for a board (owner workspace or invited member). */
 export type BoardMemberRole = "owner" | "editor";
 
-/** Soft presence lock — blocks edits while another user holds the board. */
+/** What a short-lived bulk lock protects. */
+export type BulkLockKind = "import" | "search" | "delete";
+
+/**
+ * Short bulk lock — held only while an import / Find leads / bulk delete
+ * runs. Single-lead edits are never blocked.
+ */
 export interface BoardLock {
   boardId: string;
   userId: string;
   userName: string | null;
+  kind?: BulkLockKind | null;
   lockedAt: string;
   expiresAt: string;
 }

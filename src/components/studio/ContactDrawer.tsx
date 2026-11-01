@@ -23,7 +23,6 @@ import {
   TrashIcon,
   XIcon,
 } from "@/components/icons";
-import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { JournalEntries } from "@/components/studio/JournalEntries";
 
@@ -40,7 +39,6 @@ function EditableInfoRow({
   onSave,
   onLiveChange,
   disabled = false,
-  lockHint,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -50,14 +48,12 @@ function EditableInfoRow({
   onSave: (raw: string) => void;
   onLiveChange?: (raw: string) => void;
   disabled?: boolean;
-  lockHint?: string;
 }) {
   return (
     <div className="flex items-center gap-3 text-sm text-mist-100">
       <span className="shrink-0 text-mist-500" aria-hidden>
         {icon}
       </span>
-      <Lockable className="min-w-0 flex-1">
         <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-white/10 bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50">
           <input
             key={fieldKey}
@@ -68,13 +64,11 @@ function EditableInfoRow({
               onSave(e.target.value);
             }}
             placeholder={placeholder}
-            aria-label={disabled && lockHint ? lockHint : label}
+            aria-label={label}
             disabled={disabled}
-            title={disabled ? lockHint : undefined}
             className="min-w-0 flex-1 bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-500 disabled:cursor-not-allowed disabled:opacity-70"
           />
         </div>
-      </Lockable>
     </div>
   );
 }
@@ -129,7 +123,6 @@ export function ContactDrawer({
   ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const panelRef = useRef<HTMLElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const prevFocus = useRef<HTMLElement | null>(null);
@@ -182,7 +175,7 @@ export function ContactDrawer({
   const showBoardPicker =
     creating && (!filterBoardId || filterBoardId === "all") && boards.length > 1;
   const displayName = contact?.name || draft.name;
-  const notesLocked = editLocked || creating;
+  const notesLocked = creating;
 
   useEffect(() => {
     prevFocus.current = document.activeElement as HTMLElement | null;
@@ -257,7 +250,7 @@ export function ContactDrawer({
   };
 
   const requestClose = async () => {
-    if (creating && !editLocked) {
+    if (creating) {
       const name = (nameInputRef.current?.value ?? draftRef.current.name).trim();
       if (name) {
         try {
@@ -276,7 +269,7 @@ export function ContactDrawer({
   };
 
   const addEntry = async (kind: "note" | "follow_up" | "task") => {
-    if (!contact || editLocked) return;
+    if (!contact) return;
     const text =
       noteText.trim() ||
       (kind === "follow_up" ? "Follow up" : kind === "task" ? "" : "");
@@ -317,14 +310,14 @@ export function ContactDrawer({
   };
 
   const deleteFollowUp = async (fuId: string) => {
-    if (!contact || editLocked) return;
+    if (!contact) return;
     const updated = (contact.followUps ?? []).filter((f) => f.id !== fuId);
     if (editingId === fuId) setEditingId(null);
     await onUpdate(contact.id, { followUps: updated });
   };
 
   const toggleFollowUpDone = async (fu: FollowUp) => {
-    if (!contact || editLocked) return;
+    if (!contact) return;
     const nextDone = !followUpIsDone(fu.done);
     const updated = (contact.followUps ?? []).map((f) =>
       f.id === fu.id ? { ...f, done: nextDone } : f,
@@ -333,14 +326,13 @@ export function ContactDrawer({
   };
 
   const startEditFollowUp = (fu: FollowUp) => {
-    if (editLocked) return;
     setEditingId(fu.id);
     setEditDate(fu.date);
     setEditText(fu.note);
   };
 
   const saveEditFollowUp = async () => {
-    if (!contact || editLocked || !editingId || !editDate) return;
+    if (!contact || !editingId || !editDate) return;
     const updated = (contact.followUps ?? []).map((f) =>
       f.id === editingId ? { ...f, date: editDate, note: editText.trim() } : f,
     );
@@ -386,15 +378,13 @@ export function ContactDrawer({
               {authorInitials(displayName || "?")}
             </div>
             <div className="min-w-0 flex-1">
-              <Lockable className="block min-w-0">
                 <input
                   id="contact-drawer-title"
                   ref={nameInputRef}
                   key={contact ? `${contact.id}-name-${contact.name}` : "new-name"}
                   defaultValue={contact?.name ?? ""}
                   placeholder="Name"
-                  disabled={editLocked || saving}
-                  title={editLocked ? lockHint : undefined}
+                  disabled={saving}
                   aria-invalid={nameInvalid}
                   aria-required
                   onChange={(e) => {
@@ -403,7 +393,7 @@ export function ContactDrawer({
                     if (nameInvalid && v.trim()) setNameInvalid(false);
                   }}
                   onBlur={(e) => {
-                    if (editLocked || saving) return;
+                    if (saving) return;
                     const next = e.target.value.trim();
                     if (!next) {
                       setNameInvalid(true);
@@ -421,7 +411,6 @@ export function ContactDrawer({
                   }}
                   className="w-full truncate bg-transparent font-display text-xl font-semibold text-mist-100 outline-none placeholder:text-mist-500 disabled:opacity-70 md:text-2xl"
                 />
-              </Lockable>
               <p className="mt-1 text-xs text-mist-500">
                 {creating
                   ? showBoardPicker
@@ -446,7 +435,7 @@ export function ContactDrawer({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {creating ? null : confirmDelete && !editLocked && contact ? (
+            {creating ? null : confirmDelete && contact ? (
               <div className="mr-1 flex items-center gap-1.5">
                 <button
                   type="button"
@@ -464,20 +453,17 @@ export function ContactDrawer({
                 </button>
               </div>
             ) : (
-              <Lockable>
                 <button
                   type="button"
-                  disabled={editLocked}
                   onClick={() => setConfirmDelete(true)}
                   className="rounded-lg p-2 text-mist-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400/60 disabled:opacity-50"
                   aria-label={
-                    editLocked ? lockHint : `Delete ${contact?.name ?? ""}`
+                    `Delete ${contact?.name ?? ""}`
                   }
-                  title={editLocked ? lockHint : "Delete collaborator"}
+                  title="Delete collaborator"
                 >
                   <TrashIcon className="h-5 w-5" />
                 </button>
-              </Lockable>
             )}
             <button
               type="button"
@@ -525,8 +511,7 @@ export function ContactDrawer({
                   : "new-org"
               }
               placeholder="Organization or role"
-              disabled={editLocked || saving}
-              lockHint={lockHint}
+              disabled={saving}
               onLiveChange={
                 creating
                   ? (raw) =>
@@ -545,8 +530,7 @@ export function ContactDrawer({
                   : "new-email"
               }
               placeholder="name@company.com"
-              disabled={editLocked || saving}
-              lockHint={lockHint}
+              disabled={saving}
               onLiveChange={
                 creating
                   ? (raw) => setDraft((d) => ({ ...d, email: raw }))
@@ -564,8 +548,7 @@ export function ContactDrawer({
                   : "new-phone"
               }
               placeholder="Phone number"
-              disabled={editLocked || saving}
-              lockHint={lockHint}
+              disabled={saving}
               onLiveChange={
                 creating
                   ? (raw) => setDraft((d) => ({ ...d, phone: raw }))
@@ -585,8 +568,7 @@ export function ContactDrawer({
                   : "new-loc"
               }
               placeholder="City or region"
-              disabled={editLocked || saving}
-              lockHint={lockHint}
+              disabled={saving}
               onLiveChange={
                 creating
                   ? (raw) => setDraft((d) => ({ ...d, location: raw }))
@@ -600,57 +582,45 @@ export function ContactDrawer({
             <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
               <SectionLabel className="mb-0 shrink-0">Notes</SectionLabel>
               <div className={noteActionRowClass}>
-                <Lockable>
                   <button
                     type="button"
                     disabled={notesLocked}
                     title={
                       creating
                         ? "Add a name to save this collaborator first"
-                        : editLocked
-                          ? lockHint
-                          : undefined
+                        : undefined
                     }
                     onClick={() => openComposer("note")}
                     className={noteActionClass("amber")}
                   >
                     Add Note
                   </button>
-                </Lockable>
-                <Lockable>
                   <button
                     type="button"
                     disabled={notesLocked}
                     title={
                       creating
                         ? "Add a name to save this collaborator first"
-                        : editLocked
-                          ? lockHint
-                          : undefined
+                        : undefined
                     }
                     onClick={() => openComposer("follow_up")}
                     className={noteActionClass("violet")}
                   >
                     Follow up
                   </button>
-                </Lockable>
-                <Lockable>
                   <button
                     type="button"
                     disabled={notesLocked}
                     title={
                       creating
                         ? "Add a name to save this collaborator first"
-                        : editLocked
-                          ? lockHint
-                          : undefined
+                        : undefined
                     }
                     onClick={() => openComposer("task")}
                     className={noteActionClass("aurora")}
                   >
                     Add Task
                   </button>
-                </Lockable>
               </div>
             </div>
 
@@ -677,13 +647,11 @@ export function ContactDrawer({
                   }
                   value={noteDate}
                   onChange={setNoteDate}
-                  disabled={editLocked}
                 />
                 <textarea
                   value={noteText}
                   onChange={(e) => setNoteText(e.target.value)}
                   rows={3}
-                  disabled={editLocked}
                   className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none placeholder:text-mist-600 focus:border-aurora-400/60 disabled:opacity-50"
                   placeholder={
                     composer === "follow_up"
@@ -694,21 +662,17 @@ export function ContactDrawer({
                   }
                 />
                 <div className="flex flex-wrap gap-2">
-                  <Lockable>
                     <button
                       type="button"
                       disabled={
-                        editLocked ||
                         ((composer === "note" || composer === "task") &&
                           !noteText.trim())
                       }
                       onClick={() => void addEntry(composer)}
-                      title={editLocked ? lockHint : undefined}
                       className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent disabled:opacity-40"
                     >
                       Save
                     </button>
-                  </Lockable>
                   <button
                     type="button"
                     onClick={() => setComposer(null)}
@@ -739,8 +703,6 @@ export function ContactDrawer({
                 onCancelEdit={() => setEditingId(null)}
                 onDelete={(id) => void deleteFollowUp(id)}
                 onToggleDone={(fu) => void toggleFollowUpDone(fu)}
-                disabled={editLocked}
-                lockHint={lockHint}
               />
             ) : null}
           </section>

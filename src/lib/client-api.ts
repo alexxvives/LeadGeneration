@@ -290,23 +290,6 @@ export const api = {
       body: JSON.stringify({ inviteId }),
     }),
 
-  heartbeatBoardLock: (boardId: string) =>
-    jsonFetch<{ lock: BoardLock; acquired: boolean }>(
-      `/api/boards/${boardId}/lock`,
-      { method: "POST" },
-    ),
-
-  takeoverBoardLock: (boardId: string) =>
-    jsonFetch<{ lock: BoardLock }>(`/api/boards/${boardId}/lock`, {
-      method: "POST",
-      body: JSON.stringify({ takeover: true }),
-    }),
-
-  releaseBoardLock: (boardId: string) =>
-    jsonFetch<{ ok: boolean }>(`/api/boards/${boardId}/lock`, {
-      method: "DELETE",
-    }),
-
   getBoardLock: (boardId: string) =>
     jsonFetch<{ lock: BoardLock | null }>(`/api/boards/${boardId}/lock`),
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { deleteLead, getLeadWithOutreach, updateLeadCrm } from "@/lib/service";
-import { isBoardLockedError, isLeadConflictError } from "@/lib/errors";
+import { isLeadConflictError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,9 +120,6 @@ export async function PATCH(
         { status: 409 },
       );
     }
-    if (isBoardLockedError(err)) {
-      return NextResponse.json({ error: err.message }, { status: 423 });
-    }
     throw err;
   }
 }
@@ -138,9 +135,6 @@ export async function DELETE(
     if (!ok) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    if (isBoardLockedError(err)) {
-      return NextResponse.json({ error: err.message }, { status: 423 });
-    }
     throw err;
   }
 }

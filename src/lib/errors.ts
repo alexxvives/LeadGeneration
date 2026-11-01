@@ -57,20 +57,26 @@ export function isAuthError(err: unknown): err is AuthError {
   return err instanceof AuthError;
 }
 
-/** Soft board lock held by another user — routes map to 423 Locked. */
+const BULK_ACTIVITY: Record<string, string> = {
+  import: "importing leads",
+  search: "running Find leads",
+  delete: "deleting leads",
+};
+
+/** Another user's bulk action (import / Find leads / bulk delete) is running — 423. */
 export class BoardLockedError extends Error {
   readonly holderName: string | null;
   readonly holderUserId: string;
+  readonly kind: string | null;
 
-  constructor(holderUserId: string, holderName: string | null) {
-    super(
-      holderName
-        ? `${holderName} is working on this board. Edits are paused until they leave.`
-        : "Someone else is working on this board. Edits are paused until they leave.",
-    );
+  constructor(holderUserId: string, holderName: string | null, kind?: string | null) {
+    const who = holderName?.trim() || "Someone else";
+    const what = (kind && BULK_ACTIVITY[kind]) || "running a bulk action";
+    super(`${who} is ${what} on this board — try again in a moment.`);
     this.name = "BoardLockedError";
     this.holderUserId = holderUserId;
     this.holderName = holderName;
+    this.kind = kind ?? null;
   }
 }
 

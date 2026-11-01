@@ -17,7 +17,7 @@ import {
 import { Bone, useStableDuringLoad } from "./skeletons";
 import { isOutreachReadyStatus } from "@/lib/lead-lanes";
 import { PitchEditor } from "./PitchEditor";
-import { Lockable, useBoardLockUi } from "./board-lock";
+import { BulkLockable, useBoardLockUi } from "./board-lock";
 import { displayWebsite, isUsableWebsite } from "@/lib/website";
 import { VirtualColumnList } from "./virtual-list";
 
@@ -386,7 +386,7 @@ export function OutreachView({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5 lg:justify-self-end">
           {redraftAllAvailable ? (
-            <Lockable>
+            <BulkLockable>
               <button
                 type="button"
                 onClick={() => void runDraft("redraft")}
@@ -405,10 +405,10 @@ export function OutreachView({
                 )}
                 Re-draft all
               </button>
-            </Lockable>
+            </BulkLockable>
           ) : null}
           {draftRemainingCount > 0 ? (
-            <Lockable>
+            <BulkLockable>
               <button
                 type="button"
                 onClick={() => void runDraft("remaining")}
@@ -425,7 +425,7 @@ export function OutreachView({
                 ) : null}
                 Draft remaining ({draftRemainingCount})
               </button>
-            </Lockable>
+            </BulkLockable>
           ) : null}
         </div>
       </div>
@@ -582,7 +582,6 @@ function LeadQueue({
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const [confirmId, setConfirmId] = useState<string | null>(null);
   return (
     <aside
@@ -663,21 +662,18 @@ function LeadQueue({
                   </button>
                 </div>
               ) : (
-                <Lockable>
                   <button
                     type="button"
-                    disabled={editLocked}
                     onClick={() => {
                       onSelect(row.id);
                       setConfirmId(row.id);
                     }}
-                    aria-label={editLocked ? lockHint : `Delete ${row.company}`}
-                    title={editLocked ? lockHint : "Delete lead"}
+                    aria-label={`Delete ${row.company}`}
+                    title="Delete lead"
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-mist-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400/60 disabled:opacity-50"
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
-                </Lockable>
               )}
             </div>
           );
@@ -802,7 +798,7 @@ function DraftAllPrompt({
       <p className="mt-2 max-w-sm text-sm text-mist-400">
         Draft them all. Nothing sends until you click Send on each one.
       </p>
-      <Lockable>
+      <BulkLockable>
         <button
           type="button"
           onClick={onDraft}
@@ -813,7 +809,7 @@ function DraftAllPrompt({
           {drafting ? <Spinner className="h-3.5 w-3.5" /> : null}
           Draft all ({count})
         </button>
-      </Lockable>
+      </BulkLockable>
     </div>
   );
 }
@@ -858,7 +854,6 @@ function ReviewAction({
   const email = leadEmail(lead);
   const phone = leadPhone(lead);
   const phoneOnly = !email && Boolean(phone);
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-white/10 bg-ink-950/40 lg:h-full">
@@ -909,25 +904,21 @@ function ReviewAction({
                 Next
               </button>
             ) : null}
-            <Lockable>
               <button
                 type="button"
-                disabled={busy || editLocked}
+                disabled={busy}
                 onClick={() => {
                   if (onLogCall) onLogCall();
                   else void onMarkContacted(lead.id, "phone", { promptNote: true });
                 }}
                 title={
-                  editLocked
-                    ? lockHint
-                    : "Log the call. Missed stays here; connected leaves."
+                  "Log the call. Missed stays here; connected leaves."
                 }
                 className="inline-flex h-10 items-center gap-1.5 rounded-full bg-aurora-400 px-5 text-sm font-medium text-on-accent disabled:opacity-50"
               >
                 {busy ? <Spinner className="h-3.5 w-3.5" /> : <PhoneIcon className="h-3.5 w-3.5" />}
                 Call
               </button>
-            </Lockable>
           </div>
         </div>
       ) : (
@@ -961,7 +952,6 @@ function EmailComposer({
   onSkip: () => void;
 }) {
   const outreach = lead.outreach!;
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const initialTo = outreach.toEmail ?? lead.emails[0] ?? "";
   const [toEmail, setToEmail] = useState(initialTo);
   const [subject, setSubject] = useState(outreach.subject ?? "");
@@ -977,7 +967,7 @@ function EmailComposer({
   const addressOk = Boolean(parseRecipientEmail(toEmail));
 
   const persist = async () => {
-    if (!dirty || editLocked) return;
+    if (!dirty) return;
     setSaving(true);
     try {
       await onSaveDraft(
@@ -992,7 +982,7 @@ function EmailComposer({
   };
 
   const send = async () => {
-    if (editLocked || busy || !addressOk) return;
+    if (busy || !addressOk) return;
     try {
       await persist();
     } catch {
@@ -1015,8 +1005,6 @@ function EmailComposer({
               const next = parseRecipientEmail(toEmail);
               if (next && next !== toEmail.trim()) setToEmail(next);
             }}
-            disabled={editLocked}
-            title={editLocked ? lockHint : undefined}
             placeholder="name@company.com"
             className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60 disabled:opacity-60"
           />
@@ -1031,8 +1019,6 @@ function EmailComposer({
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            disabled={editLocked}
-            title={editLocked ? lockHint : undefined}
             className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60 disabled:opacity-60"
           />
         </label>
@@ -1042,7 +1028,6 @@ function EmailComposer({
             value={body}
             onChange={setBody}
             placeholder="Email body…"
-            disabled={editLocked}
           />
         </div>
         {outreach.status === "failed" && outreach.error ? (
@@ -1054,7 +1039,7 @@ function EmailComposer({
           <button
             type="button"
             onClick={() => void persist().catch(() => undefined)}
-            disabled={saving || editLocked}
+            disabled={saving}
             className="inline-flex h-10 items-center rounded-full px-4 text-sm font-medium text-mist-300 hover:bg-white/5 disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save"}
@@ -1069,15 +1054,12 @@ function EmailComposer({
             Next
           </button>
         ) : null}
-        <Lockable>
           <button
             type="button"
-            disabled={busy || saving || editLocked || !addressOk}
+            disabled={busy || saving || !addressOk}
             onClick={() => void send()}
             title={
-              editLocked
-                ? lockHint
-                : canSendEmail
+              canSendEmail
                   ? hasNext
                     ? "Send this email and open the next lead"
                     : "Send"
@@ -1088,7 +1070,6 @@ function EmailComposer({
             {busy ? <Spinner className="h-3.5 w-3.5" /> : <SendIcon className="h-3.5 w-3.5" />}
             {hasNext ? "Send and next" : "Send"}
           </button>
-        </Lockable>
       </div>
     </>
   );

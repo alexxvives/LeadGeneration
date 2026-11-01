@@ -3,7 +3,6 @@ import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { createManualLead, listLeadsInSteps } from "@/lib/service";
 import {
-  isBoardLockedError,
   isNotFoundError,
   isQuotaError,
 } from "@/lib/errors";
@@ -70,9 +69,6 @@ export async function POST(req: Request) {
         },
         { status: 402 },
       );
-    }
-    if (isBoardLockedError(err)) {
-      return NextResponse.json({ error: err.message }, { status: 423 });
     }
     if (isNotFoundError(err)) {
       return NextResponse.json({ error: err.message }, { status: 404 });

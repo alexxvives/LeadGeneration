@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { createTask, listTasks } from "@/lib/service";
-import { isBoardLockedError, isNotFoundError } from "@/lib/errors";
+import { isNotFoundError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,9 +65,6 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ task }, { status: 201 });
   } catch (err) {
-    if (isBoardLockedError(err)) {
-      return NextResponse.json({ error: err.message }, { status: 423 });
-    }
     if (isNotFoundError(err)) {
       return NextResponse.json({ error: err.message }, { status: 404 });
     }

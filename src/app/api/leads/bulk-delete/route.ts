@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { clearBoardLeads, deleteLeads } from "@/lib/service";
+import { isBoardLockedError } from "@/lib/errors";
 
 const Body = z.union([
   z.object({
@@ -38,13 +39,14 @@ export async function POST(req: Request) {
     const result = await deleteLeads(ctx, parsed.data.ids);
     return NextResponse.json(result);
   } catch (e) {
+    if (isBoardLockedError(e)) {
+      return NextResponse.json(
+        { error: e.message, lockedBy: e.holderName, kind: e.kind },
+        { status: 423 },
+      );
+    }
     const message = e instanceof Error ? e.message : "Delete failed";
-    const status =
-      message === "Board not found"
-        ? 404
-        : message.includes("working on this board")
-          ? 403
-          : 400;
+    const status = message === "Board not found" ? 404 : 400;
     return NextResponse.json({ error: message }, { status });
   }
 }

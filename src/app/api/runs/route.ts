@@ -6,7 +6,7 @@ import {
   healStuckImportRuns,
   healStuckSearchRuns,
 } from "@/lib/service";
-import { isForbiddenError, isQuotaError } from "@/lib/errors";
+import { isBoardLockedError, isForbiddenError, isQuotaError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +61,12 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: err.message, quota: { kind: err.kind, planId: err.planId, limit: err.limit } },
         { status: 402 },
+      );
+    }
+    if (isBoardLockedError(err)) {
+      return NextResponse.json(
+        { error: err.message, lockedBy: err.holderName, kind: err.kind },
+        { status: 423 },
       );
     }
     if (isForbiddenError(err)) {

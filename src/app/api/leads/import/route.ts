@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       );
     }
     if (isBoardLockedError(err)) {
-      return NextResponse.json({ error: err.message, lockedBy: err.holderName }, { status: 423 });
+      return NextResponse.json({ error: err.message, lockedBy: err.holderName, kind: err.kind }, { status: 423 });
     }
     const message = err instanceof Error ? err.message : "Import failed";
     return NextResponse.json({ error: message }, { status: 400 });

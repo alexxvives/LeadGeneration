@@ -12,7 +12,6 @@ import {
   sortFollowUpsNewestFirst,
 } from "@/lib/follow-ups";
 import { PencilIcon, XIcon } from "@/components/icons";
-import { Lockable } from "@/components/studio/board-lock";
 import { DatePicker } from "@/components/ui/DatePicker";
 
 export function AuthorAvatar({
@@ -52,7 +51,6 @@ export function JournalEntries({
   onDelete,
   onToggleDone,
   disabled,
-  lockHint,
 }: {
   followUps: FollowUp[];
   editingId: string | null;
@@ -65,8 +63,7 @@ export function JournalEntries({
   onCancelEdit: () => void;
   onDelete: (id: string) => void;
   onToggleDone: (fu: FollowUp) => void;
-  disabled: boolean;
-  lockHint: string;
+  disabled?: boolean;
 }) {
   return (
     <ul className="space-y-2">
@@ -109,16 +106,13 @@ export function JournalEntries({
         return (
           <li key={fu.id} className="flex items-start gap-2">
             {canToggle ? (
-              <Lockable>
                 <button
                   type="button"
                   disabled={disabled}
                   onClick={() => onToggleDone(canon)}
                   aria-pressed={followUpIsDone(canon.done)}
                   title={
-                    disabled
-                      ? lockHint
-                      : followUpIsDone(canon.done)
+                    followUpIsDone(canon.done)
                         ? isTask
                           ? "Mark task not done"
                           : "Mark not done"
@@ -137,7 +131,6 @@ export function JournalEntries({
                 >
                   {tagText}
                 </button>
-              </Lockable>
             ) : (
               <span
                 className={`mt-0.5 inline-flex w-[5.25rem] shrink-0 justify-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tagClass}`}
@@ -159,17 +152,14 @@ export function JournalEntries({
                   className="w-full resize-y rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-sm text-mist-100 outline-none focus:border-aurora-400/60"
                 />
                 <div className="flex flex-wrap gap-2">
-                  <Lockable>
                     <button
                       type="button"
                       onClick={onSaveEdit}
                       disabled={disabled || !editDate}
-                      title={disabled ? lockHint : undefined}
                       className="rounded-full bg-aurora-400 px-3 py-1 text-xs font-medium text-on-accent disabled:opacity-40"
                     >
                       Save
                     </button>
-                  </Lockable>
                   <button
                     type="button"
                     onClick={onCancelEdit}
@@ -192,30 +182,26 @@ export function JournalEntries({
             )}
             {editingId === fu.id ? null : (
               <div className="mt-0.5 flex shrink-0 items-center gap-1">
-                <Lockable>
                   <button
                     type="button"
                     disabled={disabled}
                     onClick={() => onStartEdit(canon)}
                     className="text-mist-600 hover:text-mist-200 disabled:opacity-50"
-                    aria-label={disabled ? lockHint : "Edit note"}
-                    title={disabled ? lockHint : "Edit note"}
+                    aria-label="Edit note"
+                    title="Edit note"
                   >
                     <PencilIcon className="h-3 w-3" />
                   </button>
-                </Lockable>
-                <Lockable>
                   <button
                     type="button"
                     disabled={disabled}
                     onClick={() => onDelete(fu.id)}
                     className="text-mist-600 hover:text-rose-400 disabled:opacity-50"
-                    aria-label={disabled ? lockHint : "Delete note"}
-                    title={disabled ? lockHint : "Delete note"}
+                    aria-label="Delete note"
+                    title="Delete note"
                   >
                     <XIcon className="h-3 w-3" />
                   </button>
-                </Lockable>
               </div>
             )}
           </li>

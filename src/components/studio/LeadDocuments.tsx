@@ -8,16 +8,13 @@ import {
   LEAD_DOCUMENT_ACCEPT,
 } from "@/lib/lead-documents";
 import { FileIcon, TrashIcon } from "@/components/icons";
-import { Lockable } from "@/components/studio/board-lock";
 
 export function LeadDocuments({
   leadId,
   disabled,
-  lockHint,
 }: {
   leadId: string;
-  disabled: boolean;
-  lockHint: string;
+  disabled?: boolean;
 }) {
   const [docs, setDocs] = useState<LeadDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,7 +81,6 @@ export function LeadDocuments({
       <h4 className="kicker mb-2">
         Documents
       </h4>
-      <Lockable className="block w-full">
         <div
           onDragOver={(e) => {
             if (disabled) return;
@@ -119,7 +115,7 @@ export function LeadDocuments({
           <button
             type="button"
             disabled={disabled || busy}
-            title={disabled ? lockHint : "Drop files or browse"}
+            title="Drop files or browse"
             onClick={() => inputRef.current?.click()}
             className="flex w-full flex-col items-center gap-1 py-2 text-center disabled:opacity-60"
           >
@@ -132,7 +128,6 @@ export function LeadDocuments({
             </span>
           </button>
         </div>
-      </Lockable>
       {error ? (
         <p className="mt-2 text-xs text-rose-300">{error}</p>
       ) : null}
@@ -157,18 +152,16 @@ export function LeadDocuments({
               <span className="shrink-0 text-[11px] tabular-nums text-mist-500">
                 {formatDocumentSize(doc.size)}
               </span>
-              <Lockable>
                 <button
                   type="button"
                   disabled={disabled || busy}
                   onClick={() => void remove(doc)}
-                  aria-label={disabled ? lockHint : `Remove ${doc.name}`}
-                  title={disabled ? lockHint : "Remove"}
+                  aria-label={`Remove ${doc.name}`}
+                  title="Remove"
                   className="text-mist-600 hover:text-rose-400 disabled:opacity-50"
                 >
                   <TrashIcon className="h-3 w-3" />
                 </button>
-              </Lockable>
             </li>
           ))}
         </ul>

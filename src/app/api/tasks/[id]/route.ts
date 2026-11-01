@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { deleteTask, updateTask } from "@/lib/service";
-import { isBoardLockedError, isNotFoundError } from "@/lib/errors";
+import { isNotFoundError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,9 +53,6 @@ export async function PATCH(
     }
     return NextResponse.json({ task });
   } catch (err) {
-    if (isBoardLockedError(err)) {
-      return NextResponse.json({ error: err.message }, { status: 423 });
-    }
     if (isNotFoundError(err)) {
       return NextResponse.json({ error: err.message }, { status: 404 });
     }
@@ -77,9 +74,6 @@ export async function DELETE(
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    if (isBoardLockedError(err)) {
-      return NextResponse.json({ error: err.message }, { status: 423 });
-    }
     const message = err instanceof Error ? err.message : "Could not delete task";
     return NextResponse.json({ error: message }, { status: 400 });
   }

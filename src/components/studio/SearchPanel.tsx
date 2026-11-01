@@ -21,7 +21,7 @@ import { deleteSavedIcp, loadSavedIcps, saveIcp } from "@/lib/saved-icps";
 import type { SavedIcp } from "@/lib/types";
 import { api } from "@/lib/client-api";
 import type { LocationSuggestion } from "@/app/api/geocode/route";
-import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
+import { BulkLockable, useBoardLockUi } from "@/components/studio/board-lock";
 
 export interface SearchValues {
   niche: string;
@@ -598,7 +598,7 @@ export function SearchPanel({
         </div>
       </div>
       <div className="mt-5 flex items-center justify-center gap-4">
-        <Lockable>
+        <BulkLockable>
           <button
             type="submit"
             disabled={!canSubmit}
@@ -613,7 +613,7 @@ export function SearchPanel({
             "Find leads"
           )}
         </button>
-        </Lockable>
+        </BulkLockable>
       </div>
     </form>
   );

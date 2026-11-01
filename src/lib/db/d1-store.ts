@@ -1042,6 +1042,7 @@ export class D1Store implements LeadRepository {
         user_name: string | null;
         locked_at: string;
         expires_at: string;
+        kind: string | null;
       }>();
     if (!r) return null;
     if (r.expires_at <= new Date().toISOString()) {
@@ -1052,6 +1053,7 @@ export class D1Store implements LeadRepository {
       boardId: r.board_id,
       userId: r.user_id,
       userName: r.user_name,
+      kind: (r.kind as BoardLock["kind"]) ?? null,
       lockedAt: r.locked_at,
       expiresAt: r.expires_at,
     };
@@ -1078,12 +1080,14 @@ export class D1Store implements LeadRepository {
           user_name: string | null;
           locked_at: string;
           expires_at: string;
+          kind: string | null;
         }>();
       for (const r of results) {
         out.push({
           boardId: r.board_id,
           userId: r.user_id,
           userName: r.user_name,
+          kind: (r.kind as BoardLock["kind"]) ?? null,
           lockedAt: r.locked_at,
           expiresAt: r.expires_at,
         });
@@ -1136,23 +1140,47 @@ export class D1Store implements LeadRepository {
   async upsertBoardLock(lock: BoardLock): Promise<BoardLock> {
     await this.db
       .prepare(
-        `INSERT INTO board_locks (board_id, user_id, user_name, locked_at, expires_at)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO board_locks (board_id, user_id, user_name, kind, locked_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(board_id) DO UPDATE SET
            user_id = excluded.user_id,
            user_name = excluded.user_name,
+           kind = excluded.kind,
            locked_at = excluded.locked_at,
            expires_at = excluded.expires_at`,
       )
-      .bind(
-        lock.boardId,
-        lock.userId,
-        lock.userName,
-        lock.lockedAt,
-        lock.expiresAt,
-      )
+      .bind(lock.boardId, lock.userId, lock.userName, lock.kind ?? null, lock.lockedAt, lock.expiresAt)
       .run();
     return lock;
+  }
+
+  async tryAcquireBoardLock(lock: BoardLock, nowIso: string): Promise<BoardLock | null> {
+    await this.db
+      .prepare(`DELETE FROM board_locks WHERE expires_at <= ?`)
+      .bind(nowIso)
+      .run();
+    // Conditional upsert: only overwrite our own row or an expired one, so two
+    // users starting a bulk action at once can't both win.
+    const res = await this.db
+      .prepare(
+        `INSERT INTO board_locks (board_id, user_id, user_name, kind, locked_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(board_id) DO UPDATE SET
+           user_id = excluded.user_id,
+           user_name = excluded.user_name,
+           kind = excluded.kind,
+           locked_at = excluded.locked_at,
+           expires_at = excluded.expires_at
+         WHERE board_locks.user_id = excluded.user_id OR board_locks.expires_at <= ?`,
+      )
+      .bind(lock.boardId, lock.userId, lock.userName, lock.kind ?? null, lock.lockedAt, lock.expiresAt, nowIso)
+      .run();
+    if (res.meta.changes > 0) return null;
+    const holder = await this.getBoardLock(lock.boardId);
+    if (holder && holder.userId !== lock.userId) return holder;
+    // Holder vanished between the two statements — take it.
+    await this.upsertBoardLock(lock);
+    return null;
   }
 
   async clearBoardLock(boardId: string, userId?: string): Promise<boolean> {

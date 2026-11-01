@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCtx } from "@/lib/request-context";
 import { addLeadDocument, listLeadDocuments } from "@/lib/service";
-import { isBoardLockedError, isNotFoundError } from "@/lib/errors";
+import { isNotFoundError } from "@/lib/errors";
 import { LEAD_DOCUMENT_MAX_BYTES } from "@/lib/lead-documents";
 
 export const runtime = "nodejs";
@@ -52,9 +52,6 @@ export async function POST(
     });
     return NextResponse.json({ document }, { status: 201 });
   } catch (err) {
-    if (isBoardLockedError(err)) {
-      return NextResponse.json({ error: err.message }, { status: 423 });
-    }
     if (isNotFoundError(err)) {
       return NextResponse.json({ error: err.message }, { status: 404 });
     }

@@ -58,6 +58,7 @@ import type {
   Board,
   BoardInvite,
   BoardLock,
+  BulkLockKind,
   BoardMember,
   BoardMemberRole,
   BoardPerson,
@@ -121,7 +122,10 @@ import {
   sanitizeContactName,
 } from "@/lib/lead-text";
 
-const LOCK_TTL_MS = 150_000; // 2.5 minutes
+/** Bulk-lock TTLs: fallback only; locks are released on finish/error. */
+const IMPORT_LOCK_TTL_MS = 3 * 60_000; // per chunk; refreshed by each chunk
+const SEARCH_LOCK_TTL_MS = 10 * 60_000;
+const DELETE_LOCK_TTL_MS = 2 * 60_000;
 
 function uniqueById<T extends { id: string }>(rows: T[]): T[] {
   if (rows.length < 2) return rows;
@@ -421,7 +425,6 @@ export async function updateBoard(
   if (!access || access.access !== "owner" || access.shared) {
     throw new NotFoundError("Board not found");
   }
-  await assertBoardEditable(ctx, id);
   const next: Partial<Board> = { updatedAt: nowIso() };
   if (patch.name !== undefined) {
     const trimmed = patch.name.trim();
@@ -634,67 +637,6 @@ export async function listBoardPeopleForUi(
   return people;
 }
 
-/**
- * Heartbeat: claim or refresh the soft lock.
- * When someone else holds it, return their lock with `acquired: false`
- * (HTTP 200) so the viewer can still load leads — do not 423 a poll.
- * Edits still 423 via `assertBoardEditable`.
- */
-export async function heartbeatBoardLock(
-  ctx: Ctx,
-  boardId: string,
-): Promise<{ lock: BoardLock; acquired: boolean }> {
-  if (!ctx.userId) throw new Error("Sign in required");
-  const access = await resolveBoardAccess(ctx, boardId);
-  if (!access) throw new NotFoundError("Board not found");
-
-  const existing = await ctx.db.getBoardLock(boardId);
-  if (existing && existing.userId !== ctx.userId) {
-    return { lock: existing, acquired: false };
-  }
-  const now = nowIso();
-  const lock: BoardLock = {
-    boardId,
-    userId: ctx.userId,
-    userName: ctx.userName,
-    lockedAt: existing?.lockedAt ?? now,
-    expiresAt: new Date(Date.now() + LOCK_TTL_MS).toISOString(),
-  };
-  return { lock: await ctx.db.upsertBoardLock(lock), acquired: true };
-}
-
-/**
- * Steal the soft lock. The previous holder loses edit rights on their next
- * heartbeat (ADR 0030). Used when a collaborator clicks Take control.
- */
-export async function takeoverBoardLock(
-  ctx: Ctx,
-  boardId: string,
-): Promise<BoardLock> {
-  if (!ctx.userId) throw new Error("Sign in required");
-  const access = await resolveBoardAccess(ctx, boardId);
-  if (!access) throw new NotFoundError("Board not found");
-
-  await ctx.db.clearBoardLock(boardId);
-  const now = nowIso();
-  const lock: BoardLock = {
-    boardId,
-    userId: ctx.userId,
-    userName: ctx.userName,
-    lockedAt: now,
-    expiresAt: new Date(Date.now() + LOCK_TTL_MS).toISOString(),
-  };
-  return ctx.db.upsertBoardLock(lock);
-}
-
-export async function releaseBoardLock(
-  ctx: Ctx,
-  boardId: string,
-): Promise<void> {
-  if (!ctx.userId) return;
-  await ctx.db.clearBoardLock(boardId, ctx.userId);
-}
-
 export async function getBoardLockStatus(
   ctx: Ctx,
   boardId: string,
@@ -707,17 +649,46 @@ export async function getBoardLockStatus(
   return lock;
 }
 
-async function assertBoardEditable(ctx: Ctx, boardId: string): Promise<void> {
-  const lock = await ctx.db.getBoardLock(boardId);
-  if (lock && ctx.userId && lock.userId !== ctx.userId) {
-    throw new BoardLockedError(lock.userId, lock.userName);
+/**
+ * Short-lived bulk lock (ADR 0030 rev. 2). Taken ONLY while an import, Find
+ * leads run or bulk delete is running, never just for having a board open.
+ * Single-lead create/edit is never lock-bound: optimistic concurrency (lead
+ * version + three-way merge) resolves overlaps. Another user's unexpired
+ * lock → BoardLockedError (423). The same user re-acquiring refreshes it
+ * (chunked imports). Expired rows are purged on every acquire.
+ */
+export async function acquireBulkLock(
+  ctx: Ctx,
+  boardId: string,
+  kind: BulkLockKind,
+  ttlMs: number,
+): Promise<BoardLock | null> {
+  // Anonymous/demo contexts have no second user to coordinate with.
+  if (!ctx.userId) return null;
+  const now = new Date();
+  const lock: BoardLock = {
+    boardId,
+    userId: ctx.userId,
+    userName: ctx.userName,
+    kind,
+    lockedAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + ttlMs).toISOString(),
+  };
+  const holder = await ctx.db.tryAcquireBoardLock(lock, now.toISOString());
+  if (holder) {
+    throw new BoardLockedError(holder.userId, holder.userName, holder.kind ?? kind);
   }
+  return lock;
 }
 
-// Single-lead edits are never lock-bound: both users work at the same time and
-// optimistic concurrency (lead version + three-way merge) resolves overlaps.
-// The board lock only guards bulk delete / clear / import / Find leads and
-// board settings (assertBoardEditable).
+export async function releaseBulkLock(ctx: Ctx, boardId: string): Promise<void> {
+  if (!ctx.userId) return;
+  try {
+    await ctx.db.clearBoardLock(boardId, ctx.userId);
+  } catch {
+    // TTL is the fallback; never fail the bulk action over a release.
+  }
+}
 
 /** Resolve a boardId or create by name — never invents a Default board. */
 export async function resolveBoardId(
@@ -863,166 +834,170 @@ export async function createAndRunSearch(
     : await resolveRunLeadLimit(ctx, input.maxLeads);
   const searchInput: CreateRunInput = { ...input, maxLeads };
   const boardId = await resolveBoardId(ctx, { boardId: input.boardId });
-  await assertBoardEditable(ctx, boardId);
-
-  const db = ctx.db;
-  const run: Run = {
-    id: newId("run"),
-    workspaceId: ctx.workspaceId,
-    boardId,
-    niche: input.niche.trim(),
-    location: input.location?.trim() || null,
-    offerNotes: input.offerNotes?.trim() || null,
-    senderName: input.senderName?.trim() || null,
-    status: "running",
-    mode: "demo",
-    provider: "pending",
-    leadCount: 0,
-    error: null,
-    createdAt: nowIso(),
-    completedAt: null,
-  };
-  await db.createRun(run);
-
+  await acquireBulkLock(ctx, boardId, "search", SEARCH_LOCK_TTL_MS);
   try {
-    const outcome = await runSearch(searchInput);
 
-    // Cross-run dedupe: skip domains (and emails) already in this workspace.
-    const prior = await db.listLeads();
-    const knownDomains = new Set(
-      prior
-        .map((l) => domainKey(l.website))
-        .filter((d): d is string => !!d),
-    );
-    const knownEmails = new Set(
-      prior.flatMap((l) => l.emails.map((e) => e.toLowerCase())),
-    );
-    const fresh = outcome.leads.filter((l) => {
-      const d = domainKey(l.website);
-      if (d && knownDomains.has(d)) return false;
-      if (l.emails.some((e) => knownEmails.has(e.toLowerCase()))) return false;
-      return true;
-    });
-    const dropped = outcome.leads.length - fresh.length;
-
-    const { suggestCompanyType } = await import("@/lib/company-type");
-    const leads: Lead[] = fresh.map((l) => ({
-      id: newId("lead"),
+    const db = ctx.db;
+    const run: Run = {
+      id: newId("run"),
       workspaceId: ctx.workspaceId,
-      runId: run.id,
       boardId,
-      company: sanitizeCompanyName(l.company),
-      website: l.website,
-      emails: l.emails,
-      phones: l.phones,
-      contactName: sanitizeContactName(l.contactName),
-      location: l.location,
-      aboutBlurb: l.aboutBlurb,
-      companyType: suggestCompanyType(
-        l.company,
-        l.aboutBlurb,
-        l.location,
-        ...(l.tags ?? []),
-      ),
-      tags: l.tags,
-      fitScore: l.fitScore,
-      fitReasons: l.fitReasons,
-      sourceUrl: l.sourceUrl,
-      status: "new",
-      crmStage: "new",
-      contactMethods: [],
-      contactedByUserId: null,
-      contactedByName: null,
-      notes: null,
-      followUps: [],
-      customFields: {},
-      waitingOnUs: false,
-      demoDone: false,
-      conversationStep: null,
-      conversationStepAt: null,
+      niche: input.niche.trim(),
+      location: input.location?.trim() || null,
+      offerNotes: input.offerNotes?.trim() || null,
+      senderName: input.senderName?.trim() || null,
+      status: "running",
+      mode: "demo",
+      provider: "pending",
+      leadCount: 0,
+      error: null,
       createdAt: nowIso(),
-    }));
-    await db.createLeads(leads);
+      completedAt: null,
+    };
+    await db.createRun(run);
 
-    // Auto-draft only when Search explicitly selected an outreach profile.
-    const shouldDraft = input.autoDraft === true;
-    if (shouldDraft) {
-      const now = nowIso();
-      const aiPersonalize = Boolean(input.aiPersonalize);
-      const draftOverrides = {
-        signOff: input.senderName?.trim() || null,
-        offerNotes: input.offerNotes?.trim() || null,
-        subjectTemplate: input.subjectTemplate?.trim() || null,
-        staticBody: aiPersonalize ? true : input.staticBody !== false,
-        aiPersonalize,
-      };
-      const drafts: Outreach[] = await mapPool(leads, 3, async (lead) => {
-        let { subject, body } = generateDraft(lead, run, draftOverrides);
-        if (aiPersonalize) {
-          const varied = await personalizeDraftForLead({
-            company: lead.company,
-            contactName: lead.contactName,
-            location: lead.location,
-            aboutBlurb: lead.aboutBlurb,
-            website: lead.website,
-            lang: outreachLangFromLocation(lead.location),
+    try {
+      const outcome = await runSearch(searchInput);
+
+      // Cross-run dedupe: skip domains (and emails) already in this workspace.
+      const prior = await db.listLeads();
+      const knownDomains = new Set(
+        prior
+          .map((l) => domainKey(l.website))
+          .filter((d): d is string => !!d),
+      );
+      const knownEmails = new Set(
+        prior.flatMap((l) => l.emails.map((e) => e.toLowerCase())),
+      );
+      const fresh = outcome.leads.filter((l) => {
+        const d = domainKey(l.website);
+        if (d && knownDomains.has(d)) return false;
+        if (l.emails.some((e) => knownEmails.has(e.toLowerCase()))) return false;
+        return true;
+      });
+      const dropped = outcome.leads.length - fresh.length;
+
+      const { suggestCompanyType } = await import("@/lib/company-type");
+      const leads: Lead[] = fresh.map((l) => ({
+        id: newId("lead"),
+        workspaceId: ctx.workspaceId,
+        runId: run.id,
+        boardId,
+        company: sanitizeCompanyName(l.company),
+        website: l.website,
+        emails: l.emails,
+        phones: l.phones,
+        contactName: sanitizeContactName(l.contactName),
+        location: l.location,
+        aboutBlurb: l.aboutBlurb,
+        companyType: suggestCompanyType(
+          l.company,
+          l.aboutBlurb,
+          l.location,
+          ...(l.tags ?? []),
+        ),
+        tags: l.tags,
+        fitScore: l.fitScore,
+        fitReasons: l.fitReasons,
+        sourceUrl: l.sourceUrl,
+        status: "new",
+        crmStage: "new",
+        contactMethods: [],
+        contactedByUserId: null,
+        contactedByName: null,
+        notes: null,
+        followUps: [],
+        customFields: {},
+        waitingOnUs: false,
+        demoDone: false,
+        conversationStep: null,
+        conversationStepAt: null,
+        createdAt: nowIso(),
+      }));
+      await db.createLeads(leads);
+
+      // Auto-draft only when Search explicitly selected an outreach profile.
+      const shouldDraft = input.autoDraft === true;
+      if (shouldDraft) {
+        const now = nowIso();
+        const aiPersonalize = Boolean(input.aiPersonalize);
+        const draftOverrides = {
+          signOff: input.senderName?.trim() || null,
+          offerNotes: input.offerNotes?.trim() || null,
+          subjectTemplate: input.subjectTemplate?.trim() || null,
+          staticBody: aiPersonalize ? true : input.staticBody !== false,
+          aiPersonalize,
+        };
+        const drafts: Outreach[] = await mapPool(leads, 3, async (lead) => {
+          let { subject, body } = generateDraft(lead, run, draftOverrides);
+          if (aiPersonalize) {
+            const varied = await personalizeDraftForLead({
+              company: lead.company,
+              contactName: lead.contactName,
+              location: lead.location,
+              aboutBlurb: lead.aboutBlurb,
+              website: lead.website,
+              lang: outreachLangFromLocation(lead.location),
+              subject,
+              body,
+            });
+            if (varied) {
+              subject = varied.subject;
+              body = varied.body;
+            }
+          }
+          return {
+            id: newId("out"),
+            workspaceId: ctx.workspaceId,
+            leadId: lead.id,
+            runId: run.id,
+            toEmail: lead.emails[0] ?? null,
             subject,
             body,
-          });
-          if (varied) {
-            subject = varied.subject;
-            body = varied.body;
-          }
-        }
-        return {
-          id: newId("out"),
-          workspaceId: ctx.workspaceId,
-          leadId: lead.id,
-          runId: run.id,
-          toEmail: lead.emails[0] ?? null,
-          subject,
-          body,
-          status: "draft" as const,
-          deliveryStatus: "unknown" as const,
-          sentAt: null,
-          error: null,
-          createdAt: now,
-          updatedAt: now,
-        };
+            status: "draft" as const,
+            deliveryStatus: "unknown" as const,
+            sentAt: null,
+            error: null,
+            createdAt: now,
+            updatedAt: now,
+          };
+        });
+        await Promise.all(drafts.map((d) => db.upsertOutreach(d)));
+        await Promise.all(leads.map((l) => db.updateLead(l.id, { status: "queued" })));
+      }
+
+      // Enriched leads consume lead credits (1 credit = 1 lead — business-plan §6).
+      // Demo samples are free / offline — don't burn plan or Insider counters.
+      if (!input.demo) {
+        await recordLeadUsage(ctx, leads.length);
+      }
+
+      const updated = await db.updateRun(run.id, {
+        status: "complete",
+        mode: outcome.mode,
+        provider: outcome.provider,
+        leadCount: leads.length,
+        error:
+          dropped > 0
+            ? `Skipped ${dropped} duplicate domain/email already in workspace`
+            : null,
+        completedAt: nowIso(),
       });
-      await Promise.all(drafts.map((d) => db.upsertOutreach(d)));
-      await Promise.all(leads.map((l) => db.updateLead(l.id, { status: "queued" })));
+      return updated ?? run;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await db.updateRun(run.id, {
+        status: "failed",
+        error: message,
+        completedAt: nowIso(),
+      });
+      // Surface "no provider / use Load demo" as a clean client error, not a
+      // successful 201 with an empty board wiping the previous run.
+      if (err instanceof SearchUnavailableError) throw err;
+      throw err instanceof Error ? err : new Error(message);
     }
-
-    // Enriched leads consume lead credits (1 credit = 1 lead — business-plan §6).
-    // Demo samples are free / offline — don't burn plan or Insider counters.
-    if (!input.demo) {
-      await recordLeadUsage(ctx, leads.length);
-    }
-
-    const updated = await db.updateRun(run.id, {
-      status: "complete",
-      mode: outcome.mode,
-      provider: outcome.provider,
-      leadCount: leads.length,
-      error:
-        dropped > 0
-          ? `Skipped ${dropped} duplicate domain/email already in workspace`
-          : null,
-      completedAt: nowIso(),
-    });
-    return updated ?? run;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    await db.updateRun(run.id, {
-      status: "failed",
-      error: message,
-      completedAt: nowIso(),
-    });
-    // Surface "no provider / use Load demo" as a clean client error, not a
-    // successful 201 with an empty board wiping the previous run.
-    if (err instanceof SearchUnavailableError) throw err;
-    throw err instanceof Error ? err : new Error(message);
+  } finally {
+    await releaseBulkLock(ctx, boardId);
   }
 }
 
@@ -2559,15 +2534,21 @@ export async function deleteLeads(
     list.push(id);
     byDb.set(found.db, list);
   }
-  for (const boardId of boardIds) {
-    await assertBoardEditable(ctx, boardId);
+  const locked: string[] = [];
+  try {
+    for (const boardId of boardIds) {
+      await acquireBulkLock(ctx, boardId, "delete", DELETE_LOCK_TTL_MS);
+      locked.push(boardId);
+    }
+    await cancelRunningImportRuns(ctx);
+    let deleted = 0;
+    for (const [db, chunkIds] of byDb) {
+      deleted += await db.deleteLeads(chunkIds);
+    }
+    return { deleted };
+  } finally {
+    for (const boardId of locked) await releaseBulkLock(ctx, boardId);
   }
-  await cancelRunningImportRuns(ctx);
-  let deleted = 0;
-  for (const [db, chunkIds] of byDb) {
-    deleted += await db.deleteLeads(chunkIds);
-  }
-  return { deleted };
 }
 
 /**
@@ -2580,10 +2561,14 @@ export async function clearBoardLeads(
 ): Promise<{ deleted: number }> {
   const access = await resolveBoardAccess(ctx, boardId);
   if (!access) throw new Error("Board not found");
-  await assertBoardEditable(ctx, boardId);
-  await cancelRunningImportRuns(ctx);
-  const deleted = await access.db.deleteLeadsByBoard(boardId);
-  return { deleted };
+  await acquireBulkLock(ctx, boardId, "delete", DELETE_LOCK_TTL_MS);
+  try {
+    await cancelRunningImportRuns(ctx);
+    const deleted = await access.db.deleteLeadsByBoard(boardId);
+    return { deleted };
+  } finally {
+    await releaseBulkLock(ctx, boardId);
+  }
 }
 
 /** Mark every running import as failed so late chunks stop writing. */
@@ -3056,377 +3041,389 @@ export async function importLeads(
     boardId: opts?.boardId,
     newBoardName: opts?.newBoardName,
   });
-  await assertBoardEditable(ctx, boardId);
-
-  const { normalizeWebsiteUrl } = await import("@/lib/website");
-  const { preferCrmStage } = await import("@/lib/import-crm-stage");
-
-  const cleaned = rows
-    .map((r) => ({
-      company: r.company?.trim()
-        ? sanitizeCompanyName(r.company)
-        : "",
-      website: normalizeWebsiteUrl(r.website) ?? null,
-      emails: sanitizeEmailList(r.emails ?? []),
-      phones: (r.phones ?? []).map((p) => p.trim()).filter(Boolean),
-      contactName: sanitizeContactName(r.contactName?.trim() || null),
-      location: r.location?.trim() || null,
-      companyType: r.companyType?.trim() || null,
-      crmStage: r.crmStage ?? null,
-      contactMethods: (r.contactMethods ?? []).filter(Boolean),
-    }))
-    .filter((r) => r.company.length > 0 || r.emails.length > 0);
-
-  const finalize = opts?.finalize !== false;
-  // Finalize-only ping (empty chunk) after a successful upload — closes stuck "running".
-  if (cleaned.length === 0) {
-    if (!opts?.runId || !finalize) {
-      throw new Error("No usable rows — need at least a company name or email.");
-    }
-    const existing = await db.getRun(opts.runId);
-    if (!existing || existing.workspaceId !== ctx.workspaceId) {
-      throw new Error("Import run not found");
-    }
-    const boardCount = await db.countLeads({ boardId: existing.boardId });
-    const updated = await db.updateRun(existing.id, {
-      status: "complete",
-      leadCount: boardCount,
-      completedAt: nowIso(),
-    });
-    return {
-      imported: 0,
-      merged: 0,
-      skipped: 0,
-      run: updated ?? existing,
-      boardId: existing.boardId,
-      processed: 0,
-    };
-  }
-
-  let run: Run;
-  if (opts?.runId) {
-    const existing = await db.getRun(opts.runId);
-    if (!existing || existing.workspaceId !== ctx.workspaceId) {
-      throw new Error("Import run not found");
-    }
-    if (existing.provider !== "import") {
-      throw new Error("Not an import run");
-    }
-    // User deleted leads mid-import — refuse further chunks.
-    if (existing.status === "failed") {
-      throw new Error(
-        existing.error?.includes("Cancelled")
-          ? "Import cancelled — leads were deleted"
-          : existing.error || "Import was cancelled",
-      );
-    }
-    if (existing.status === "complete" && !finalize) {
-      throw new Error("Import already finished");
-    }
-    run = existing;
-    if (run.status !== "running" && run.status !== "complete") {
-      await db.updateRun(run.id, { status: "running", completedAt: null, error: null });
-    }
-  } else {
-    run = {
-      id: newId("run"),
-      workspaceId: ctx.workspaceId,
-      boardId,
-      niche: "Imported list",
-      location: null,
-      offerNotes: opts?.offerNotes?.trim() || null,
-      senderName: null,
-      status: "running",
-      mode: "live",
-      provider: "import",
-      leadCount: 0,
-      error: null,
-      createdAt: nowIso(),
-      completedAt: null,
-    };
-    await db.createRun(run);
-  }
-
-  const offerNotes = (opts?.offerNotes ?? run.offerNotes)?.trim() || "";
-
+  await acquireBulkLock(ctx, boardId, "import", IMPORT_LOCK_TTL_MS);
+  let importOk = false;
   try {
-    const prior = await db.listLeads();
-    // Name-only within the target board — never silently relocate a lead from
-    // another board (multi-board campaigns share common company names).
-    const byCompany = new Map<string, Lead>();
-    for (const l of prior) {
-      if (l.boardId !== boardId) continue;
-      const ck = companyKey(l.company);
-      if (ck) byCompany.set(ck, l);
+
+    const { normalizeWebsiteUrl } = await import("@/lib/website");
+    const { preferCrmStage } = await import("@/lib/import-crm-stage");
+
+    const cleaned = rows
+      .map((r) => ({
+        company: r.company?.trim()
+          ? sanitizeCompanyName(r.company)
+          : "",
+        website: normalizeWebsiteUrl(r.website) ?? null,
+        emails: sanitizeEmailList(r.emails ?? []),
+        phones: (r.phones ?? []).map((p) => p.trim()).filter(Boolean),
+        contactName: sanitizeContactName(r.contactName?.trim() || null),
+        location: r.location?.trim() || null,
+        companyType: r.companyType?.trim() || null,
+        crmStage: r.crmStage ?? null,
+        contactMethods: (r.contactMethods ?? []).filter(Boolean),
+      }))
+      .filter((r) => r.company.length > 0 || r.emails.length > 0);
+
+    const finalize = opts?.finalize !== false;
+    // Finalize-only ping (empty chunk) after a successful upload — closes stuck "running".
+    if (cleaned.length === 0) {
+      if (!opts?.runId || !finalize) {
+        throw new Error("No usable rows — need at least a company name or email.");
+      }
+      const existing = await db.getRun(opts.runId);
+      if (!existing || existing.workspaceId !== ctx.workspaceId) {
+        throw new Error("Import run not found");
+      }
+      const boardCount = await db.countLeads({ boardId: existing.boardId });
+      const updated = await db.updateRun(existing.id, {
+        status: "complete",
+        leadCount: boardCount,
+        completedAt: nowIso(),
+      });
+      importOk = true;
+      return {
+        imported: 0,
+        merged: 0,
+        skipped: 0,
+        run: updated ?? existing,
+        boardId: existing.boardId,
+        processed: 0,
+      };
     }
 
-    const freshRows: typeof cleaned = [];
-    /** Same-chunk name collisions merge into the first fresh row (no Lead id yet). */
-    const freshByCompany = new Map<string, number>();
-    const mergePatches: Array<{ id: string; patch: Partial<Lead> }> = [];
-    let skipped = 0;
+    let run: Run;
+    if (opts?.runId) {
+      const existing = await db.getRun(opts.runId);
+      if (!existing || existing.workspaceId !== ctx.workspaceId) {
+        throw new Error("Import run not found");
+      }
+      if (existing.provider !== "import") {
+        throw new Error("Not an import run");
+      }
+      // User deleted leads mid-import — refuse further chunks.
+      if (existing.status === "failed") {
+        throw new Error(
+          existing.error?.includes("Cancelled")
+            ? "Import cancelled — leads were deleted"
+            : existing.error || "Import was cancelled",
+        );
+      }
+      if (existing.status === "complete" && !finalize) {
+        throw new Error("Import already finished");
+      }
+      run = existing;
+      if (run.status !== "running" && run.status !== "complete") {
+        await db.updateRun(run.id, { status: "running", completedAt: null, error: null });
+      }
+    } else {
+      run = {
+        id: newId("run"),
+        workspaceId: ctx.workspaceId,
+        boardId,
+        niche: "Imported list",
+        location: null,
+        offerNotes: opts?.offerNotes?.trim() || null,
+        senderName: null,
+        status: "running",
+        mode: "live",
+        provider: "import",
+        leadCount: 0,
+        error: null,
+        createdAt: nowIso(),
+        completedAt: null,
+      };
+      await db.createRun(run);
+    }
 
-    for (const r of cleaned) {
-      const ck = companyKey(r.company);
-      const match = ck ? byCompany.get(ck) ?? null : null;
+    const offerNotes = (opts?.offerNotes ?? run.offerNotes)?.trim() || "";
 
-      if (!match) {
-        if (ck && freshByCompany.has(ck)) {
-          const idx = freshByCompany.get(ck)!;
-          const prev = freshRows[idx]!;
-          let changed = false;
-          if ((!prev.website || /\[object\s+Object\]/i.test(prev.website)) && r.website) {
-            prev.website = r.website;
-            changed = true;
-          }
-          if (!prev.location && r.location) {
-            prev.location = r.location;
-            changed = true;
-          } else if (
-            r.location &&
-            prev.location &&
-            r.location.length > prev.location.length
-          ) {
-            prev.location = r.location;
-            changed = true;
-          }
-          if (r.phones.length && prev.phones.length === 0) {
-            prev.phones = r.phones;
-            changed = true;
-          }
-          if (r.emails.length) {
-            const mergedEmails = [...new Set([...prev.emails, ...r.emails])];
-            if (mergedEmails.length > prev.emails.length) {
-              prev.emails = mergedEmails;
+    try {
+      const prior = await db.listLeads();
+      // Name-only within the target board — never silently relocate a lead from
+      // another board (multi-board campaigns share common company names).
+      const byCompany = new Map<string, Lead>();
+      for (const l of prior) {
+        if (l.boardId !== boardId) continue;
+        const ck = companyKey(l.company);
+        if (ck) byCompany.set(ck, l);
+      }
+
+      const freshRows: typeof cleaned = [];
+      /** Same-chunk name collisions merge into the first fresh row (no Lead id yet). */
+      const freshByCompany = new Map<string, number>();
+      const mergePatches: Array<{ id: string; patch: Partial<Lead> }> = [];
+      let skipped = 0;
+
+      for (const r of cleaned) {
+        const ck = companyKey(r.company);
+        const match = ck ? byCompany.get(ck) ?? null : null;
+
+        if (!match) {
+          if (ck && freshByCompany.has(ck)) {
+            const idx = freshByCompany.get(ck)!;
+            const prev = freshRows[idx]!;
+            let changed = false;
+            if ((!prev.website || /\[object\s+Object\]/i.test(prev.website)) && r.website) {
+              prev.website = r.website;
               changed = true;
             }
-          }
-          if (!prev.companyType && r.companyType) {
-            prev.companyType = r.companyType;
-            changed = true;
-          }
-          if (!prev.contactName && r.contactName) {
-            prev.contactName = r.contactName;
-            changed = true;
-          }
-          if (r.crmStage) {
-            const nextStage = preferCrmStage(prev.crmStage ?? "new", r.crmStage);
-            if (nextStage !== (prev.crmStage ?? "new")) {
-              prev.crmStage = nextStage;
+            if (!prev.location && r.location) {
+              prev.location = r.location;
               changed = true;
+            } else if (
+              r.location &&
+              prev.location &&
+              r.location.length > prev.location.length
+            ) {
+              prev.location = r.location;
+              changed = true;
+            }
+            if (r.phones.length && prev.phones.length === 0) {
+              prev.phones = r.phones;
+              changed = true;
+            }
+            if (r.emails.length) {
+              const mergedEmails = [...new Set([...prev.emails, ...r.emails])];
+              if (mergedEmails.length > prev.emails.length) {
+                prev.emails = mergedEmails;
+                changed = true;
+              }
+            }
+            if (!prev.companyType && r.companyType) {
+              prev.companyType = r.companyType;
+              changed = true;
+            }
+            if (!prev.contactName && r.contactName) {
+              prev.contactName = r.contactName;
+              changed = true;
+            }
+            if (r.crmStage) {
+              const nextStage = preferCrmStage(prev.crmStage ?? "new", r.crmStage);
+              if (nextStage !== (prev.crmStage ?? "new")) {
+                prev.crmStage = nextStage;
+                changed = true;
+              }
+              if (
+                r.contactMethods.length > 0 &&
+                (prev.contactMethods?.length ?? 0) === 0
+              ) {
+                prev.contactMethods = r.contactMethods;
+                changed = true;
+              }
             }
             if (
-              r.contactMethods.length > 0 &&
-              (prev.contactMethods?.length ?? 0) === 0
+              r.company.trim() &&
+              prev.company.length < r.company.trim().length
             ) {
-              prev.contactMethods = r.contactMethods;
+              prev.company = r.company.trim();
               changed = true;
             }
+            if (!changed) skipped++;
+            continue;
           }
-          if (
-            r.company.trim() &&
-            prev.company.length < r.company.trim().length
-          ) {
-            prev.company = r.company.trim();
-            changed = true;
-          }
-          if (!changed) skipped++;
+          freshRows.push(r);
+          if (ck) freshByCompany.set(ck, freshRows.length - 1);
           continue;
         }
-        freshRows.push(r);
-        if (ck) freshByCompany.set(ck, freshRows.length - 1);
-        continue;
-      }
 
-      const patch: Partial<Lead> = {};
-      if (match.runId !== run.id) patch.runId = run.id;
-      if ((!match.website || /\[object\s+Object\]/i.test(match.website)) && r.website) {
-        patch.website = r.website;
-      }
-      if (!match.location && r.location) patch.location = r.location;
-      if (r.location && match.location && r.location.length > match.location.length) {
-        patch.location = r.location;
-      }
-      if (r.phones.length && match.phones.length === 0) patch.phones = r.phones;
-      if (r.emails.length) {
-        const mergedEmails = [
-          ...new Set([...match.emails.map((e) => e.toLowerCase()), ...r.emails]),
-        ];
-        if (mergedEmails.length > match.emails.length) patch.emails = mergedEmails;
-      }
-      if (!match.companyType && r.companyType) patch.companyType = r.companyType;
-      if (!match.contactName && r.contactName) patch.contactName = r.contactName;
-      if (r.crmStage) {
-        const nextStage = preferCrmStage(match.crmStage ?? "new", r.crmStage);
-        if (nextStage !== (match.crmStage ?? "new")) {
-          patch.crmStage = nextStage;
+        const patch: Partial<Lead> = {};
+        if (match.runId !== run.id) patch.runId = run.id;
+        if ((!match.website || /\[object\s+Object\]/i.test(match.website)) && r.website) {
+          patch.website = r.website;
+        }
+        if (!match.location && r.location) patch.location = r.location;
+        if (r.location && match.location && r.location.length > match.location.length) {
+          patch.location = r.location;
+        }
+        if (r.phones.length && match.phones.length === 0) patch.phones = r.phones;
+        if (r.emails.length) {
+          const mergedEmails = [
+            ...new Set([...match.emails.map((e) => e.toLowerCase()), ...r.emails]),
+          ];
+          if (mergedEmails.length > match.emails.length) patch.emails = mergedEmails;
+        }
+        if (!match.companyType && r.companyType) patch.companyType = r.companyType;
+        if (!match.contactName && r.contactName) patch.contactName = r.contactName;
+        if (r.crmStage) {
+          const nextStage = preferCrmStage(match.crmStage ?? "new", r.crmStage);
+          if (nextStage !== (match.crmStage ?? "new")) {
+            patch.crmStage = nextStage;
+          }
+          if (
+            r.contactMethods.length > 0 &&
+            (match.contactMethods?.length ?? 0) === 0
+          ) {
+            patch.contactMethods = r.contactMethods;
+          }
         }
         if (
-          r.contactMethods.length > 0 &&
-          (match.contactMethods?.length ?? 0) === 0
+          r.company.trim() &&
+          (match.company === "Unknown company" ||
+            match.company.length < r.company.trim().length)
         ) {
-          patch.contactMethods = r.contactMethods;
+          patch.company = r.company.trim();
+        }
+        if (Object.keys(patch).length > 0) {
+          mergePatches.push({ id: match.id, patch });
+          // Keep in-memory map current for later rows in this chunk.
+          const next = { ...match, ...patch };
+          const nextKey = companyKey(next.company) ?? ck;
+          if (nextKey) byCompany.set(nextKey, next);
+        } else {
+          skipped++;
         }
       }
-      if (
-        r.company.trim() &&
-        (match.company === "Unknown company" ||
-          match.company.length < r.company.trim().length)
-      ) {
-        patch.company = r.company.trim();
-      }
-      if (Object.keys(patch).length > 0) {
-        mergePatches.push({ id: match.id, patch });
-        // Keep in-memory map current for later rows in this chunk.
-        const next = { ...match, ...patch };
-        const nextKey = companyKey(next.company) ?? ck;
-        if (nextKey) byCompany.set(nextKey, next);
-      } else {
-        skipped++;
-      }
-    }
 
-    const merged =
-      mergePatches.length > 0 ? await db.updateLeads(mergePatches) : 0;
+      const merged =
+        mergePatches.length > 0 ? await db.updateLeads(mergePatches) : 0;
 
-    if (ctx.metered && freshRows.length > 0) {
-      const freshWs = ws ? await db.getWorkspace(ctx.workspaceId) : null;
-      if (freshWs) {
-        const plan = getPlan(freshWs.planId);
-        const used = freshWs.leadsUsedThisMonth;
-        const remaining =
-          freshWs.planId === "insider"
-            ? // Imports use plain fetch (no Firecrawl) — do not gate on FC credits.
-              Number.POSITIVE_INFINITY
-            : Math.max(0, plan.leadCreditsPerMonth - used);
-        if (freshRows.length > remaining) {
-          throw new QuotaError({
-            kind: "leads",
-            planId: freshWs.planId,
-            limit: used + remaining,
-            used,
-            message: `Import would use ${freshRows.length} leads but only ${remaining} remain.`,
-          });
+      if (ctx.metered && freshRows.length > 0) {
+        const freshWs = ws ? await db.getWorkspace(ctx.workspaceId) : null;
+        if (freshWs) {
+          const plan = getPlan(freshWs.planId);
+          const used = freshWs.leadsUsedThisMonth;
+          const remaining =
+            freshWs.planId === "insider"
+              ? // Imports use plain fetch (no Firecrawl) — do not gate on FC credits.
+                Number.POSITIVE_INFINITY
+              : Math.max(0, plan.leadCreditsPerMonth - used);
+          if (freshRows.length > remaining) {
+            throw new QuotaError({
+              kind: "leads",
+              planId: freshWs.planId,
+              limit: used + remaining,
+              used,
+              message: `Import would use ${freshRows.length} leads but only ${remaining} remain.`,
+            });
+          }
         }
       }
-    }
 
-    // Spreadsheet-only: no per-row website fetch / AI pitch-fit. Those made
-    // multi-thousand imports crawl (HTTP × concurrency 3). Fit score uses
-    // columns already on the row; users can enrich later from the drawer.
-    const { suggestCompanyType } = await import("@/lib/company-type");
-    const leads: Lead[] = freshRows.map((r) => {
-      const fromEmail = r.emails[0] ?? null;
-      const rawCompany =
-        r.company.trim() ||
-        companyGuessFromEmail(fromEmail) ||
-        "Unknown company";
-      const company = sanitizeCompanyName(
-        rawCompany.replace(/^./, (c) => c.toUpperCase()),
-      );
-      // Never invent https://gmail.com (etc.) from a free-mail inbox.
-      const website = r.website || websiteFromEmail(fromEmail);
-      const location = r.location;
-      const phones = r.phones;
-      const aboutBlurb: string | null = null;
+      // Spreadsheet-only: no per-row website fetch / AI pitch-fit. Those made
+      // multi-thousand imports crawl (HTTP × concurrency 3). Fit score uses
+      // columns already on the row; users can enrich later from the drawer.
+      const { suggestCompanyType } = await import("@/lib/company-type");
+      const leads: Lead[] = freshRows.map((r) => {
+        const fromEmail = r.emails[0] ?? null;
+        const rawCompany =
+          r.company.trim() ||
+          companyGuessFromEmail(fromEmail) ||
+          "Unknown company";
+        const company = sanitizeCompanyName(
+          rawCompany.replace(/^./, (c) => c.toUpperCase()),
+        );
+        // Never invent https://gmail.com (etc.) from a free-mail inbox.
+        const website = r.website || websiteFromEmail(fromEmail);
+        const location = r.location;
+        const phones = r.phones;
+        const aboutBlurb: string | null = null;
 
-      const companyType =
-        r.companyType ||
-        suggestCompanyType(company, aboutBlurb, r.location) ||
-        null;
+        const companyType =
+          r.companyType ||
+          suggestCompanyType(company, aboutBlurb, r.location) ||
+          null;
 
-      const scored = scoreImportedLead(
-        {
+        const scored = scoreImportedLead(
+          {
+            company,
+            website,
+            emails: r.emails,
+            phones,
+            aboutBlurb,
+            location,
+            tags: ["imported"],
+            contactName: r.contactName,
+            companyType,
+          },
+          offerNotes || null,
+        );
+
+        importOk = true;
+        return {
+          id: newId("lead"),
+          workspaceId: ctx.workspaceId,
+          runId: run.id,
+          boardId,
           company,
           website,
           emails: r.emails,
           phones,
-          aboutBlurb,
-          location,
-          tags: ["imported"],
           contactName: r.contactName,
+          location,
+          aboutBlurb,
           companyType,
-        },
-        offerNotes || null,
-      );
+          tags: ["imported"],
+          fitScore: scored.score,
+          fitReasons: scored.reasons,
+          sourceUrl: website || "import",
+          status: "new" as const,
+          crmStage: r.crmStage ?? ("new" as const),
+          contactMethods: r.contactMethods ?? [],
+          contactedByUserId: null,
+          contactedByName: null,
+          notes: null,
+          followUps: [],
+          customFields: {},
+          waitingOnUs: false,
+          demoDone: false,
+          conversationStep: null,
+          conversationStepAt: null,
+          createdAt: nowIso(),
+        };
+      });
 
+      if (leads.length > 0) await db.createLeads(leads);
+      if (leads.length > 0) await recordLeadUsage(ctx, leads.length);
+
+      // COUNT(*) — avoid reloading every lead row on each chunk.
+      const boardCount = await db.countLeads({ boardId });
+      const parts: string[] = [];
+      if (merged > 0) {
+        parts.push(`updated ${merged} already in workspace (same company name)`);
+      }
+      if (skipped > 0) {
+        parts.push(
+          `${skipped} already in workspace — no new fields (same company name)`,
+        );
+      }
+
+      const updated = finalize
+        ? await db.updateRun(run.id, {
+            status: "complete",
+            leadCount: boardCount,
+            error: parts.length ? parts.join(" · ") : null,
+            completedAt: nowIso(),
+          })
+        : await db.updateRun(run.id, {
+            status: "running",
+            leadCount: boardCount,
+            error: parts.length ? parts.join(" · ") : null,
+          });
+
+      importOk = true;
       return {
-        id: newId("lead"),
-        workspaceId: ctx.workspaceId,
-        runId: run.id,
+        imported: leads.length,
+        merged,
+        skipped,
+        run: updated ?? run,
         boardId,
-        company,
-        website,
-        emails: r.emails,
-        phones,
-        contactName: r.contactName,
-        location,
-        aboutBlurb,
-        companyType,
-        tags: ["imported"],
-        fitScore: scored.score,
-        fitReasons: scored.reasons,
-        sourceUrl: website || "import",
-        status: "new" as const,
-        crmStage: r.crmStage ?? ("new" as const),
-        contactMethods: r.contactMethods ?? [],
-        contactedByUserId: null,
-        contactedByName: null,
-        notes: null,
-        followUps: [],
-        customFields: {},
-        waitingOnUs: false,
-        demoDone: false,
-        conversationStep: null,
-        conversationStepAt: null,
-        createdAt: nowIso(),
+        processed: cleaned.length,
       };
-    });
-
-    if (leads.length > 0) await db.createLeads(leads);
-    if (leads.length > 0) await recordLeadUsage(ctx, leads.length);
-
-    // COUNT(*) — avoid reloading every lead row on each chunk.
-    const boardCount = await db.countLeads({ boardId });
-    const parts: string[] = [];
-    if (merged > 0) {
-      parts.push(`updated ${merged} already in workspace (same company name)`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await db.updateRun(run.id, {
+        status: "failed",
+        error: message,
+        completedAt: nowIso(),
+      });
+      throw err instanceof Error ? err : new Error(message);
     }
-    if (skipped > 0) {
-      parts.push(
-        `${skipped} already in workspace — no new fields (same company name)`,
-      );
+  } finally {
+    // Chunked uploads keep the lock between chunks; drop it on the last
+    // chunk or on any error (TTL is the fallback if the client vanishes).
+    if (!importOk || opts?.finalize !== false) {
+      await releaseBulkLock(ctx, boardId);
     }
-
-    const updated = finalize
-      ? await db.updateRun(run.id, {
-          status: "complete",
-          leadCount: boardCount,
-          error: parts.length ? parts.join(" · ") : null,
-          completedAt: nowIso(),
-        })
-      : await db.updateRun(run.id, {
-          status: "running",
-          leadCount: boardCount,
-          error: parts.length ? parts.join(" · ") : null,
-        });
-
-    return {
-      imported: leads.length,
-      merged,
-      skipped,
-      run: updated ?? run,
-      boardId,
-      processed: cleaned.length,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    await db.updateRun(run.id, {
-      status: "failed",
-      error: message,
-      completedAt: nowIso(),
-    });
-    throw err instanceof Error ? err : new Error(message);
   }
 }
 

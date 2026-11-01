@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { deleteContact, updateContact } from "@/lib/service";
-import { isBoardLockedError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,9 +55,6 @@ export async function PATCH(
     }
     return NextResponse.json({ contact });
   } catch (err) {
-    if (isBoardLockedError(err)) {
-      return NextResponse.json({ error: err.message }, { status: 423 });
-    }
     const message = err instanceof Error ? err.message : "Could not update contact";
     return NextResponse.json({ error: message }, { status: 400 });
   }
@@ -77,9 +73,6 @@ export async function DELETE(
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    if (isBoardLockedError(err)) {
-      return NextResponse.json({ error: err.message }, { status: 423 });
-    }
     throw err;
   }
 }

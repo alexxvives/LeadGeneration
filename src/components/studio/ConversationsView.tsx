@@ -17,7 +17,6 @@ import { ConversationStepBadge } from "@/components/studio/ConversationStepBadge
 import { EmptyState } from "@/components/studio/StudioHelpers";
 import { MarqueeText } from "@/components/studio/MarqueeText";
 import { AuthorAvatar } from "@/components/studio/JournalEntries";
-import { useBoardLockUi } from "@/components/studio/board-lock";
 
 function recentComments(
   followUps: FollowUp[] | undefined,
@@ -52,7 +51,6 @@ export function ConversationsView({
   onOpen: (id: string) => void;
   onCompleteTask?: (leadId: string) => void;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
 
   const rows = [...leads]
     .filter((l) => (l.crmStage ?? "new") === "in_conversation")
@@ -186,8 +184,8 @@ export function ConversationsView({
                   <button
                     type="button"
                     onClick={() => onCompleteTask?.(lead.id)}
-                    disabled={editLocked || !onCompleteTask}
-                    title={editLocked ? lockHint : "Mark task done"}
+                    disabled={!onCompleteTask}
+                    title="Mark task done"
                     aria-label="Mark task done"
                     className="inline-flex items-center rounded-full bg-aurora-400/20 px-2 py-0.5 text-[10px] font-medium text-aurora-200 ring-1 ring-aurora-400/35 hover:bg-aurora-400/30 disabled:opacity-50"
                   >

@@ -35,7 +35,6 @@ import {
 import { AuthorAvatar } from "@/components/studio/JournalEntries";
 import { EmptyState } from "@/components/studio/StudioHelpers";
 import { DatePicker } from "@/components/ui/DatePicker";
-import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 import { TrashIcon } from "@/components/icons";
 
 type TaskFilter = "all" | "mine" | "open" | "overdue";
@@ -127,7 +126,6 @@ function TaskCardFace({
   onOpen: () => void;
   onDelete: () => void;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const deadline = formatTaskDeadline(task.deadline);
   const completed = task.status === "completed";
   const softOverdue =
@@ -141,11 +139,9 @@ function TaskCardFace({
         completed ? "opacity-80" : ""
       }`}
     >
-      <Lockable>
         <button
           type="button"
-          disabled={editLocked}
-          title={editLocked ? lockHint : "Delete task"}
+          title="Delete task"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -156,7 +152,6 @@ function TaskCardFace({
         >
           <TrashIcon className="h-4 w-4" />
         </button>
-      </Lockable>
       <button
         type="button"
         onClick={onOpen}
@@ -202,23 +197,16 @@ function DraggableTaskCard({
   onDelete: () => void;
   isDragging: boolean;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const { attributes, listeners, setNodeRef } = useDraggable({
     id: task.id,
-    disabled: editLocked,
   });
 
   return (
     <div
       ref={setNodeRef}
       {...attributes}
-      {...(editLocked ? {} : listeners)}
-      title={editLocked ? lockHint : undefined}
-      className={`${
-        editLocked
-          ? "cursor-not-allowed"
-          : "cursor-grab touch-pan-y active:cursor-grabbing"
-      } ${isDragging ? "opacity-30" : ""}`}
+      {...listeners}
+      className={`cursor-grab touch-pan-y active:cursor-grabbing ${isDragging ? "opacity-30" : ""}`}
     >
       <TaskCardFace task={task} onOpen={onOpen} onDelete={onDelete} />
     </div>
@@ -293,7 +281,6 @@ function TaskEditSheet({
   }) => Promise<void>;
   onDelete?: () => void;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   const [title, setTitle] = useState("");
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [deadline, setDeadline] = useState<string | null>(null);
@@ -360,7 +347,7 @@ function TaskEditSheet({
           className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
           onSubmit={(e) => {
             e.preventDefault();
-            if (editLocked || !title.trim()) return;
+            if (!title.trim()) return;
             setBusy(true);
             void onSave({
               title: title.trim(),
@@ -433,22 +420,19 @@ function TaskEditSheet({
           </div>
           <div className="mt-auto flex flex-wrap gap-2 border-t border-white/10 pt-4">
             {task?.id && onDelete ? (
-              <Lockable>
                 <button
                   type="button"
-                  disabled={editLocked || busy}
-                  title={editLocked ? lockHint : "Delete task"}
+                  disabled={busy}
+                  title="Delete task"
                   onClick={onDelete}
                   className="rounded-full border border-rose-400/30 px-4 py-2 text-sm text-rose-300 hover:bg-rose-400/10 disabled:opacity-50"
                 >
                   Delete
                 </button>
-              </Lockable>
             ) : null}
             <button
               type="submit"
-              disabled={editLocked || busy || !title.trim()}
-              title={editLocked ? lockHint : undefined}
+              disabled={busy || !title.trim()}
               className="ml-auto rounded-full bg-aurora-400 px-6 py-2 text-sm font-medium text-on-accent disabled:opacity-50"
             >
               Save
@@ -491,7 +475,6 @@ export function TasksView({
   addOpenSignal?: boolean;
   onAddOpenConsumed?: () => void;
 }) {
-  const { locked: editLocked } = useBoardLockUi();
   const [filter, setFilter] = useState<TaskFilter>("all");
   const [mobileStatus, setMobileStatus] = useState<TaskStatus>("todo");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -641,7 +624,6 @@ export function TasksView({
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    if (editLocked) return;
     dragStartedRef.current = true;
     setActiveId(String(event.active.id));
   };
@@ -651,7 +633,6 @@ export function TasksView({
     window.setTimeout(() => {
       dragStartedRef.current = false;
     }, 0);
-    if (editLocked) return;
     const { active, over } = event;
     if (!over) return;
     const task = tasks.find((t) => t.id === active.id);
@@ -698,12 +679,10 @@ export function TasksView({
             {filtered.length === 0
               ? "No matches"
               : `${filtered.length} task${filtered.length === 1 ? "" : "s"}`}
-            {editLocked ? null : (
               <span className="hidden lg:inline text-mist-500">
                 {" "}
                 · drag to change status
               </span>
-            )}
           </p>
         </div>
       ) : null}

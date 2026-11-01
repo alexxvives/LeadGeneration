@@ -29,7 +29,6 @@ import { MailCheckIcon } from "@/components/lucide-animated/mail-check";
 import { PhoneIcon as AnimatedPhoneIcon } from "@/components/lucide-animated/phone";
 import { PhoneMissedIcon } from "@/components/lucide-animated/phone-missed";
 import { useIconMotion } from "@/components/lucide-animated/hover";
-import { Lockable, useBoardLockUi } from "@/components/studio/board-lock";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
@@ -887,7 +886,6 @@ function DayGroup({
   onToggleFollowUp?: (ev: CalendarEvent, done: boolean) => void;
   onToggleTask?: (ev: CalendarEvent, done: boolean) => void;
 }) {
-  const { locked: editLocked, hint: lockHint } = useBoardLockUi();
   if (events.length === 0) return null;
   const missed = missedCallCount(events);
   return (
@@ -912,23 +910,17 @@ function DayGroup({
               }`}
             >
               {onToggleTask && ev.kind === "task" ? (
-                <Lockable>
                   <button
                     type="button"
-                    disabled={editLocked}
                     onClick={() => onToggleTask(ev, !ev.done)}
                     aria-pressed={ev.done}
                     aria-label={
-                      editLocked
-                        ? lockHint
-                        : ev.done
+                      ev.done
                           ? "Reopen task"
                           : "Complete task"
                     }
                     title={
-                      editLocked
-                        ? lockHint
-                        : ev.done
+                      ev.done
                           ? "Reopen task"
                           : "Complete task"
                     }
@@ -940,25 +932,18 @@ function DayGroup({
                   >
                     {ev.done ? <CheckIcon className="h-3 w-3" /> : null}
                   </button>
-                </Lockable>
               ) : onToggleFollowUp && ev.kind === "follow_up" ? (
-                <Lockable>
                   <button
                     type="button"
-                    disabled={editLocked}
                     onClick={() => onToggleFollowUp(ev, !ev.done)}
                     aria-pressed={ev.done}
                     aria-label={
-                      editLocked
-                        ? lockHint
-                        : ev.done
+                      ev.done
                           ? "Mark follow-up not done"
                           : "Mark follow-up done"
                     }
                     title={
-                      editLocked
-                        ? lockHint
-                        : ev.done
+                      ev.done
                           ? "Mark follow-up not done"
                           : "Mark follow-up done"
                     }
@@ -970,7 +955,6 @@ function DayGroup({
                   >
                     {ev.done ? <CheckIcon className="h-3 w-3" /> : null}
                   </button>
-                </Lockable>
               ) : (
                 <span
                   className={`mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${

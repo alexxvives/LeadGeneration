@@ -612,6 +612,17 @@ export class JsonStore implements LeadRepository {
     });
   }
 
+  tryAcquireBoardLock(lock: BoardLock, nowIso: string): Promise<BoardLock | null> {
+    return this.mutate((data) => {
+      data.boardLocks = data.boardLocks.filter((l) => l.expiresAt > nowIso);
+      const held = data.boardLocks.find((l) => l.boardId === lock.boardId);
+      if (held && held.userId !== lock.userId) return { data, result: held };
+      data.boardLocks = data.boardLocks.filter((l) => l.boardId !== lock.boardId);
+      data.boardLocks.push(lock);
+      return { data, result: null };
+    });
+  }
+
   clearBoardLock(boardId: string, userId?: string): Promise<boolean> {
     return this.mutate((data) => {
       const before = data.boardLocks.length;
