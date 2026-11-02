@@ -1,4 +1,5 @@
 import type { LeadRepository } from "@/lib/db";
+import { outreachToAfterLeadEmailEdit } from "./outreach-recipient";
 import { newId, nowIso } from "@/lib/id";
 import {
   FOLLOW_UP_PLAN,
@@ -3034,11 +3035,33 @@ async function applyLeadCrmPatch(
     ),
   );
 
-  return db.updateLeadIfVersion(
+  const saved = await db.updateLeadIfVersion(
     leadId,
     { ...next, updatedByName: ctx.userName?.trim() || ctx.userEmail?.trim() || null },
     expectedVersion,
   );
+  // Removing an email must also drop it from the unsent draft's To — the
+  // outreach queue / send path read outreach.to_email first, so a stale To
+  // kept removed addresses in the queue (and sendable).
+  if (saved && patch.emails !== undefined) {
+    const outreach = await db.getOutreachByLead(leadId);
+    if (outreach) {
+      const nextTo = outreachToAfterLeadEmailEdit(
+        outreach.toEmail,
+        outreach.status,
+        lead.emails,
+        saved.emails,
+      );
+      if (nextTo !== undefined) {
+        const updated = await db.updateOutreach(outreach.id, {
+          toEmail: nextTo,
+          updatedAt: nowIso(),
+        });
+        return { ...saved, outreach: updated ?? { ...outreach, toEmail: nextTo } } as Lead;
+      }
+    }
+  }
+  return saved;
 }
 
 /**

@@ -250,5 +250,14 @@ export function mergeMutationIntoCached(
   if (serverLead.followUps) {
     incoming.followUps = serverLead.followUps;
   }
-  return mergeSlimIntoCached(prev, incoming, { writeAt });
+  const merged = mergeSlimIntoCached(prev, incoming, { writeAt });
+  // Server synced the draft's To after an email edit — take it verbatim.
+  const syncedOutreach = (serverLead as Partial<LeadWithOutreach>).outreach;
+  if (syncedOutreach && merged.outreach) {
+    return {
+      ...merged,
+      outreach: { ...merged.outreach, toEmail: syncedOutreach.toEmail, updatedAt: syncedOutreach.updatedAt },
+    };
+  }
+  return merged;
 }
