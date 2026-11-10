@@ -3454,28 +3454,9 @@ export async function importLeads(
       const merged =
         mergePatches.length > 0 ? await db.updateLeads(mergePatches) : 0;
 
-      if (ctx.metered && freshRows.length > 0) {
-        const freshWs = ws ? await db.getWorkspace(ctx.workspaceId) : null;
-        if (freshWs) {
-          const plan = getPlan(freshWs.planId);
-          const used = freshWs.leadsUsedThisMonth;
-          const remaining =
-            freshWs.planId === "insider"
-              ? // Imports use plain fetch (no Firecrawl) — do not gate on FC credits.
-                Number.POSITIVE_INFINITY
-              : Math.max(0, plan.leadCreditsPerMonth - used);
-          if (freshRows.length > remaining) {
-            throw new QuotaError({
-              kind: "leads",
-              planId: freshWs.planId,
-              limit: used + remaining,
-              used,
-              message: `Import would use ${freshRows.length} leads but only ${remaining} remain.`,
-            });
-          }
-        }
-      }
-
+      // Spreadsheet import is not enrichment (no Firecrawl). Monthly lead
+      // credits gate Find leads / search, not a CSV the user already has.
+    
       // Spreadsheet-only: no per-row website fetch / AI pitch-fit. Those made
       // multi-thousand imports crawl (HTTP × concurrency 3). Fit score uses
       // columns already on the row; users can enrich later from the drawer.
@@ -3550,7 +3531,6 @@ export async function importLeads(
       });
 
       if (leads.length > 0) await db.createLeads(leads);
-      if (leads.length > 0) await recordLeadUsage(ctx, leads.length);
 
       // COUNT(*) — avoid reloading every lead row on each chunk.
       const boardCount = await db.countLeads({ boardId });
