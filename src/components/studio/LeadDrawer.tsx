@@ -28,7 +28,6 @@ import {
   collapseEmailSentFollowUps,
   emailSentFollowUpId,
   followUpIsDone,
-  hasEmailSentOn,
   isEmailSentNote,
   mergeFollowUpLists,
   inferFollowUpKind,
@@ -43,6 +42,7 @@ import {
   todayIsoDate,
   withFollowUpAuthor,
 } from "@/lib/follow-ups";
+import { ensureEmailSentHistory } from "@/lib/email-sent-history";
 import { normalizePitchHtml } from "@/lib/outreach/rich-text";
 import { PitchEditor } from "@/components/studio/PitchEditor";
 import { Bone, LeadDrawerPendingSkeleton } from "@/components/studio/skeletons";
@@ -425,32 +425,25 @@ export function LeadDrawer(props: DrawerProps) {
       existing,
       lead.contactedByName,
     );
-    if (hasEmailSentOn(collapsed, sentDay)) {
-      if (collapsed.length !== existing.length) {
-        setFollowUps(collapsed);
-        void props.onUpdateCrm(lead.id, { followUps: collapsed });
-      }
-      return;
-    }
-    const actor = lead.contactedByName?.trim();
-    const inserted: FollowUp = withFollowUpAuthor(
-      {
-        id: emailSentFollowUpId(lead.id, sentDay),
-        date: sentDay,
-        note: "Email sent",
-        done: true,
-        kind: "email",
-      },
-      actor ?? actorName,
-    );
-    const updated = collapseEmailSentFollowUps(
-      [inserted, ...collapsed],
-      lead.contactedByName,
-    );
+    const actor = lead.contactedByName?.trim() ?? actorName;
+    const to = outreach.toEmail?.trim() ?? lead.emails.find((e) => e.trim())?.trim() ?? "";
+    const updated = to
+      ? ensureEmailSentHistory(collapsed, {
+          leadId: lead.id,
+          date: sentDay,
+          to,
+          subject: outreach.subject,
+          actorName: actor,
+        })
+      : collapsed;
+    const changed =
+      updated.length !== existing.length ||
+      updated.some((f, i) => f.note !== (existing[i]?.note ?? "") || f.id !== existing[i]?.id);
+    if (!changed) return;
     setFollowUps(updated);
     void props.onUpdateCrm(lead.id, { followUps: updated });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot heal per lead/sent day
-  }, [lead.id, outreach?.status, outreach?.sentAt, lead.detailLoaded]);
+  }, [lead.id, outreach?.status, outreach?.sentAt, outreach?.toEmail, outreach?.subject, lead.detailLoaded]);
 
   useEffect(() => {
     if (!showAddNote) return;
@@ -667,7 +660,8 @@ export function LeadDrawer(props: DrawerProps) {
     } else if (callMode === "call" && !text) {
       text = phoneCallNotePrefix(actorName).trim();
     } else if (callMode === "email" && !text) {
-      text = emailSentNotePrefix(actorName).trim();
+      const to = (lead.emails.find((e) => e.trim()) ?? outreach?.toEmail ?? "").trim();
+      text = to ? `Email sent to ${to}` : emailSentNotePrefix(actorName).trim();
     }
     if (callMode === "email") text = normalizeEmailSentNote(text);
     if (!newNoteDate || !text) return;

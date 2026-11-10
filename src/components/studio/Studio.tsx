@@ -2635,7 +2635,7 @@ export function Studio() {
             ) : null}
             {view === "leads" && hasLeads ? (
               <span className="inline-flex">
-                <ExportButton />
+                <ExportButton boardId={filterBoardId} />
               </span>
             ) : null}
             {editLocked ? <BulkActivityChip holder={lockHolder} kind={lockKind} /> : null}
@@ -2968,7 +2968,7 @@ export function Studio() {
               stage={pipelineFilter}
               onStage={setPipelineFilter}
             />
-            {hasLeads ? <ExportButton compact /> : null}
+            {hasLeads ? <ExportButton compact boardId={filterBoardId} /> : null}
             {board ? (
               <>
                 <button

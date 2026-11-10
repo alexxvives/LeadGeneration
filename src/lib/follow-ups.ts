@@ -571,30 +571,36 @@ export function emailSentFollowUpId(leadId: string, date: string): string {
 }
 
 /**
- * Bare “Email sent” (or a slim board row whose body was stripped) on this day.
- * A line with extra detail (“Email sent: pricing”) is kept.
+ * Day this row is the automatic send line (bare, slim shell, or "Email sent to …").
+ * Custom "Email sent: pricing" counts too so we don't keep a bare duplicate beside it.
  */
-function bareEmailSentDate(f: FollowUp): string | null {
+function emailSentDate(f: FollowUp): string | null {
   const note = f.note.trim();
-  if (/^email sent$/i.test(note)) return f.date;
-  if (!note && f.kind === "email") return f.date;
+  if (isEmailSentNote(note) || (!note && f.kind === "email")) return f.date;
   return null;
+}
+
+/** Prefer a line that records the recipient (and subject) over a bare "Email sent". */
+function emailSentDetailScore(f: FollowUp): number {
+  const note = f.note.trim();
+  let n = note.length;
+  if (/^email sent\s+to\s+\S/i.test(note)) n += 100;
+  if (!note) n -= 10;
+  return n;
 }
 
 /** True when this day already has the automatic send line (including a slim shell). */
 export function hasEmailSentOn(followUps: FollowUp[], date: string): boolean {
   return followUps.some((raw) => {
     const f = canonicalizeFollowUp(raw);
-    return bareEmailSentDate(f) === date || (
-      f.date === date && isEmailSentNote(f.note)
-    );
+    return emailSentDate(f) === date;
   });
 }
 
 /**
- * Drop a second bare "Email sent" on the same day. Names live on authorName
- * now — do not rewrite the line to “Email sent by …”.
- * Prefer a row that still has body text over a slim empty shell.
+ * One "Email sent" line per day. Names live on authorName now — do not rewrite
+ * the line to “Email sent by …”. Prefer the row with more detail (recipient /
+ * subject) over a bare or slim-empty shell.
  */
 export function collapseEmailSentFollowUps(
   followUps: FollowUp[],
@@ -604,9 +610,9 @@ export function collapseEmailSentFollowUps(
   const out: FollowUp[] = [];
   for (const raw of followUps) {
     const f = withFollowUpAuthor(canonicalizeFollowUp(raw), actorName);
-    const day = bareEmailSentDate(f);
+    const day = emailSentDate(f);
     if (!day) {
-      out.push(f.kind === "email" || isEmailSentNote(f.note) ? { ...f, kind: f.kind ?? "email" } : f);
+      out.push(f);
       continue;
     }
     const tagged = { ...f, kind: f.kind ?? "email" as const };
@@ -616,7 +622,7 @@ export function collapseEmailSentFollowUps(
       out.push(tagged);
       continue;
     }
-    if (!prev.note.trim() && tagged.note.trim()) {
+    if (emailSentDetailScore(tagged) > emailSentDetailScore(prev)) {
       const idx = out.findIndex((row) => row.id === prev.id);
       if (idx >= 0) out[idx] = tagged;
       keptByDate.set(day, tagged);

@@ -5,6 +5,7 @@ import { api } from "@/lib/client-api";
 import { ExportIcon } from "@/components/icons";
 import { Spinner, crmStageLabel } from "@/components/ui";
 import type { CrmStage, LeadStatus } from "@/lib/types";
+import { exportBoardParam } from "@/lib/export-board";
 
 const STAGE_LABELS: CrmStage[] = [
   "new",
@@ -70,14 +71,14 @@ function autoFitColumns(
  * Export leads as a real Excel Table with conditional formatting rules
  * and data-validation dropdowns for categorical columns (not hardcoded fills).
  */
-export function ExportButton({ compact = false }: { compact?: boolean }) {
+export function ExportButton({ compact = false, boardId }: { compact?: boolean; boardId?: string | null }) {
   const [exporting, setExporting] = useState(false);
 
   const exportExcel = async () => {
     setExporting(true);
     try {
       const ExcelJS = (await import("exceljs")).default;
-      const board = await api.board();
+      const board = await api.board(exportBoardParam(boardId));
       const rows = board.leads;
       const lastRow = Math.max(rows.length + 1, 2);
       const colCount = 8;

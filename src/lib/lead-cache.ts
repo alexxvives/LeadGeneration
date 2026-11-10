@@ -250,6 +250,11 @@ export function mergeMutationIntoCached(
   if (serverLead.followUps) {
     incoming.followUps = serverLead.followUps;
   }
+  // Email edits can also reset Email status and append a journal line.
+  if (patch.emails !== undefined) {
+    incoming.status = serverLead.status;
+    if (serverLead.followUps) incoming.followUps = serverLead.followUps;
+  }
   const merged = mergeSlimIntoCached(prev, incoming, { writeAt });
   // Server synced the draft's To after an email edit — take it verbatim.
   const syncedOutreach = (serverLead as Partial<LeadWithOutreach>).outreach;

@@ -1,5 +1,12 @@
 import type { LeadRepository } from "@/lib/db";
 import { outreachToAfterLeadEmailEdit } from "./outreach-recipient";
+import {
+  crmFieldsAfterEmailSent,
+  formatSentAddressRemovedNote,
+  hasSentAddressRemovedNote,
+  sentAddressFrom,
+  shouldResetSentEmailStatus,
+} from "./email-sent-history";
 import { newId, nowIso } from "@/lib/id";
 import {
   FOLLOW_UP_PLAN,
@@ -101,7 +108,7 @@ import {
   contactMethodsEqual,
   contactMethodAddedNote,
 } from "@/lib/contact-methods";
-import { collapseEmailSentFollowUps, emailSentFollowUpId, hasEmailSentOn, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
+import { collapseEmailSentFollowUps, isBounceNote, isContactRegisteredNote, resolveFollowUpKind, slimFollowUpsForList, withFollowUpAuthor, canonicalizeFollowUp } from "@/lib/follow-ups";
 import { conversationStepPatch } from "@/lib/conversation-steps";
 import { CREATED_BY_FIELD, preserveCreatorStamp } from "@/lib/lead-ownership";
 import {
@@ -1936,44 +1943,27 @@ async function sendClaimedOutreach(
     const lead = leadForProfile ?? (await db.getLead(outreach.leadId));
     const crmPatch: Partial<Lead> = { status: "sent" };
     if (lead) {
-      if (lead.crmStage === "new") crmPatch.crmStage = "contacted";
-      if (!lead.contactMethods.includes("email")) {
-        crmPatch.contactMethods = [...lead.contactMethods, "email"];
-      }
       const attr = firstContactAttribution(
         ctx,
         lead,
-        crmPatch.crmStage ?? lead.crmStage,
+        lead.crmStage === "new" ? "contacted" : lead.crmStage,
       );
-      if (attr) Object.assign(crmPatch, attr);
-      const existing = lead.followUps ?? [];
-      const today = nowIso().slice(0, 10);
       const actor =
         attr?.contactedByName?.trim() ||
         lead.contactedByName?.trim() ||
         ctx.userName?.trim() ||
         ctx.userEmail?.trim() ||
         null;
-      const emailSentNote = "Email sent";
-      // One automatic line per lead per day. The drawer heal uses the same id
-      // so the two writers cannot leave a pair of "Email sent" notes.
-      const alreadyLogged = hasEmailSentOn(existing, today);
-      const followUps = alreadyLogged
-        ? existing
-        : [
-            withFollowUpAuthor(
-              {
-                id: emailSentFollowUpId(lead.id, today),
-                date: today,
-                note: emailSentNote,
-                done: true,
-                kind: "email" as const,
-              },
-              actor,
-            ),
-            ...existing,
-          ];
-      crmPatch.followUps = collapseEmailSentFollowUps(followUps, actor);
+      Object.assign(
+        crmPatch,
+        crmFieldsAfterEmailSent(lead, {
+          toEmail,
+          subject: outreach.subject,
+          sentAtIso: nowIso(),
+          actorName: actor,
+        }),
+      );
+      if (attr) Object.assign(crmPatch, attr);
     }
     await db.updateLead(outreach.leadId, crmPatch);
     await db.incrementWorkspaceUsage(ctx.workspaceId, { sends: 1 });
@@ -3035,6 +3025,40 @@ async function applyLeadCrmPatch(
     ),
   );
 
+  // Sent lead whose sent-to address was cleared or replaced: Email status
+  // goes back to New, and a journal line keeps the old address. The sent
+  // outreach row itself is left alone (audit trail).
+  const outreachForEmails =
+    patch.emails !== undefined ? await db.getOutreachByLead(leadId) : null;
+  if (patch.emails !== undefined) {
+    const nextEmails = next.emails ?? patch.emails;
+    const sentTo = sentAddressFrom(outreachForEmails, next.followUps ?? lead.followUps);
+    if (
+      shouldResetSentEmailStatus({
+        status: lead.status,
+        nextEmails,
+        sentTo,
+      })
+    ) {
+      (next as { status?: string }).status = "new";
+      if (sentTo && !hasSentAddressRemovedNote(next.followUps ?? lead.followUps ?? [], sentTo)) {
+        next.followUps = [
+          withFollowUpAuthor(
+            {
+              id: newId("fu"),
+              date: nowIso().slice(0, 10),
+              note: formatSentAddressRemovedNote(sentTo),
+              done: true,
+              kind: "note",
+            },
+            actorName,
+          ),
+          ...(next.followUps ?? lead.followUps ?? []),
+        ];
+      }
+    }
+  }
+
   const saved = await db.updateLeadIfVersion(
     leadId,
     { ...next, updatedByName: ctx.userName?.trim() || ctx.userEmail?.trim() || null },
@@ -3042,9 +3066,10 @@ async function applyLeadCrmPatch(
   );
   // Removing an email must also drop it from the unsent draft's To — the
   // outreach queue / send path read outreach.to_email first, so a stale To
-  // kept removed addresses in the queue (and sendable).
+  // kept removed addresses in the queue (and sendable). Sent outreach To is
+  // left unchanged so history can still recover the address.
   if (saved && patch.emails !== undefined) {
-    const outreach = await db.getOutreachByLead(leadId);
+    const outreach = outreachForEmails;
     if (outreach) {
       const nextTo = outreachToAfterLeadEmailEdit(
         outreach.toEmail,
