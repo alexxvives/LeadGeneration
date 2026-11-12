@@ -16,6 +16,7 @@ import {
 } from "@/lib/activation-follow-ups";
 import { runSearch, SearchUnavailableError } from "@/lib/search";
 import { generateDraft, stripLegacyCompliance } from "@/lib/outreach/draft";
+import { pickCurrentOutreachFromMap } from "@/lib/outreach-current";
 import { mapPool, personalizeDraftForLead } from "@/lib/ai/generate";
 import {
   outreachLangFromLocation,
@@ -1426,7 +1427,7 @@ async function attachOutreach(
     leads.map((l) => l.id),
     opts?.slim ? { omitBody: true } : undefined,
   );
-  const byLead = new Map(rows.map((o) => [o.leadId, o]));
+  const byLead = pickCurrentOutreachFromMap(rows);
   return leads.map((l) => {
     const outreach = byLead.get(l.id) ?? null;
     if (!opts?.slim) {
@@ -1566,14 +1567,17 @@ export async function draftOutreach(
     }
   }
   const existing = await db.getOutreachByLead(leadId);
-  // Preserve send audit trail — never reopen in-flight or sent mail (Art. I.1).
-  if (existing?.status === "sent" || existing?.status === "sending") {
+  // Never touch an in-flight send. A sent row is kept as history; a new
+  // draft is inserted so the lead can be emailed again (migration 0047).
+  if (existing?.status === "sending") {
     return existing;
   }
   const now = nowIso();
+  const openExisting =
+    existing && existing.status !== "sent" ? existing : null;
 
-  const outreach: Outreach = existing
-    ? { ...existing, subject, body, status: "draft", error: null, updatedAt: now }
+  const outreach: Outreach = openExisting
+    ? { ...openExisting, subject, body, status: "draft", error: null, updatedAt: now }
     : {
         id: newId("out"),
         workspaceId: ctx.workspaceId,

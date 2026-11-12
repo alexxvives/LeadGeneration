@@ -1,3 +1,4 @@
+import { pickCurrentOutreach } from "@/lib/outreach-current";
 import { promises as fs } from "fs";
 import path from "path";
 import {
@@ -1023,7 +1024,7 @@ export class JsonStore implements LeadRepository {
     });
     const dataFull = data;
     const sentAt = (id: string) => {
-      const o = dataFull.outreach.find((x) => x.leadId === id);
+      const o = pickCurrentOutreach(dataFull.outreach.filter((x) => x.leadId === id));
       return o?.status === "sent" ? o.sentAt ?? "" : "";
     };
     const sorted = [...leads]
@@ -1038,7 +1039,7 @@ export class JsonStore implements LeadRepository {
       });
     const byLane = filter?.lane
       ? sorted.filter((l) => {
-          const o = dataFull.outreach.find((x) => x.leadId === l.id) ?? null;
+          const o = pickCurrentOutreach(dataFull.outreach.filter((x) => x.leadId === l.id));
           return leadHydrateLane(l, o) === filter.lane;
         })
       : sorted;
@@ -1278,8 +1279,10 @@ export class JsonStore implements LeadRepository {
 
   async getOutreachByLead(leadId: string): Promise<Outreach | null> {
     const data = await this.read();
-    const o = data.outreach.find((x) => x.leadId === leadId && this.inScope(x));
-    return o ? normalizeOutreach(o) : null;
+    const o = pickCurrentOutreach(
+      data.outreach.filter((x) => x.leadId === leadId && this.inScope(x)).map(normalizeOutreach),
+    );
+    return o ?? null;
   }
 
   async listOutreach(): Promise<Outreach[]> {

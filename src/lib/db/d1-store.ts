@@ -1,3 +1,4 @@
+import { CURRENT_OUTREACH_ORDER_SQL, pickCurrentOutreach } from "@/lib/outreach-current";
 import type {
   Board,
   BoardInvite,
@@ -2016,7 +2017,13 @@ export class D1Store implements LeadRepository {
     return this.db
       .prepare(
         `SELECT ${cols} FROM leads l
-         LEFT JOIN outreach o ON o.lead_id = l.id
+         LEFT JOIN outreach o ON o.id = (
+           SELECT o2.id FROM outreach o2
+           WHERE o2.lead_id = l.id AND o2.workspace_id = l.workspace_id
+           ORDER BY CASE WHEN o2.status IN ('sent', 'sending') THEN 1 ELSE 0 END ASC,
+                    o2.updated_at DESC, o2.created_at DESC
+           LIMIT 1
+         )
          ${where}
          ${orderSql}${pageSql}`,
       )
@@ -2262,7 +2269,12 @@ export class D1Store implements LeadRepository {
 
   async getOutreachByLead(leadId: string): Promise<Outreach | null> {
     const row = await this.db
-      .prepare(`SELECT * FROM outreach WHERE lead_id = ? AND workspace_id = ?`)
+      .prepare(
+        `SELECT * FROM outreach
+         WHERE lead_id = ? AND workspace_id = ?
+         ORDER BY ${CURRENT_OUTREACH_ORDER_SQL}
+         LIMIT 1`,
+      )
       .bind(leadId, this.workspaceId)
       .first<OutreachRow>();
     return row ? rowToOutreach(row) : null;
@@ -2301,7 +2313,8 @@ export class D1Store implements LeadRepository {
         this.db
           .prepare(
             `SELECT ${cols} FROM outreach
-             WHERE workspace_id = ? AND lead_id IN (${placeholders})`,
+             WHERE workspace_id = ? AND lead_id IN (${placeholders})
+             ORDER BY ${CURRENT_OUTREACH_ORDER_SQL}`,
           )
           .bind(this.workspaceId, ...chunk),
       );
