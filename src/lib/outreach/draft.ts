@@ -7,6 +7,7 @@ import {
   normalizePitchHtml,
   plainToHtmlFragment,
 } from "@/lib/outreach/rich-text";
+import { displayCompanyName } from "@/lib/outreach/display-company";
 import type { Lead, Run } from "@/lib/types";
 
 // Deterministic, no-API-key outreach drafting. Language follows lead geography
@@ -51,11 +52,13 @@ function firstName(lead: Lead): string {
 }
 
 /**
- * Company string for `{company}` placeholders. Keep the full name — chopping on
- * `. ` broke honorifics ("Dra. Barriga | …" → "Dra").
+ * Company string for `{company}` placeholders. Uses a conservative short-brand
+ * cleaner (legal suffixes, taglines, "Academia de … en CITY BRAND", addresses
+ * after Plaza/Calle, …). Falls back to the original when unsure. Never chops
+ * on a raw `. ` — that broke honorifics ("Dra. Barriga | …" → "Dra").
  */
 function shortCompany(lead: Lead): string {
-  return lead.company.trim();
+  return displayCompanyName(lead.company, lead.website);
 }
 
 /** Resolve `{lead_name}` / `{company}` / `{location}` in subject or pitch text. */
