@@ -21,6 +21,13 @@ import {
   outreachLangFromLocation,
   type OutreachLang,
 } from "@/lib/outreach/locale";
+import {
+  pitchForLang,
+  profileFromWorkspaceJson,
+  resolveDraftLang,
+  resolveSignature,
+  subjectForLang,
+} from "@/lib/sender-profile";
 import { sendEmail } from "@/lib/email/sender";
 import { parseRecipientEmail, sanitizeEmailList } from "@/lib/email/address";
 import {
@@ -1498,15 +1505,49 @@ export async function draftOutreach(
   const run = await db.getRun(lead.runId);
   if (!run) return null;
 
-  const aiPersonalize = Boolean(overrides?.aiPersonalize);
-  const draftLang =
-    overrides?.forceLang ?? outreachLangFromLocation(lead.location);
-  const draftOverrides = {
-    ...overrides,
-    forceLang: draftLang,
-    staticBody: aiPersonalize ? true : overrides?.staticBody !== false,
-    aiPersonalize,
+  // Board-linked outreach profile wins over client offerNotes / the workspace
+  // "active" profile. Draft remaining used to send whatever profile was
+  // selected in the tab (e.g. LUMIA copy onto the AKADEMO board).
+  const ws = await db.getWorkspace(lead.workspaceId ?? ctx.workspaceId);
+  const boardProfileId = await profileIdForLead(db, lead);
+  const boardProfile = profileFromWorkspaceJson(
+    ws?.outreachProfilesJson,
+    boardProfileId,
+  );
+
+  let draftOverrides: {
+    signOff?: string | null;
+    offerNotes?: string | null;
+    subjectTemplate?: string | null;
+    staticBody?: boolean;
+    aiPersonalize?: boolean;
+    forceLang?: OutreachLang;
   };
+  let aiPersonalize: boolean;
+  let draftLang: OutreachLang;
+
+  if (boardProfile) {
+    draftLang = resolveDraftLang(boardProfile, lead.location);
+    aiPersonalize = Boolean(boardProfile.aiPersonalize);
+    draftOverrides = {
+      signOff: resolveSignature(boardProfile),
+      offerNotes: pitchForLang(boardProfile, draftLang),
+      subjectTemplate: subjectForLang(boardProfile, draftLang) || undefined,
+      forceLang: draftLang,
+      staticBody: true,
+      aiPersonalize,
+    };
+  } else {
+    aiPersonalize = Boolean(overrides?.aiPersonalize);
+    draftLang =
+      overrides?.forceLang ?? outreachLangFromLocation(lead.location);
+    draftOverrides = {
+      ...overrides,
+      forceLang: draftLang,
+      staticBody: aiPersonalize ? true : overrides?.staticBody !== false,
+      aiPersonalize,
+    };
+  }
   let { subject, body } = generateDraft(lead, run, draftOverrides);
   if (aiPersonalize) {
     const varied = await personalizeDraftForLead({

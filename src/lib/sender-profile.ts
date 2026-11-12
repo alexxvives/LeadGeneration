@@ -493,6 +493,60 @@ export async function hydrateOutreachProfilesFromServer(): Promise<void> {
   }
 }
 
+/**
+ * Resolve an outreach profile from the workspace JSON blob.
+ * Prefers `preferredId` (board-linked), then the store's activeId, then first.
+ * Safe to call on the server — no localStorage.
+ */
+export function profileFromWorkspaceJson(
+  json: string | null | undefined,
+  preferredId?: string | null,
+): OutreachProfile | null {
+  if (!json?.trim()) return null;
+  try {
+    const parsed = JSON.parse(json) as Partial<ProfileStore>;
+    const profiles = Array.isArray(parsed.profiles)
+      ? parsed.profiles.map((p) => normalizeProfile(p))
+      : [];
+    if (profiles.length === 0) return null;
+    const pref = preferredId?.trim() || "";
+    if (pref) {
+      const hit = profiles.find((p) => p.id === pref);
+      if (hit) return hit;
+    }
+    return (
+      profiles.find((p) => p.id === parsed.activeId) ?? profiles[0] ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Profile linked to a board, else the locally active profile.
+ * Use this for drafting so AKADEMO leads cannot pick up LUMIA copy
+ * just because the Settings / last-viewed profile is still selected.
+ */
+export function profileForBoardId(
+  boardId: string | null | undefined,
+  boards: ReadonlyArray<{ id: string; outreachProfileId?: string | null }>,
+): OutreachProfile {
+  const linked =
+    (boardId &&
+      boards.find((b) => b.id === boardId)?.outreachProfileId?.trim()) ||
+    null;
+  const store = loadOutreachProfiles();
+  if (linked) {
+    const hit = store.profiles.find((p) => p.id === linked);
+    if (hit) return hit;
+  }
+  return (
+    store.profiles.find((p) => p.id === store.activeId) ??
+    store.profiles[0] ??
+    emptyProfile()
+  );
+}
+
 /** Active profile (or a fresh empty one). */
 export function loadSenderProfile(): OutreachProfile {
   const store = readStore();

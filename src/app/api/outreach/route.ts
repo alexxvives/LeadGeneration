@@ -30,8 +30,9 @@ export async function POST(req: Request) {
   }
 
   const ctx = await getCtx();
-  // Always forward offerNotes when the client sent it (incl. "") so drafting
-  // uses the active profile pitch — never a stale run.offerNotes from search.
+  // Client pitch is forwarded for boards with no linked profile (fallback).
+  // draftOutreach prefers the lead's board-linked profile over these
+  // overrides, so a stale "active" profile cannot leak onto the wrong board.
   const outreach = await draftOutreach(ctx, parsed.data.leadId, {
     signOff: parsed.data.signOff,
     ...(typeof parsed.data.offerNotes === "string"

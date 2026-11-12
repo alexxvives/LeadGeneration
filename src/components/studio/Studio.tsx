@@ -81,6 +81,7 @@ import {
   hydrateOutreachProfilesFromServer,
   loadSenderProfile,
   pitchForLang,
+  profileForBoardId,
   resolveDraftLang,
   resolveSignature,
   subjectForLang,
@@ -1459,8 +1460,11 @@ export function Studio() {
     opts?: { silent?: boolean },
   ): Promise<string | null> => {
     try {
-      const profile = loadSenderProfile();
       const lead = board?.leads.find((l) => l.id === leadId);
+      const profile = profileForBoardId(
+        lead?.boardId ?? board?.activeBoardId,
+        board?.boards ?? [],
+      );
       const lang = resolveDraftLang(profile, lead?.location ?? null);
       const flags = draftFlagsFromProfile(profile);
       const pitch = pitchForLang(profile, lang).trim();
