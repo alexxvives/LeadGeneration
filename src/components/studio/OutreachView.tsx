@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
 import { loadWarmupProfile, warmupStatus } from "@/lib/email/warmup";
 import { parseRecipientEmail } from "@/lib/email/address";
+import { outreachSubjectIssue } from "@/lib/outreach/subject-guard";
 import { Spinner } from "@/components/ui";
 import {
   ChevronLeftIcon,
@@ -962,9 +963,11 @@ function EmailComposer({
     toEmail: initialTo,
   });
   const [saving, setSaving] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const dirty =
     subject !== saved.subject || body !== saved.body || toEmail !== saved.toEmail;
   const addressOk = Boolean(parseRecipientEmail(toEmail));
+  const subjectIssue = outreachSubjectIssue(subject);
 
   const persist = async () => {
     if (!dirty) return;
@@ -982,13 +985,26 @@ function EmailComposer({
   };
 
   const send = async () => {
-    if (busy || !addressOk) return;
+    if (busy) return;
+    setSendError(null);
+    if (!addressOk) {
+      setSendError("Needs a real address (name@example.com).");
+      return;
+    }
+    if (subjectIssue) {
+      setSendError(subjectIssue);
+      return;
+    }
     try {
       await persist();
-    } catch {
+    } catch (e) {
+      setSendError((e as Error).message || "Could not save the draft. Try again.");
       return;
     }
     const ok = await onSend(outreach.id);
+    if (!ok) {
+      setSendError((current) => current ?? "Send did not go through. See the message above, or try again.");
+    }
     onAdvance(ok, lead.id);
   };
 
@@ -1000,7 +1016,10 @@ function EmailComposer({
           <span className="mb-1.5 block text-sm font-medium text-mist-100">To</span>
           <input
             value={toEmail}
-            onChange={(e) => setToEmail(e.target.value)}
+            onChange={(e) => {
+              setToEmail(e.target.value);
+              setSendError(null);
+            }}
             onBlur={() => {
               const next = parseRecipientEmail(toEmail);
               if (next && next !== toEmail.trim()) setToEmail(next);
@@ -1018,9 +1037,15 @@ function EmailComposer({
           <span className="mb-1.5 block text-sm font-medium text-mist-100">Subject</span>
           <input
             value={subject}
-            onChange={(e) => setSubject(e.target.value)}
+            onChange={(e) => {
+              setSubject(e.target.value);
+              setSendError(null);
+            }}
             className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-mist-100 outline-none focus:border-aurora-400/60 disabled:opacity-60"
           />
+          {subjectIssue ? (
+            <span className="mt-1 block text-[11px] text-rose-300">{subjectIssue}</span>
+          ) : null}
         </label>
         <div>
           <span className="mb-1.5 block text-sm font-medium text-mist-100">Body</span>
@@ -1032,6 +1057,10 @@ function EmailComposer({
         </div>
         {outreach.status === "failed" && outreach.error ? (
           <p className="text-xs text-rose-300/90">{outreach.error}</p>
+        ) : sendError ? (
+          <p className="text-xs text-rose-300/90" role="alert">{sendError}</p>
+        ) : outreach.status === "sending" && outreach.error ? (
+          <p className="text-xs text-rose-300/90" role="alert">{outreach.error}</p>
         ) : null}
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/10 px-4 py-3">

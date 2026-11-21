@@ -50,6 +50,7 @@ import { LeadDocuments } from "@/components/studio/LeadDocuments";
 import { useDraftField } from "@/components/studio/use-draft-field";
 import { JournalEntries } from "@/components/studio/JournalEntries";
 import { parseRecipientEmail, sanitizeEmailList } from "@/lib/email/address";
+import { outreachSubjectIssue } from "@/lib/outreach/subject-guard";
 import {
   toggleContactMethod,
   contactMethodsEqual,
@@ -268,6 +269,7 @@ export function LeadDrawer(props: DrawerProps) {
     false | "call" | "missed" | "email"
   >(promptNote);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [treeOpen, setTreeOpen] = useState(false);
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
   const notesPaneRef = useRef<HTMLElement | null>(null);
@@ -799,6 +801,7 @@ export function LeadDrawer(props: DrawerProps) {
 
   /** Recipient required; Send is the per-lead human gate. */
   const canSend = Boolean(parseRecipientEmail(toEmail));
+  const subjectIssue = outreachSubjectIssue(subject);
   const sent = outreach?.status === "sent";
 
   return (
@@ -1538,10 +1541,18 @@ export function LeadDrawer(props: DrawerProps) {
                 <FieldMini label="Subject">
                   <input
                     value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
+                    onChange={(e) => {
+                      setSubject(e.target.value);
+                      setSendError(null);
+                    }}
                     disabled={sent}
                     className="w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm outline-none focus:border-aurora-400/60 disabled:opacity-60"
                   />
+                  {!sent && (subjectIssue || sendError) ? (
+                    <span className="mt-1 block text-[11px] text-rose-300" role="alert">
+                      {sendError ?? subjectIssue}
+                    </span>
+                  ) : null}
                 </FieldMini>
                 <FieldMini label="Body">
                   {sent ? (
@@ -1643,9 +1654,14 @@ export function LeadDrawer(props: DrawerProps) {
                         onClick={() =>
                           void (async () => {
                             if (busy === "send") return;
+                            if (subjectIssue) {
+                              setSendError(subjectIssue);
+                              return;
+                            }
                             try {
                               await persistIfDirty();
-                            } catch {
+                            } catch (e) {
+                              setSendError((e as Error).message || "Could not save the draft. Try again.");
                               return;
                             }
                             // Close immediately — progress lives on the studio toast.
@@ -1653,7 +1669,7 @@ export function LeadDrawer(props: DrawerProps) {
                             void props.onSend(outreach.id);
                           })()
                         }
-                        disabled={!canSend || busy === "send"}
+                        disabled={!canSend || Boolean(subjectIssue) || busy === "send"}
                         title={
                           !toEmail
                               ? "Add a recipient email first"

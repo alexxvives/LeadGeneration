@@ -7,6 +7,11 @@ import {
   sentAddressFrom,
   shouldResetSentEmailStatus,
 } from "./email-sent-history";
+import {
+  AMBIGUOUS_SEND_ERROR,
+  isAmbiguousProviderSent,
+  outreachSubjectIssue,
+} from "./outreach/subject-guard";
 import { newId, nowIso } from "@/lib/id";
 import {
   FOLLOW_UP_PLAN,
@@ -1714,9 +1719,17 @@ export async function sendApprovedOutreach(
   opts?: { skipVerify?: boolean },
 ): Promise<SendOutcome> {
   const db = ctx.db;
+  const existingBefore = await db.getOutreach(outreachId);
+  if (isAmbiguousProviderSent(existingBefore)) {
+    return {
+      ok: false,
+      error: AMBIGUOUS_SEND_ERROR,
+      outreach: existingBefore,
+    };
+  }
   const claimed = await db.claimOutreachForSend(outreachId);
   if (!claimed) {
-    const existing = await db.getOutreach(outreachId);
+    const existing = existingBefore ?? (await db.getOutreach(outreachId));
     if (!existing) return { ok: false, error: "Outreach not found" };
     if (existing.status === "sent") {
       return { ok: false, error: "Already sent", outreach: existing };
@@ -1762,6 +1775,19 @@ async function sendClaimedOutreach(
   };
 
   const outreach = claimed;
+  if (isAmbiguousProviderSent(outreach)) {
+    await db.updateOutreach(outreachId, {
+      status: "sending",
+      error: AMBIGUOUS_SEND_ERROR,
+      updatedAt: nowIso(),
+    });
+    return { ok: false, error: AMBIGUOUS_SEND_ERROR, outreach };
+  }
+  const subjectIssue = outreachSubjectIssue(outreach.subject);
+  if (subjectIssue) {
+    await releaseClaim(subjectIssue);
+    return { ok: false, error: subjectIssue };
+  }
   // Prior verify hard-cleanups (or a re-added CRM email) can leave outreach.To
   // empty while the lead still has an address — heal before failing the send.
   let toEmail = outreach.toEmail?.trim() ?? "";

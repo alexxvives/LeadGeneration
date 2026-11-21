@@ -8,6 +8,7 @@ import {
   plainToHtmlFragment,
 } from "@/lib/outreach/rich-text";
 import { displayCompanyName } from "@/lib/outreach/display-company";
+import { isReservedStageLabel } from "@/lib/outreach/subject-guard";
 import type { Lead, Run } from "@/lib/types";
 
 // Deterministic, no-API-key outreach drafting. Language follows lead geography
@@ -58,7 +59,9 @@ function firstName(lead: Lead): string {
  * on a raw `. ` — that broke honorifics ("Dra. Barriga | …" → "Dra").
  */
 function shortCompany(lead: Lead): string {
-  return displayCompanyName(lead.company, lead.website);
+  const name = displayCompanyName(lead.company, lead.website);
+  // Never interpolate Outreach/Pipeline column titles as the company name.
+  return isReservedStageLabel(name) ? "" : name;
 }
 
 /** Resolve `{lead_name}` / `{company}` / `{location}` in subject or pitch text. */

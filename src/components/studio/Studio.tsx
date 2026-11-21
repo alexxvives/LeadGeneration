@@ -21,6 +21,11 @@ import {
   RateLimitedError,
   type BoardResponse,
 } from "@/lib/client-api";
+import {
+  AMBIGUOUS_SEND_ERROR,
+  isAmbiguousProviderSent,
+  isStaleSending,
+} from "@/lib/outreach/subject-guard";
 import type { BoardPerson, Contact, ContactMethod, ConversationStep, CrmStage, FollowUp, Lead, LeadWithOutreach, PlanId, Task } from "@/lib/types";
 import {
   mergeFollowUpLists,
@@ -1743,7 +1748,19 @@ export function Studio() {
     // Per-lead Send click is the human gate (ADR 0029).
     const lead = findLeadByOutreach(outreachId);
     const st = lead?.outreach?.status;
-    if (st === "sending") return false; // claim already in flight
+    if (st === "sending") {
+      // Fresh claim: don't start a second POST. Stale sending is reclaimable
+      // server-side after 2 minutes — unless the provider already marked it sent
+      // without Hermes recording sentAt (retry would risk a duplicate).
+      if (isAmbiguousProviderSent(lead?.outreach)) {
+        toast("err", AMBIGUOUS_SEND_ERROR);
+        return false;
+      }
+      if (!isStaleSending(lead?.outreach)) {
+        toast("err", "This email is already sending. Wait a moment and try again if it does not finish.");
+        return false;
+      }
+    }
     if (st === "rejected") {
       await onDecide(outreachId, "approved", { silent: true });
     }
