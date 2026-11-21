@@ -1720,7 +1720,7 @@ export async function sendApprovedOutreach(
 ): Promise<SendOutcome> {
   const db = ctx.db;
   const existingBefore = await db.getOutreach(outreachId);
-  if (isAmbiguousProviderSent(existingBefore)) {
+  if (existingBefore && isAmbiguousProviderSent(existingBefore)) {
     return {
       ok: false,
       error: AMBIGUOUS_SEND_ERROR,
