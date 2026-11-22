@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MAX_LEAD_EMAILS } from "@/lib/email/address";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { deleteLead, getLeadWithOutreach, updateLeadCrm } from "@/lib/service";
@@ -58,7 +59,7 @@ const PatchSchema = z.object({
   companyType: z.string().max(120).nullable().optional(),
   company: z.string().min(1).max(200).optional(),
   website: z.string().max(500).nullable().optional(),
-  emails: z.array(z.string().min(3).max(200)).max(10).optional(),
+  emails: z.array(z.string().min(3).max(200)).max(MAX_LEAD_EMAILS).optional(),
   phones: z.array(z.string().max(40)).max(5).optional(),
   location: z.string().max(400).nullable().optional(),
   aboutBlurb: z.string().max(2000).nullable().optional(),

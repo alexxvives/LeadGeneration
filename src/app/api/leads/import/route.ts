@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MAX_LEAD_EMAILS } from "@/lib/email/address";
 import { z } from "zod";
 import { getCtx } from "@/lib/request-context";
 import { cancelImportRun, importLeads } from "@/lib/service";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 const RowSchema = z.object({
   company: z.string().max(200).optional().default(""),
   website: z.string().max(500).nullable().optional(),
-  emails: z.array(z.string().min(3).max(200)).max(10).optional(),
+  emails: z.array(z.string().min(3).max(200)).max(MAX_LEAD_EMAILS).optional(),
   phones: z.array(z.string().max(40)).max(5).optional(),
   contactName: z.string().max(120).nullable().optional(),
   location: z.string().max(400).nullable().optional(),

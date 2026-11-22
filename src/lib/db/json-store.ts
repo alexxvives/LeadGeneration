@@ -20,6 +20,7 @@ import {
   type Workspace,
 } from "@/lib/types";
 import { parseContactMethods } from "@/lib/contact-methods";
+import { normalizeLookupEmail } from "@/lib/email/address";
 import {
   canonicalizeFollowUp,
   hasPendingTask,
@@ -1315,10 +1316,10 @@ export class JsonStore implements LeadRepository {
     email: string,
     workspaceId?: string,
   ): Promise<Outreach | null> {
-    const needle = email.trim().toLowerCase();
+    const needle = normalizeLookupEmail(email);
     if (!needle) return null;
     const data = await this.read();
-    const candidates = data.outreach
+    const byTo = data.outreach
       .filter(
         (o) =>
           o.status === "sent" &&
@@ -1326,7 +1327,27 @@ export class JsonStore implements LeadRepository {
           (!workspaceId || o.workspaceId === workspaceId),
       )
       .sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
-    return candidates[0] ? normalizeOutreach(candidates[0]) : null;
+    if (byTo[0]) return normalizeOutreach(byTo[0]);
+
+    const leadIds = new Set(
+      data.leads
+        .filter(
+          (l) =>
+            (!workspaceId || l.workspaceId === workspaceId) &&
+            (l.emails ?? []).some((e) => e.trim().toLowerCase() === needle),
+        )
+        .map((l) => l.id),
+    );
+    if (leadIds.size === 0) return null;
+    const byLead = data.outreach
+      .filter(
+        (o) =>
+          o.status === "sent" &&
+          leadIds.has(o.leadId) &&
+          (!workspaceId || o.workspaceId === workspaceId),
+      )
+      .sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
+    return byLead[0] ? normalizeOutreach(byLead[0]) : null;
   }
 
   async countRecentSendActivity(

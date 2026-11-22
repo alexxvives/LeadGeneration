@@ -262,7 +262,8 @@ export interface LeadRepository {
    * Prefer tag-based matching when provider tags are present.
    */
   /**
-   * Latest sent outreach for `email`. When `workspaceId` is set, search is
+   * Latest sent outreach for `email`, matching `to_email` first and then a
+   * secondary address on the lead. When `workspaceId` is set, search is
    * tenant-scoped (required when the webhook was verified with a BYO secret).
    * Omit for platform-level secrets only.
    */

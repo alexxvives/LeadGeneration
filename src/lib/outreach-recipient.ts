@@ -19,7 +19,16 @@ export function outreachToAfterLeadEmailEdit(
   const to = norm(currentTo);
   if (!to) return undefined;
   const next = nextEmails.map((e) => e.trim()).filter(Boolean);
-  if (next.some((e) => norm(e) === to)) return undefined;
+  const prevPrimary = norm(prevEmails.find((e) => e.trim()) ?? "");
+  const nextPrimary = next[0] ?? null;
+  // Still on the lead: leave a custom / secondary To alone, but follow a
+  // new primary when the draft was addressed to the previous primary.
+  if (next.some((e) => norm(e) === to)) {
+    if (prevPrimary && to === prevPrimary && nextPrimary && norm(nextPrimary) !== to) {
+      return nextPrimary;
+    }
+    return undefined;
+  }
   const wasLeadEmail = prevEmails.some((e) => norm(e) === to);
   if (!wasLeadEmail && next.length > 0) return undefined;
   return next[0] ?? null;

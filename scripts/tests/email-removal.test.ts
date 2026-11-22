@@ -37,6 +37,28 @@ assert.equal(next("a@x.es", "sent", ["a@x.es"], []), undefined, "sent audit trai
 assert.equal(next(null, "draft", ["a@x.es"], []), undefined);
 console.log("PASS outreachToAfterLeadEmailEdit rule");
 
+assert.equal(
+  next("a@x.es", "draft", ["a@x.es", "b@x.es"], ["b@x.es", "a@x.es"]),
+  "b@x.es",
+  "draft To follows a new primary",
+);
+assert.equal(
+  next("b@x.es", "draft", ["a@x.es", "b@x.es"], ["b@x.es", "a@x.es"]),
+  undefined,
+  "secondary To is left alone when it is already the new primary",
+);
+assert.equal(
+  next("custom@y.es", "draft", ["a@x.es", "b@x.es"], ["b@x.es", "a@x.es"]),
+  undefined,
+  "custom To is kept when primary changes",
+);
+assert.equal(
+  next("a@x.es", "sent", ["a@x.es", "b@x.es"], ["b@x.es", "a@x.es"]),
+  undefined,
+  "sent audit trail untouched when primary changes",
+);
+console.log("PASS outreachToAfterLeadEmailEdit primary switch");
+
 const sql = new DatabaseSync(":memory:");
 for (const f of readdirSync("migrations").filter((f) => f.endsWith(".sql")).sort()) {
   try { sql.exec(readFileSync(`migrations/${f}`, "utf8")); } catch { /* D1-only */ }

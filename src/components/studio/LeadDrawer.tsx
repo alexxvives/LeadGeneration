@@ -13,6 +13,7 @@ import {
   MailIcon,
   PhoneIcon,
   PinIcon,
+  PlusIcon,
   SparkIcon,
   TrashIcon,
   TreeIcon,
@@ -49,7 +50,7 @@ import { Bone, LeadDrawerPendingSkeleton } from "@/components/studio/skeletons";
 import { LeadDocuments } from "@/components/studio/LeadDocuments";
 import { useDraftField } from "@/components/studio/use-draft-field";
 import { JournalEntries } from "@/components/studio/JournalEntries";
-import { parseRecipientEmail, sanitizeEmailList } from "@/lib/email/address";
+import { MAX_LEAD_EMAILS, parseRecipientEmail, sanitizeEmailList } from "@/lib/email/address";
 import { outreachSubjectIssue } from "@/lib/outreach/subject-guard";
 import {
   toggleContactMethod,
@@ -1093,22 +1094,13 @@ export function LeadDrawer(props: DrawerProps) {
                 }
               }}
             />
-            <EditableInfoRow
-              icon={<MailIcon className="h-4 w-4" />}
-              label="Emails"
-              defaultValue={lead.emails.join(", ")}
-              fieldKey={`${lead.id}-emails-${lead.emails.join(",")}`}
-              placeholder="name@company.com"
-              onSave={(raw) => {
-                const typed = parseList(raw);
-                const next = sanitizeEmailList(typed);
-                const rejected = typed.filter((t) => !parseRecipientEmail(t));
+            <EmailsEditor
+              key={`${lead.id}-emails-${lead.emails.join(",")}`}
+              emails={lead.emails}
+              onSave={(next) => {
                 if (next.join("\0") !== lead.emails.join("\0")) {
                   void props.onUpdateCrm(lead.id, { emails: next });
                 }
-                return rejected.length
-                  ? `Not saved — not a valid email: ${rejected.join(", ")}`
-                  : null;
               }}
             />
             <EditableInfoRow
@@ -1729,6 +1721,148 @@ export function LeadDrawer(props: DrawerProps) {
  * `onSave` may return a warning; the typed text then stays in the field so
  * nothing silently disappears.
  */
+
+const EMAIL_ROW_INPUT =
+  "min-w-0 flex-1 bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-500 disabled:cursor-not-allowed disabled:opacity-70";
+
+function EmailsEditor({
+  emails,
+  onSave,
+  disabled = false,
+}: {
+  emails: string[];
+  onSave: (emails: string[]) => void;
+  disabled?: boolean;
+}) {
+  const [rows, setRows] = useState(emails);
+  const [adding, setAdding] = useState("");
+  const [warning, setWarning] = useState<string | null>(null);
+
+  const commit = (nextRows: string[], extra = "") => {
+    const typed = [...nextRows, extra].flatMap(parseList);
+    const next = sanitizeEmailList(typed);
+    const rejected = typed.filter((t) => !parseRecipientEmail(t));
+    setRows(next);
+    setAdding("");
+    setWarning(
+      rejected.length
+        ? `Not saved — not a valid email: ${rejected.join(", ")}`
+        : null,
+    );
+    if (next.join("\0") !== emails.join("\0")) onSave(next);
+    return next;
+  };
+
+  const atCap = rows.length >= MAX_LEAD_EMAILS;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-start gap-3 text-sm text-mist-100">
+        <span className="mt-2 shrink-0 text-mist-500" aria-hidden>
+          <MailIcon className="h-4 w-4" />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          {rows.map((email, i) => (
+            <div
+              key={i}
+              className={`flex min-w-0 items-center gap-1.5 rounded-lg border bg-ink-950/40 px-2.5 py-1.5 focus-within:border-aurora-400/50 ${
+                warning ? "border-rose-400/60" : "border-white/10"
+              }`}
+            >
+              <input
+                value={email}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setRows((prev) => prev.map((row, j) => (j === i ? value : row)));
+                }}
+                onBlur={(e) => {
+                  const next = rows.map((row, j) => (j === i ? e.target.value : row));
+                  commit(next);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                placeholder={i === 0 ? "name@company.com" : "another@company.com"}
+                aria-label={
+                  i === 0 && rows.length > 1
+                    ? "Primary email"
+                    : `Email ${i + 1}`
+                }
+                disabled={disabled}
+                className={EMAIL_ROW_INPUT}
+              />
+              {rows.length > 1 && i === 0 ? (
+                <span className="shrink-0 rounded-full bg-aurora-400/15 px-2 py-0.5 text-[11px] font-medium text-aurora-300">
+                  Primary
+                </span>
+              ) : null}
+              {rows.length > 1 && i > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = [rows[i], ...rows.filter((_, j) => j !== i)];
+                    setRows(next);
+                    commit(next);
+                  }}
+                  disabled={disabled}
+                  className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium text-mist-400 transition-colors hover:bg-white/5 hover:text-mist-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-400/70 disabled:opacity-50"
+                >
+                  Make primary
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = rows.filter((_, j) => j !== i);
+                  setRows(next);
+                  commit(next);
+                }}
+                disabled={disabled}
+                aria-label={`Remove ${email || "email"}`}
+                className="shrink-0 rounded-md p-0.5 text-mist-500 transition-colors hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400/60 disabled:opacity-50"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          {atCap ? (
+            <p className="text-[11px] text-mist-500">
+              Up to {MAX_LEAD_EMAILS} emails per lead.
+            </p>
+          ) : (
+            <div className="flex min-w-0 items-center gap-1.5 rounded-lg border border-dashed border-white/10 bg-ink-950/20 px-2.5 py-1.5 focus-within:border-aurora-400/50">
+              <PlusIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" aria-hidden />
+              <input
+                value={adding}
+                onChange={(e) => setAdding(e.target.value)}
+                onBlur={() => {
+                  if (adding.trim()) commit(rows, adding);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                placeholder={rows.length ? "Add another email" : "name@company.com"}
+                aria-label="Add email"
+                disabled={disabled}
+                className={EMAIL_ROW_INPUT}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+      {warning ? (
+        <p role="alert" className="pl-7 text-xs text-rose-300">
+          {warning}
+        </p>
+      ) : rows.length > 1 ? (
+        <p className="pl-7 text-[11px] text-mist-500">
+          Outreach is sent to the primary email only.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function EditableInfoRow({
   icon,
   label,

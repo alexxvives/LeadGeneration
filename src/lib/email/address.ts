@@ -61,6 +61,9 @@ export function parseRecipientEmail(raw: string | null | undefined): string | nu
   return isSendableEmail(email) ? email : null;
 }
 
+/** Hard cap on emails stored on a lead (matches the PATCH/import zod max). */
+export const MAX_LEAD_EMAILS = 10;
+
 export function sanitizeEmailList(emails: string[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -69,8 +72,23 @@ export function sanitizeEmailList(emails: string[]): string[] {
     if (!e || seen.has(e)) continue;
     seen.add(e);
     out.push(e);
+    if (out.length >= MAX_LEAD_EMAILS) break;
   }
   return out;
+}
+
+/**
+ * Bare, lowercased address for reply/bounce lookup. Valid mailboxes go
+ * through `parseRecipientEmail` (strips `Name <email>`). Anything else is
+ * still trimmed and lowercased so historical `to_email` rows can match.
+ */
+export function normalizeLookupEmail(raw: string | null | undefined): string {
+  const parsed = parseRecipientEmail(raw);
+  if (parsed) return parsed;
+  const t = (raw ?? "").trim().replace(/^mailto:/i, "");
+  if (!t) return "";
+  const angle = t.match(/<([^<>]+)>/);
+  return (angle?.[1] ?? t).trim().toLowerCase();
 }
 
 /**

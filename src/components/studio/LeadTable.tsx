@@ -440,7 +440,7 @@ export function LeadTable({
                         className={`inline-flex items-center gap-1 tabular-nums ${
                           l.emails.length ? "text-aurora-300" : "text-mist-500"
                         }`}
-                        title={l.emails[0] ?? "No email"}
+                        title={l.emails.join(", ") || "No email"}
                       >
                         <MailIcon className="h-3.5 w-3.5 shrink-0" />
                         {l.emails.length || "—"}
@@ -462,9 +462,12 @@ export function LeadTable({
                         }`}
                       >
                         <MailIcon className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate" title={l.emails[0] ?? undefined}>
+                        <span className="truncate" title={l.emails.join(", ") || undefined}>
                           {l.emails[0] ?? "—"}
                         </span>
+                        {l.emails.length > 1 ? (
+                          <span className="shrink-0 text-mist-500">+{l.emails.length - 1}</span>
+                        ) : null}
                       </span>
                       <span
                         className={`flex min-w-0 items-center gap-1 ${

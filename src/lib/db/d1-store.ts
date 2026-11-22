@@ -32,6 +32,7 @@ import {
 } from "@/lib/tasks";
 import type { LeadListFilter, LeadRepository } from "./index";
 import { LOCAL_WORKSPACE_ID } from "./index";
+import { normalizeLookupEmail } from "@/lib/email/address";
 
 /**
  * Minimal D1 type stubs — keeps this file type-safe without adding
@@ -587,6 +588,18 @@ function buildSet(
     clause: entries.map(([k]) => `${k} = ?`).join(", "),
     values: entries.map(([, v]) => v),
   };
+}
+
+
+function leadEmailsInclude(raw: string | null | undefined, needle: string): boolean {
+  if (!raw || !needle) return false;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return false;
+    return parsed.some((e) => String(e).trim().toLowerCase() === needle);
+  } catch {
+    return false;
+  }
 }
 
 export class D1Store implements LeadRepository {
@@ -2328,7 +2341,7 @@ export class D1Store implements LeadRepository {
     email: string,
     workspaceId?: string,
   ): Promise<Outreach | null> {
-    const needle = email.trim().toLowerCase();
+    const needle = normalizeLookupEmail(email);
     if (!needle) return null;
     // Unscoped only for platform webhook secrets; BYO secrets must pass workspaceId.
     const row = workspaceId
@@ -2351,7 +2364,42 @@ export class D1Store implements LeadRepository {
           )
           .bind(needle)
           .first<OutreachRow>();
-    return row ? rowToOutreach(row) : null;
+    if (row) return rowToOutreach(row);
+
+    // Fallback: a reply may come from a secondary address on the lead.
+    // LIKE is only a prefilter; exact match is checked in JS so substring
+    // hits (info@x.com vs info@x.com.au) and invalid JSON don't slip through.
+    type RowWithEmails = OutreachRow & { lead_emails: string | null };
+    const candidates = workspaceId
+      ? await this.db
+          .prepare(
+            `SELECT o.*, l.emails AS lead_emails
+             FROM outreach o
+             JOIN leads l ON l.id = o.lead_id
+             WHERE o.workspace_id = ?
+               AND o.status = 'sent'
+               AND instr(lower(l.emails), ?) > 0
+             ORDER BY o.sent_at DESC
+             LIMIT 50`,
+          )
+          .bind(workspaceId, needle)
+          .all<RowWithEmails>()
+      : await this.db
+          .prepare(
+            `SELECT o.*, l.emails AS lead_emails
+             FROM outreach o
+             JOIN leads l ON l.id = o.lead_id
+             WHERE o.status = 'sent'
+               AND instr(lower(l.emails), ?) > 0
+             ORDER BY o.sent_at DESC
+             LIMIT 50`,
+          )
+          .bind(needle)
+          .all<RowWithEmails>();
+    const match = (candidates.results ?? []).find((r) =>
+      leadEmailsInclude(r.lead_emails, needle),
+    );
+    return match ? rowToOutreach(match) : null;
   }
 
   async countRecentSendActivity(
