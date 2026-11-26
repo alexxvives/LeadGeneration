@@ -5,6 +5,12 @@ import type { ContactMethod, LeadWithOutreach } from "@/lib/types";
 import { loadWarmupProfile, warmupStatus } from "@/lib/email/warmup";
 import { parseRecipientEmail } from "@/lib/email/address";
 import { outreachSubjectIssue } from "@/lib/outreach/subject-guard";
+import {
+  langBadge,
+  outreachLangEvidenceForLead,
+  outreachLangMismatchIssue,
+  type LangRouting,
+} from "@/lib/outreach/locale";
 import { Spinner } from "@/components/ui";
 import {
   ChevronLeftIcon,
@@ -25,6 +31,23 @@ import { VirtualColumnList } from "./virtual-list";
 type OutreachBucket = "review" | "ready" | "contacted";
 /** Send-list contact-channel filter. */
 type ReadyChannelFilter = "all" | "email" | "phone";
+/** Send-list language filter. */
+type LangFilter = "all" | "es" | "en" | "fr" | "mismatch";
+
+function leadLangMeta(
+  lead: LeadWithOutreach,
+  routing: LangRouting,
+): { lang: "en" | "es" | "fr" | "it" | "de" | "pt" | "pl"; confident: boolean; mismatch: string | null } {
+  const expected = outreachLangEvidenceForLead(lead, routing);
+  const mismatch = lead.outreach
+    ? outreachLangMismatchIssue(
+        { subject: lead.outreach.subject, body: lead.outreach.body },
+        lead,
+        { routing },
+      )
+    : null;
+  return { lang: expected.lang, confident: expected.confident, mismatch };
+}
 
 function leadEmail(lead: LeadWithOutreach): string | null {
   const fromLead = lead.emails.find((e) => e.trim())?.trim() ?? null;
@@ -178,6 +201,7 @@ function contactedDayHint(sentToday: number, softCap: number): string {
  */
 export function OutreachView({
   leads,
+  langRouting = "default",
   sendsToday = 0,
   warmupScopeId = null,
   canSendEmail,
@@ -195,6 +219,8 @@ export function OutreachView({
   onDeleteLead,
 }: {
   leads: LeadWithOutreach[];
+  /** Board profile geography → language mapping (AKADEMO vs default). */
+  langRouting?: LangRouting;
   /** Workspace DB count of emails sent from this board’s mailbox today. */
   sendsToday?: number;
   /** Board outreach profile (or board id) — mailbox age / ~N/day suggest. */
@@ -228,8 +254,10 @@ export function OutreachView({
   const { bulkLocked: editLocked, hint: lockHint } = useBoardLockUi();
   const busySet = useMemo(() => new Set(busyIds), [busyIds]);
   const [readyChannel, setReadyChannel] = useState<ReadyChannelFilter>("all");
+  const [langFilter, setLangFilter] = useState<LangFilter>("all");
   const [drafting, setDrafting] = useState<null | "remaining" | "redraft">(null);
   const skipReadyChannelPersist = useRef(true);
+  const skipLangFilterPersist = useRef(true);
   const [focusId, setFocusId] = useState<string | null>(null);
   const pendingFocus = useRef<string | null>(null);
   const focusIdRef = useRef(focusId);
@@ -241,6 +269,16 @@ export function OutreachView({
       const raw = sessionStorage.getItem("hermes_outreach_ready_channel");
       if (raw === "email" || raw === "phone" || raw === "all") {
         setReadyChannel(raw);
+      }
+      const langRaw = sessionStorage.getItem("hermes_outreach_lang_filter");
+      if (
+        langRaw === "es" ||
+        langRaw === "en" ||
+        langRaw === "fr" ||
+        langRaw === "mismatch" ||
+        langRaw === "all"
+      ) {
+        setLangFilter(langRaw);
       }
     } catch {
       /* ignore */
@@ -259,6 +297,18 @@ export function OutreachView({
     }
   }, [readyChannel]);
 
+  useEffect(() => {
+    if (skipLangFilterPersist.current) {
+      skipLangFilterPersist.current = false;
+      return;
+    }
+    try {
+      sessionStorage.setItem("hermes_outreach_lang_filter", langFilter);
+    } catch {
+      /* ignore */
+    }
+  }, [langFilter]);
+
   const draftRemainingCount = useMemo(
     () => leads.filter(needsOutreachDraft).length,
     [leads],
@@ -275,14 +325,19 @@ export function OutreachView({
       // Undrafted emails stay visible. Phone-only and drafted emails are ready.
       if (bucket === "ready" || bucket === "review") ready.push(lead);
     }
-    if (readyChannel === "email") {
-      return ready.filter((l) => Boolean(leadEmail(l)));
-    }
-    if (readyChannel === "phone") {
-      return ready.filter((l) => !leadEmail(l) && Boolean(leadPhone(l)));
-    }
-    return ready;
-  }, [leads, readyChannel]);
+    const byChannel =
+      readyChannel === "email"
+        ? ready.filter((l) => Boolean(leadEmail(l)))
+        : readyChannel === "phone"
+          ? ready.filter((l) => !leadEmail(l) && Boolean(leadPhone(l)))
+          : ready;
+    if (langFilter === "all") return byChannel;
+    return byChannel.filter((lead) => {
+      const meta = leadLangMeta(lead, langRouting);
+      if (langFilter === "mismatch") return Boolean(meta.mismatch);
+      return meta.lang === langFilter;
+    });
+  }, [leads, readyChannel, langFilter, langRouting]);
 
   const rows = useStableDuringLoad(groupedReady, byQueue, backfilling);
 
@@ -366,6 +421,40 @@ export function OutreachView({
                 className={`min-h-8 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
                   active
                     ? "bg-aurora-400 text-on-accent"
+                    : "text-mist-300 hover:text-mist-100"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <div
+          className="mt-2 inline-flex flex-wrap rounded-full border border-white/10 bg-ink-900/60 p-1"
+          role="group"
+          aria-label="Filter by language"
+        >
+          {(
+            [
+              ["all", "All"],
+              ["es", "ES"],
+              ["en", "EN"],
+              ["fr", "FR"],
+              ["mismatch", "Mismatch"],
+            ] as const
+          ).map(([id, label]) => {
+            const active = langFilter === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setLangFilter(id)}
+                aria-pressed={active}
+                className={`min-h-8 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                  active
+                    ? id === "mismatch"
+                      ? "bg-rose-400 text-on-accent"
+                      : "bg-aurora-400 text-on-accent"
                     : "text-mist-300 hover:text-mist-100"
                 }`}
               >
@@ -485,6 +574,7 @@ export function OutreachView({
           <div className="flex min-h-0 flex-1 flex-col gap-3 sm:flex-row">
             <LeadQueue
               rows={rows}
+              langRouting={langRouting}
               focusId={lead.id}
               activeIndex={index}
               onSelect={setFocusId}
@@ -504,6 +594,7 @@ export function OutreachView({
             />
             <ReviewAction
               lead={lead}
+              langRouting={langRouting}
               busy={
                 busySet.has(lead.id) ||
                 (!!lead.outreach?.id && busySet.has(lead.outreach.id))
@@ -567,17 +658,22 @@ function LeadPager({
 }
 
 function queueSubtitle(lead: LeadWithOutreach): string {
-  return lead.contactName?.trim() || leadEmail(lead) || leadPhone(lead) || "";
+  const location = lead.location?.trim() ?? "";
+  const who = lead.contactName?.trim() || leadEmail(lead) || leadPhone(lead) || "";
+  if (location && who && who !== location) return `${location} · ${who}`;
+  return location || who;
 }
 
 function LeadQueue({
   rows,
+  langRouting,
   focusId,
   activeIndex,
   onSelect,
   onDelete,
 }: {
   rows: LeadWithOutreach[];
+  langRouting: LangRouting;
   focusId: string;
   activeIndex: number;
   onSelect: (id: string) => void;
@@ -600,7 +696,7 @@ function LeadQueue({
       </div>
       <VirtualColumnList
         items={rows}
-        estimateSize={52}
+        estimateSize={64}
         padding={8}
         gap={4}
         itemClassName="px-2"
@@ -610,6 +706,7 @@ function LeadQueue({
           const email = leadEmail(row);
           const subtitle = queueSubtitle(row);
           const confirming = confirmId === row.id;
+          const meta = leadLangMeta(row, langRouting);
           return (
             <div
               className={`flex w-full min-h-11 items-center rounded-lg border-l-2 pr-1 transition-colors ${
@@ -634,6 +731,28 @@ function LeadQueue({
                     <PhoneIcon className="h-3.5 w-3.5 shrink-0 text-mist-500" />
                   )}
                   <span className="truncate text-sm font-medium">{row.company}</span>
+                  <span
+                    className={`ml-auto shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ${
+                      meta.confident
+                        ? "bg-white/10 text-mist-200"
+                        : "bg-white/5 text-mist-500"
+                    }`}
+                    title={
+                      meta.confident
+                        ? `Detected language: ${langBadge(meta.lang)}`
+                        : "Language not certain from location, website, or phone"
+                    }
+                  >
+                    {langBadge(meta.lang)}
+                  </span>
+                  {meta.mismatch ? (
+                    <span
+                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide bg-rose-400/20 text-rose-300"
+                      title={meta.mismatch}
+                    >
+                      Mismatch
+                    </span>
+                  ) : null}
                 </span>
                 {subtitle ? (
                   <span className="w-full truncate pl-5 text-xs text-mist-400">
@@ -817,6 +936,7 @@ function DraftAllPrompt({
 
 function ReviewAction({
   lead,
+  langRouting,
   busy,
   canSendEmail,
   hasNext,
@@ -831,6 +951,7 @@ function ReviewAction({
   onSkip,
 }: {
   lead: LeadWithOutreach;
+  langRouting: LangRouting;
   busy: boolean;
   canSendEmail: boolean;
   hasNext: boolean;
@@ -863,6 +984,7 @@ function ReviewAction({
           <EmailComposer
             key={`${lead.id}:${lead.outreach.id}`}
             lead={lead}
+            langRouting={langRouting}
             busy={busy}
             canSendEmail={canSendEmail}
             hasNext={hasNext}
@@ -931,6 +1053,7 @@ function ReviewAction({
 
 function EmailComposer({
   lead,
+  langRouting,
   busy,
   canSendEmail,
   hasNext,
@@ -940,6 +1063,7 @@ function EmailComposer({
   onSkip,
 }: {
   lead: LeadWithOutreach;
+  langRouting: LangRouting;
   busy: boolean;
   canSendEmail: boolean;
   hasNext: boolean;
@@ -968,6 +1092,11 @@ function EmailComposer({
     subject !== saved.subject || body !== saved.body || toEmail !== saved.toEmail;
   const addressOk = Boolean(parseRecipientEmail(toEmail));
   const subjectIssue = outreachSubjectIssue(subject);
+  const langIssue = outreachLangMismatchIssue(
+    { subject, body },
+    lead,
+    { routing: langRouting },
+  );
 
   const persist = async () => {
     if (!dirty) return;
@@ -993,6 +1122,10 @@ function EmailComposer({
     }
     if (subjectIssue) {
       setSendError(subjectIssue);
+      return;
+    }
+    if (langIssue) {
+      setSendError(langIssue);
       return;
     }
     try {
@@ -1045,6 +1178,8 @@ function EmailComposer({
           />
           {subjectIssue ? (
             <span className="mt-1 block text-[11px] text-rose-300">{subjectIssue}</span>
+          ) : langIssue ? (
+            <span className="mt-1 block text-[11px] text-rose-300">{langIssue}</span>
           ) : null}
         </label>
         <div>

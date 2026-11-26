@@ -24,12 +24,15 @@ import { generateDraft, stripLegacyCompliance } from "@/lib/outreach/draft";
 import { pickCurrentOutreachFromMap } from "@/lib/outreach-current";
 import { mapPool, personalizeDraftForLead } from "@/lib/ai/generate";
 import {
-  outreachLangFromLocation,
+  outreachLangForLead,
+  outreachLangMismatchIssue,
   type OutreachLang,
 } from "@/lib/outreach/locale";
 import {
+  draftCopyForLead,
   pitchForLang,
   profileFromWorkspaceJson,
+  profileLangRouting,
   resolveDraftLang,
   resolveSignature,
   subjectForLang,
@@ -1025,15 +1028,33 @@ export async function createAndRunSearch(
       const shouldDraft = input.autoDraft === true;
       if (shouldDraft) {
         const now = nowIso();
-        const aiPersonalize = Boolean(input.aiPersonalize);
-        const draftOverrides = {
-          signOff: input.senderName?.trim() || null,
-          offerNotes: input.offerNotes?.trim() || null,
-          subjectTemplate: input.subjectTemplate?.trim() || null,
-          staticBody: aiPersonalize ? true : input.staticBody !== false,
-          aiPersonalize,
-        };
+        const wsForDraft = await db.getWorkspace(ctx.workspaceId);
+        const boardForDraft = await db.getBoard(boardId);
+        const boardProfile = profileFromWorkspaceJson(
+          wsForDraft?.outreachProfilesJson,
+          boardForDraft?.outreachProfileId,
+        );
+        const aiPersonalize = boardProfile
+          ? Boolean(boardProfile.aiPersonalize)
+          : Boolean(input.aiPersonalize);
         const drafts: Outreach[] = await mapPool(leads, 3, async (lead) => {
+          const copy = boardProfile
+            ? draftCopyForLead(boardProfile, lead)
+            : {
+                lang: outreachLangForLead(lead),
+                offerNotes: input.offerNotes?.trim() || "",
+                subjectTemplate: input.subjectTemplate?.trim() || "",
+              };
+          const draftOverrides = {
+            signOff: boardProfile
+              ? resolveSignature(boardProfile)
+              : input.senderName?.trim() || null,
+            offerNotes: copy.offerNotes,
+            subjectTemplate: copy.subjectTemplate || undefined,
+            forceLang: copy.lang,
+            staticBody: aiPersonalize ? true : input.staticBody !== false,
+            aiPersonalize,
+          };
           let { subject, body } = generateDraft(lead, run, draftOverrides);
           if (aiPersonalize) {
             const varied = await personalizeDraftForLead({
@@ -1042,7 +1063,7 @@ export async function createAndRunSearch(
               location: lead.location,
               aboutBlurb: lead.aboutBlurb,
               website: lead.website,
-              lang: outreachLangFromLocation(lead.location),
+              lang: copy.lang,
               subject,
               body,
             });
@@ -1533,7 +1554,7 @@ export async function draftOutreach(
   let draftLang: OutreachLang;
 
   if (boardProfile) {
-    draftLang = resolveDraftLang(boardProfile, lead.location);
+    draftLang = resolveDraftLang(boardProfile, lead);
     aiPersonalize = Boolean(boardProfile.aiPersonalize);
     draftOverrides = {
       signOff: resolveSignature(boardProfile),
@@ -1546,7 +1567,7 @@ export async function draftOutreach(
   } else {
     aiPersonalize = Boolean(overrides?.aiPersonalize);
     draftLang =
-      overrides?.forceLang ?? outreachLangFromLocation(lead.location);
+      overrides?.forceLang ?? outreachLangForLead(lead);
     draftOverrides = {
       ...overrides,
       forceLang: draftLang,
@@ -1787,6 +1808,26 @@ async function sendClaimedOutreach(
   if (subjectIssue) {
     await releaseClaim(subjectIssue);
     return { ok: false, error: subjectIssue };
+  }
+  const leadForLang = await db.getLead(outreach.leadId);
+  if (leadForLang) {
+    const wsForLang = await db.getWorkspace(
+      leadForLang.workspaceId ?? ctx.workspaceId,
+    );
+    const boardProfileId = await profileIdForLead(db, leadForLang);
+    const boardProfile = profileFromWorkspaceJson(
+      wsForLang?.outreachProfilesJson,
+      boardProfileId,
+    );
+    const langIssue = outreachLangMismatchIssue(
+      { subject: outreach.subject, body: outreach.body },
+      leadForLang,
+      { routing: boardProfile ? profileLangRouting(boardProfile) : "default" },
+    );
+    if (langIssue) {
+      await releaseClaim(langIssue);
+      return { ok: false, error: langIssue };
+    }
   }
   // Prior verify hard-cleanups (or a re-added CRM email) can leave outreach.To
   // empty while the lead still has an address — heal before failing the send.

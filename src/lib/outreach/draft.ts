@@ -1,5 +1,5 @@
 import {
-  outreachLangFromLocation,
+  outreachLangForLead,
   type OutreachLang,
 } from "@/lib/outreach/locale";
 import {
@@ -259,7 +259,7 @@ export function generateDraft(
   run: Run,
   overrides?: DraftOverrides,
 ): DraftResult {
-  const lang = overrides?.forceLang ?? outreachLangFromLocation(lead.location);
+  const lang = overrides?.forceLang ?? outreachLangForLead(lead);
   const copy = COPY[lang];
   const name = firstName(lead);
   const company = shortCompany(lead);

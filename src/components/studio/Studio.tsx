@@ -87,6 +87,7 @@ import {
   loadSenderProfile,
   pitchForLang,
   profileForBoardId,
+  profileLangRouting,
   resolveDraftLang,
   resolveSignature,
   subjectForLang,
@@ -1470,7 +1471,7 @@ export function Studio() {
         lead?.boardId ?? board?.activeBoardId,
         board?.boards ?? [],
       );
-      const lang = resolveDraftLang(profile, lead?.location ?? null);
+      const lang = resolveDraftLang(profile, lead ?? null);
       const flags = draftFlagsFromProfile(profile);
       const pitch = pitchForLang(profile, lang).trim();
       const { outreach } = await api.draft(leadId, {
@@ -3167,6 +3168,12 @@ export function Studio() {
             <OutreachView
               key={filterBoardId ?? "all"}
               leads={outreachFilteredLeads}
+              langRouting={profileLangRouting(
+                profileForBoardId(
+                  filterBoardId ?? board?.activeBoardId,
+                  board?.boards ?? [],
+                ),
+              )}
               sendsToday={board.workspace.sendsToday ?? 0}
               warmupScopeId={
                 board.boards.find((b) => b.id === board.activeBoardId)

@@ -4,10 +4,16 @@
  */
 import { readMigratedKey } from "@/lib/browser-storage";
 import {
-  outreachLangFromLocation,
+  isLangRouting,
+  outreachLangEvidenceForLead,
   outreachLangFromText,
+  type LangRouting,
+  type LeadLangInput,
   type OutreachLang,
 } from "@/lib/outreach/locale";
+
+/** AKADEMO outreach profile — Spain → es, France → fr, everywhere else → en. */
+export const AKADEMO_PROFILE_ID = "op_kmptks9q";
 
 const KEY = "hermes_sender_profiles";
 const LEGACY_MULTI = ["leadify_sender_profiles"];
@@ -50,6 +56,12 @@ export type OutreachProfile = {
    * When false, the email body template is used as-is (placeholders only).
    */
   aiPersonalize?: boolean;
+  /**
+   * Optional geography → language mapping. Unset profiles use `default`,
+   * except AKADEMO (`op_kmptks9q`) which defaults to Spain/France/else-en
+   * without writing the field back to the stored profile.
+   */
+  langRouting?: LangRouting;
   /**
    * @deprecated Prefer aiPersonalize. Kept for migration of older profiles.
    * true = raw template; false = legacy assembled opener/CTA.
@@ -129,6 +141,9 @@ function emptyProfile(partial?: Partial<OutreachProfile>): OutreachProfile {
       : undefined,
     aiPersonalize: partial?.aiPersonalize ?? false,
     staticBody: partial?.staticBody,
+    langRouting: isLangRouting(partial?.langRouting)
+      ? partial.langRouting
+      : undefined,
   };
 }
 
@@ -154,47 +169,89 @@ export function resolveSignature(p: OutreachProfile): string {
   return built || SIGNATURE_PLACEHOLDER;
 }
 
-/** Pitch for a language; falls back to any other version, then empty. */
+/** Pitch for a language; prefer English when the requested slot is empty. */
 export function pitchForLang(
   p: OutreachProfile,
   lang: OutreachLang,
 ): string {
   const exact = p.pitches[lang]?.trim();
   if (exact) return exact;
+  const en = p.pitches.en?.trim();
+  if (en) return en;
   for (const v of Object.values(p.pitches)) {
     if (v?.trim()) return v.trim();
   }
   return "";
 }
 
-/** Subject template for a language; falls back to shared subjectTemplate. */
+/** Subject template for a language; prefer English, then the shared template. */
 export function subjectForLang(
   p: OutreachProfile,
   lang: OutreachLang,
 ): string {
   const exact = p.subjects[lang]?.trim();
   if (exact) return exact;
+  const en = p.subjects.en?.trim();
+  if (en) return en;
   const primary = primaryPitchLang(p);
-  if (primary && primary !== lang) {
+  if (primary && primary !== lang && primary !== "en") {
     const fromPitchLang = p.subjects[primary]?.trim();
     if (fromPitchLang) return fromPitchLang;
   }
   return p.subjectTemplate.trim();
 }
 
+function hasTemplateForLang(p: OutreachProfile, lang: OutreachLang): boolean {
+  return Boolean(p.pitches[lang]?.trim() || p.subjects[lang]?.trim());
+}
+
+/**
+ * Effective routing for a profile. AKADEMO defaults to the
+ * Spain → es / France → fr / else → en rule without a D1 write.
+ */
+export function profileLangRouting(p: Pick<OutreachProfile, "id" | "langRouting">): LangRouting {
+  if (isLangRouting(p.langRouting)) return p.langRouting;
+  if (p.id === AKADEMO_PROFILE_ID) return "spainEsFranceFrElseEn";
+  return "default";
+}
+
 /**
  * Language for drafting from the active profile.
- * Prefer the lead's country/location so Create matches the prospect — not the
- * flag currently open in Settings.
+ * Prefer the lead's country / website TLD / email TLD / phone so Create
+ * matches the prospect — not the flag currently open in Settings.
+ * If that language has no saved template, fall back to `en` when present.
  */
 export function resolveDraftLang(
   p: OutreachProfile,
-  location: string | null | undefined,
+  leadOrLocation: LeadLangInput | string | null | undefined,
 ): OutreachLang {
-  if (location?.trim()) {
-    return outreachLangFromLocation(location);
-  }
-  return primaryPitchLang(p) ?? "en";
+  const routing = profileLangRouting(p);
+  const evidence = outreachLangEvidenceForLead(leadOrLocation, routing);
+  const intended = evidence.confident
+    ? evidence.lang
+    : routing === "spainEsFranceFrElseEn"
+      ? "en"
+      : (primaryPitchLang(p) ?? "en");
+  if (hasTemplateForLang(p, intended)) return intended;
+  if (intended !== "en" && hasTemplateForLang(p, "en")) return "en";
+  return primaryPitchLang(p) ?? intended;
+}
+
+/** Per-lead subject + pitch for Search auto-draft and board drafting. */
+export function draftCopyForLead(
+  p: OutreachProfile,
+  lead: LeadLangInput,
+): {
+  lang: OutreachLang;
+  offerNotes: string;
+  subjectTemplate: string;
+} {
+  const lang = resolveDraftLang(p, lead);
+  return {
+    lang,
+    offerNotes: pitchForLang(p, lang),
+    subjectTemplate: subjectForLang(p, lang),
+  };
 }
 
 /**
@@ -347,6 +404,7 @@ function normalizeProfile(p: Partial<OutreachProfile> & { defaultOffer?: string 
     templateLang: p.templateLang,
     aiPersonalize: resolveAiPersonalize(p),
     staticBody: p.staticBody,
+    langRouting: isLangRouting(p.langRouting) ? p.langRouting : undefined,
   });
 }
 
