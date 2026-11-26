@@ -77,7 +77,32 @@ const POLISH_CITIES =
   /\b(warsaw|warszawa|krak[oó]w|krakow|wroc[lł]aw|wroclaw|gda[nń]sk|gdansk|pozna[nń]|poznan|[lł][oó]d[zź]|lodz)\b/i;
 
 const ENGLISH_COUNTRY =
-  /\b(united\s*states|usa|u\.s\.a?\.?|uk|united\s*kingdom|great\s*britain|england|scotland|wales|northern\s*ireland|ireland|canada|australia|new\s*zealand|singapore|india|philippines|nigeria|south\s*africa)\b/i;
+  /\b(united\s*states|estados\s*unidos|[eé]tats-?unis|etats-?unis|usa|u\.s\.a?\.?|ee\.?\s*uu\.?|\beeuu\b|uk|united\s*kingdom|reino\s*unido|royaume-?uni|great\s*britain|england|inglaterra|angleterre|scotland|escocia|[eé]cosse|wales|\bgales\b|northern\s*ireland|ireland|irlanda|canada|australia|new\s*zealand|singapore|india|philippines|nigeria|south\s*africa)\b/i;
+
+/**
+ * US states (full names). Checked before LatAm countries and city lists so
+ * "New Mexico" is not swallowed by Mexico, and "Toledo, Ohio" / "Paris, Texas"
+ * are not swallowed by Spanish or French cities.
+ */
+const US_STATES =
+  /\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new\s*hampshire|new\s*jersey|new\s*mexico|new\s*york|north\s*carolina|north\s*dakota|ohio|oklahoma|oregon|pennsylvania|rhode\s*island|south\s*carolina|south\s*dakota|tennessee|texas|utah|vermont|virginia|washington|west\s*virginia|wisconsin|wyoming|district\s*of\s*columbia)\b/i;
+
+/**
+ * Spanish autonomous communities, missing provinces, and regional endonyms.
+ * City names stay in SPAIN_CITIES. Country names still win first, so
+ * "La Rioja, Argentina" or "León, Mexico" stay LatAm.
+ */
+const SPAIN_REGIONS =
+  /\b(andaluc[ií]a|andalusia|arag[oó]n|principado\s*de\s*asturias|\basturias\b|islas\s*baleares|illes\s*balears|\bbaleares\b|balearic\s*islands|islas\s*canarias|canary\s*islands|\bcanarias\b|\bcantabria\b|castilla[-\s]*la[-\s]*mancha|castilla[-\s]+y[-\s]*le[oó]n|castilla-le[oó]n|catalu[nñ]a|catalunya|catalonia|comunidad\s*valenciana|comunitat\s*valenciana|pa[ií]s\s*valenci[aà]|\bextremadura\b|\bgalicia\b|\bgaliza\b|comunidad\s*de\s*madrid|regi[oó]n\s*de\s*murcia|comunidad\s*foral\s*de\s*navarra|\bnavarra\b|\bnafarroa\b|pa[ií]s\s*vasco|\beuskadi\b|euskal\s*herria|basque\s*country|la\s*rioja|\bceuta\b|\bmelilla\b|ja[eé]n|[áa]lava|\baraba\b|vizcaya|bizkaia|guip[uú]zcoa|gipuzkoa|santiago\s*de\s*compostela|\balacant\b|castell[oó]\s*de\s*la\s*plana|\bgerona\b)\b/i;
+
+/**
+ * French régions (current and a few former), with and without accents.
+ * Avoid short / ambiguous département names (Nord, Lot, Cher, Ain, Eure).
+ * "Pays Basque" is the French Basque country — not Spain's País Vasco.
+ */
+const FRANCE_REGIONS =
+  /\b([iî]le-?de-?france|ile\s*de\s*france|auvergne-?rh[oô]ne-?alpes|\bauvergne\b|nouvelle-?aquitaine|\boccitanie\b|occitania|languedoc|hauts-?de-?france|grand\s*est|provence-?alpes-?c[oô]te\s*d['’]azur|\bprovence\b|c[oô]te\s*d['’]azur|\bpaca\b|pays\s*de\s*la\s*loire|\bbretagne\b|brittany|normandie|normandy|bourgogne-?franche-?comt[eé]|\bbourgogne\b|burgundy|franche-?comt[eé]|centre-?val\s*de\s*loire|\bcorse\b|corsica|pays\s*basque|\balsace\b|\blorraine\b|\bpicardie\b|picardy|midi-?pyr[eé]n[eé]es|champagne-?ardenne|nord-?pas-?de-?calais|poitou-?charentes|\blimousin\b|\baquitaine\b)\b/i;
+
 const ENGLISH_CITIES =
   /\b(new\s*york|los\s*angeles|chicago|houston|miami|boston|seattle|san\s*francisco|washington|london|manchester|birmingham|edinburgh|glasgow|cardiff|belfast|dublin|toronto|vancouver|sydney|melbourne|auckland|wellington)\b/i;
 
@@ -158,6 +183,10 @@ function locationLang(location: string): LangEvidence | null {
   if (SPAIN_COUNTRY.test(loc)) {
     return { lang: "es", confident: true, bucket: "ES" };
   }
+  // US states before LatAm so "New Mexico" is not swallowed by Mexico.
+  if (US_STATES.test(loc)) {
+    return { lang: "en", confident: true, bucket: "OTHER" };
+  }
   if (LATAM_COUNTRY.test(loc)) {
     return { lang: "es", confident: true, bucket: "OTHER" };
   }
@@ -192,6 +221,13 @@ function locationLang(location: string): LangEvidence | null {
       return { lang: "it", confident: true, bucket: "OTHER" };
     }
     return { lang: "de", confident: true, bucket: "OTHER" };
+  }
+
+  if (SPAIN_REGIONS.test(loc)) {
+    return { lang: "es", confident: true, bucket: "ES" };
+  }
+  if (FRANCE_REGIONS.test(loc)) {
+    return { lang: "fr", confident: true, bucket: "FR" };
   }
 
   if (SPAIN_CITIES.test(loc)) {

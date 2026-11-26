@@ -61,6 +61,67 @@ assert.equal(outreachLangFromLocation(""), "en");
 assert.equal(outreachLangFromLocation(null), "en");
 assert.equal(outreachLangFromLocation("Calle Mayor 12"), "en");
 
+// Spanish communities / provinces without the country name.
+assert.equal(outreachLangFromLocation("Linares, Jaén, Andalucía"), "es");
+assert.equal(outreachLangFromLocation("Jaen, Andalucia"), "es");
+assert.equal(outreachLangFromLocation("Jaén, Jaén, Andalucía"), "es");
+assert.equal(outreachLangFromLocation("Catalunya"), "es");
+assert.equal(outreachLangFromLocation("Euskadi"), "es");
+assert.equal(outreachLangFromLocation("Galicia"), "es");
+assert.equal(outreachLangFromLocation("Castilla-La Mancha"), "es");
+assert.equal(outreachLangFromLocation("Santiago de Compostela"), "es");
+assert.equal(
+  outreachLangEvidenceForLead({ location: "Linares, Jaén, Andalucía" }).confident,
+  true,
+);
+assert.equal(
+  outreachLangEvidenceForLead({ location: "Linares, Jaén, Andalucía" }).bucket,
+  "ES",
+);
+
+// French régions without the country name.
+assert.equal(outreachLangFromLocation("Nouvelle-Aquitaine"), "fr");
+assert.equal(outreachLangFromLocation("Occitanie"), "fr");
+assert.equal(outreachLangFromLocation("Île-de-France"), "fr");
+assert.equal(outreachLangFromLocation("Provence-Alpes-Côte d'Azur"), "fr");
+assert.equal(
+  outreachLangEvidenceForLead({ location: "Nouvelle-Aquitaine" }).confident,
+  true,
+);
+assert.equal(
+  outreachLangEvidenceForLead({ location: "Nouvelle-Aquitaine" }).bucket,
+  "FR",
+);
+
+// Ambiguous city names: explicit foreign country/state wins over Spain/France cities.
+assert.equal(outreachLangFromLocation("Toledo, Ohio"), "en");
+assert.equal(outreachLangFromLocation("United States"), "en");
+assert.equal(outreachLangFromLocation("Estados Unidos"), "en");
+assert.equal(outreachLangFromLocation("Paris, Texas"), "en");
+assert.equal(outreachLangFromLocation("New Mexico"), "en");
+assert.equal(outreachLangFromLocation("Toledo, Castilla-La Mancha"), "es");
+assert.equal(outreachLangFromLocation("Córdoba, Argentina"), "es");
+assert.equal(outreachLangFromLocation("Granada, Nicaragua"), "es");
+assert.equal(outreachLangFromLocation("León, Mexico"), "es");
+assert.equal(outreachLangFromLocation("Leon, France"), "fr");
+assert.equal(
+  outreachLangForLead({ location: "Toledo, Ohio" }, "spainEsFranceFrElseEn"),
+  "en",
+);
+assert.equal(
+  outreachLangForLead({ location: "Córdoba, Argentina" }, "spainEsFranceFrElseEn"),
+  "en",
+  "LatAm stays English under AKADEMO routing",
+);
+assert.equal(
+  outreachLangForLead({ location: "Linares, Jaén, Andalucía" }, "spainEsFranceFrElseEn"),
+  "es",
+);
+assert.equal(
+  outreachLangForLead({ location: "Nouvelle-Aquitaine" }, "spainEsFranceFrElseEn"),
+  "fr",
+);
+
 // --- TLD fallback when location is blank / unrecognized ---
 assert.equal(
   outreachLangForLead(lead({ website: "https://www.academia.es/contacto" })),
